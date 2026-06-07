@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.4.0", date:"2026-06-07", features:[
+    "👋 Écran de sélection — chaque joueur choisit sa carte au démarrage",
+    "🔐 Accès parent sécurisé depuis l'écran d'accueil",
+  ]},
   { version:"1.3.0", date:"2026-06-07", features:[
     "🏅 Système de badges — débloquez des trophées en complétant des quêtes!",
     "🎨 Thèmes XP-gatés — chaque joueur commence avec 2 thèmes aléatoires",
@@ -2314,8 +2318,99 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// LOGIN SCREEN — "Qui joue?"
+// ═══════════════════════════════════════════════════════════════
+function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin }) {
+  const [pinOpen, setPinOpen] = useState(false);
+  const [parentPin, setParentPin] = useState("");
+  const [pinError, setPinError] = useState(false);
+
+  const handleParentPin = (digit) => {
+    const next = (parentPin + digit).slice(0, 4);
+    setParentPin(next);
+    setPinError(false);
+    if (next.length === 4) {
+      if (next === config.pin) {
+        setParentPin("");
+        setPinOpen(false);
+        onParentLogin();
+      } else {
+        setPinError(true);
+        SFX.error?.();
+        setTimeout(() => { setParentPin(""); setPinError(false); }, 700);
+      }
+    }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
+      <style>{GLOBAL_CSS}</style>
+      {/* BG glow */}
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#5DECF520 0%,transparent 60%)",pointerEvents:"none"}}/>
+
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6,textAlign:"center"}}>⚔️ LIVRE DE QUÊTES</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#888",marginBottom:36,textAlign:"center"}}>Qui part en quête aujourd'hui?</div>
+
+      {/* Player cards */}
+      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:16,maxWidth:480,width:"100%",marginBottom:32}}>
+        {config.players.map((player, i) => {
+          const ps = gameStates[i] || { xp:0, coins:0, completed:[] };
+          const lv = getLevel(ps.xp);
+          const pt = getPlayerTheme(player.themeId);
+          const doneTodayCount = (ps.completed||[]).filter(k=>k.includes(new Date().toDateString())).length;
+          return (
+            <div key={player.id}
+              onClick={() => { SFX.click(); onSelectPlayer(i); }}
+              style={{background:`linear-gradient(135deg,rgba(0,0,0,0.8),${player.color}18)`,border:`3px solid ${player.color}`,borderRadius:12,padding:"20px 16px",cursor:"pointer",textAlign:"center",transition:"all 0.15s",boxShadow:`0 0 0 0 ${player.color}`}}
+              onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 0 24px ${player.color}60`; e.currentTarget.style.transform="translateY(-3px)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.transform="none"; }}>
+              <AvatarCanvas avatarDef={ps.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={64}
+                style={{border:`4px solid ${player.color}`,borderRadius:8,marginBottom:10}}/>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:player.color,marginBottom:4}}>{displayName(player)}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",marginBottom:8}}>{pt.icon} {getLevelTitle(ps.xp,player.themeId).title}</div>
+              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>Niv.{lv.level}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>{ps.xp} ⚡</span>
+                {doneTodayCount>0&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#2ECC40"}}>✓{doneTodayCount}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Parent access */}
+      {!pinOpen ? (
+        <button onClick={()=>{ SFX.click(); setPinOpen(true); }}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 20px",background:"transparent",color:"#555",border:"2px solid #333",borderRadius:3,cursor:"pointer"}}>
+          🔐 Accès parent
+        </button>
+      ) : (
+        <div style={{background:"rgba(0,0,0,0.8)",border:"3px solid #FF8C00",borderRadius:8,padding:"20px 24px",textAlign:"center",maxWidth:280,width:"100%"}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FF8C00",marginBottom:12}}>🔐 PIN PARENT</div>
+          <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
+            {[0,1,2,3].map(n=>(
+              <div key={n} style={{width:28,height:36,background:pinError?"#FF4444":(parentPin.length>n?"#FF8C00":"#222"),borderRadius:3,border:`2px solid ${pinError?"#FF4444":(parentPin.length>n?"#FF8C00":"#555")}`,transition:"all 0.15s"}}/>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+            {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(d=>(
+              <button key={d} onClick={()=>{ SFX.click(); if(d==="⌫") setParentPin(p=>p.slice(0,-1)); else if(d==="✕"){ setPinOpen(false); setParentPin(""); } else handleParentPin(d); }}
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,padding:"10px 0",background:d==="✕"?"#330000":"#1a1a1a",color:d==="✕"?"#FF4444":"#ccc",border:"2px solid #333",borderRadius:3,cursor:"pointer"}}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#333",marginTop:28}}>v{APP_VERSION}</div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [screen, setScreen] = useState("loading"); // loading|setup|game
+  const [screen, setScreen] = useState("loading"); // loading|setup|login|game
   const [config, setConfig] = useState(null);
   const [gameStates, setGameStates] = useState([]); // per-player
   const [view, setView] = useState("family"); // "family"|0|1|2|3
@@ -2350,7 +2445,7 @@ export default function App() {
           // Sauvegarder les seenVersions pour ne pas réafficher
           save({...data, config:data.config, newChangelogVersions:[]});
         }
-        setScreen("game");
+        setScreen("login");
       } else setScreen("setup");
     });
   },[]);
@@ -2368,7 +2463,7 @@ export default function App() {
   // Handle setup complete
   const handleSetupDone = useCallback((cfg) => {
     const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[], badges:[] }));
-    setConfig(cfg); setGameStates(gs); setScreen("game"); setView("family");
+    setConfig(cfg); setGameStates(gs); setScreen("login"); setView("family");
     persist(cfg,gs);
     setTimeout(()=>SFX.welcome(),300);
   },[persist]);
@@ -2553,6 +2648,10 @@ export default function App() {
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
+  if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
+    onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
+    onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}/>;
+
 
   const currentPlayerView = typeof view==="number" ? view : null;
   const currentPlayer = currentPlayerView!==null ? config.players[currentPlayerView] : null;
