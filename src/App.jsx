@@ -1,0 +1,2557 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+
+const APP_VERSION = "1.1.0";
+const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
+
+// ─── AUDIO ────────────────────────────────────────────────────
+let _ac = null;
+const ac = () => { try { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); _ac.resume(); return _ac; } catch { return null; } };
+const tone = (f, type, dur, vol, delay = 0) => {
+  try { const ctx = ac(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type = type; o.frequency.setValueAtTime(f, ctx.currentTime + delay); g.gain.setValueAtTime(0, ctx.currentTime + delay); g.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + 0.01); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur); o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + dur + 0.05); } catch {}
+};
+const SFX = {
+  click:   () => tone(440, "square", 0.04, 0.1),
+  task:    () => { [523,659,784,1047].forEach((f,i) => tone(f,"square",0.13,0.17,i*0.1)); },
+  epic:    () => { [262,330,392,523,659,784].forEach((f,i) => tone(f,"square",0.16,0.2,i*0.09)); },
+  buy:     () => { [880,1100,1320].forEach((f,i) => tone(f,"sine",0.07,0.25,i*0.08)); },
+  pinOk:   () => { [523,659,784,1047].forEach((f,i) => tone(f,"sine",0.1,0.2,i*0.07)); },
+  pinErr:  () => { [440,415,392].forEach((f,i) => tone(f,"sawtooth",0.13,0.17,i*0.09)); },
+  pinKey:  () => tone(660, "sine", 0.04, 0.15),
+  welcome: () => { [262,330,392,523].forEach((f,i) => tone(f,"square",0.16,0.17,i*0.12)); setTimeout(() => SFX.epic(), 600); },
+  coin:    () => tone(1320, "sine", 0.07, 0.2),
+  alert:   () => { [440,440,440].forEach((f,i) => tone(f,"square",0.1,0.2,i*0.2)); },
+};
+
+// ─── CONSTANTS ───────────────────────────────────────────────
+const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+const DAYS_SHORT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+const COLORS = ["#4A90D9","#C060D0","#2ECC40","#FF6B35","#FFD700","#FF4444","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
+
+const LEVELS = [
+  { level:1, xpNeeded:0,   title:"Débutant",   titleF:"Débutante"   },
+  { level:2, xpNeeded:60,  title:"Aventurier", titleF:"Aventurière" },
+  { level:3, xpNeeded:150, title:"Héros",      titleF:"Héroïne"     },
+  { level:4, xpNeeded:280, title:"Champion",   titleF:"Championne"  },
+  { level:5, xpNeeded:450, title:"LÉGENDE",    titleF:"LÉGENDE"     },
+];
+const getLevel = xp => { let c = LEVELS[0]; for (const l of LEVELS) if (xp >= l.xpNeeded) c = l; return c; };
+const getLevelTitle = (xp, themeId) => {
+  const lv = getLevel(xp);
+  const pt = getPlayerTheme(themeId);
+  const idx = Math.min(lv.level - 1, 4);
+  return { level: lv.level, title: pt.levels[idx] || pt.levels[0] };
+};
+const xpBar = xp => { for (let i=0;i<LEVELS.length-1;i++) if (xp<LEVELS[i+1].xpNeeded) return { cur: xp-LEVELS[i].xpNeeded, needed: LEVELS[i+1].xpNeeded-LEVELS[i].xpNeeded }; return {cur:1,needed:1}; };
+
+// ─── TASK CATALOG ────────────────────────────────────────────
+const TASK_CATALOG = [
+  // Cuisine
+  { id:"tc01", emoji:"🍽️", label:"Faire le lave-vaisselle (haut)",         xp:15, coins:8,  diff:"easy",   cat:"cuisine" },
+  { id:"tc02", emoji:"🍽️", label:"Faire le lave-vaisselle (bas)",           xp:15, coins:8,  diff:"easy",   cat:"cuisine" },
+  { id:"tc03", emoji:"🫙",  label:"Remplir le lave-vaisselle",               xp:15, coins:8,  diff:"easy",   cat:"cuisine" },
+  { id:"tc04", emoji:"🧼",  label:"Laver la grosse vaisselle + essuyer",     xp:25, coins:12, diff:"medium", cat:"cuisine" },
+  { id:"tc05", emoji:"🍳",  label:"Aider en cuisine pour un repas",          xp:30, coins:15, diff:"medium", cat:"cuisine" },
+  { id:"tc06", emoji:"🧺",  label:"Vider ma boîte à lunch",                 xp:10, coins:5,  diff:"easy",   cat:"cuisine" },
+  { id:"tc07", emoji:"🪣",  label:"Laver la table",                          xp:15, coins:8,  diff:"easy",   cat:"cuisine" },
+  { id:"tc08", emoji:"🧽",  label:"Laver les comptoirs de la cuisine",       xp:20, coins:10, diff:"easy",   cat:"cuisine" },
+  // Ménage
+  { id:"tm01", emoji:"🗑️", label:"Préparer les poubelles",                  xp:15, coins:8,  diff:"easy",   cat:"menage"  },
+  { id:"tm02", emoji:"🗑️", label:"Sortir les poubelles",                    xp:20, coins:10, diff:"easy",   cat:"menage"  },
+  { id:"tm03", emoji:"♻️", label:"Préparer la récup",                       xp:15, coins:8,  diff:"easy",   cat:"menage"  },
+  { id:"tm04", emoji:"♻️", label:"Sortir la récup",                         xp:20, coins:10, diff:"easy",   cat:"menage"  },
+  { id:"tm05", emoji:"🌿",  label:"Vider le compost",                        xp:15, coins:8,  diff:"easy",   cat:"menage"  },
+  { id:"tm06", emoji:"🌿",  label:"Sortir le compost",                       xp:20, coins:10, diff:"easy",   cat:"menage"  },
+  { id:"tm07", emoji:"🧹",  label:"Laver le plancher d'une pièce",           xp:35, coins:18, diff:"hard",   cat:"menage"  },
+  { id:"tm08", emoji:"🛏️", label:"Ménage de mon lit (rangement dodo)",       xp:20, coins:10, diff:"easy",   cat:"menage"  },
+  { id:"tm09", emoji:"🪆",  label:"Ménage de mon cocon (chambre)",           xp:30, coins:15, diff:"medium", cat:"menage"  },
+  { id:"tm10", emoji:"🗂️", label:"Ménage de mon bureau",                    xp:25, coins:12, diff:"medium", cat:"menage"  },
+  { id:"tm11", emoji:"👕",  label:"Ranger une brassée de vêtements",         xp:25, coins:12, diff:"medium", cat:"menage"  },
+  { id:"tm12", emoji:"🚿",  label:"Laver le lavabo de la salle de bain",     xp:20, coins:10, diff:"easy",   cat:"menage"  },
+  { id:"tm13", emoji:"🛋️", label:"Ranger la véranda",                       xp:25, coins:12, diff:"medium", cat:"menage"  },
+  // Routine
+  { id:"tr01", emoji:"🥣",  label:"Bon déjeuner",                            xp:10, coins:5,  diff:"easy",   cat:"routine" },
+  { id:"tr02", emoji:"💊",  label:"Prendre ses pilules",                      xp:20, coins:10, diff:"easy",   cat:"routine" },
+  { id:"tr03", emoji:"🎒",  label:"Préparer son sac",                        xp:15, coins:8,  diff:"easy",   cat:"routine" },
+  { id:"tr04", emoji:"🚿",  label:"Prendre ma douche",                       xp:20, coins:10, diff:"easy",   cat:"routine" },
+  { id:"tr05", emoji:"🛁",  label:"Bain",                                    xp:20, coins:10, diff:"easy",   cat:"routine" },
+  { id:"tr06", emoji:"📚",  label:"Faire ses devoirs + études",              xp:40, coins:20, diff:"hard",   cat:"routine" },
+  { id:"tr07", emoji:"🌙",  label:"Routine du soir complète",                xp:25, coins:12, diff:"medium", cat:"routine" },
+  // Défis
+  { id:"td01", emoji:"😴",  label:"Laisser la tribu dormir le matin",        xp:50, coins:25, diff:"boss",   cat:"defi"    },
+  { id:"td02", emoji:"🍜",  label:"Être calme au souper",                    xp:35, coins:18, diff:"hard",   cat:"defi"    },
+  { id:"td03", emoji:"💬",  label:"Nommer clairement son émotion",           xp:40, coins:20, diff:"hard",   cat:"defi"    },
+  { id:"td04", emoji:"🤝",  label:"Nommer son mécontentement avec bienveillance", xp:45, coins:22, diff:"boss", cat:"defi" },
+  { id:"td05", emoji:"🛌",  label:"Être dans mon lit à max 20h15",           xp:40, coins:20, diff:"hard",   cat:"defi"    },
+  { id:"td06", emoji:"🪥",  label:"Faire ma routine du dodo seul en SDB",    xp:35, coins:18, diff:"hard",   cat:"defi"    },
+  { id:"td07", emoji:"📖",  label:"Lire calmement dans mon lit avant bonne nuit", xp:30, coins:15, diff:"medium", cat:"defi" },
+  { id:"td08", emoji:"💤",  label:"M'endormir seul",                         xp:70, coins:35, diff:"boss",   cat:"defi"    },
+  { id:"td09", emoji:"🐇",  label:"Cueillir des verdures pour Boulette",     xp:20, coins:10, diff:"easy",   cat:"defi"    },
+  // Outdoor & Jardin
+  { id:"to01", emoji:"⚽",  label:"Jouer dehors en harmonie",                xp:35, coins:18, diff:"hard",   cat:"outdoor" },
+  { id:"to02", emoji:"🚴",  label:"Faire du vélo",                           xp:25, coins:12, diff:"medium", cat:"outdoor" },
+  { id:"to03", emoji:"🌿",  label:"Arroser le jardin cour",                  xp:20, coins:10, diff:"easy",   cat:"outdoor" },
+  { id:"to04", emoji:"🌸",  label:"Arroser le jardin devant",                xp:20, coins:10, diff:"easy",   cat:"outdoor" },
+];
+
+const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰ Routine", defi:"🎯 Défis", outdoor:"🌳 Dehors" };
+const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
+
+// ─── REWARD CATALOG ──────────────────────────────────────────
+const REWARD_CATALOG = [
+  { id:"rw01", emoji:"📱", label:"15 min d'écrans",          coins:20 },
+  { id:"rw02", emoji:"🍬", label:"Collation sucrée",          coins:15 },
+  { id:"rw03", emoji:"💝", label:"15 min privées avec parent",coins:25 },
+  { id:"rw04", emoji:"💵", label:"5$ au dépanneur",           coins:50 },
+  { id:"rw05", emoji:"💆", label:"Massage au dodo (avant 20h)",coins:30 },
+  { id:"rw06", emoji:"🎮", label:"Choix du jeu vidéo",        coins:30 },
+  { id:"rw07", emoji:"🍪", label:"Fudgee-O ou pépites",       coins:18 },
+  { id:"rw08", emoji:"🍬", label:"Sweet Tarts au choix",      coins:12 },
+  { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:50 },
+  { id:"rw10", emoji:"🎬", label:"Choisir le film du vendredi",coins:35 },
+];
+
+const THEMES = {
+  minecraft: { name:"Minecraft", bg:"#1a1a2e", primary:"#5D9E34", accent:"#FFD700", card:"rgba(0,0,0,0.5)", text:"#fff" },
+  galaxy:    { name:"Galaxie",   bg:"#0a0a1a", primary:"#7B2FBE", accent:"#00D4FF", card:"rgba(10,0,30,0.7)", text:"#fff" },
+  ocean:     { name:"Océan",     bg:"#001a2e", primary:"#0066CC", accent:"#00FFB2", card:"rgba(0,10,30,0.7)", text:"#fff" },
+  volcano:   { name:"Volcan",    bg:"#1a0a00", primary:"#CC3300", accent:"#FF8C00", card:"rgba(30,10,0,0.7)", text:"#fff" },
+  forest:    { name:"Forêt",     bg:"#0a1a0a", primary:"#2E7D32", accent:"#A5D6A7", card:"rgba(0,20,0,0.7)",  text:"#fff" },
+};
+
+
+// ─── PLAYER THEME CATALOG ────────────────────────────────────
+const PLAYER_THEMES = {
+  none: {
+    id:"none", name:"Aucun", icon:"⬜",
+    bg:"#1a1a2e", primary:"#5D9E34", accent:"#FFD700", glow:"#FFD700",
+    levels:["Débutant","Aventurier","Héros","Champion","LÉGENDE"],
+    levelsF:["Débutante","Aventurière","Héroïne","Championne","LÉGENDE"],
+    taskVerb:"complétée", winMsg:"Mission accomplie!", coinName:"Pièce",
+    platformBg:"#1a1a2e", platformColor:"#5D9E34", platformItem:"⭐",
+    platformItems:["⭐","💫","✨","🌟","💎"],
+    platformHazard:null, platformObstacle:"🪨",
+    charBodyColor:null, // null = use player.color
+    shopCategory:{ id:"themed", label:"🎯 Items", items:[] },
+  },
+  lego: {
+    id:"lego", name:"LEGO", icon:"🧱",
+    bg:"#1a1a0a", primary:"#E3000B", accent:"#FFD700", glow:"#FFD700",
+    levels:["Apprenti","Constructeur","Architecte","Maître","LEGO MASTER"],
+    levelsF:["Apprentie","Constructrice","Architecte","Maître","LEGO MASTER"],
+    taskVerb:"construite", winMsg:"Tu as construit cette quête!", coinName:"Brique",
+    platformBg:"#2a2a00", platformColor:"#E3000B", platformItem:"🧱",
+    platformItems:["🧱","⚙️","🪄","🔵","🟡"],
+    platformHazard:"💥", platformObstacle:"🟥",
+    charBodyColor:"#FFD700",
+    shopCategory:{ id:"lego", label:"🧱 LEGO", items:[
+      {id:"lg1",emoji:"🧱",name:"Brique légendaire",  cost:20,slot:"themed"},
+      {id:"lg2",emoji:"🪄",name:"Minifig spéciale",   cost:35,slot:"themed"},
+      {id:"lg3",emoji:"🏗️",name:"Set exclusif",       cost:50,slot:"themed"},
+      {id:"lg4",emoji:"⚙️",name:"Pièce technique",    cost:15,slot:"themed"},
+      {id:"lg5",emoji:"🎭",name:"Tête d'expression",  cost:25,slot:"face"},
+      {id:"lg6",emoji:"🟡",name:"Tête jaune classique",cost:12,slot:"face"},
+    ]},
+  },
+  medieval: {
+    id:"medieval", name:"Médiéval", icon:"⚔️",
+    bg:"#1a1400", primary:"#8B6914", accent:"#DAA520", glow:"#FFD700",
+    levels:["Paysan","Écuyer","Chevalier","Seigneur","ROI"],
+    levelsF:["Paysanne","Écuyère","Chevalière","Dame","REINE"],
+    taskVerb:"accomplie", winMsg:"Quête accomplie, noble guerrier!", coinName:"Pièce d'or",
+    platformBg:"#0a0800", platformColor:"#8B6914", platformItem:"📜",
+    platformItems:["📜","🗡️","🛡️","👑","💎"],
+    platformHazard:"🔥", platformObstacle:"🪨",
+    charBodyColor:"#8B6914",
+    shopCategory:{ id:"medieval", label:"⚔️ Médiéval", items:[
+      {id:"md1",emoji:"🗡️",name:"Épée légendaire",    cost:35,slot:"themed"},
+      {id:"md2",emoji:"🛡️",name:"Bouclier héraldique",cost:25,slot:"themed"},
+      {id:"md3",emoji:"👑",name:"Couronne royale",     cost:50,slot:"hat"},
+      {id:"md4",emoji:"🏰",name:"Château miniature",   cost:60,slot:"themed"},
+      {id:"md5",emoji:"📜",name:"Parchemin rare",      cost:15,slot:"themed"},
+      {id:"md6",emoji:"🪖",name:"Heaume de chevalier", cost:30,slot:"hat"},
+    ]},
+  },
+  kpop: {
+    id:"kpop", name:"K-Pop", icon:"🎤",
+    bg:"#0a0010", primary:"#CC00AA", accent:"#FF69B4", glow:"#FF69B4",
+    levels:["Trainee","Idol","Center","Soliste","SUPERSTAR"],
+    levelsF:["Trainee","Idol","Center","Soliste","SUPERSTAR"],
+    taskVerb:"performée", winMsg:"Le fandom t'adore!", coinName:"Lightstick",
+    platformBg:"#050005", platformColor:"#CC00AA", platformItem:"🎵",
+    platformItems:["🎵","🎤","💿","🌟","💜"],
+    platformHazard:"📸", platformObstacle:"🎸",
+    charBodyColor:"#CC00AA",
+    shopCategory:{ id:"kpop", label:"🎤 K-Pop", items:[
+      {id:"kp1",emoji:"🎤",name:"Micro légendaire",  cost:35,slot:"themed"},
+      {id:"kp2",emoji:"💿",name:"Album signé",       cost:40,slot:"themed"},
+      {id:"kp3",emoji:"🌟",name:"Lightstick ultime", cost:25,slot:"themed"},
+      {id:"kp4",emoji:"👟",name:"Souliers de scène", cost:20,slot:"themed"},
+      {id:"kp5",emoji:"🎧",name:"Casque studio",     cost:30,slot:"hat"},
+      {id:"kp6",emoji:"💜",name:"Ruban ARMY",        cost:15,slot:"themed"},
+    ]},
+  },
+  unicorn: {
+    id:"unicorn", name:"Licornes", icon:"🦄",
+    bg:"#0a0015", primary:"#DD44FF", accent:"#FFB3FF", glow:"#FFB3FF",
+    levels:["Poulain","Licorne","Licorne Ailée","Licorne Arc-en-ciel","LICORNE LÉGENDAIRE"],
+    levelsF:["Pouliche","Licorne","Licorne Ailée","Licorne Arc-en-ciel","LICORNE LÉGENDAIRE"],
+    taskVerb:"enchantée", winMsg:"Ta corne brille! Le royaume t'acclame!", coinName:"Poussière de fée",
+    platformBg:"#050008", platformColor:"#DD44FF", platformItem:"🌈",
+    platformItems:["🌈","✨","🌸","💎","🧁"],
+    platformHazard:"🌩️", platformObstacle:"☁️",
+    charBodyColor:"#DD44FF",
+    shopCategory:{ id:"unicorn", label:"🦄 Licorne", items:[
+      {id:"un1",emoji:"🌈",name:"Arc-en-ciel en bouteille",cost:30,slot:"themed"},
+      {id:"un2",emoji:"✨",name:"Poussière de fée",         cost:15,slot:"themed"},
+      {id:"un3",emoji:"🌸",name:"Fleur magique",            cost:20,slot:"themed"},
+      {id:"un4",emoji:"💎",name:"Cristal de corne",         cost:50,slot:"themed"},
+      {id:"un5",emoji:"🧁",name:"Cupcake enchanté",         cost:25,slot:"themed"},
+      {id:"un6",emoji:"🎀",name:"Ruban arc-en-ciel",        cost:12,slot:"hat"},
+    ]},
+  },
+  demon: {
+    id:"demon", name:"Démons", icon:"😈",
+    bg:"#0a0000", primary:"#CC1100", accent:"#FF3300", glow:"#FF0066",
+    levels:["Imp","Diablotin","Démon","Archidémon","SEIGNEUR DES OMBRES"],
+    levelsF:["Imp","Diablotine","Démone","Archidémone","SEIGNEURE DES OMBRES"],
+    taskVerb:"dominée", winMsg:"Le chaos s'incline! L'enfer t'acclame!", coinName:"Âme",
+    platformBg:"#050000", platformColor:"#CC1100", platformItem:"🔥",
+    platformItems:["🔥","💀","🧿","⛓️","🌋"],
+    platformHazard:"💥", platformObstacle:"🪨",
+    charBodyColor:"#1a0000",
+    shopCategory:{ id:"demon", label:"😈 Démon", items:[
+      {id:"dm1",emoji:"💀",name:"Crâne rare",            cost:30,slot:"themed"},
+      {id:"dm2",emoji:"🔥",name:"Flamme éternelle",      cost:25,slot:"themed"},
+      {id:"dm3",emoji:"🧿",name:"Œil démoniaque",        cost:35,slot:"themed"},
+      {id:"dm4",emoji:"⛓️",name:"Chaîne légendaire",     cost:40,slot:"themed"},
+      {id:"dm5",emoji:"🌋",name:"Fragment de volcan",     cost:20,slot:"themed"},
+      {id:"dm6",emoji:"😈",name:"Cornes de boss",         cost:50,slot:"hat"},
+    ]},
+  },
+  angel: {
+    id:"angel", name:"Anges", icon:"😇",
+    bg:"#00040a", primary:"#6699FF", accent:"#FFE566", glow:"#FFFFAA",
+    levels:["Novice Céleste","Chérubin","Ange Gardien","Archange","SÉRAPHIN"],
+    levelsF:["Novice Céleste","Chérubin","Ange Gardienne","Archange","SÉRAPHIN"],
+    taskVerb:"bénie", winMsg:"Les cieux chantent! Les anges t'applaudissent!", coinName:"Étoile",
+    platformBg:"#000508", platformColor:"#6699FF", platformItem:"⭐",
+    platformItems:["⭐","🪶","🎺","💫","📿"],
+    platformHazard:"⚡", platformObstacle:"☁️",
+    charBodyColor:"#E8F4FF",
+    shopCategory:{ id:"angel", label:"😇 Ange", items:[
+      {id:"ag1",emoji:"🌟",name:"Étoile céleste",       cost:25,slot:"themed"},
+      {id:"ag2",emoji:"🪶",name:"Plume sacrée",          cost:20,slot:"themed"},
+      {id:"ag3",emoji:"🎺",name:"Trompette dorée",       cost:35,slot:"themed"},
+      {id:"ag4",emoji:"💫",name:"Sphère lumineuse",      cost:30,slot:"themed"},
+      {id:"ag5",emoji:"📿",name:"Chapelet enchanté",     cost:15,slot:"themed"},
+      {id:"ag6",emoji:"😇",name:"Auréole divine",        cost:50,slot:"hat"},
+    ]},
+  },
+  // ── SCIENTIFIQUE ──────────────────────────────────────────
+  scientifique: {
+    id:"scientifique", name:"Scientifique", icon:"🔬",
+    bg:"#001a0a", primary:"#00CC66", accent:"#00FF99", glow:"#00FF99",
+    levels:["Cobaye","Stagiaire","Chercheur","Professeur","PRIX NOBEL"],
+    levelsF:["Cobaye","Stagiaire","Chercheuse","Professeure","PRIX NOBEL"],
+    taskVerb:"prouvée", winMsg:"L'hypothèse est confirmée. Pour une fois.",
+    coinName:"Molécule",
+    platformBg:"#000d05", platformColor:"#00CC66", platformItem:"🧪",
+    platformItems:["🧪","⚗️","🔭","💉","🧬"], platformHazard:"☢️", platformObstacle:"🧱",
+    charBodyColor:"#004422",
+    shopCategory:{ id:"scientifique", label:"🔬 Labo", items:[
+      {id:"sc1",emoji:"🔬",name:"Microscope ultime",cost:35,slot:"themed"},
+      {id:"sc2",emoji:"🥼",name:"Blouse trouée (rare)",cost:20,slot:"themed"},
+      {id:"sc3",emoji:"🏆",name:"Trophée Nobel raté",cost:50,slot:"themed"},
+      {id:"sc4",emoji:"⚗️",name:"Éprouvette légendaire",cost:25,slot:"themed"},
+      {id:"sc5",emoji:"🧬",name:"ADN personnalisé",cost:40,slot:"themed"},
+      {id:"sc6",emoji:"🎓",name:"Chapeau de docteur",cost:30,slot:"hat"},
+    ]},
+  },
+  // ── INSECTES ──────────────────────────────────────────────
+  insectes: {
+    id:"insectes", name:"Insectes", icon:"🐛",
+    bg:"#0a1400", primary:"#66AA00", accent:"#AAFF00", glow:"#AAFF00",
+    levels:["Oeuf","Larve","Chrysalide","Insecte","REINE DES BUGS"],
+    levelsF:["Oeuf","Larve","Chrysalide","Insecte","REINE DES BUGS"],
+    taskVerb:"butinée", winMsg:"Même une fourmi travaille. Leçon de vie.",
+    coinName:"Larve",
+    platformBg:"#050a00", platformColor:"#66AA00", platformItem:"🌿",
+    platformItems:["🌿","🌸","🍄","💧","🪲"], platformHazard:"🕷️", platformObstacle:"🪨",
+    charBodyColor:"#335500",
+    shopCategory:{ id:"insectes", label:"🐛 Insectes", items:[
+      {id:"in1",emoji:"🦋",name:"Ailes de papillon",cost:30,slot:"themed"},
+      {id:"in2",emoji:"🐞",name:"Carapace coccinelle",cost:25,slot:"themed"},
+      {id:"in3",emoji:"🦗",name:"Antennes grillon",cost:20,slot:"hat"},
+      {id:"in4",emoji:"🪲",name:"Cocon doré",cost:50,slot:"themed"},
+      {id:"in5",emoji:"🐜",name:"Armure fourmi",cost:35,slot:"themed"},
+      {id:"in6",emoji:"🌿",name:"Branche camouflage",cost:15,slot:"themed"},
+    ]},
+  },
+  // ── MONSTRES ──────────────────────────────────────────────
+  monstres: {
+    id:"monstres", name:"Monstres", icon:"👹",
+    bg:"#1a0020", primary:"#8800CC", accent:"#CC44FF", glow:"#CC44FF",
+    levels:["Petit Monstre","Croqueur","Grognard","Terroriseur","MONSTRE SUPRÊME"],
+    levelsF:["Petite Monstre","Croqueuse","Grognarde","Terroriseuse","MONSTRE SUPRÊME"],
+    taskVerb:"dévorée", winMsg:"Frankenstein faisait ses tâches. Probablement.",
+    coinName:"Rugissement",
+    platformBg:"#0d0015", platformColor:"#8800CC", platformItem:"💜",
+    platformItems:["💜","🦷","👁️","⛓️","💀"], platformHazard:"🔥", platformObstacle:"🪨",
+    charBodyColor:"#440066",
+    shopCategory:{ id:"monstres", label:"👹 Monstres", items:[
+      {id:"mo1",emoji:"👹",name:"Masque de monstre",cost:35,slot:"hat"},
+      {id:"mo2",emoji:"🦷",name:"Dents géantes",cost:25,slot:"themed"},
+      {id:"mo3",emoji:"💜",name:"Cape de monstre",cost:30,slot:"themed"},
+      {id:"mo4",emoji:"⛓️",name:"Chaînes de boss",cost:40,slot:"themed"},
+      {id:"mo5",emoji:"👁️",name:"Œil central",cost:20,slot:"themed"},
+      {id:"mo6",emoji:"🖤",name:"Coeur de ténèbres",cost:50,slot:"themed"},
+    ]},
+  },
+  // ── PRÉHISTOIRE ───────────────────────────────────────────
+  prehistoire: {
+    id:"prehistoire", name:"Préhistoire", icon:"🦕",
+    bg:"#1a1000", primary:"#AA6600", accent:"#FFAA00", glow:"#FFAA00",
+    levels:["Homo Canapé","Chasseur","Troglodyte","Chef de Clan","DIEU DE LA CAVERNE"],
+    levelsF:["Homo Canapé","Chasseuse","Troglodyte","Cheffe de Clan","DIEU DE LA CAVERNE"],
+    taskVerb:"chassée", winMsg:"Les dinosaures ont arrêté de ranger. C'est pour ça qu'ils ont disparu.",
+    coinName:"Os",
+    platformBg:"#0d0800", platformColor:"#AA6600", platformItem:"🦴",
+    platformItems:["🦴","🪨","🌋","🦕","🥚"], platformHazard:"🌋", platformObstacle:"🪨",
+    charBodyColor:"#664400",
+    shopCategory:{ id:"prehistoire", label:"🦕 Préhistoire", items:[
+      {id:"pr1",emoji:"🪨",name:"Massue de roche",cost:20,slot:"themed"},
+      {id:"pr2",emoji:"🦣",name:"Peau de mammouth",cost:35,slot:"themed"},
+      {id:"pr3",emoji:"🖼️",name:"Peinture rupestre",cost:25,slot:"themed"},
+      {id:"pr4",emoji:"🦕",name:"Œuf de dinosaure",cost:50,slot:"themed"},
+      {id:"pr5",emoji:"🪶",name:"Parure de chef",cost:30,slot:"hat"},
+      {id:"pr6",emoji:"🔥",name:"Feu sacré",cost:15,slot:"themed"},
+    ]},
+  },
+  // ── MICROSCOPIQUE ─────────────────────────────────────────
+  microscopique: {
+    id:"microscopique", name:"Microscopique", icon:"🦠",
+    bg:"#000a14", primary:"#0088CC", accent:"#00DDFF", glow:"#00DDFF",
+    levels:["Virus","Microbe","Bactérie","Cellule","ORGANISME ENTIER"],
+    levelsF:["Virus","Microbe","Bactérie","Cellule","ORGANISME ENTIER"],
+    taskVerb:"divisée", winMsg:"Tu es officiellement plus organisé qu'une amibe. C'est un compliment.",
+    coinName:"Bactérie",
+    platformBg:"#00050a", platformColor:"#0088CC", platformItem:"💉",
+    platformItems:["💉","🔵","⚪","🧬","🫧"], platformHazard:"⚡", platformObstacle:"🫧",
+    charBodyColor:"#003344",
+    shopCategory:{ id:"microscopique", label:"🦠 Micro", items:[
+      {id:"mi1",emoji:"🦠",name:"Flagelle doré",cost:30,slot:"themed"},
+      {id:"mi2",emoji:"🔵",name:"Noyau cellulaire",cost:25,slot:"themed"},
+      {id:"mi3",emoji:"🧬",name:"Mitochondrie légendaire",cost:50,slot:"themed"},
+      {id:"mi4",emoji:"💉",name:"Seringue de pouvoir",cost:20,slot:"themed"},
+      {id:"mi5",emoji:"🫧",name:"Bulle protectrice",cost:35,slot:"themed"},
+      {id:"mi6",emoji:"⚗️",name:"Pipette d'élite",cost:15,slot:"themed"},
+    ]},
+  },
+  // ── ROBLOX ────────────────────────────────────────────────
+  roblox: {
+    id:"roblox", name:"Roblox", icon:"🎮",
+    bg:"#0a0a0a", primary:"#CC0000", accent:"#FF4444", glow:"#FF6666",
+    levels:["Noob","Builder","Pro","Admin","OWNER"],
+    levelsF:["Noob","Builder","Pro","Admin","OWNER"],
+    taskVerb:"obbyée", winMsg:"OOF. Quête complétée. Tu n'es plus un noob. Presque.",
+    coinName:"Robux fictif",
+    platformBg:"#050505", platformColor:"#CC0000", platformItem:"🧱",
+    platformItems:["🧱","⭐","💎","🎯","🏆"], platformHazard:"💥", platformObstacle:"🟥",
+    charBodyColor:"#880000",
+    shopCategory:{ id:"roblox", label:"🎮 Roblox", items:[
+      {id:"rb1",emoji:"🧢",name:"Chapeau aux oeufs",cost:25,slot:"hat"},
+      {id:"rb2",emoji:"💎",name:"Gemme Admin",cost:50,slot:"themed"},
+      {id:"rb3",emoji:"🏠",name:"Brique ultime",cost:20,slot:"themed"},
+      {id:"rb4",emoji:"⚔️",name:"Épée légendaire obby",cost:35,slot:"themed"},
+      {id:"rb5",emoji:"🛡️",name:"Bouclier noob+",cost:15,slot:"themed"},
+      {id:"rb6",emoji:"🏆",name:"Trophée Owner",cost:60,slot:"themed"},
+    ]},
+  },
+  // ── BISOUNOURS ────────────────────────────────────────────
+  bisounours: {
+    id:"bisounours", name:"Rose Bisounours 🆘", icon:"🌈",
+    bg:"#1a0010", primary:"#FF69B4", accent:"#FFB3FF", glow:"#FFB3FF",
+    levels:["Bébé Bisounours","Super Doux","Trop Mignon","Câlinosaure","GRAND MAÎTRE DU ROSE"],
+    levelsF:["Bébé Bisounours","Super Douce","Trop Mignonne","Câlinosaure","GRAND MAÎTRE DU ROSE"],
+    taskVerb:"câlinée", winMsg:"Félicitations! Tu as gagné un arc-en-ciel supplémentaire. ENCORE UN.",
+    coinName:"Câlin forcé",
+    platformBg:"#0f000a", platformColor:"#FF69B4", platformItem:"🌈",
+    platformItems:["🌈","💝","✨","🦄","☁️"], platformHazard:"💖", platformObstacle:"☁️",
+    charBodyColor:"#CC0066",
+    shopCategory:{ id:"bisounours", label:"🌈 Bisounours", items:[
+      {id:"bs1",emoji:"☁️",name:"Nuage rose",cost:15,slot:"themed"},
+      {id:"bs2",emoji:"💝",name:"Coeur géant",cost:20,slot:"themed"},
+      {id:"bs3",emoji:"🌈",name:"Arc-en-ciel en plastique",cost:25,slot:"themed"},
+      {id:"bs4",emoji:"✨",name:"Paillettes obligatoires",cost:30,slot:"themed"},
+      {id:"bs5",emoji:"🦄",name:"Licorne bonus",cost:50,slot:"pet"},
+      {id:"bs6",emoji:"🎀",name:"Noeud rose fluo",cost:10,slot:"hat"},
+    ]},
+  },
+  // ── CUISINE ───────────────────────────────────────────────
+  cuisine: {
+    id:"cuisine", name:"Cuisine", icon:"🍳",
+    bg:"#14080a", primary:"#CC4400", accent:"#FF8844", glow:"#FF8844",
+    levels:["Lave-Vaisselle","Apprenti","Sous-Chef","Chef","GORDON RAMSAY"],
+    levelsF:["Lave-Vaisselle","Apprentie","Sous-Cheffe","Cheffe","GORDON RAMSAY"],
+    taskVerb:"cuisinée", winMsg:"C'est pas encore brûlé. Progrès.",
+    coinName:"Étoile Michelin",
+    platformBg:"#0a0405", platformColor:"#CC4400", platformItem:"🍳",
+    platformItems:["🍳","🥄","🔪","🧂","🏆"], platformHazard:"🔥", platformObstacle:"🫕",
+    charBodyColor:"#881100",
+    shopCategory:{ id:"cuisine", label:"🍳 Cuisine", items:[
+      {id:"cu1",emoji:"👨‍🍳",name:"Toque de chef",cost:25,slot:"hat"},
+      {id:"cu2",emoji:"👔",name:"Tablier légendaire",cost:20,slot:"themed"},
+      {id:"cu3",emoji:"🔪",name:"Couteau pro",cost:35,slot:"themed"},
+      {id:"cu4",emoji:"🥄",name:"Spatule d'or",cost:30,slot:"themed"},
+      {id:"cu5",emoji:"⭐",name:"3 étoiles Michelin",cost:60,slot:"themed"},
+      {id:"cu6",emoji:"🍕",name:"Pizza magique",cost:15,slot:"themed"},
+    ]},
+  },
+  // ── HORREUR ───────────────────────────────────────────────
+  horreur: {
+    id:"horreur", name:"Horreur", icon:"😱",
+    bg:"#050005", primary:"#880000", accent:"#FF2222", glow:"#FF4444",
+    levels:["Trouillard","Nerveux","Courageux","Survivant","DERNIER SURVIVANT"],
+    levelsF:["Trouillarde","Nerveuse","Courageuse","Survivante","DERNIER SURVIVANT"],
+    taskVerb:"survécue", winMsg:"Tu as accompli ça. Dans le noir. Sans mourir. Impressive.",
+    coinName:"Frisson",
+    platformBg:"#020002", platformColor:"#880000", platformItem:"🔦",
+    platformItems:["🔦","🗝️","📿","🩸","💀"], platformHazard:"👻", platformObstacle:"⛓️",
+    charBodyColor:"#330000",
+    shopCategory:{ id:"horreur", label:"😱 Horreur", items:[
+      {id:"ho1",emoji:"🔦",name:"Lampe de poche",cost:15,slot:"themed"},
+      {id:"ho2",emoji:"🎭",name:"Masque de hockey",cost:30,slot:"hat"},
+      {id:"ho3",emoji:"🗝️",name:"Clé de la cave",cost:25,slot:"themed"},
+      {id:"ho4",emoji:"📿",name:"Amulette protectrice",cost:35,slot:"themed"},
+      {id:"ho5",emoji:"🩸",name:"Stigmate du survivant",cost:50,slot:"themed"},
+      {id:"ho6",emoji:"💀",name:"Crâne du boss final",cost:40,slot:"themed"},
+    ]},
+  },
+  // ── TOTALEMENT MÉLANGÉ ────────────────────────────────────
+  melange: {
+    id:"melange", name:"Totalement Mélangé", icon:"🌪️",
+    bg:"#0a0a14", primary:"#8844CC", accent:"#FFCC00", glow:"#FFCC00",
+    levels:["Chaos","Confusion","Désordre Organisé","Anarchie","C'EST QUI LE BOSS ICI?"],
+    levelsF:["Chaos","Confusion","Désordre Organisé","Anarchie","C'EST QUI LE BOSS ICI?"],
+    taskVerb:"chaotisée", winMsg:"Un dinosaure Bisounours scientifique vient de valider ça. Normal.",
+    coinName:"Truc",
+    platformBg:"#050510", platformColor:"#8844CC", platformItem:"🌀",
+    platformItems:["🌀","🦕","🌈","🔬","🎮"], platformHazard:"❓", platformObstacle:"🌪️",
+    charBodyColor:null, // random each render
+    mixedMode:true, // signals UI to slowly cycle accent color
+    shopCategory:{ id:"melange", label:"🌪️ Chaos", items:[
+      {id:"mx1",emoji:"🌪️",name:"Tourbillon de trucs",cost:20,slot:"themed"},
+      {id:"mx2",emoji:"❓",name:"Item mystère",cost:25,slot:"themed"},
+      {id:"mx3",emoji:"🦕",name:"Dino-Bisounours",cost:35,slot:"pet"},
+      {id:"mx4",emoji:"🌈",name:"Arc-en-ciel scientifique",cost:30,slot:"themed"},
+      {id:"mx5",emoji:"🎲",name:"Dé du destin",cost:15,slot:"themed"},
+      {id:"mx6",emoji:"🌀",name:"Chapeau de chaos",cost:40,slot:"hat"},
+    ]},
+  },
+  // ── HARRY POTTER ──────────────────────────────────────────
+  harrypotter: {
+    id:"harrypotter", name:"Harry Potter", icon:"🪄",
+    bg:"#07060d", primary:"#7B2FBE", accent:"#F0C040", glow:"#F0C040",
+    levels:["Moldu","Élève","Préfet","Auror","SORCIER SUPRÊME"],
+    levelsF:["Moldue","Élève","Préfète","Auror","SORCIÈRE SUPRÊME"],
+    taskVerb:"ensorcelée", winMsg:"Hermione aurait déjà fini. Juste dit.",
+    coinName:"Gallion",
+    platformBg:"#040309", platformColor:"#7B2FBE", platformItem:"✨",
+    platformItems:["✨","🪄","📚","🦉","⚡"], platformHazard:"🧙",  platformObstacle:"🪨",
+    charBodyColor:"#3d1a6e",
+    shopCategory:{ id:"harrypotter", label:"🪄 Poudlard", items:[
+      {id:"hp1",emoji:"🪄",name:"Baguette en bois de houx",cost:30,slot:"themed"},
+      {id:"hp2",emoji:"🧣",name:"Écharpe de maison",cost:20,slot:"themed"},
+      {id:"hp3",emoji:"🎓",name:"Chapeau du Choixpeau",cost:40,slot:"hat"},
+      {id:"hp4",emoji:"🦉",name:"Hibou messager",cost:35,slot:"pet"},
+      {id:"hp5",emoji:"🏆",name:"Coupe des Quatre Maisons",cost:60,slot:"themed"},
+      {id:"hp6",emoji:"🔮",name:"Boule de cristal",cost:25,slot:"themed"},
+    ]},
+  },
+  // ── GÉANT DE FER ──────────────────────────────────────────
+  geantdefer: {
+    id:"geantdefer", name:"Géant de Fer", icon:"🤖",
+    bg:"#050a10", primary:"#4477CC", accent:"#88CCFF", glow:"#88CCFF",
+    levels:["Ferraille","Robot","Androïde","Géant","SUPERMAN (le vrai)"],
+    levelsF:["Ferraille","Robot","Androïde","Géante","SUPERMAN (le vrai)"],
+    taskVerb:"boulonnée", winMsg:"Tu n'es pas une arme. Tu es un héros. Maintenant range ta chambre.",
+    coinName:"Boulon",
+    platformBg:"#020508", platformColor:"#4477CC", platformItem:"⚙️",
+    platformItems:["⚙️","🔩","🦾","💥","⭐"], platformHazard:"🚀", platformObstacle:"🪨",
+    charBodyColor:"#2244AA",
+    shopCategory:{ id:"geantdefer", label:"🤖 Géant", items:[
+      {id:"gi1",emoji:"🦾",name:"Poing de métal",cost:30,slot:"themed"},
+      {id:"gi2",emoji:"👁️",name:"Laser oculaire",cost:35,slot:"themed"},
+      {id:"gi3",emoji:"🛡️",name:"Plaque de blindage",cost:40,slot:"themed"},
+      {id:"gi4",emoji:"⭐",name:"Étoile de Superman",cost:50,slot:"themed"},
+      {id:"gi5",emoji:"🔩",name:"Boulon légendaire",cost:20,slot:"themed"},
+      {id:"gi6",emoji:"🪖",name:"Casque de titane",cost:25,slot:"hat"},
+    ]},
+  },
+  // ── LES TROLLS ────────────────────────────────────────────
+  trolls: {
+    id:"trolls", name:"Les Trolls", icon:"🧌",
+    bg:"#0a0014", primary:"#CC44AA", accent:"#FF88FF", glow:"#FF88FF",
+    levels:["Muet","Chantonneur","Harmonieux","DJ","ROI DE LA FÊTE"],
+    levelsF:["Muette","Chantonnante","Harmonieuse","DJ","REINE DE LA FÊTE"],
+    taskVerb:"chantée", winMsg:"Branch approuve. Poppy aussi. Tout le monde chante. Tu ne peux pas fuir.",
+    coinName:"Étincelle",
+    platformBg:"#070009", platformColor:"#CC44AA", platformItem:"🎵",
+    platformItems:["🎵","🎉","💃","🌺","🌟"], platformHazard:"🎹", platformObstacle:"☁️",
+    charBodyColor:"#881177",
+    shopCategory:{ id:"trolls", label:"🧌 Trolls", items:[
+      {id:"tr1",emoji:"🌺",name:"Fleur dans les cheveux",cost:15,slot:"hat"},
+      {id:"tr2",emoji:"✨",name:"Glitter tube",cost:20,slot:"themed"},
+      {id:"tr3",emoji:"🤗",name:"Hug Time badge",cost:25,slot:"themed"},
+      {id:"tr4",emoji:"🎤",name:"Micro de scène",cost:30,slot:"themed"},
+      {id:"tr5",emoji:"🎶",name:"Notes musicales",cost:35,slot:"themed"},
+      {id:"tr6",emoji:"💃",name:"Pas de danse légendaire",cost:50,slot:"themed"},
+    ]},
+  },
+  // ── GHIBLI ────────────────────────────────────────────────
+  ghibli: {
+    id:"ghibli", name:"Univers Ghibli", icon:"🍃",
+    bg:"#050d0a", primary:"#3A8A4A", accent:"#A8E6B0", glow:"#A8E6B0",
+    levels:["Esprit de la Forêt","Voyageur","Héros Calme","Sage","TOTORO"],
+    levelsF:["Esprit de la Forêt","Voyageuse","Héroïne Calme","Sage","TOTORO"],
+    taskVerb:"contemplée", winMsg:"Chihiro a nettoyé des bains publics. Toi tu fais juste ta chambre.",
+    coinName:"Esprit",
+    platformBg:"#020806", platformColor:"#3A8A4A", platformItem:"🍃",
+    platformItems:["🍃","🌸","🏮","🌳","✨"], platformHazard:"💨", platformObstacle:"🌳",
+    charBodyColor:"#224433",
+    shopCategory:{ id:"ghibli", label:"🍃 Ghibli", items:[
+      {id:"gh1",emoji:"🚌",name:"Ticket Chat-Bus",cost:30,slot:"themed"},
+      {id:"gh2",emoji:"🍃",name:"Feuille magique",cost:20,slot:"themed"},
+      {id:"gh3",emoji:"🍱",name:"Bento du Studio",cost:25,slot:"themed"},
+      {id:"gh4",emoji:"🦔",name:"Totoro de poche",cost:50,slot:"pet"},
+      {id:"gh5",emoji:"🏮",name:"Lanterne du voyage",cost:35,slot:"themed"},
+      {id:"gh6",emoji:"🎋",name:"Chapeau de paille",cost:15,slot:"hat"},
+    ]},
+  },
+  // ── PLANÈTE DES SINGES ────────────────────────────────────
+  singes: {
+    id:"singes", name:"Planète des Singes", icon:"🐒",
+    bg:"#0d0a00", primary:"#886600", accent:"#FFCC44", glow:"#FFCC44",
+    levels:["Singe Paresseux","Grimpeur","Guerrier","Général","CÉSAR"],
+    levelsF:["Singe Paresseuse","Grimpeuse","Guerrière","Générale","CÉSAR"],
+    taskVerb:"conquise", winMsg:"César n'a jamais laissé traîner ses affaires. C'est pour ça qu'il a pris le pouvoir.",
+    coinName:"Banane",
+    platformBg:"#080600", platformColor:"#886600", platformItem:"🍌",
+    platformItems:["🍌","🌴","⚔️","🏔️","👑"], platformHazard:"💥", platformObstacle:"🌴",
+    charBodyColor:"#553300",
+    shopCategory:{ id:"singes", label:"🐒 Singes", items:[
+      {id:"si1",emoji:"⚔️",name:"Lance tribale",cost:25,slot:"themed"},
+      {id:"si2",emoji:"🎖️",name:"Épaulettes de général",cost:35,slot:"themed"},
+      {id:"si3",emoji:"🏅",name:"Médaille de la révolution",cost:40,slot:"themed"},
+      {id:"si4",emoji:"🌴",name:"Couronne de palmes",cost:20,slot:"hat"},
+      {id:"si5",emoji:"🍌",name:"Banane légendaire",cost:15,slot:"themed"},
+      {id:"si6",emoji:"🦍",name:"Familier gorille",cost:60,slot:"pet"},
+    ]},
+  },
+  // ── JAMES BOND ────────────────────────────────────────────
+  jamesbond: {
+    id:"jamesbond", name:"James Bond", icon:"🕵️",
+    bg:"#050508", primary:"#223355", accent:"#C0A060", glow:"#C0A060",
+    levels:["Stagiaire MI6","Agent","00X","007","M (le vrai boss)"],
+    levelsF:["Stagiaire MI6","Agente","00X","007","M (la vraie boss)"],
+    taskVerb:"infiltrée", winMsg:"Mission accomplie. Q est... modérément impressionné.",
+    coinName:"Gadget",
+    platformBg:"#020204", platformColor:"#223355", platformItem:"🔫",
+    platformItems:["🔫","🎰","🍸","💼","🚗"], platformHazard:"💣", platformObstacle:"🏢",
+    charBodyColor:"#111133",
+    shopCategory:{ id:"jamesbond", label:"🕵️ MI6", items:[
+      {id:"jb1",emoji:"🚗",name:"Aston Martin miniature",cost:50,slot:"themed"},
+      {id:"jb2",emoji:"⌚",name:"Montre gadget",cost:40,slot:"themed"},
+      {id:"jb3",emoji:"🤵",name:"Smoking légendaire",cost:35,slot:"themed"},
+      {id:"jb4",emoji:"🍸",name:"Martini (au jus)",cost:15,slot:"themed"},
+      {id:"jb5",emoji:"💼",name:"Mallette secrète",cost:30,slot:"themed"},
+      {id:"jb6",emoji:"🕶️",name:"Lunettes espion",cost:20,slot:"hat"},
+    ]},
+  },
+  // ── BOOMERANG FU ──────────────────────────────────────────
+  boomerangfu: {
+    id:"boomerangfu", name:"Boomerang Fu", icon:"💥",
+    bg:"#0a0800", primary:"#CC6600", accent:"#FF9900", glow:"#FF9900",
+    levels:["Pain Grillé","Croissant","Taco Ninja","Burger Boss","SEIGNEUR DU BOOMERANG"],
+    levelsF:["Pain Grillé","Croissant","Taco Ninja","Burger Boss","SEIGNEUR DU BOOMERANG"],
+    taskVerb:"lancée-revenue", winMsg:"Tu as lancé ton boomerang de tâche et il est revenu complété. Physique quantique.",
+    coinName:"Boomerang",
+    platformBg:"#070500", platformColor:"#CC6600", platformItem:"💥",
+    platformItems:["💥","🥐","🌮","🍔","🏆"], platformHazard:"💥", platformObstacle:"🧱",
+    charBodyColor:"#884400",
+    shopCategory:{ id:"boomerangfu", label:"💥 Boomerang", items:[
+      {id:"bf1",emoji:"🪃",name:"Boomerang doré",cost:35,slot:"themed"},
+      {id:"bf2",emoji:"🥖",name:"Armure de baguette",cost:25,slot:"themed"},
+      {id:"bf3",emoji:"🍕",name:"Chapeau chef ninja",cost:20,slot:"hat"},
+      {id:"bf4",emoji:"💥",name:"Explosion de puissance",cost:40,slot:"themed"},
+      {id:"bf5",emoji:"🌮",name:"Taco de victoire",cost:15,slot:"themed"},
+      {id:"bf6",emoji:"🏆",name:"Trophée du pain",cost:50,slot:"themed"},
+    ]},
+  },
+  // ── MINECRAFT ++ ──────────────────────────────────────────
+  minecraftpp: {
+    id:"minecraftpp", name:"Minecraft ++", icon:"⛏️",
+    bg:"#0d1a0d", primary:"#4A9E34", accent:"#5DECF5", glow:"#5DECF5",
+    levels:["Bois","Pierre","Fer","Or","DIAMANT LÉGENDAIRE"],
+    levelsF:["Bois","Pierre","Fer","Or","DIAMANT LÉGENDAIRE"],
+    taskVerb:"craftée", winMsg:"Steve a construit une maison entière en une nuit. Toi t'as rangé une brassée. Respect quand même.",
+    coinName:"Diamant",
+    platformBg:"#060e06", platformColor:"#4A9E34", platformItem:"💎",
+    platformItems:["💎","⛏️","🪵","🔥","🏹"], platformHazard:"💀", platformObstacle:"🪨",
+    charBodyColor:"#2A6E24",
+    shopCategory:{ id:"minecraftpp", label:"⛏️ Minecraft", items:[
+      {id:"mc1",emoji:"⛏️",name:"Pickaxe diamant",cost:35,slot:"themed"},
+      {id:"mc2",emoji:"🗡️",name:"Épée enchantée",cost:40,slot:"themed"},
+      {id:"mc3",emoji:"🛡️",name:"Totem d'immortalité",cost:60,slot:"themed"},
+      {id:"mc4",emoji:"🪶",name:"Elytra",cost:50,slot:"themed"},
+      {id:"mc5",emoji:"💎",name:"Bloc de diamant",cost:25,slot:"themed"},
+      {id:"mc6",emoji:"🪖",name:"Casque Netherite",cost:30,slot:"hat"},
+    ]},
+  },
+  // ── COURSE FUTURISTE ──────────────────────────────────────
+  coursefutur: {
+    id:"coursefutur", name:"Course Futuriste", icon:"🏎️",
+    bg:"#000a14", primary:"#0055AA", accent:"#00AAFF", glow:"#00DDFF",
+    levels:["Mécanicien","Pilote","Ace","Champion","PILOTE FANTÔME"],
+    levelsF:["Mécanicien","Pilote","Ace","Champion","PILOTE FANTÔME"],
+    taskVerb:"pilotée", winMsg:"Tu as complété ça à 300km/h. Mentalement, du moins.",
+    coinName:"Boost",
+    platformBg:"#000508", platformColor:"#0055AA", platformItem:"🏎️",
+    platformItems:["🏎️","⚡","🏁","💨","🏆"], platformHazard:"💥", platformObstacle:"🚧",
+    charBodyColor:"#002255",
+    shopCategory:{ id:"coursefutur", label:"🏎️ Course", items:[
+      {id:"cf1",emoji:"🪖",name:"Casque holographique",cost:30,slot:"hat"},
+      {id:"cf2",emoji:"🚗",name:"Voiture miniature",cost:40,slot:"themed"},
+      {id:"cf3",emoji:"⚡",name:"Turbo légendaire",cost:35,slot:"themed"},
+      {id:"cf4",emoji:"🏁",name:"Drapeau du champion",cost:25,slot:"themed"},
+      {id:"cf5",emoji:"🛞",name:"Aileron aérodynamique",cost:20,slot:"themed"},
+      {id:"cf6",emoji:"💫",name:"Moteur fantôme",cost:50,slot:"themed"},
+    ]},
+  },
+  // ── SECRET THEMES (random pool only) ─────────────────────
+  canards: {
+    id:"canards", name:"🦆 Canards Jaunes", icon:"🦆",
+    bg:"#0a0d00", primary:"#DDAA00", accent:"#FFEE44", glow:"#FFEE44",
+    levels:["Poussin","Caneton","Canard","Canard Pro","SUPER CANARD"],
+    levelsF:["Poussin","Caneton","Canard","Canard Pro","SUPER CANARD"],
+    taskVerb:"canardée", winMsg:"Coin coin! Tâche accomplie. Tu mérites un biscuit en forme de canard.",
+    coinName:"Plume",
+    platformBg:"#060800", platformColor:"#DDAA00", platformItem:"🦆",
+    platformItems:["🦆","🪶","💛","🌊","⭐"], platformHazard:"🐊", platformObstacle:"🌾",
+    charBodyColor:"#DDAA00", secret:true,
+    shopCategory:{ id:"canards", label:"🦆 Canards", items:[
+      {id:"dk1",emoji:"🦆",name:"Canard légendaire",cost:30,slot:"pet"},
+      {id:"dk2",emoji:"🪶",name:"Plume d'or",cost:20,slot:"themed"},
+      {id:"dk3",emoji:"💛",name:"Couronne jaune",cost:35,slot:"hat"},
+      {id:"dk4",emoji:"🌊",name:"Mare privée",cost:40,slot:"themed"},
+      {id:"dk5",emoji:"🐥",name:"Poussin familier",cost:15,slot:"pet"},
+      {id:"dk6",emoji:"🛁",name:"Bain de canards",cost:25,slot:"themed"},
+    ]},
+  },
+  aliens: {
+    id:"aliens", name:"👽 Invasion Alien", icon:"👽",
+    bg:"#000d00", primary:"#00AA44", accent:"#44FF88", glow:"#44FF88",
+    levels:["Terrien","Contact","Abducté","Hybride","MAÎTRE GALACTIQUE"],
+    levelsF:["Terrienne","Contact","Abductée","Hybride","MAÎTRE GALACTIQUE"],
+    taskVerb:"abductée", winMsg:"Les Hommes en Noir approuvent. Probablement.",
+    coinName:"Cristal",
+    platformBg:"#000800", platformColor:"#00AA44", platformItem:"🛸",
+    platformItems:["🛸","💚","🔭","⭐","👾"], platformHazard:"🔦", platformObstacle:"🪨",
+    charBodyColor:"#003322", secret:true,
+    shopCategory:{ id:"aliens", label:"👽 Alien", items:[
+      {id:"al1",emoji:"🛸",name:"Soucoupe volante",cost:40,slot:"pet"},
+      {id:"al2",emoji:"👽",name:"Masque alien",cost:30,slot:"hat"},
+      {id:"al3",emoji:"💚",name:"Cristal vert",cost:20,slot:"themed"},
+      {id:"al4",emoji:"🌌",name:"Carte galactique",cost:35,slot:"themed"},
+      {id:"al5",emoji:"👾",name:"Familier pixel",cost:15,slot:"pet"},
+      {id:"al6",emoji:"🔬",name:"Rayon analyseur",cost:25,slot:"themed"},
+    ]},
+  },
+  pirates: {
+    id:"pirates", name:"🏴 Pirates", icon:"🏴",
+    bg:"#080500", primary:"#885500", accent:"#FFAA22", glow:"#FFAA22",
+    levels:["Mousse","Matelot","Pirate","Capitaine","PIRATE LÉGENDAIRE"],
+    levelsF:["Mousse","Matelote","Pirate","Capitaine","PIRATE LÉGENDAIRE"],
+    taskVerb:"pillée", winMsg:"Yo ho ho! Le trésor est à toi. Range quand même ta chambre.",
+    coinName:"Doubloon",
+    platformBg:"#040300", platformColor:"#885500", platformItem:"🪝",
+    platformItems:["🪝","💰","🗺️","🦜","💎"], platformHazard:"🦈", platformObstacle:"🌊",
+    charBodyColor:"#442200", secret:true,
+    shopCategory:{ id:"pirates", label:"🏴 Pirates", items:[
+      {id:"pi1",emoji:"🦜",name:"Perroquet pirate",cost:25,slot:"pet"},
+      {id:"pi2",emoji:"🎩",name:"Chapeau de capitaine",cost:30,slot:"hat"},
+      {id:"pi3",emoji:"⚔️",name:"Sabre du corsaire",cost:35,slot:"themed"},
+      {id:"pi4",emoji:"💰",name:"Coffre au trésor",cost:50,slot:"themed"},
+      {id:"pi5",emoji:"🗺️",name:"Carte au trésor",cost:20,slot:"themed"},
+      {id:"pi6",emoji:"🔭",name:"Longue-vue",cost:15,slot:"themed"},
+    ]},
+  },
+  sushi: {
+    id:"sushi", name:"🍣 Sushi World", icon:"🍣",
+    bg:"#0a0005", primary:"#CC0033", accent:"#FF6688", glow:"#FF6688",
+    levels:["Riz nature","Maki","California","Nigiri","CHEF SUSHI ULTIME"],
+    levelsF:["Riz nature","Maki","California","Nigiri","CHEF SUSHI ULTIME"],
+    taskVerb:"roulée", winMsg:"Itadakimasu! Tâche accomplie avec grâce et wasabi.",
+    coinName:"Maki",
+    platformBg:"#050003", platformColor:"#CC0033", platformItem:"🍣",
+    platformItems:["🍣","🥢","🍱","🐟","⭐"], platformHazard:"🦑", platformObstacle:"🌊",
+    charBodyColor:"#660011", secret:true,
+    shopCategory:{ id:"sushi", label:"🍣 Sushi", items:[
+      {id:"su1",emoji:"🍣",name:"Sushi légendaire",cost:25,slot:"themed"},
+      {id:"su2",emoji:"🥢",name:"Baguettes en or",cost:20,slot:"themed"},
+      {id:"su3",emoji:"🍱",name:"Bento de champion",cost:30,slot:"themed"},
+      {id:"su4",emoji:"🎌",name:"Bandeau chef",cost:35,slot:"hat"},
+      {id:"su5",emoji:"🌊",name:"Vague de wasabi",cost:15,slot:"themed"},
+      {id:"su6",emoji:"🐡",name:"Fugu familier",cost:40,slot:"pet"},
+    ]},
+  },
+  robots: {
+    id:"robots", name:"🤖 Robots", icon:"🤖",
+    bg:"#000510", primary:"#0044AA", accent:"#00AAFF", glow:"#00CCFF",
+    levels:["Grille-pain","Aspirateur","Robot","Cyborg","INTELLIGENCE ARTIFICIELLE"],
+    levelsF:["Grille-pain","Aspirateur","Robot","Cyborg","INTELLIGENCE ARTIFICIELLE"],
+    taskVerb:"calculée", winMsg:"TÂCHE_COMPLÉTÉE = TRUE. FÉLICITATIONS.EXE",
+    coinName:"Pixel",
+    platformBg:"#000308", platformColor:"#0044AA", platformItem:"🤖",
+    platformItems:["🤖","⚙️","💾","🔩","⭐"], platformHazard:"🔌", platformObstacle:"🖥️",
+    charBodyColor:"#002255", secret:true,
+    shopCategory:{ id:"robots", label:"🤖 Robots", items:[
+      {id:"ro1",emoji:"🤖",name:"Tête de robot",cost:30,slot:"hat"},
+      {id:"ro2",emoji:"🦾",name:"Bras robotique",cost:35,slot:"themed"},
+      {id:"ro3",emoji:"💾",name:"Disque dur rare",cost:25,slot:"themed"},
+      {id:"ro4",emoji:"⚡",name:"Batterie infinie",cost:40,slot:"themed"},
+      {id:"ro5",emoji:"📡",name:"Antenne satellite",cost:20,slot:"hat"},
+      {id:"ro6",emoji:"🖥️",name:"Écran intégré",cost:50,slot:"themed"},
+    ]},
+  },
+  // ── JAPON ────────────────────────────────────────────────────
+  japon: {
+    id:"japon", name:"Japon", icon:"⛩️",
+    bg:"#08000a", primary:"#CC0044", accent:"#FF4488", glow:"#FF4488",
+    levels:["Shōshin","Genin","Chūnin","Jōnin","SHOGUN"],
+    levelsF:["Shōshin","Genin","Chūnin","Jōnin","SHOGUN"],
+    taskVerb:"maîtrisée", winMsg:"Ichi-go ichi-e. Ce moment ne reviendra pas. T'as bien fait.",
+    coinName:"Mon",
+    platformBg:"#040005", platformColor:"#CC0044", platformItem:"⛩️",
+    platformItems:["⛩️","🌸","🎋","🏯","⚔️"], platformHazard:"🔥", platformObstacle:"🪨",
+    charBodyColor:"#440022",
+    xpUnlock:200,
+    shopCategory:{ id:"japon", label:"⛩️ Japon", items:[
+      {id:"jp1",emoji:"⛩️",name:"Torii personnel",cost:40,slot:"themed"},
+      {id:"jp2",emoji:"🌸",name:"Fleur de cerisier",cost:20,slot:"themed"},
+      {id:"jp3",emoji:"⚔️",name:"Katana légendaire",cost:50,slot:"themed"},
+      {id:"jp4",emoji:"🥷",name:"Armure de ninja",cost:35,slot:"themed"},
+      {id:"jp5",emoji:"🎋",name:"Brin de bambou",cost:15,slot:"themed"},
+      {id:"jp6",emoji:"🗡️",name:"Casque samurai",cost:30,slot:"hat"},
+    ]},
+  },
+  // ── LICORNES ET PAILLETTES ────────────────────────────────────
+  licornes: {
+    id:"licornes", name:"Licornes ✨", icon:"🦄",
+    bg:"#0f000f", primary:"#DD44FF", accent:"#FFAAFF", glow:"#FFAAFF",
+    levels:["Poussiéreux","Scintillant","Brillant","Étincelant","DÉESSE DU GLITTER"],
+    levelsF:["Poussiéreuse","Scintillante","Brillante","Étincelante","DÉESSE DU GLITTER"],
+    taskVerb:"pailletée", winMsg:"Félicitations! Tu peux maintenant lancer des paillettes partout. Bonne chance pour le nettoyage.",
+    coinName:"Paillette",
+    platformBg:"#09000f", platformColor:"#DD44FF", platformItem:"🦄",
+    platformItems:["🦄","🌈","✨","💎","🌸"], platformHazard:"💥", platformObstacle:"☁️",
+    charBodyColor:"#8800AA",
+    xpUnlock:100,
+    shopCategory:{ id:"licornes", label:"🦄 Licornes", items:[
+      {id:"lc1",emoji:"🦄",name:"Corne de licorne",cost:50,slot:"hat"},
+      {id:"lc2",emoji:"🌈",name:"Queue arc-en-ciel",cost:35,slot:"themed"},
+      {id:"lc3",emoji:"✨",name:"Manteau de paillettes",cost:40,slot:"themed"},
+      {id:"lc4",emoji:"💎",name:"Diamant magique",cost:45,slot:"themed"},
+      {id:"lc5",emoji:"🧁",name:"Cupcake licorne",cost:20,slot:"themed"},
+      {id:"lc6",emoji:"🌸",name:"Couronne fleurie",cost:25,slot:"hat"},
+    ]},
+  },
+  // ── MARVEL ───────────────────────────────────────────────────
+  marvel: {
+    id:"marvel", name:"Marvel", icon:"⚡",
+    bg:"#05000f", primary:"#CC1111", accent:"#FF4444", glow:"#FF8888",
+    levels:["Civil","Agent S.H.I.E.L.D","Avenger","Super-héros","VENGEUR LÉGENDAIRE"],
+    levelsF:["Civile","Agente S.H.I.E.L.D","Avenger","Super-héroïne","VENGERESSE LÉGENDAIRE"],
+    taskVerb:"sauvée", winMsg:"L'univers est en sécurité. Pour l'instant. Va ranger ta chambre, Spider-Man.",
+    coinName:"Vibranium",
+    platformBg:"#030008", platformColor:"#CC1111", platformItem:"⚡",
+    platformItems:["⚡","🛡️","🕷️","⭐","💎"], platformHazard:"💥", platformObstacle:"🏢",
+    charBodyColor:"#660000",
+    xpUnlock:300,
+    shopCategory:{ id:"marvel", label:"⚡ Marvel", items:[
+      {id:"mv1",emoji:"🛡️",name:"Bouclier de Captain America",cost:60,slot:"themed"},
+      {id:"mv2",emoji:"🕷️",name:"Toile de Spider-Man",cost:35,slot:"themed"},
+      {id:"mv3",emoji:"⚡",name:"Marteau de Thor",cost:50,slot:"themed"},
+      {id:"mv4",emoji:"🪖",name:"Casque d'Iron Man",cost:40,slot:"hat"},
+      {id:"mv5",emoji:"💎",name:"Pierre de l'Infini",cost:55,slot:"themed"},
+      {id:"mv6",emoji:"🦾",name:"Bras Vibranium",cost:45,slot:"themed"},
+    ]},
+  },
+  // ── DISNEY ───────────────────────────────────────────────────
+  disney: {
+    id:"disney", name:"Disney", icon:"🏰",
+    bg:"#000810", primary:"#0044CC", accent:"#66AAFF", glow:"#88CCFF",
+    levels:["Spectateur","Apprenti Magicien","Héros","Prince/Princesse","MAÎTRE MAGICIEN"],
+    levelsF:["Spectatrice","Apprentie Magicienne","Héroïne","Princesse","MAÎTRE MAGICIENNE"],
+    taskVerb:"enchantée", winMsg:"Bibbidi-Bobbidi-Boo! La tâche est faite. Cendrillon rangeait sans plaindre, juste dit.",
+    coinName:"Étoile de souhait",
+    platformBg:"#000508", platformColor:"#0044CC", platformItem:"🏰",
+    platformItems:["🏰","⭐","🧚","🎠","🌟"], platformHazard:"🧙", platformObstacle:"☁️",
+    charBodyColor:"#002266",
+    xpUnlock:250,
+    shopCategory:{ id:"disney", label:"🏰 Disney", items:[
+      {id:"di1",emoji:"🏰",name:"Château miniature",cost:45,slot:"themed"},
+      {id:"di2",emoji:"🧚",name:"Fée Clochette",cost:35,slot:"pet"},
+      {id:"di3",emoji:"⭐",name:"Étoile de souhait",cost:30,slot:"themed"},
+      {id:"di4",emoji:"🎪",name:"Chapeau de Mickey",cost:25,slot:"hat"},
+      {id:"di5",emoji:"🎠",name:"Carrousel enchanté",cost:50,slot:"themed"},
+      {id:"di6",emoji:"🌹",name:"Rose de la Bête",cost:40,slot:"themed"},
+    ]},
+  },
+  // ── PIXAR ────────────────────────────────────────────────────
+  pixar: {
+    id:"pixar", name:"Pixar", icon:"💡",
+    bg:"#00060f", primary:"#0066CC", accent:"#44AAFF", glow:"#66CCFF",
+    levels:["Idée","Étincelle","Aventurier","Héros Animé","PIXAR STAR"],
+    levelsF:["Idée","Étincelle","Aventurière","Héroïne Animée","PIXAR STAR"],
+    taskVerb:"animée", winMsg:"WALL-E nettoyait la Terre entière. Toi t'as fait ta chambre. On est loin, mais c'est un début.",
+    coinName:"Étoile Pixar",
+    platformBg:"#000408", platformColor:"#0066CC", platformItem:"💡",
+    platformItems:["💡","🤖","🐟","🚀","⭐"], platformHazard:"💥", platformObstacle:"🌊",
+    charBodyColor:"#003366",
+    xpUnlock:350,
+    shopCategory:{ id:"pixar", label:"💡 Pixar", items:[
+      {id:"px1",emoji:"🤖",name:"WALL-E miniature",cost:50,slot:"pet"},
+      {id:"px2",emoji:"🐟",name:"Nemo en bocal",cost:35,slot:"pet"},
+      {id:"px3",emoji:"🚀",name:"Vaisseau Buzz",cost:45,slot:"themed"},
+      {id:"px4",emoji:"💡",name:"Lampe Luxo",cost:30,slot:"themed"},
+      {id:"px5",emoji:"🎈",name:"Bouquet de ballons",cost:25,slot:"themed"},
+      {id:"px6",emoji:"🪖",name:"Casque de pompier",cost:20,slot:"hat"},
+    ]},
+  },
+
+};
+// XP thresholds for theme unlock (applied at load time to avoid editing every entry)
+const THEME_XP_UNLOCK = {
+  none:0, lego:0, medieval:50, kpop:50,
+  unicorn:100, demon:100, licornes:100,
+  angel:150, scientifique:150, roblox:150,
+  harrypotter:200, ghibli:200, insectes:200, japon:200,
+  monstres:250, prehistoire:250, horreur:250, disney:250,
+  boomerangfu:300, microscopique:300, bisounours:300, marvel:300,
+  singes:350, geantdefer:350, trolls:350, jamesbond:350, cuisine:350,
+  minecraftpp:400, coursefutur:400, melange:400, pixar:350,
+  // secret — unlocked only via random (secret flag bypasses XP)
+  canards:999, aliens:999, pirates:999, sushi:999, robots:999,
+};
+Object.keys(PLAYER_THEMES).forEach(k => {
+  if (PLAYER_THEMES[k].xpUnlock === undefined)
+    PLAYER_THEMES[k].xpUnlock = THEME_XP_UNLOCK[k] ?? 0;
+});
+
+const PT_LIST = Object.values(PLAYER_THEMES);
+const getPlayerTheme = (id) => PLAYER_THEMES[id] || PLAYER_THEMES.none;
+// Display name: pseudo if set, else real name
+const displayName = (player) => (player?.pseudo?.trim()) || player?.name || "";
+// Returns 2 random non-secret theme IDs for a brand-new player
+const pickStarterThemes = () => {
+  const pool = Object.keys(PLAYER_THEMES).filter(k => k !== "none" && !PLAYER_THEMES[k].secret);
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 2);
+};
+
+const isThemeUnlocked = (themeId, playerXp, starterThemes = []) => {
+  if (themeId === "none") return true; // always free
+  const t = PLAYER_THEMES[themeId];
+  if (!t) return false;
+  if (t.secret) return false; // secret only via random
+  if (starterThemes.includes(themeId)) return true; // starter pick
+  return (playerXp || 0) >= (t.xpUnlock ?? 0);
+};
+
+const SECRET_THEME_IDS = Object.values(PLAYER_THEMES).filter(t=>t.secret).map(t=>t.id);
+const RANDOM_THEME_PLAYER = { id:"random", name:"Au hasard 🎲", icon:"🎲", secret:false,
+  bg:"#0a0a14", primary:"#888", accent:"#aaa", glow:"#aaa", levels:["?","?","?","?","?"],
+  coinName:"Surprise", taskVerb:"mystérisée", winMsg:"Thème mystère activé!" };
+const RANDOM_THEME_WEEK   = { id:"random_week", name:"Semaine surprise 🎲", icon:"🎲" };
+
+// Pick a random theme for a player (seeded by player id + week)
+const resolveRandomTheme = (playerId) => {
+  const allIds = [...SECRET_THEME_IDS, ...Object.keys(PLAYER_THEMES).filter(k=>!PLAYER_THEMES[k].secret&&k!=="none")];
+  const seed = (playerId||"x").split("").reduce((a,c)=>a+c.charCodeAt(0),0) + new Date().getDay();
+  return allIds[seed % allIds.length];
+};
+const resolveWeekRandomTheme = (weekSeed) => {
+  const all = Object.keys(THEMES);
+  return all[(weekSeed||0) % all.length];
+};
+
+
+
+// ─── STORAGE ─────────────────────────────────────────────────
+// Structured for easy Supabase swap: replace save/load with async Supabase calls
+// Future: import { saveToSupabase, loadFromSupabase } from './lib/supabase.js'
+const STORE_KEY = "livre-de-quetes-v1";
+
+const save = async (data) => {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { console.warn("Storage save failed:", e); }
+  // FUTURE SUPABASE: await supabase.from('family_sessions').upsert({ id: familyId, data })
+};
+
+const load = async () => {
+  try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch {}
+  // FUTURE SUPABASE: const { data } = await supabase.from('family_sessions').select().eq('id', familyId).single()
+  return null;
+};
+
+// FUTURE: export family config as JSON for sharing / backup
+const exportConfig = (config, gameStates) => {
+  const blob = new Blob([JSON.stringify({config, gameStates, exportedAt: new Date().toISOString()}, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `livre-de-quetes-${new Date().toISOString().slice(0,10)}.json`; a.click();
+};
+
+const importConfig = (file, onSuccess) => {
+  const r = new FileReader();
+  r.onload = e => { try { const d = JSON.parse(e.target.result); onSuccess(d); } catch { alert('Fichier invalide'); } };
+  r.readAsText(file);
+};
+
+// ─── UTILS ───────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2,9);
+const todayStr = () => new Date().toISOString().slice(0,10);
+const weekKey = () => { const d=new Date(); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
+
+// ─── CSS ─────────────────────────────────────────────────────
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Nunito:wght@700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Nunito',sans-serif;-webkit-tap-highlight-color:transparent;}
+  ::-webkit-scrollbar{width:4px;height:4px;} ::-webkit-scrollbar-track{background:#111;} ::-webkit-scrollbar-thumb{background:#444;border-radius:2px;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+  @keyframes clkPulse{from{opacity:1}to{opacity:0.65}}
+  @keyframes bounceIn{from{transform:scale(0.2);opacity:0}to{transform:scale(1);opacity:1}}
+  @keyframes floatUp{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(-180px) scale(0.4);opacity:0}}
+  @keyframes confettiFall{from{transform:translateY(0) rotate(0deg);opacity:1}to{transform:translateY(100vh) rotate(720deg);opacity:0}}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @keyframes shimmer{from{left:-50%}to{left:150%}}
+  @keyframes mixedBg{0%{background:#0a0a14}20%{background:#140a0a}40%{background:#0a140a}60%{background:#0a0a14}80%{background:#14140a}100%{background:#0a0a14}}
+  @keyframes redPulse{from{box-shadow:0 0 8px #FF444440}to{box-shadow:0 0 20px #FF4444AA}}
+  @keyframes slideIn{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+  input:focus{outline:none;}
+  button:focus{outline:none;}
+`;
+
+// ═══════════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+// ─── PLATFORMER MINI-GAME (theme-aware) ─────────────────────
+const Platformer = ({ player, onClose }) => {
+  const canvasRef = useRef(null);
+  const gameRef = useRef(null);
+  const [collected, setCollected] = useState(0);
+  const [done, setDone] = useState(false);
+  const pt = getPlayerTheme(player.themeId);
+
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width = 600, H = canvas.height = 240;
+    const GRAVITY = 0.55, JUMP = -13, SPEED = 3.5;
+    const pColor = pt.charBodyColor || player.color;
+    const pColor2 = pt.platformColor;
+    const bgColor = pt.platformBg;
+    const acColor = pt.accent;
+    const platItems = pt.platformItems;
+    const platforms = [
+      {x:0,y:205,w:160,h:14},{x:185,y:172,w:100,h:14},{x:305,y:140,w:110,h:14},
+      {x:435,y:172,w:100,h:14},{x:525,y:135,w:75,h:14},
+    ];
+    const items = [
+      {x:240,y:148,r:11,c:false,e:platItems[0]||"⭐"},
+      {x:360,y:118,r:11,c:false,e:platItems[1]||"💫"},
+      {x:490,y:148,r:11,c:false,e:platItems[2]||"✨"},
+      {x:558,y:106,r:11,c:false,e:platItems[3]||"🌟"},
+    ];
+    const char = {x:28,y:155,w:26,h:34,vx:0,vy:0,onG:false,fr:true};
+    let frame=0, cCount=0, finished=false, autoJ=0;
+    const nextPX=[185,305,435,525,700]; let nPI=0;
+    const keys={};
+    const hk=(e)=>{const m={ArrowLeft:"l",ArrowRight:"r"," ":"j",ArrowUp:"j"}; if(m[e.key]){keys[m[e.key]]=e.type==="keydown";e.preventDefault();}};
+    window.addEventListener("keydown",hk); window.addEventListener("keyup",hk);
+
+    const loop=()=>{
+      frame++;
+      char.vx=SPEED; char.fr=true;
+      if(keys.l){char.vx=-SPEED;char.fr=false;} if(keys.r){char.vx=SPEED;char.fr=true;}
+      if(autoJ>0)autoJ--;
+      if(nPI<nextPX.length&&char.x>=nextPX[nPI]-40&&char.onG&&autoJ===0){char.vy=JUMP;autoJ=38;nPI++;}
+      if((keys.j)&&char.onG){char.vy=JUMP;SFX.click();}
+      char.vy+=GRAVITY; char.x+=char.vx; char.y+=char.vy; char.onG=false;
+      for(const p of platforms){if(char.x+char.w>p.x&&char.x<p.x+p.w&&char.y+char.h>p.y&&char.y+char.h<p.y+p.h+10&&char.vy>=0){char.y=p.y-char.h;char.vy=0;char.onG=true;}}
+      if(char.y>H){char.y=0;char.vy=0;} if(char.x<0)char.x=0;
+      for(const it of items){if(!it.c&&Math.hypot(char.x+13-it.x,char.y+17-it.y)<20){it.c=true;cCount++;setCollected(cCount);SFX.coin();}}
+      if(char.x>W-36&&!finished){finished=true;setDone(true);SFX.levelup();}
+
+      // Draw
+      ctx.fillStyle=bgColor; ctx.fillRect(0,0,W,H);
+      // Animated bg dots
+      ctx.fillStyle=`${acColor}40`;
+      for(let i=0;i<12;i++){const sx=(i*71+frame*0.4)%W,sy=(i*53)%(H/2);ctx.fillRect(sx,sy,2,2);}
+      // Platforms
+      for(const p of platforms){
+        ctx.fillStyle=pColor2; ctx.fillRect(p.x,p.y,p.w,8);
+        ctx.fillStyle=darken(pColor2); ctx.fillRect(p.x,p.y+8,p.w,p.h-8);
+        ctx.strokeStyle="#000"; ctx.lineWidth=2; ctx.strokeRect(p.x,p.y,p.w,p.h);
+      }
+      // Items
+      ctx.textAlign="center"; ctx.font="18px serif";
+      for(const it of items){if(!it.c){const bob=Math.sin(frame*0.08+it.x)*3;ctx.shadowColor=acColor;ctx.shadowBlur=12;ctx.fillText(it.e,it.x,it.y+bob);ctx.shadowBlur=0;}}
+      // Character
+      const cx=char.x,cy=char.y;
+      const bb=char.onG?Math.abs(Math.sin(frame*0.3))*2:0;
+      ctx.fillStyle=pColor; ctx.fillRect(cx+3,cy+12+bb,22,18);
+      ctx.fillStyle="#FFCC99"; ctx.fillRect(cx+3,cy+bb,22,14);
+      ctx.fillStyle="#333";
+      if(char.fr){ctx.fillRect(cx+14,cy+4+bb,4,4);ctx.fillRect(cx+19,cy+4+bb,4,4);}
+      else{ctx.fillRect(cx+3,cy+4+bb,4,4);ctx.fillRect(cx+8,cy+4+bb,4,4);}
+      ctx.fillStyle="#1a3a8a";
+      const la=char.onG?Math.sin(frame*0.3)*4:0;
+      ctx.fillRect(cx+4,cy+30+bb,9,6+la); ctx.fillRect(cx+15,cy+30+bb,9,6-la);
+      // Finish flag
+      ctx.shadowBlur=0; ctx.font="28px serif"; ctx.fillText("🏁",W-16,105);
+      ctx.globalAlpha=1;
+      if(!finished)gameRef.current=requestAnimationFrame(loop);
+    };
+    gameRef.current=requestAnimationFrame(loop);
+    return()=>{cancelAnimationFrame(gameRef.current);window.removeEventListener("keydown",hk);window.removeEventListener("keyup",hk);};
+  },[]);
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:pt.accent,textShadow:`0 0 16px ${pt.glow}`}}>
+        {pt.icon} LEVEL UP — Mini-Niveau! {pt.icon}
+      </div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#aaa"}}>Flèches / Espace — Ramasse les {pt.coinName}s!</div>
+      <canvas ref={canvasRef} style={{border:`4px solid ${pt.accent}`,borderRadius:4,maxWidth:"100%",boxShadow:`0 0 30px ${pt.glow}`}}/>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent}}>
+        {pt.platformItems[0]} ×{collected} ramassés!
+      </div>
+      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>🏆 CONTINUER →</button>}
+      {!done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer"}}>Passer</button>}
+    </div>
+  );
+};
+const darken = (hex) => { try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${Math.floor(r*0.6)},${Math.floor(g*0.6)},${Math.floor(b*0.6)})`;}catch{return "#333";} };
+
+// ─── PIN PAD ─────────────────────────────────────────────────
+function PinPad({ pin, label, onSuccess, onCancel, th }) {
+  const [buf, setBuf] = useState("");
+  const [err, setErr] = useState(false);
+  const press = v => {
+    SFX.pinKey();
+    if (v === "del") { setBuf(b => b.slice(0,-1)); return; }
+    if (buf.length >= 4) return;
+    const next = buf + v;
+    setBuf(next);
+    if (next.length === 4) setTimeout(() => {
+      if (next === pin) { SFX.pinOk(); onSuccess(); }
+      else { SFX.pinErr(); setErr(true); setBuf(""); setTimeout(() => setErr(false), 1500); }
+    }, 150);
+  };
+  const T = th || THEMES.minecraft;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:`linear-gradient(135deg,${T.bg},#1a1a2e)`,border:`6px solid ${T.accent}`,borderRadius:10,padding:"28px 34px",textAlign:"center",maxWidth:360,width:"90%",boxShadow:`0 0 50px ${T.accent}60`,animation:"bounceIn 0.35s ease"}}>
+        <div style={{fontSize:44,marginBottom:8}}>👩‍💻</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:6}}>VALIDATION PARENT</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",marginBottom:14,lineHeight:1.3}}>{label}</div>
+        <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:14}}>
+          {[0,1,2,3].map(i=><div key={i} style={{width:20,height:20,borderRadius:"50%",border:`3px solid ${T.accent}`,background:i<buf.length?T.accent:"transparent",boxShadow:i<buf.length?`0 0 10px ${T.accent}`:"none",transition:"all 0.15s"}}/>)}
+        </div>
+        {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF4444",marginBottom:8,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
+          {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
+            <button key={k} onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"#888":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #000"}}>
+              {k}
+            </button>
+          ))}
+        </div>
+        <button onClick={onCancel} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#888",border:"2px solid #555",cursor:"pointer",borderRadius:2}}>Annuler</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── TOAST ───────────────────────────────────────────────────
+function Toast({ msg, color }) {
+  return <div style={{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,0.93)",border:`3px solid ${color||"#2ECC40"}`,borderRadius:4,padding:"9px 18px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:color||"#2ECC40",zIndex:990,whiteSpace:"nowrap",animation:"toastIn 0.3s ease",maxWidth:"90vw",textAlign:"center"}}>{msg}</div>;
+}
+
+// ─── PARTICLES FX ────────────────────────────────────────────
+function spawnParticles(emoji) {
+  const emojis = [emoji,"⭐","✨","💫"];
+  for(let i=0;i<7;i++) setTimeout(()=>{
+    const p=document.createElement("div");
+    p.style.cssText=`position:fixed;left:${Math.random()*70+15}vw;top:${Math.random()*50+25}vh;font-size:22px;pointer-events:none;z-index:2999;animation:floatUp 1.4s ease-out forwards;`;
+    p.textContent=emojis[Math.floor(Math.random()*emojis.length)]; document.body.appendChild(p); setTimeout(()=>p.remove(),1500);
+  },i*90);
+  const cols=["#FFD700","#4A90D9","#C060D0","#2ECC40","#FF6464"];
+  for(let i=0;i<18;i++) setTimeout(()=>{
+    const c=document.createElement("div");
+    c.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-10px;width:${Math.random()*8+4}px;height:${Math.random()*8+4}px;background:${cols[Math.floor(Math.random()*5)]};z-index:2998;border-radius:2px;animation:confettiFall ${Math.random()*1+1.5}s ease-in ${Math.random()*0.4}s forwards;`;
+    document.body.appendChild(c); setTimeout(()=>c.remove(),2200);
+  },i*35);
+}
+
+// ─── REWARD POPUP ────────────────────────────────────────────
+function RewardPopup({ task, player, onClose, th }) {
+  const T = th || THEMES.minecraft;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:T.bg,border:`6px solid ${T.accent}`,borderRadius:10,padding:"30px 40px",textAlign:"center",maxWidth:440,width:"90%",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
+        <div style={{fontSize:60,marginBottom:10}}>{task.emoji}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:T.accent,marginBottom:8}}>⚡ QUÊTE {(getPlayerTheme(player?.themeId)?.taskVerb||"validée").toUpperCase()}!</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(16px,2.5vw,20px)",color:"#fff",marginBottom:16,lineHeight:1.4}}>{task.label}</div>
+        <div style={{display:"flex",gap:20,justifyContent:"center",marginBottom:18}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#5DECF5"}}>+{task.xp} ⚡</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#FFD700"}}>+{task.coins} 🪙</div>
+        </div>
+        {player && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:player.color,marginBottom:14}}>Bravo {displayName(player)}! 🎉</div>}
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#2ECC40",color:"#000",border:"4px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>→ CONTINUER ←</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETUP WIZARD
+// ═══════════════════════════════════════════════════════════════
+function SetupWizard({ existing, onDone }) {
+  const [step, setStep] = useState(0); // 0=mode 1=players 2=theme 3=tasks 4=rewards 5=pin
+  const STEPS = ["Mode","Joueurs","Ambiance","Tâches","Récompenses","PIN"];
+
+  // Config state
+  const [mode, setMode] = useState("routine"); // "week" | "routine"
+  const [weekPersist, setWeekPersist] = useState(false);
+  const [routineEnd, setRoutineEnd] = useState("08:30");
+  const [numPlayers, setNumPlayers] = useState(2);
+  const [players, setPlayers] = useState([
+    { id:uid(), name:"Elli",                    pseudo:"", color:"#C060D0", themeId:"angel",    starterThemes: pickStarterThemes() },
+    { id:uid(), name:"Antoine E",               pseudo:"", color:"#4A90D9", themeId:"medieval", starterThemes: pickStarterThemes() },
+    { id:uid(), name:"Antoine DR",              pseudo:"", color:"#FF6B35", themeId:"lego",     starterThemes: pickStarterThemes() },
+    { id:uid(), name:"Olivier DR",              pseudo:"", color:"#2ECC40", themeId:"none",     starterThemes: pickStarterThemes() },
+  ]);
+  const [theme, setTheme] = useState("minecraft");
+  const [pin, setPin] = useState("1234");
+
+  // Task assignments: array of { instanceId, taskId, playerIds:[], days:[], time:"" }
+  const [assignments, setAssignments] = useState([]);
+  // Reward selection
+  const [selectedRewards, setSelectedRewards] = useState(new Set(["rw01","rw02","rw03","rw04","rw05"]));
+  // Custom tasks / rewards
+  const [customTasks, setCustomTasks] = useState([]);
+  const [customRewards, setCustomRewards] = useState([]);
+
+  // Task catalog filter
+  const [catFilter, setCatFilter] = useState("all");
+  const [dragOver, setDragOver] = useState(null);
+  const [dragging, setDragging] = useState(null);
+
+  // Pre-fill if editing
+  useEffect(() => {
+    if (existing) {
+      setMode(existing.mode || "routine");
+      setWeekPersist(true); // always persist — badges depend on it
+      setRoutineEnd(existing.routineEnd || "08:30");
+      const pl = existing.players || [];
+      setNumPlayers(pl.length || 2);
+      setPlayers(pl.length ? pl.map(p=>({themeId:"none",pseudo:"",starterThemes:p.starterThemes||pickStarterThemes(),...p})) : players);
+      setTheme(existing.theme || "minecraft");
+      setPin(existing.pin || "1234");
+      setAssignments(existing.assignments || []);
+      setSelectedRewards(new Set(existing.selectedRewards || ["rw01","rw02","rw03"]));
+      setCustomTasks(existing.customTasks || []);
+      setCustomRewards(existing.customRewards || []);
+    }
+  }, []);
+
+  const T = THEMES[theme];
+  const activePlayers = players.slice(0, numPlayers);
+  const allTasks = [...TASK_CATALOG, ...customTasks];
+  const allRewards = [...REWARD_CATALOG, ...customRewards];
+
+  const addAssignment = (taskId) => {
+    SFX.click();
+    setAssignments(a => [...a, {
+      instanceId: uid(), taskId,
+      playerIds: activePlayers.map(p=>p.id),
+      days: mode === "week" ? [0] : [],
+      time: "",
+    }]);
+  };
+  const removeAssignment = (iid) => { SFX.click(); setAssignments(a => a.filter(x=>x.instanceId!==iid)); };
+  const duplicateAssignment = (iid) => { SFX.click(); setAssignments(a => { const src=a.find(x=>x.instanceId===iid); if(!src)return a; return [...a,{...src,instanceId:uid()}]; }); };
+  const updateAssignment = (iid, field, val) => setAssignments(a => a.map(x=>x.instanceId===iid?{...x,[field]:val}:x));
+  const toggleAssignmentPlayer = (iid, pid) => setAssignments(a => a.map(x => {
+    if (x.instanceId!==iid) return x;
+    const has = x.playerIds.includes(pid);
+    return {...x, playerIds: has ? x.playerIds.filter(id=>id!==pid) : [...x.playerIds,pid]};
+  }));
+  const toggleAssignmentDay = (iid, dayIdx) => setAssignments(a => a.map(x => {
+    if (x.instanceId!==iid) return x;
+    const has = x.days.includes(dayIdx);
+    return {...x, days: has ? x.days.filter(d=>d!==dayIdx) : [...x.days,dayIdx]};
+  }));
+
+  // Drag & drop for assignment ordering
+  const onDragStart = (e, iid) => { setDragging(iid); e.dataTransfer.effectAllowed="move"; };
+  const onDragOver = (e, iid) => { e.preventDefault(); setDragOver(iid); };
+  const onDrop = (e, targetIid) => {
+    e.preventDefault(); setDragOver(null);
+    if (!dragging || dragging===targetIid) return;
+    setAssignments(a => {
+      const from=a.findIndex(x=>x.instanceId===dragging), to=a.findIndex(x=>x.instanceId===targetIid);
+      if(from<0||to<0)return a; const n=[...a]; const [item]=n.splice(from,1); n.splice(to,0,item); return n;
+    });
+    setDragging(null);
+  };
+
+  const addCustomTask = () => {
+    const label = prompt("Nom de la tâche:");
+    if (!label?.trim()) return;
+    const emoji = prompt("Emoji (ex: 🌟):") || "⭐";
+    setCustomTasks(c => [...c, { id:"cust_"+uid(), emoji, label:label.trim(), xp:20, coins:10, diff:"medium", cat:"custom" }]);
+  };
+  const addCustomReward = () => {
+    const label = prompt("Nom de la récompense:");
+    if (!label?.trim()) return;
+    const emoji = prompt("Emoji (ex: 🎁):") || "🎁";
+    const coins = parseInt(prompt("Coût en pièces:") || "20") || 20;
+    setCustomRewards(c => [...c, { id:"cr_"+uid(), emoji, label:label.trim(), coins }]);
+  };
+
+  const finish = () => {
+    // Expand multi-player assignments into per-player instances
+    const expandedAssignments = [];
+    for (const ass of assignments) {
+      if (ass.playerIds.length <= 1) {
+        expandedAssignments.push(ass);
+      } else {
+        // One independent copy per player
+        for (const pid of ass.playerIds) {
+          expandedAssignments.push({ ...ass, instanceId: uid(), playerIds: [pid] });
+        }
+      }
+    }
+    const config = {
+      mode, weekPersist, routineEnd,
+      players: activePlayers,
+      theme,
+      pin,
+      assignments: expandedAssignments,
+      selectedRewards: [...selectedRewards],
+      customTasks,
+      customRewards,
+      createdAt: new Date().toISOString(),
+    };
+    onDone(config);
+  };
+
+  // Styles
+  const card = { background:T.card, border:`2px solid ${T.accent}40`, borderRadius:8, padding:"16px 18px" };
+  const Btn = ({active,children,onClick,style={},...p}) => (
+    <button onClick={()=>{SFX.click();onClick?.();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",padding:"8px 14px",background:active?T.accent:"#222",color:active?"#000":"#888",border:`2px solid ${active?T.accent:"#444"}`,borderRadius:3,cursor:"pointer",boxShadow:active?`3px 3px 0 #000,0 0 10px ${T.accent}50`:"2px 2px 0 #000",transition:"all 0.1s",...style}} {...p}>{children}</button>
+  );
+
+  const canProceed = () => {
+    if (step===1) return activePlayers.every(p=>p.name.trim());
+    if (step===3) return assignments.length>0;
+    if (step===5) return pin.length===4;
+    return true;
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 12px",gap:16,overflowX:"hidden"}}>
+      <style>{GLOBAL_CSS}</style>
+      {/* Title */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2.5vw,22px)",color:T.accent,textShadow:`3px 3px 0 #000,0 0 20px ${T.accent}80`,textAlign:"center",marginTop:8}}>⚔️ JOURNÉE ÉPIQUE ⚔️</div>
+      {/* Step indicators */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+        {STEPS.map((s,i)=>(
+          <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#333",color:i<=step?"#000":"#555",borderRadius:2,border:"2px solid #000",cursor:i<step?"pointer":"default"}}>
+            {i<step?"✓ ":""}{s}
+          </div>
+        ))}
+      </div>
+
+      <div style={{...card,maxWidth:680,width:"100%",animation:"slideIn 0.25s ease"}}>
+
+        {/* ── STEP 0: Mode ── */}
+        {step===0 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:16}}>🎮 Quel mode?</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+            {[
+              {k:"routine",icon:"⏰",title:"Mode Routine",desc:"Matin, soir ou après-école. Compte à rebours proéminent jusqu'à l'heure cible."},
+              {k:"week",   icon:"📅",title:"Mode Semaine", desc:"Organisation sur 7 jours. Progression hebdomadaire avec bilan."},
+            ].map(({k,icon,title,desc})=>(
+              <div key={k} onClick={()=>{setMode(k);SFX.click();}} style={{border:`3px solid ${mode===k?T.accent:"#444"}`,borderRadius:6,padding:16,cursor:"pointer",background:mode===k?`${T.accent}15`:"rgba(0,0,0,0.4)",boxShadow:mode===k?`0 0 16px ${T.accent}50`:"none",transition:"all 0.15s"}}>
+                <div style={{fontSize:34,marginBottom:8}}>{icon}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:mode===k?T.accent:"#ccc",marginBottom:8}}>{title}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa",lineHeight:1.4}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          {mode==="routine" && (
+            <div style={{...card,marginBottom:12}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:T.accent,marginBottom:10}}>⏱ Heure de fin de routine</div>
+              <input type="time" value={routineEnd} onChange={e=>setRoutineEnd(e.target.value)}
+                style={{background:"#111",border:`2px solid ${T.accent}`,color:T.accent,padding:"10px 14px",fontFamily:"'Press Start 2P',monospace",fontSize:16,borderRadius:4,outline:"none",width:"100%"}}/>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginTop:8}}>Le compte à rebours sera bien visible pour motiver!</div>
+            </div>
+          )}
+          {mode==="week" && (
+            <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(0,0,0,0.15)",border:`2px solid ${T.accent}44`,borderRadius:6,padding:12}}>
+              <div style={{fontSize:20}}>💾</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Progression sauvegardée automatiquement — les badges ne sont jamais perdus!</div>
+            </div>
+          )}
+        </>}
+
+        {/* ── STEP 1: Players ── */}
+        {step===1 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:14}}>👥 Joueurs</div>
+          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+            {[1,2,3,4].map(n=><Btn key={n} active={numPlayers===n} onClick={()=>{ setNumPlayers(n); if(players.length<n) { const extra=Array.from({length:n-players.length},(_,i)=>({id:uid(),name:`Joueur ${players.length+i+1}`,color:COLORS[players.length+i]||"#888",feminine:false})); setPlayers(p=>[...p,...extra]); } }}>{n}</Btn>)}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {Array.from({length:numPlayers},(_,i)=>{
+              const pl=players[i]||{id:uid(),name:"",color:COLORS[i]||"#888",feminine:false};
+              return (
+                <div key={i} style={{...card,border:`2px solid ${pl.color}`}}>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",minWidth:50}}>JOUEUR {i+1}</span>
+                    <input value={pl.name} onChange={e=>{ const arr=[...players]; arr[i]={...arr[i],name:e.target.value}; setPlayers(arr); }} placeholder={`Nom joueur ${i+1}`}
+                      style={{flex:1,background:"#111",border:`2px solid ${pl.color}`,color:"#fff",padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:18,borderRadius:3}}/>
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",minWidth:50}}>PSEUDO</span>
+                    <input value={pl.pseudo||""} onChange={e=>{ const arr=[...players]; arr[i]={...arr[i],pseudo:e.target.value}; setPlayers(arr); }} placeholder={`Surnom visible (optionnel)`}
+                      style={{flex:1,background:"#111",border:`2px dashed ${pl.color}55`,color:"#ccc",padding:"6px 10px",fontFamily:"'VT323',monospace",fontSize:17,borderRadius:3}}/>
+                  </div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {COLORS.map(c=>{ const isNoir=c==="#0a0a0a"; const isBlanc=c==="#F0F0FF"; const glowColor=isNoir?"#FF0066":isBlanc?"#AACCFF":c; return (<div key={c} onClick={()=>{ const arr=[...players]; arr[i]={...arr[i],color:c}; setPlayers(arr); }} style={{width:26,height:26,borderRadius:4,background:c,border:`3px solid ${pl.color===c?"#fff":"#333"}`,cursor:"pointer",boxShadow:pl.color===c?`0 0 10px ${glowColor}`:"none",outline:isNoir?"1px solid #333":isBlanc?"1px solid #888":"none"}}/>); })}
+                  </div>
+                  {/* Per-player theme */}
+                  <div style={{marginTop:10}}>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:7}}>🎭 THÈME PERSONNEL</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {PT_LIST.map(pt=>{
+                        const sel=(pl.themeId||"none")===pt.id;
+                        const unlocked = isThemeUnlocked(pt.id, 0, pl.starterThemes||[]);
+                        return <div key={pt.id}
+                          onClick={()=>{ if(!unlocked)return; const arr=[...players]; arr[i]={...arr[i],themeId:pt.id}; setPlayers(arr); SFX.click(); }}
+                          title={!unlocked?`🔒 Déblocable à ${pt.xpUnlock} XP`:""}
+                          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 9px",background:sel?`${pt.accent}22`:unlocked?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.2)",border:`2px solid ${sel?pt.accent:unlocked?"#333":"#222"}`,borderRadius:4,cursor:unlocked?"pointer":"not-allowed",boxShadow:sel?`0 0 10px ${pt.glow}50`:"none",opacity:unlocked?1:0.4,transition:"all 0.15s"}}>
+                          <span style={{fontSize:16}}>{unlocked?pt.icon:"🔒"}</span>
+                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:sel?pt.accent:unlocked?"#666":"#444"}}>{pt.name}{!unlocked?` (${pt.xpUnlock}xp)`:""}</span>
+                        </div>;
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>}
+
+        {/* ── STEP 2: Theme ── */}
+        {step===2 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:6}}>🎨 Ambiance globale</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12}}>Fond et header seulement — chaque joueur garde son thème perso dans son panel.</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+            {[...Object.entries(THEMES), ["random_week", RANDOM_THEME_WEEK]].map(([k,th])=>(
+              <div key={k} onClick={()=>{setTheme(k);SFX.click();}} style={{border:`3px solid ${theme===k?th.accent:"#444"}`,borderRadius:6,padding:"14px 10px",cursor:"pointer",background:theme===k?`${th.accent}18`:"rgba(0,0,0,0.4)",boxShadow:theme===k?`0 0 14px ${th.accent}50`:"none",textAlign:"center",transition:"all 0.15s"}}>
+                <div style={{fontSize:30,marginBottom:6}}>{k==="random_week"?"🎲":k==="minecraft"?"⛏️":k==="galaxy"?"🌌":k==="ocean"?"🌊":k==="volcano"?"🌋":"🌲"}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:theme===k?th.accent:"#aaa"}}>{th.name}</div>
+              </div>
+            ))}
+          </div>
+        </>}
+
+        {/* ── STEP 3: Tasks ── */}
+        {step===3 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:12}}>📋 Tâches & Quêtes ({assignments.length})</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,maxHeight:"65vh",overflow:"hidden"}}>
+            {/* Catalog left */}
+            <div style={{display:"flex",flexDirection:"column",gap:8,overflowY:"auto",paddingRight:4}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>CATALOGUE — cliquer pour ajouter</div>
+              {/* Category filter */}
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+                <Btn active={catFilter==="all"} onClick={()=>setCatFilter("all")} style={{padding:"3px 7px",fontSize:7}}>Tout</Btn>
+                {Object.entries(CAT_LABELS).map(([k,l])=><Btn key={k} active={catFilter===k} onClick={()=>setCatFilter(k)} style={{padding:"3px 7px",fontSize:7}}>{l}</Btn>)}
+              </div>
+              {allTasks.filter(t=>catFilter==="all"||t.cat===catFilter).map(task=>(
+                <div key={task.id} onClick={()=>addAssignment(task.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:4,cursor:"pointer",transition:"border 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent} onMouseLeave={e=>e.currentTarget.style.borderColor="#333"}>
+                  <span style={{fontSize:20}}>{task.emoji}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{task.label}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{task.xp}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙{task.coins}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff)}}>{task.diff}</span>
+                    </div>
+                  </div>
+                  <span style={{color:T.accent,fontSize:16,fontWeight:"bold"}}>+</span>
+                </div>
+              ))}
+              <button onClick={addCustomTask} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${T.accent}60`,color:T.accent,borderRadius:4,cursor:"pointer",marginTop:4}}>+ Tâche personnalisée</button>
+            </div>
+
+            {/* Assigned right */}
+            <div style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",paddingRight:2}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>TÂCHES ASSIGNÉES — glisser pour réordonner</div>
+              {assignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",textAlign:"center",marginTop:20}}>Clique sur une tâche à gauche pour l'ajouter →</div>}
+              {assignments.map(ass=>{
+                const task=allTasks.find(t=>t.id===ass.taskId);
+                if(!task)return null;
+                return (
+                  <div key={ass.instanceId} draggable onDragStart={e=>onDragStart(e,ass.instanceId)} onDragOver={e=>onDragOver(e,ass.instanceId)} onDrop={e=>onDrop(e,ass.instanceId)} onDragLeave={()=>setDragOver(null)}
+                    style={{background:dragOver===ass.instanceId?`${T.accent}20`:"rgba(0,0,0,0.55)",border:`2px solid ${dragOver===ass.instanceId?T.accent:"#444"}`,borderRadius:5,padding:"8px 10px",cursor:"grab",transition:"all 0.15s"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                      <span style={{color:"#555",fontSize:12,cursor:"grab"}}>⠿</span>
+                      <span style={{fontSize:17}}>{task.emoji}</span>
+                      <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</span>
+                      <button onClick={()=>duplicateAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:14,padding:2}} title="Dupliquer">⧉</button>
+                      <button onClick={()=>removeAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#FF4444",cursor:"pointer",fontSize:16,padding:2}}>×</button>
+                    </div>
+                    {/* Player assignment — each toggled player gets their own independent copy */}
+                    <div style={{marginBottom:mode==="week"?6:4}}>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555"}}>QUI:</span>
+                        {activePlayers.map(pl=>{
+                          const sel=ass.playerIds.includes(pl.id);
+                          return <div key={pl.id} onClick={()=>toggleAssignmentPlayer(ass.instanceId,pl.id)}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",
+                              background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",
+                              border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer",
+                              boxShadow:sel?`0 0 8px ${pl.color}60`:"none",transition:"all 0.12s",
+                              display:"flex",alignItems:"center",gap:4}}>
+                            <span style={{width:7,height:7,borderRadius:"50%",background:sel?"#000":pl.color,display:"inline-block"}}/>
+                            {displayName(pl)}
+                          </div>;
+                        })}
+                        <div onClick={()=>{ const allIds=activePlayers.map(p=>p.id); const allSel=allIds.every(id=>ass.playerIds.includes(id)); setAssignments(a=>a.map(x=>x.instanceId===ass.instanceId?{...x,playerIds:allSel?[]:allIds}:x)); SFX.click(); }}
+                          style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 7px",background:"#222",color:"#888",border:"1px solid #444",borderRadius:3,cursor:"pointer"}}>
+                          {activePlayers.every(p=>ass.playerIds.includes(p.id))?"Aucun":"Tous"}
+                        </div>
+                      </div>
+                      {ass.playerIds.length>1&&<div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#555",marginTop:3}}>→ {ass.playerIds.length} copies indépendantes</div>}
+                    </div>
+                    {/* Day assignment (week mode) */}
+                    {mode==="week" && (
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                        {DAYS_SHORT.map((d,i)=>(
+                          <div key={i} onClick={()=>toggleAssignmentDay(ass.instanceId,i)}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"2px 5px",background:ass.days.includes(i)?T.accent:"#222",color:ass.days.includes(i)?"#000":"#555",border:`1px solid ${ass.days.includes(i)?T.accent:"#444"}`,borderRadius:2,cursor:"pointer"}}>
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Time (routine mode) */}
+                    {mode==="routine" && (
+                      <input type="time" value={ass.time||""} onChange={e=>updateAssignment(ass.instanceId,"time",e.target.value)} placeholder="Heure"
+                        style={{background:"#111",border:`1px solid ${T.accent}60`,color:T.accent,padding:"3px 8px",fontFamily:"'Press Start 2P',monospace",fontSize:8,borderRadius:2,width:"100%",marginTop:4}}/>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>}
+
+        {/* ── STEP 4: Rewards ── */}
+        {step===4 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:12}}>🎁 Récompenses disponibles</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"55vh",overflowY:"auto"}}>
+            {allRewards.map(r=>{
+              const sel=selectedRewards.has(r.id);
+              return (
+                <div key={r.id} onClick={()=>{ SFX.click(); setSelectedRewards(s=>{ const n=new Set(s); if(n.has(r.id))n.delete(r.id); else n.add(r.id); return n; }); }}
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:sel?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.3)",border:`2px solid ${sel?T.accent:"#444"}`,borderRadius:5,cursor:"pointer",boxShadow:sel?`0 0 8px ${T.accent}40`:"none",transition:"all 0.15s"}}>
+                  <span style={{fontSize:26}}>{r.emoji}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:sel?"#fff":"#aaa"}}>{r.label}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙 {r.coins} pièces</div>
+                  </div>
+                  <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={addCustomReward} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${T.accent}60`,color:T.accent,borderRadius:4,cursor:"pointer",marginTop:10,width:"100%"}}>+ Récompense personnalisée</button>
+        </>}
+
+        {/* ── STEP 5: PIN ── */}
+        {step===5 && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:14}}>🔐 Code secret parent</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",marginBottom:14}}>Demandé à chaque validation. Les enfants ne le voient pas!</div>
+          <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="4 chiffres"
+            style={{width:"100%",background:"#111",border:`3px solid ${T.accent}`,color:"#fff",padding:"14px",fontFamily:"'Press Start 2P',monospace",fontSize:20,borderRadius:4,textAlign:"center",letterSpacing:10}}/>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8}}>Code actuel: {pin} — défaut: 1234</div>
+        </>}
+
+        {/* NAV */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:18}}>
+          {step>0?<Btn onClick={()=>setStep(s=>s-1)}>← Retour</Btn>:<span/>}
+          {step<STEPS.length-1
+            ? <Btn active={canProceed()} onClick={()=>canProceed()&&setStep(s=>s+1)}>Suivant →</Btn>
+            : <Btn active={canProceed()} onClick={()=>canProceed()&&finish()}>🚀 C'est parti!</Btn>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GAME ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+// ─── COUNTDOWN (Routine mode) ────────────────────────────────
+function Countdown({ endTime, th }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
+  const [eh,em]=endTime.split(":").map(Number);
+  const target=new Date(); target.setHours(eh,em,0,0);
+  const diff=target-now;
+  const isLate=diff<0;
+  const abs=Math.abs(diff);
+  const h=Math.floor(abs/3600000), m=Math.floor((abs%3600000)/60000), s=Math.floor((abs%60000)/1000);
+  const pct=isLate?100:Math.max(0,100-(diff/(3600000*2))*100); // 2h window
+  const urgent=diff>0&&diff<900000; // <15min
+  return (
+    <div style={{padding:"10px 14px",background:isLate?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${isLate?"#FF4444":urgent?"#FFD700":th.accent}60`,borderRadius:6,animation:urgent||isLate?"redPulse 1s ease-in-out infinite":"none"}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isLate?"#FF4444":urgent?"#FFD700":th.accent,marginBottom:6,textAlign:"center"}}>
+        {isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ ROUTINE TERMINE À "+endTime}
+      </div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:isLate?"#FF4444":urgent?"#FFD700":"#fff",textAlign:"center",textShadow:`0 0 20px ${isLate?"#FF4444":urgent?"#FFD700":th.accent}`,letterSpacing:2,marginBottom:8}}>
+        {isLate?"+":""}{h>0?h+"h ":""}{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
+      </div>
+      <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden"}}>
+        <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${th.primary},${isLate?"#FF4444":th.accent})`,transition:"width 1s ease"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── WEEK VIEW ───────────────────────────────────────────────
+function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx }) {
+  const allTasks = [...TASK_CATALOG, ...(config.customTasks||[])];
+  return (
+    <div style={{overflowX:"auto",paddingBottom:8}}>
+      <div style={{display:"grid",gridTemplateColumns:`120px repeat(7,1fr)`,gap:2,minWidth:700}}>
+        {/* Header */}
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555",display:"flex",alignItems:"center",justifyContent:"center"}}>TÂCHE</div>
+        {DAYS_SHORT.map((d,i)=>(
+          <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"#888",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
+            {d}{i===todayDayIdx&&<div style={{fontSize:5,color:th.accent,marginTop:2}}>▲</div>}
+          </div>
+        ))}
+        {/* Rows per assignment */}
+        {config.assignments.map(ass=>{
+          const task=allTasks.find(t=>t.id===ass.taskId);
+          if(!task)return null;
+          const assignedPlayers=config.players.filter(p=>ass.playerIds.includes(p.id));
+          return [
+            <div key={ass.instanceId+"_label"} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px",background:"rgba(0,0,0,0.4)",borderRadius:3}}>
+              <span style={{fontSize:16}}>{task.emoji}</span>
+              <div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ddd",lineHeight:1.2}}>{task.label}</div>
+                <div style={{display:"flex",gap:3}}>
+                  {assignedPlayers.map(pl=><div key={pl.id} style={{width:8,height:8,borderRadius:"50%",background:pl.color}}/>)}
+                </div>
+              </div>
+            </div>,
+            ...DAYS_SHORT.map((_,dayIdx)=>{
+              const inDay=ass.days.includes(dayIdx)||(ass.days.length===0);
+              if(!inDay)return <div key={ass.instanceId+"_d"+dayIdx} style={{background:"rgba(0,0,0,0.2)",borderRadius:3}}/>;
+              return (
+                <div key={ass.instanceId+"_d"+dayIdx} style={{padding:3}}>
+                  {ass.playerIds.map(pid=>{
+                    const pl=config.players.find(p=>p.id===pid);
+                    if(!pl)return null;
+                    const doneKey=`${ass.instanceId}_${pid}_${dayIdx}`;
+                    const done=gameState.completed?.includes(doneKey);
+                    return (
+                      <div key={pid} onClick={()=>!done&&onCompleteTask(ass,pid,dayIdx)}
+                        style={{background:done?`${pl.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${done?pl.color:"#333"}`,borderRadius:3,padding:"3px 4px",cursor:done?"default":"pointer",marginBottom:2,textAlign:"center",transition:"all 0.15s"}} title={displayName(pl)}>
+                        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:done?pl.color:"#555"}}>{done?"✓":displayName(pl).slice(0,3)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          ];
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── PLAYER DASHBOARD ────────────────────────────────────────
+
+// ─── AVATAR PARTS CATALOG ────────────────────────────────────
+const AVATAR_PARTS = {
+  skin: [
+    {id:"sk1",label:"Clair",  color:"#FFCC99"}, {id:"sk2",label:"Doré",   color:"#E8A060"},
+    {id:"sk3",label:"Brun",   color:"#C07840"}, {id:"sk4",label:"Foncé",  color:"#7B4A20"},
+    {id:"sk5",label:"Azur",   color:"#99CCFF"}, {id:"sk6",label:"Vert",   color:"#88CC88"},
+    {id:"sk7",label:"Rose",   color:"#FFAACC"}, {id:"sk8",label:"Violet", color:"#CC88FF"},
+  ],
+  eyes: [
+    {id:"ey1",emoji:"👀",label:"Normal",    eyeColor:"#333",  eyeShape:"round"},
+    {id:"ey2",emoji:"😊",label:"Joyeux",    eyeColor:"#2244AA",eyeShape:"happy"},
+    {id:"ey3",emoji:"😎",label:"Cool",      eyeColor:"#000",  eyeShape:"cool"},
+    {id:"ey4",emoji:"⭐",label:"Étoile",    eyeColor:"#FFD700",eyeShape:"star"},
+    {id:"ey5",emoji:"😺",label:"Chat",      eyeColor:"#00AA66",eyeShape:"cat"},
+    {id:"ey6",emoji:"👾",label:"Alien",     eyeColor:"#FF4444",eyeShape:"alien"},
+  ],
+  mouth: [
+    {id:"mo1",emoji:"😐",label:"Neutre",   color:"#CC6644"},
+    {id:"mo2",emoji:"😁",label:"Sourire",  color:"#CC4422"},
+    {id:"mo3",emoji:"😤",label:"Sérieux",  color:"#884422"},
+    {id:"mo4",emoji:"😛",label:"Langue",   color:"#FF4488"},
+    {id:"mo5",emoji:"😬",label:"Crispé",   color:"#AA5533"},
+    {id:"mo6",emoji:"🤐",label:"Secret",   color:"#556677"},
+  ],
+  hair: [
+    {id:"ha1",emoji:"🟤",label:"Brun court",  color:"#5C3317",style:"short"},
+    {id:"ha2",emoji:"⬛",label:"Noir",         color:"#111",   style:"short"},
+    {id:"ha3",emoji:"🟡",label:"Blond",        color:"#FFD700",style:"short"},
+    {id:"ha4",emoji:"🔴",label:"Roux",         color:"#CC4400",style:"short"},
+    {id:"ha5",emoji:"⚪",label:"Blanc",        color:"#EEE",   style:"short"},
+    {id:"ha6",emoji:"🟣",label:"Violet",       color:"#9933CC",style:"short"},
+    {id:"ha7",emoji:"🔵",label:"Bleu",         color:"#2244AA",style:"short"},
+    {id:"ha8",emoji:"🩷",label:"Rose",         color:"#FF69B4",style:"short"},
+  ],
+};
+
+const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
+
+// Render avatar to canvas (used both in-panel and in popup)
+function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72) {
+  const av = {...DEFAULT_AVATAR, ...avatarDef};
+  const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
+  const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
+  const mouthPart= AVATAR_PARTS.mouth.find(m=>m.id===av.mouth) || AVATAR_PARTS.mouth[0];
+  const hairPart = AVATAR_PARTS.hair.find(h=>h.id===av.hair) || AVATAR_PARTS.hair[0];
+  const sc = W/72; // scale factor
+  const s = (v) => Math.round(v*sc);
+
+  ctx.clearRect(0,0,W,H);
+  // Hair (back)
+  ctx.fillStyle = hairPart.color;
+  ctx.fillRect(s(3),s(0),s(30),s(8));
+  ctx.fillRect(s(0),s(4),s(4),s(18));
+  ctx.fillRect(s(29),s(4),s(4),s(18));
+  // Head
+  ctx.fillStyle = skinPart.color;
+  ctx.fillRect(s(3),s(2),s(30),s(22));
+  // Hair top
+  ctx.fillStyle = hairPart.color;
+  ctx.fillRect(s(3),s(2),s(30),s(5));
+  // Eyes
+  ctx.fillStyle = eyePart.eyeColor;
+  if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
+  else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#000";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
+  else if(eyePart.eyeShape==="star"){ctx.font=`${s(10)}px serif`;ctx.textAlign="center";ctx.fillText("★",s(12),s(15));ctx.fillText("★",s(24),s(15));}
+  else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
+  else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#000";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
+  else{ctx.fillRect(s(9),s(9),s(5),s(5));ctx.fillRect(s(21),s(9),s(5),s(5));}
+  // Mouth
+  ctx.fillStyle = mouthPart.color;
+  if(av.mouth==="mo2"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));}
+  else if(av.mouth==="mo4"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillStyle="#FF88AA";ctx.fillRect(s(14),s(21),s(8),s(4));}
+  else if(av.mouth==="mo6"){ctx.fillRect(s(10),s(18),s(16),s(2));ctx.fillRect(s(10),s(18),s(2),s(5));ctx.fillRect(s(24),s(18),s(2),s(5));}
+  else{ctx.fillRect(s(11),s(18),s(14),s(3));}
+  // Body
+  ctx.fillStyle = bodyColor || "#4A90D9";
+  ctx.fillRect(s(2),s(26),s(32),s(24));
+  // Outline
+  ctx.strokeStyle="#000"; ctx.lineWidth=1;
+  ctx.strokeRect(s(2),s(26),s(32),s(24));
+  // Arms
+  ctx.fillStyle = skinPart.color;
+  ctx.fillRect(s(-2),s(28),s(6),s(14));
+  ctx.fillRect(s(32),s(28),s(6),s(14));
+  ctx.strokeRect(s(-2),s(28),s(6),s(14));
+  ctx.strokeRect(s(32),s(28),s(6),s(14));
+  // Legs
+  ctx.fillStyle="#1A3A8A";
+  ctx.fillRect(s(6),s(50),s(12),s(14));
+  ctx.fillRect(s(20),s(50),s(12),s(14));
+  ctx.strokeRect(s(6),s(50),s(12),s(14));
+  ctx.strokeRect(s(20),s(50),s(12),s(14));
+}
+
+// Inline avatar component (renders canvas)
+function AvatarCanvas({ avatarDef, bodyColor, size=72, style={} }) {
+  const canvasRef = useRef(null);
+  useEffect(()=>{
+    const c=canvasRef.current; if(!c)return;
+    const ctx=c.getContext("2d");
+    renderAvatarToCtx(ctx, avatarDef||DEFAULT_AVATAR, bodyColor, size, size);
+  },[avatarDef, bodyColor, size]);
+  return <canvas ref={canvasRef} width={size} height={size}
+    style={{imageRendering:"pixelated",borderRadius:4,...style}}/>;
+}
+
+// ─── AVATAR POPUP (creator + inventory) ──────────────────────
+function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShopItems, th }) {
+  const [tab, setTab] = useState("creator"); // creator | inventory
+  const [partTab, setPartTab] = useState("skin");
+  const avatarDef = pState.avatar || DEFAULT_AVATAR;
+  const pt = getPlayerTheme(player.themeId);
+
+  const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id));
+  const eq = pState.equipped || {};
+
+  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux"};
+
+  const update = (part, id) => { SFX.click(); onUpdateAvatar({...avatarDef,[part]:id}); };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
+      <div style={{background:pt.bg||"#1a1a2e",border:`5px solid ${pt.accent||"#FFD700"}`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,boxShadow:`0 0 40px ${pt.glow||"#FFD700"}60`,overflowY:"auto"}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#FFD700"}}>{displayName(player)} — Mon Perso</div>
+          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Preview */}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"10px 0"}}>
+          <div style={{position:"relative"}}>
+            <AvatarCanvas avatarDef={avatarDef} bodyColor={pt.charBodyColor||player.color} size={120}
+              style={{border:`4px solid ${pt.accent||"#FFD700"}`,boxShadow:`0 0 20px ${pt.glow||"#FFD700"}50`}}/>
+            {eq.hat   && <span style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",fontSize:32,filter:"drop-shadow(0 2px 0 #000)"}}>{allShopItems.find(i=>i.id===eq.hat)?.emoji}</span>}
+            {eq.armor  && <span style={{position:"absolute",bottom:-14,right:-14,fontSize:26}}>{allShopItems.find(i=>i.id===eq.armor)?.emoji}</span>}
+            {eq.pet    && <span style={{position:"absolute",bottom:-14,left:-14,fontSize:26}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>}
+          </div>
+          <div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:player.color,marginBottom:6}}>{displayName(player)}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#FFD700",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId).title}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡ {pState.xp} XP</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.values(eq).filter(Boolean).length}</div>
+          </div>
+        </div>
+
+        {/* Main tabs */}
+        <div style={{display:"flex",gap:6}}>
+          {[["creator","✏️ Créer"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
+            <button key={k} onClick={()=>{setTab(k);SFX.click();}}
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px",background:tab===k?(pt.accent||"#FFD700"):"#222",color:tab===k?"#000":"#888",border:`2px solid ${tab===k?(pt.accent||"#FFD700"):"#444"}`,borderRadius:4,cursor:"pointer"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* CREATOR TAB */}
+        {tab==="creator" && <>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {Object.entries(PART_TABS).map(([k,l])=>(
+              <button key={k} onClick={()=>{setPartTab(k);SFX.click();}}
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 9px",background:partTab===k?(pt.accent||"#FFD700"):"#222",color:partTab===k?"#000":"#888",border:`2px solid ${partTab===k?(pt.accent||"#FFD700"):"#444"}`,borderRadius:3,cursor:"pointer"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {partTab==="skin" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {AVATAR_PARTS.skin.map(s=>(
+                <div key={s.id} onClick={()=>update("skin",s.id)}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.skin===s.id?s.color:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:avatarDef.skin===s.id?`0 0 10px ${s.color}80`:"none"}}>
+                  <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #000"}}/>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {partTab==="eyes" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+              {AVATAR_PARTS.eyes.map(e=>(
+                <div key={e.id} onClick={()=>update("eyes",e.id)}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:avatarDef.eyes===e.id?`${e.eyeColor}20`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.eyes===e.id?e.eyeColor:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+                  <span style={{fontSize:26}}>{e.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{e.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {partTab==="mouth" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+              {AVATAR_PARTS.mouth.map(m=>(
+                <div key={m.id} onClick={()=>update("mouth",m.id)}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:avatarDef.mouth===m.id?`${m.color}20`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.mouth===m.id?m.color:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+                  <span style={{fontSize:26}}>{m.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{m.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {partTab==="hair" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {AVATAR_PARTS.hair.map(h=>(
+                <div key={h.id} onClick={()=>update("hair",h.id)}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.hair===h.id?`${h.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.hair===h.id?h.color:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:avatarDef.hair===h.id?`0 0 10px ${h.color}60`:"none"}}>
+                  <div style={{width:28,height:14,background:h.color,borderRadius:"4px 4px 0 0",border:"2px solid #000"}}/>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc"}}>{h.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>}
+
+        {/* INVENTORY TAB */}
+        {tab==="inventory" && <>
+          {allOwned.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Ton inventaire est vide — achète des items dans la boutique!</div>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+            {allOwned.map(item=>{
+              const isEq = item.slot && eq[item.slot]===item.id;
+              return (
+                <div key={item.id} onClick={()=>{ if(item.slot){onEquip(item);SFX.click();} }}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",
+                    background:isEq?`${pt.accent}20`:"rgba(0,0,0,0.45)",
+                    border:`3px solid ${isEq?(pt.accent||"#2ECC40"):"#444"}`,borderRadius:5,cursor:item.slot?"pointer":"default",
+                    boxShadow:isEq?`0 0 10px ${pt.glow||"#FFD700"}60`:"none"}}>
+                  <span style={{fontSize:24}}>{item.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc",textAlign:"center",lineHeight:1.2}}>{item.name||item.label}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#2ECC40":"#888"}}>
+                    {isEq?"✅ ÉQUIPÉ":item.slot?"Équiper":"-"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, th }) {
+  const [shopTab, setShopTab] = useState("rewards");
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [themeRevealed, setThemeRevealed] = useState(false);
+  const T = th;
+  // Resolve random theme per player (stable per session via player.id)
+  const resolvedThemeId = player.themeId==="random"
+    ? (themeRevealed ? resolveRandomTheme(player.id) : "none")
+    : player.themeId;
+  const pt = getPlayerTheme(resolvedThemeId);
+  const isRandomUnrevealed = player.themeId==="random" && !themeRevealed;
+  const lv = getLevel(pState.xp);
+  const lvTitle = getLevelTitle(pState.xp, player.themeId);
+  const xbr = xpBar(pState.xp);
+  const xpPct = Math.min(100, (xbr.cur/xbr.needed)*100);
+  const myAssignments = assignments.filter(a=>a.playerIds.includes(player.id));
+  const themedCat = pt.shopCategory;
+  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  const SHOP_ITEMS = {
+    hats:[{id:"h1",emoji:"🎩",name:"Chapeau magique",cost:20,slot:"hat"},{id:"h2",emoji:"👑",name:"Couronne",cost:40,slot:"hat"},{id:"h3",emoji:"⛑",name:"Casque héros",cost:25,slot:"hat"},{id:"h4",emoji:"🪖",name:"Casque diamant",cost:35,slot:"hat"},{id:"h5",emoji:"🎓",name:"Chapeau savant",cost:30,slot:"hat"},{id:"h6",emoji:"🧢",name:"Cap champion",cost:15,slot:"hat"}],
+    armors:[{id:"a1",emoji:"🛡️",name:"Bouclier",cost:15,slot:"armor"},{id:"a2",emoji:"⚔️",name:"Épée",cost:20,slot:"armor"},{id:"a3",emoji:"🏹",name:"Arc en or",cost:35,slot:"armor"},{id:"a4",emoji:"💎",name:"Armure diamant",cost:50,slot:"armor"},{id:"a5",emoji:"🪄",name:"Bâton magique",cost:30,slot:"armor"}],
+    pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"}],
+  };
+  const eq = pState.equipped || {};
+  // hat/armor/pet resolved via allShopItemsFlat after it's declared below
+
+  const myRewards = allRewards.filter(r=>config.selectedRewards?.includes(r.id));
+  const allShopItemsFlat = [
+    ...SHOP_ITEMS.hats, ...SHOP_ITEMS.armors, ...SHOP_ITEMS.pets,
+    ...(pt.shopCategory?.items||[]),
+  ];
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px"}}>
+      {/* Player header card */}
+      <div style={{background:"rgba(0,0,0,0.55)",border:`4px solid #000`,borderTop:`4px solid ${player.color}`,borderRadius:6,padding:12,display:"flex",gap:12,alignItems:"center",boxShadow:`0 0 24px ${player.color}40`}}>
+        {/* Avatar — clickable → opens creator/inventory */}
+        <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setAvatarOpen(true);SFX.click();}} title="Personnaliser mon perso">
+          <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
+            style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
+          {eq.hat   && <span style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:22,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.hat)?.emoji}</span>}
+          {eq.armor && <span style={{position:"absolute",bottom:-10,right:-8,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.armor)?.emoji}</span>}
+          {eq.pet   && <span style={{position:"absolute",bottom:-10,left:-8,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>}
+          <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",whiteSpace:"nowrap"}}>✏️ Modifier</div>
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,14px)",color:player.color,marginBottom:3}}>{displayName(player)}</div>
+          {isRandomUnrevealed
+            ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FFD700",marginBottom:5}}>❓ THÈME MYSTÈRE</div>
+            : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#aaa",marginBottom:5,textShadow:`0 0 8px ${pt.glow}60`}}>Niv.{lvTitle.level} — {lvTitle.title}</div>
+          }
+          {isRandomUnrevealed && <button onClick={()=>{setThemeRevealed(true);SFX.epic();spawnParticles("🎲");}}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 12px",background:"linear-gradient(90deg,#FF4444,#FFD700,#44FF44)",color:"#000",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"3px 3px 0 #000",marginBottom:4}}>
+            🎲 RÉVÉLER MON THÈME!
+          </button>}
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",marginBottom:2}}>⚡ XP {pState.xp}</div>
+          <div style={{height:9,background:"#111",border:"2px solid #333",borderRadius:1,overflow:"hidden",marginBottom:6}}>
+            <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},#5DECF5)`,transition:"width 0.8s ease"}}/>
+          </div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#FFD700"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+        </div>
+      </div>
+
+      {/* Tasks */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES</div>
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucune quête assignée pour ce joueur.</div>}
+      {myAssignments.map(ass=>{
+        const task=allTasks.find(t=>t.id===ass.taskId);
+        if(!task)return null;
+        const doneKey=ass.instanceId+"_"+player.id;
+        const done=pState.completed?.includes(doneKey);
+        const pending=pState.pending?.includes(doneKey);
+        return (
+          <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":pending?"#FFD700":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
+            {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
+            <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
+            <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
+            </div>
+            {!done&&!pending&&<button onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
+              style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
+                color:"#000",background:player.color,border:"3px solid #000",borderRadius:3,cursor:"pointer",
+                boxShadow:"4px 4px 0 #000",transition:"all 0.08s"}}>
+              ✔ J'AI FAIT ÇA!
+            </button>}
+            {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
+              style={{width:"100%",padding:"6px",fontFamily:"'Press Start 2P',monospace",fontSize:"7px",
+                color:"#000",background:"#FF8C00",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
+              ⚡ OVERRIDE (parent)
+            </button>}
+            {done&&parentMode&&<button onClick={()=>onDeComplete(ass.instanceId+"_"+player.id, playerIdx)}
+              style={{position:"absolute",top:4,right:4,padding:"3px 7px",fontFamily:"'Press Start 2P',monospace",fontSize:"6px",
+                color:"#FF4444",background:"rgba(0,0,0,0.7)",border:"1px solid #FF4444",borderRadius:2,cursor:"pointer",zIndex:10}}>
+              ↩️ Annuler
+            </button>}
+            {pending&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",textAlign:"center",marginTop:4}}>⏳ En attente de parent…</div>}
+          </div>
+        );
+      })}
+
+      {/* Shop */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:4}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
+      <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #FFD700",borderRadius:5,padding:10}}>
+        <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
+          {Object.entries(SHOP_TABS).map(([k,l])=>(
+            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#FFD700":"#222",color:shopTab===k?"#000":"#888",border:`2px solid ${shopTab===k?"#FFD700":"#555"}`,borderRadius:2,cursor:"pointer"}}>{l}</button>
+          ))}
+        </div>
+        {shopTab==="rewards" && (
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {myRewards.map(r=>{
+              const canBuy=pState.coins>=r.coins;
+              const bought=pState.boughtRewards?.includes(r.id);
+              return (
+                <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${bought?"#2ECC40":canBuy?"#FFD700":"#333"}`,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
+                  <span style={{fontSize:22}}>{r.emoji}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#2ECC40":"#ddd"}}>{r.label}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#2ECC40":"#FFD700"}}>{bought?"RÉCLAMÉ!":r.coins+" 🪙"}</div>
+                  </div>
+                  {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
+                  {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {shopTab!=="rewards" && (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
+            {(SHOP_ITEMS[shopTab]||[]).map(item=>{
+              const owned=pState.owned?.includes(item.id);
+              const equipped=eq[item.slot]===item.id;
+              const canAfford=pState.coins>=item.cost;
+              return (
+                <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
+                  style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${equipped?"#2ECC40":owned?"#888":canAfford?"#555":"#333"}`,borderRadius:4,padding:"7px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.4:1}}>
+                  <span style={{fontSize:20,display:"block",marginBottom:2}}>{item.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#2ECC40":owned?"#888":"#FFD700"}}>{equipped?"✅ ON":owned?"Équiper":item.cost+" 🪙"}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    {/* Avatar popup */}
+    {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
+      onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
+      allShopItems={allShopItemsFlat} th={th}/>}
+    </div>
+  );
+}
+
+// ─── FAMILY OVERVIEW ─────────────────────────────────────────
+function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
+  const totalAssignments = config.assignments.length;
+  return (
+    <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
+      {/* Player cards grid */}
+      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:10}}>
+        {config.players.map((player,i)=>{
+          const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
+          const myDone=config.assignments.filter(a=>a.playerIds.includes(player.id)&&ps.completed?.some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
+          const myTotal=config.assignments.filter(a=>a.playerIds.includes(player.id)).length;
+          const pct=myTotal>0?Math.round((myDone/myTotal)*100):0;
+          const lv=getLevel(ps.xp);
+          return (
+            <div key={player.id} onClick={()=>{SFX.click();onSelectPlayer(i);}}
+              style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${player.color}`,borderRadius:8,padding:14,cursor:"pointer",transition:"all 0.15s",boxShadow:`0 0 0 0 ${player.color}`}} onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 16px ${player.color}60`} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+              <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+                <AvatarCanvas avatarDef={gameStates[i]?.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(player.themeId).charBodyColor||player.color} size={44}
+                  style={{border:`3px solid ${player.color}`,borderRadius:5}}/>
+                <div>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:player.color}}>{displayName(player)}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Niv.{getLevelTitle(ps.xp,player.themeId).level} — {getLevelTitle(ps.xp,player.themeId).title}</div>
+                </div>
+              </div>
+              {/* Progress */}
+              <div style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>Quêtes</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color}}>{myDone}/{myTotal}</span>
+                </div>
+                <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.8s ease"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡ {ps.xp}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>🪙 {ps.coins}</span>
+              </div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,marginTop:8,textAlign:"center"}}>Voir mon tableau →</div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Week view if mode=week */}
+      {config.mode==="week"&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginTop:4}}>📅 Plan de la semaine — défiler →</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════
+
+// ─── PARENT PANEL ────────────────────────────────────────────
+function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
+  onClose, onUndo, onReset, onResetPlayer, onAdjustXP, onChangePin,
+  onExport, onImport, onSetup, players, th }) {
+  const [tab, setTab] = useState("actions"); // actions | log | pin | export
+  const [xpPlayer, setXpPlayer] = useState(0);
+  const [xpDelta, setXpDelta] = useState(10);
+  const [pinVal, setPinVal] = useState("");
+  const T = th;
+
+  const TabBtn = ({k,l}) => (
+    <button onClick={()=>setTab(k)} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",
+      padding:"8px 4px",background:tab===k?"#FF8C00":"#222",color:tab===k?"#000":"#888",
+      border:`2px solid ${tab===k?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer"}}>
+      {l}
+    </button>
+  );
+  const Row = ({children,style={}}) => <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,...style}}>{children}</div>;
+  const PBtn = ({onClick,color="#333",textColor="#fff",children,style={}}) => (
+    <button onClick={onClick} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",
+      padding:"8px 12px",background:color,color:textColor,border:"2px solid #000",borderRadius:3,
+      cursor:"pointer",boxShadow:"2px 2px 0 #000",flexShrink:0,...style}}>
+      {children}
+    </button>
+  );
+
+  return (
+    <div style={{position:"fixed",top:0,right:0,bottom:0,width:"min(340px,90vw)",
+      background:"#0d0d0d",borderLeft:"4px solid #FF8C00",zIndex:500,
+      display:"flex",flexDirection:"column",boxShadow:"-4px 0 30px rgba(255,140,0,0.3)",
+      animation:"slideInRight 0.25s ease"}}>
+      <style>{`@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+
+      {/* Header */}
+      <div style={{background:"#FF8C00",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",color:"#000"}}>🔓 MODE PARENT</div>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,
+          padding:"5px 10px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>✕</button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111"}}>
+        <TabBtn k="actions" l="⚡ Actions"/>
+        <TabBtn k="log"     l="📋 Log"/>
+        <TabBtn k="pin"     l="🔐 PIN"/>
+        <TabBtn k="export"  l="💾 Data"/>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:"12px 14px"}}>
+
+        {/* ACTIONS TAB */}
+        {tab==="actions" && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>ACTIONS GLOBALES</div>
+          <Row>
+            {undoStack.length>0
+              ? <PBtn onClick={onUndo} color="#FF6464" textColor="#000" style={{flex:1}}>↩️ Annuler dernière</PBtn>
+              : <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#444"}}>Rien à annuler</div>}
+          </Row>
+          <Row>
+            <PBtn onClick={()=>onSetup()} color="#333" textColor="#888" style={{flex:1}}>⚙️ Reconfigurer</PBtn>
+          </Row>
+
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"14px 0 8px"}}>PAR JOUEUR</div>
+          {players.map((pl,i)=>(
+            <div key={pl.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl.color}30`,borderRadius:5,padding:"10px",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:pl.color,flexShrink:0}}/>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pl.color}}>{displayName(pl)}</span>
+                <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginLeft:"auto"}}>
+                  ⚡{gameStates[i]?.xp||0} 🪙{gameStates[i]?.coins||0}
+                </span>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <PBtn onClick={()=>onAdjustXP(i,10)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 XP</PBtn>
+                <PBtn onClick={()=>onAdjustXP(i,25)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+25 XP</PBtn>
+                <PBtn onClick={()=>onAdjustXP(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 XP</PBtn>
+                <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#FF4444" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 Reset</PBtn>
+              </div>
+            </div>
+          ))}
+        </>}
+
+        {/* LOG TAB */}
+        {tab==="log" && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
+          {actionLog.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444"}}>Aucune action encore.</div>}
+          {actionLog.map((entry,i)=>(
+            <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1a1a1a"}}>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",flexShrink:0,marginTop:2}}>{entry.time}</span>
+              <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:entry.color||"#aaa",lineHeight:1.3}}>{entry.msg}</span>
+            </div>
+          ))}
+        </>}
+
+        {/* PIN TAB */}
+        {tab==="pin" && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>CHANGER LE PIN</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:10}}>PIN actuel: {config.pin}</div>
+          <input type="password" inputMode="numeric" maxLength={4} value={pinVal}
+            onChange={e=>setPinVal(e.target.value.replace(/\D/g,"").slice(0,4))}
+            placeholder="Nouveau PIN (4 chiffres)"
+            style={{width:"100%",background:"#111",border:"2px solid #FF8C00",color:"#fff",
+              padding:"12px",fontFamily:"'Press Start 2P',monospace",fontSize:18,
+              borderRadius:3,textAlign:"center",letterSpacing:8,marginBottom:10}}/>
+          <PBtn onClick={()=>{if(pinVal.length===4){onChangePin(pinVal);setPinVal("");}}}
+            color={pinVal.length===4?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:pinVal.length===4?1:0.5}}>
+            ✓ Confirmer
+          </PBtn>
+        </>}
+
+        {/* EXPORT TAB */}
+        {tab==="export" && <>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>DONNÉES</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12,lineHeight:1.4}}>
+            Exporte la config pour la partager avec un autre appareil ou faire une sauvegarde.
+          </div>
+          <PBtn onClick={onExport} color="#1a3a1a" textColor="#2ECC40" style={{width:"100%",marginBottom:10}}>
+            📤 Exporter config JSON
+          </PBtn>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Importer une config sauvegardée:</div>
+          <label style={{display:"block",padding:"10px",background:"#111",border:"2px dashed #444",
+            borderRadius:3,cursor:"pointer",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",textAlign:"center"}}>
+            📥 Choisir un fichier .json
+            <input type="file" accept=".json" onChange={e=>e.target.files[0]&&onImport(e.target.files[0])} style={{display:"none"}}/>
+          </label>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:10,lineHeight:1.4}}>
+            Futur: synchronisation Supabase temps réel entre tous les appareils.
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [screen, setScreen] = useState("loading"); // loading|setup|game
+  const [config, setConfig] = useState(null);
+  const [gameStates, setGameStates] = useState([]); // per-player
+  const [view, setView] = useState("family"); // "family"|0|1|2|3
+  const [pendingValidation, setPendingValidation] = useState(null); // {ass,playerId,playerIdx,clickX,clickY}
+  const [parentPinOpen, setParentPinOpen] = useState(false);
+  const [parentMode, setParentMode] = useState(false);
+  const [parentPanel, setParentPanel] = useState(false); // slide-out panel
+  const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
+  const [undoStack, setUndoStack] = useState([]);
+  const [pinChangeMode, setPinChangeMode] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [toast, setToast] = useState(null);
+  const [rewardPopup, setRewardPopup] = useState(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
+
+  // Load
+  useEffect(()=>{
+    load().then(data=>{
+      if(data?.config&&data?.gameStates){ setConfig(data.config); setGameStates(data.gameStates); setScreen("game"); }
+      else setScreen("setup");
+    });
+  },[]);
+
+  const persist = useCallback((cfg,gs) => save({config:cfg,gameStates:gs,savedAt:new Date().toISOString()}), []);
+
+  const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
+  const logAction = useCallback((msg,color="#FF8C00")=>{
+    const entry={time:new Date().toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"}),msg,color};
+    setActionLog(l=>[entry,...l.slice(0,19)]);
+  },[]);
+
+  const todayDayIdx = (now.getDay()+6)%7; // Mon=0
+
+  // Handle setup complete
+  const handleSetupDone = useCallback((cfg) => {
+    const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[] }));
+    setConfig(cfg); setGameStates(gs); setScreen("game"); setView("family");
+    persist(cfg,gs);
+    setTimeout(()=>SFX.welcome(),300);
+  },[persist]);
+
+  // Request complete
+  const requestComplete = useCallback((ass,playerId,evt) => {
+    const playerIdx = config.players.findIndex(p=>p.id===playerId);
+    if(playerIdx<0)return;
+    const gs=gameStates[playerIdx];
+    const doneKey=ass.instanceId+"_"+playerId;
+    if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
+    const rect=evt?.target?.getBoundingClientRect?.()||{left:window.innerWidth/2,top:window.innerHeight/2,width:0,height:0};
+    setPendingValidation({ass,playerId,playerIdx,clickX:rect.left+rect.width/2,clickY:rect.top+rect.height/2,doneKey});
+    // mark pending
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
+  },[config,gameStates,persist]);
+
+  // PIN success
+  const handlePinSuccess = useCallback(()=>{
+    if(!pendingValidation)return;
+    const {ass,playerId,playerIdx,clickX,clickY,doneKey}=pendingValidation;
+    setPendingValidation(null);
+    const task=(config.customTasks||[]).concat(TASK_CATALOG).find(t=>t.id===ass.taskId);
+    if(!task)return;
+    const player=config.players[playerIdx];
+    setGameStates(gs=>{
+      const p=gs[playerIdx];
+      const prevLv=getLevel(p.xp).level;
+      const newXp=p.xp+task.xp, newCoins=p.coins+task.coins;
+      const newLv=getLevel(newXp).level;
+      const n=[...gs]; n[playerIdx]={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
+      persist(config,n);
+      setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
+      setTimeout(()=>{
+        spawnParticles(task.emoji);
+        if(task.xp>=35){SFX.epic();}else{SFX.task();}
+        setRewardPopup({task,player});
+      },100);
+      return n;
+    });
+  },[pendingValidation,config,persist]);
+
+  const handlePinCancel = useCallback(()=>{
+    if(!pendingValidation)return;
+    const {playerIdx,doneKey}=pendingValidation;
+    setPendingValidation(null);
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
+  },[pendingValidation,config,persist]);
+
+  // Buy / equip
+  const handleBuy = useCallback((item,playerId)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    setGameStates(gs=>{
+      const p=gs[idx];
+      const isReward=!item.slot;
+      if(p.coins<item.cost)return gs;
+      SFX.buy();
+      const n=[...gs]; n[idx]={...p,coins:p.coins-item.cost,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{})};
+      persist(config,n);
+      showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#FFD700");
+      spawnParticles(item.emoji||"🎉");
+      return n;
+    });
+  },[config,persist,showToast]);
+
+  const handleUpdateAvatar = useCallback((avatarDef, playerId)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    setGameStates(gs=>{ const n=[...gs]; n[idx]={...n[idx],avatar:avatarDef}; persist(config,n); return n; });
+  },[config,persist]);
+
+  const handleEquip = useCallback((item,playerId)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    setGameStates(gs=>{ const n=[...gs]; n[idx]={...n[idx],equipped:{...(n[idx].equipped||{}),[item.slot]:item.id}}; persist(config,n); return n; });
+    showToast(`✅ ${item.emoji} équipé!`,"#2ECC40");
+  },[config,persist,showToast]);
+
+  // ── Parent mode actions ──────────────────────────────────
+  const handleDeComplete = useCallback((doneKey, playerIdx) => {
+    const player = config.players[playerIdx];
+    const assId = doneKey.split("_")[0];
+    const ass = config.assignments.find(a=>a.instanceId===assId);
+    const task = ass ? [...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId) : null;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      n[playerIdx]={...p, xp:Math.max(0,p.xp-(task?.xp||0)), coins:Math.max(0,p.coins-(task?.coins||0)),
+        completed:(p.completed||[]).filter(k=>k!==doneKey)};
+      persist(config,n); return n; });
+    logAction(`↩️ ${player?.name}: tâche annulée (${task?.label||doneKey})`,"#FF8C00");
+    showToast(`↩️ Tâche annulée pour ${player?.name}`,"#FF8C00");
+  },[config,persist,logAction,showToast]);
+
+  const handleAdjustXP = useCallback((playerIdx, delta) => {
+    const player = config.players[playerIdx];
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],xp:Math.max(0,n[playerIdx].xp+delta),coins:Math.max(0,n[playerIdx].coins+(delta>0?Math.abs(Math.floor(delta/2)):0))}; persist(config,n); return n; });
+    logAction(`${delta>0?"+":""}${delta} XP → ${player?.name}`,"#5DECF5");
+    showToast(`${delta>0?"+":""}}${delta} XP pour ${player?.name}`,"#5DECF5");
+  },[config,persist,logAction,showToast]);
+
+  const handleForceComplete = useCallback((ass, playerId) => {
+    const playerIdx=config.players.findIndex(p=>p.id===playerId); if(playerIdx<0)return;
+    const player=config.players[playerIdx];
+    const doneKey=ass.instanceId+"_"+playerId;
+    const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId);
+    if(!task)return;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      if(p.completed?.includes(doneKey))return gs;
+      n[playerIdx]={...p,xp:p.xp+task.xp,coins:p.coins+task.coins,
+        completed:[...new Set([...(p.completed||[]),doneKey])],
+        pending:(p.pending||[]).filter(k=>k!==doneKey)};
+      persist(config,n); return n; });
+    logAction(`✅ Override: ${player?.name} — ${task.label}`,"#2ECC40");
+    showToast(`✅ Tâche forcée pour ${player?.name}`,"#2ECC40");
+    spawnParticles(task.emoji);
+  },[config,persist,logAction,showToast]);
+
+  const handleResetPlayer = useCallback((playerIdx) => {
+    const player=config.players[playerIdx];
+    if(!window.confirm(`Reset ${player?.name}? XP, pièces et tâches seront à 0.`))return;
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
+    logAction(`🔄 Reset complet: ${player?.name}`,"#FF4444");
+    showToast(`🔄 ${player?.name} réinitialisé`,"#FF4444");
+  },[config,persist,logAction,showToast]);
+
+  const handleExport = useCallback(() => {
+    exportConfig(config, gameStates);
+    logAction("📤 Config exportée","#888");
+    showToast("📤 Fichier téléchargé!","#888");
+  },[config, gameStates, logAction, showToast]);
+
+  const handleImport = useCallback((file) => {
+    importConfig(file, ({config:c, gameStates:gs}) => {
+      setConfig(c); setGameStates(gs); setScreen("game");
+      persist(c, gs);
+      showToast("📥 Config importée!","#2ECC40");
+      logAction("📥 Config importée","#2ECC40");
+    });
+  },[persist, showToast, logAction]);
+
+  const handleChangePin = useCallback((p) => {
+    if(p.length!==4||!/^\d{4}$/.test(p))return;
+    const newConfig={...config,pin:p};
+    setConfig(newConfig);
+    persist(newConfig,gameStates);
+    logAction(`🔐 PIN changé`,"#888");
+    showToast("🔐 PIN mis à jour!","#888");
+    setPinChangeMode(false); setNewPin("");
+  },[config,gameStates,persist,logAction,showToast]);
+
+  const handleUndo = useCallback(()=>{
+    if(!undoStack.length)return;
+    const last=undoStack[undoStack.length-1]; setUndoStack(u=>u.slice(0,-1));
+    setGameStates(gs=>{ const n=[...gs]; const p=n[last.playerIdx]; n[last.playerIdx]={...p,xp:Math.max(0,p.xp-last.xp),coins:Math.max(0,p.coins-last.coins),completed:(p.completed||[]).filter(k=>k!==last.doneKey)}; persist(config,n); return n; });
+    showToast("↩️ Action annulée!","#FF8C00");
+  },[undoStack,config,persist,showToast]);
+
+  const allTasks = [...TASK_CATALOG,...(config?.customTasks||[])];
+  const allRewards = [...REWARD_CATALOG,...(config?.customRewards||[])];
+  // Resolve week theme (random_week → pick based on current week number)
+  const weekNum = Math.ceil(new Date().getDate()/7) + new Date().getMonth()*4;
+  const resolvedWeekTheme = config?.theme==="random_week"
+    ? THEMES[resolveWeekRandomTheme(weekNum)] || THEMES.minecraft
+    : THEMES[config?.theme||"minecraft"];
+  const th = resolvedWeekTheme;
+
+  // Clock display
+  const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0"), S=String(now.getSeconds()).padStart(2,"0");
+  const daysArr=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"],mthArr=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
+  const dateStr=`${daysArr[now.getDay()]} ${now.getDate()} ${mthArr[now.getMonth()]}`;
+
+  // Day progress (routine: 6h–routineEnd, week: Mon–Sun)
+  const dayPct = useMemo(()=>{
+    if(!config)return 0;
+    if(config.mode==="routine"){ const [eh,em]=(config.routineEnd||"08:30").split(":").map(Number); const s=new Date();s.setHours(6,0,0,0); const e=new Date();e.setHours(eh,em,0,0); return Math.max(0,Math.min(100,((now-s)/(e-s))*100)); }
+    if(config.mode==="week"){ return Math.round((todayDayIdx/6)*100); }
+    return 0;
+  },[config,now,todayDayIdx]);
+
+  if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
+  if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
+
+  const currentPlayerView = typeof view==="number" ? view : null;
+  const currentPlayer = currentPlayerView!==null ? config.players[currentPlayerView] : null;
+  const currentPlayerState = currentPlayerView!==null ? gameStates[currentPlayerView] : null;
+
+  return (
+    <div style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
+      <style>{GLOBAL_CSS+`
+        .nav-btn:hover{opacity:0.85;}
+        .task-card:hover{transform:translateY(-1px);}
+      `}</style>
+      <div style={{position:"fixed",inset:0,background:`radial-gradient(ellipse at 30% 0%,${th.primary}18 0%,transparent 60%)`,zIndex:0,pointerEvents:"none"}}/>
+
+      {/* ── HEADER ── */}
+      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(135deg,${th.bg}EE,#1a1a1aEE)`,borderBottom:`5px solid ${th.accent}`,padding:"8px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        {/* Title + mode badge */}
+        <div style={{flex:1,minWidth:120}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent,textShadow:"2px 2px 0 #000"}}>⚔️ JOURNÉE ÉPIQUE</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{config.mode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
+        </div>
+        {/* Clock */}
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(14px,2.5vw,22px)",color:"#5DECF5",textShadow:`0 0 12px #5DECF5`,animation:"clkPulse 1s infinite alternate"}}>{H}:{M}:{S}</div>
+        {/* Date */}
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#666"}}>{dateStr}</div>
+        {/* Parent controls */}
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={()=>{SFX.click();if(parentMode){setParentPanel(p=>!p);}else{setParentPinOpen(true);}}}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",
+              background:parentMode?"#FF8C00":"#222",color:parentMode?"#000":"#888",
+              border:`2px solid ${parentMode?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer",
+              boxShadow:parentMode?"0 0 10px #FF8C0060":"none"}}>
+            {parentMode?"🔓 PARENT ▸":"🔐"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── ROUTINE COUNTDOWN (sticky below header) ── */}
+      {config.mode==="routine"&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={config.routineEnd||"08:30"} th={th}/></div>}
+
+      {/* ── DAY PROGRESS ── */}
+      <div style={{padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{config.mode==="routine"?"6h00":"Lun"}</span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>
+            {config.mode==="routine"?"⏱ Progression":"📅 Semaine — "+DAYS_SHORT[todayDayIdx]}
+          </span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{config.mode==="routine"?config.routineEnd:"Dim"}</span>
+        </div>
+        <div style={{height:12,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden",position:"relative"}}>
+          <div style={{height:"100%",width:dayPct+"%",background:`linear-gradient(90deg,${th.primary},${th.accent})`,transition:"width 1s ease",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",animation:"shimmer 2s infinite"}}/>
+          </div>
+          {config.mode==="week"&&DAYS_SHORT.map((d,i)=><div key={i} style={{position:"absolute",top:0,left:`${(i/6)*100}%`,width:1,height:"100%",background:"rgba(255,255,255,0.1)"}}/>)}
+        </div>
+      </div>
+
+      {/* ── PLAYER NAV ── */}
+      <div style={{display:"flex",gap:0,background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
+        <button onClick={()=>{setView("family");SFX.click();}} className="nav-btn"
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          👨‍👩‍👧‍👦 Famille
+        </button>
+        {config.players.map((pl,i)=>(
+          <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none",textShadow:view===i?"none":`0 0 8px ${getPlayerTheme(pl.themeId).glow}40`}}>
+            {displayName(pl)}
+          </button>
+        ))}
+        {config.mode==="week"&&<button onClick={()=>{setView("week");SFX.click();}} className="nav-btn"
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="week"?th.accent:"transparent",color:view==="week"?"#000":"#888",border:"none",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:"auto"}}>
+          📅 Semaine
+        </button>}
+      </div>
+
+      {/* ── CONTENT ── */}
+      <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto"}}>
+        {view==="family"&&(
+          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} th={th}/>
+        )}
+        {typeof view==="number"&&(
+          <PlayerDashboard
+            player={config.players[view]}
+            pState={gameStates[view]||{xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[]}}
+            config={config}
+            assignments={config.assignments}
+            allTasks={allTasks}
+            allRewards={allRewards}
+            onRequestComplete={requestComplete}
+            onBuy={handleBuy}
+            onEquip={handleEquip}
+            th={th}
+          />
+        )}
+        {view==="week"&&config.mode==="week"&&(
+          <div style={{padding:12}}>
+            <WeekView config={config} gameState={gameStates[0]||{completed:[]}} onCompleteTask={(ass,pid,dayIdx)=>{}} th={th} todayDayIdx={todayDayIdx}/>
+          </div>
+        )}
+      </div>
+
+      {/* ── MODALS ── */}
+      {pendingValidation&&(
+        <PinPad pin={config.pin} label={`${(allTasks.find(t=>t.id===pendingValidation.ass.taskId))||{emoji:"",label:"Tâche"}}`.length>0?`${allTasks.find(t=>t.id===pendingValidation.ass.taskId)?.emoji||""} ${allTasks.find(t=>t.id===pendingValidation.ass.taskId)?.label||"Tâche"}`:"Tâche"} onSuccess={handlePinSuccess} onCancel={handlePinCancel} th={th}/>
+      )}
+      {/* Parent Panel slide-out */}
+      {parentMode && parentPanel && (
+        <ParentPanel
+          config={config} gameStates={gameStates} parentMode={parentMode}
+          actionLog={actionLog} undoStack={undoStack} players={config.players} th={th}
+          onClose={()=>setParentPanel(false)}
+          onUndo={handleUndo}
+          onReset={()=>{ if(window.confirm("Reset tous les joueurs?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
+          onResetPlayer={handleResetPlayer}
+          onAdjustXP={handleAdjustXP}
+          onChangePin={handleChangePin}
+          onExport={handleExport}
+          onImport={handleImport}
+          onSetup={()=>{ setScreen("setup"); setParentPanel(false); }}
+        />
+      )}
+
+      {parentPinOpen&&(
+        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{setParentMode(p=>!p);setParentPinOpen(false);showToast(parentMode?"🔒 Mode parent désactivé":"🔓 Mode parent activé!","#FF8C00");}} onCancel={()=>setParentPinOpen(false)} th={th}/>
+      )}
+      {rewardPopup&&(
+        <RewardPopup task={rewardPopup.task} player={rewardPopup.player} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
+      )}
+      {toast&&<Toast msg={toast.msg} color={toast.color}/>}
+
+      {/* ── VERSION FOOTER ── */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"5px 12px",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:50,borderTop:"1px solid #222"}}>
+        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#444"}}>Livre de Quêtes v{APP_VERSION}</span>
+        <button
+          onClick={()=>{
+            const subject=encodeURIComponent(`[Bug v${APP_VERSION}] `);
+            const body=encodeURIComponent(`Version: ${APP_VERSION}\nDate: ${new Date().toLocaleString("fr-CA")}\n\nDécris le bug ici:\n\n`);
+            window.location.href=`mailto:${BUG_EMAIL}?subject=${subject}&body=${body}`;
+          }}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"3px 8px",background:"transparent",color:"#444",border:"1px solid #333",borderRadius:3,cursor:"pointer"}}
+          title="Rapporter un bug"
+        >🐛 bug</button>
+      </div>
+    </div>
+  );
+}
