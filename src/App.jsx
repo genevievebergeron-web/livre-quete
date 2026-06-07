@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -1049,6 +1049,21 @@ const GLOBAL_CSS = `
   @keyframes mixedBg{0%{background:#0a0a14}20%{background:#140a0a}40%{background:#0a140a}60%{background:#0a0a14}80%{background:#14140a}100%{background:#0a0a14}}
   @keyframes redPulse{from{box-shadow:0 0 8px #FF444440}to{box-shadow:0 0 20px #FF4444AA}}
   @keyframes slideIn{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+  @keyframes glowPulse{0%,100%{text-shadow:3px 3px 0 #000,0 0 12px currentColor}60%{text-shadow:3px 3px 0 #000,0 0 32px currentColor,0 0 54px currentColor}}
+  @keyframes blink{0%,100%{opacity:1}49%{opacity:1}50%,99%{opacity:0}}
+  @keyframes xpFill{from{width:0}to{width:var(--xp-target)}}
+  :root{--hp:#ff4444;--mp:#4488ff;--gold:#FFD700;--xp-clr:#4ade80;--xp-bg:#0d2010;}
+  .float-y{animation:floatY 2.4s ease-in-out infinite}
+  .float-y-slow{animation:floatY 3.2s ease-in-out infinite}
+  .glow-pulse{animation:glowPulse 2.8s ease-in-out infinite}
+  .blink{animation:blink 1.1s step-end infinite}
+  .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #000,0 0 28px #FFD70045,4px 4px 0 #000!important;border-radius:4px!important}
+  .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#000;border:3px solid #000;box-shadow:4px 4px 0 #000;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
+  .btn-pixel-primary:hover{box-shadow:2px 2px 0 #000;transform:translate(2px,2px)}
+  .hp-bar-fill{background:var(--hp);height:100%;border-radius:2px;transition:width 0.4s}
+  .mp-bar-fill{background:var(--mp);height:100%;border-radius:2px;transition:width 0.4s}
+  .xp-step-fill{background:var(--xp-clr);height:100%;border-radius:2px;transition:width 0.5s ease}
   input:focus{outline:none;}
   button:focus{outline:none;}
 `;
@@ -1394,21 +1409,40 @@ function SetupWizard({ existing, onDone }) {
     return true;
   };
 
+  const xpPct = Math.round((step / (STEPS.length - 1)) * 100);
+
   return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 12px",gap:16,overflowX:"hidden"}}>
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 12px",gap:12,overflowX:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
-      {/* Title */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2.5vw,22px)",color:T.accent,textShadow:`3px 3px 0 #000,0 0 20px ${T.accent}80`,textAlign:"center",marginTop:8}}>⚔️ LIVRE DE QUÊTES ⚔️</div>
-      {/* Step indicators */}
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
-        {STEPS.map((s,i)=>(
-          <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#333",color:i<=step?"#000":"#555",borderRadius:2,border:"2px solid #000",cursor:i<step?"pointer":"default"}}>
-            {i<step?"✓ ":""}{s}
-          </div>
-        ))}
+
+      {/* ── HEADER ── */}
+      <div style={{textAlign:"center",marginTop:8,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+        {/* Floating emoji flankers + title */}
+        <div style={{display:"flex",alignItems:"center",gap:"clamp(8px,2vw,20px)"}}>
+          <span className="float-y" style={{fontSize:"clamp(18px,3.5vw,32px)",animationDelay:"0s"}}>⚔️</span>
+          <span className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,2.2vw,20px)",color:T.accent}}>LIVRE DE QUÊTES</span>
+          <span className="float-y" style={{fontSize:"clamp(18px,3.5vw,32px)",animationDelay:"1.2s"}}>🛡️</span>
+        </div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(13px,1.8vw,18px)",color:"#666",letterSpacing:2}}>— CONFIGURATION —</div>
       </div>
 
-      <div style={{...card,maxWidth:680,width:"100%",animation:"slideIn 0.25s ease"}}>
+      {/* ── STEP INDICATORS + XP BAR ── */}
+      <div style={{width:"100%",maxWidth:680,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",justifyContent:"center"}}>
+          {STEPS.map((s,i)=>(
+            <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.75vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#222",color:i<=step?"#000":"#444",borderRadius:2,border:`2px solid ${i===step?"#000":i<step?"#000":"#333"}`,cursor:i<step?"pointer":"default",boxShadow:i===step?"3px 3px 0 #000":i<step?"2px 2px 0 #000":"none",transition:"all 0.15s"}}>
+              {i<step?"✓ ":""}{s}
+            </div>
+          ))}
+        </div>
+        {/* XP progress bar */}
+        <div style={{background:"var(--xp-bg)",border:"2px solid #1a3a1a",borderRadius:3,height:10,overflow:"hidden",position:"relative"}}>
+          <div className="xp-step-fill" style={{width:`${xpPct}%`,height:"100%"}}/>
+          <div style={{position:"absolute",right:6,top:0,fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#4ade8099",lineHeight:"10px"}}>{xpPct}% XP</div>
+        </div>
+      </div>
+
+      <div className="pixel-border-gold" style={{...card,maxWidth:680,width:"100%",animation:"slideIn 0.25s ease"}}>
 
         {/* ── STEP 0: Mode ── */}
         {step===0 && <>
@@ -1632,6 +1666,11 @@ function SetupWizard({ existing, onDone }) {
             ? <Btn active={canProceed()} onClick={()=>canProceed()&&setStep(s=>s+1)}>Suivant →</Btn>
             : <Btn active={canProceed()} onClick={()=>canProceed()&&finish()}>🚀 C'est parti!</Btn>}
         </div>
+      </div>
+
+      {/* ── FOOTER ── */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.7vw,7px)",color:"#444",letterSpacing:2,paddingBottom:8}}>
+        ▼ PRESS START TO CONTINUE <span className="blink">_</span>
       </div>
     </div>
   );
