@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.6.0", date:"2026-06-07", features:[
+    "🧒 Nouvelle connexion — Enfant ou Parent, puis choix du joueur",
+    "🎨 Onboarding 1er login — thème, avatar, surnom et code secret",
+    "📅 Calendrier examens/devoirs — rappels automatiques 3 jours avant",
+  ]},
   { version:"1.5.0", date:"2026-06-07", features:[
     "🔑 Code secret par joueur — chaque aventurier protège son compte",
   ]},
@@ -979,13 +984,23 @@ const load = async () => {
 
 // ─── DATA MIGRATION ── préserve les données des enfants entre les pushes ────
 // Ajoute les nouveaux champs sans jamais écraser les données existantes
-const migrateGameState = (gs) => ({
-  xp: 0, coins: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
-  ...gs, // données existantes gardées telles quelles
-  badges: gs.badges || [],        // nouveau champ v1.3.0
-  boughtRewards: gs.boughtRewards || [],
-  pin: gs.pin ?? null,            // nouveau champ v1.5.0 — null = pas encore créé
-});
+const migrateGameState = (gs) => {
+  const hasPin = gs.pin != null;
+  const oldAvatar = gs.avatar || {};
+  return {
+    xp: 0, coins: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
+    ...gs,
+    badges: gs.badges || [],
+    boughtRewards: gs.boughtRewards || [],
+    pin: gs.pin ?? null,
+    calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
+    avatar: {
+      skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
+      ...oldAvatar,
+      configured: oldAvatar.configured ?? hasPin, // v1.6.0 — true = onboarding complété
+    },
+  };
+};
 
 const migrateSavedData = (data) => {
   if (!data) return null;
@@ -1383,7 +1398,7 @@ function SetupWizard({ existing, onDone }) {
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 12px",gap:16,overflowX:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
       {/* Title */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2.5vw,22px)",color:T.accent,textShadow:`3px 3px 0 #000,0 0 20px ${T.accent}80`,textAlign:"center",marginTop:8}}>⚔️ JOURNÉE ÉPIQUE ⚔️</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2.5vw,22px)",color:T.accent,textShadow:`3px 3px 0 #000,0 0 20px ${T.accent}80`,textAlign:"center",marginTop:8}}>⚔️ LIVRE DE QUÊTES ⚔️</div>
       {/* Step indicators */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
         {STEPS.map((s,i)=>(
@@ -1950,10 +1965,12 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, onUpdateCalendar, th }) {
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
+  const [calForm, setCalForm] = useState({type:"devoir", label:"", date:""});
   const T = th;
   // Resolve random theme per player (stable per session via player.id)
   const resolvedThemeId = player.themeId==="random"
@@ -2013,6 +2030,32 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       </div>
 
+      {/* Calendar reminders */}
+      {(()=>{
+        const today = new Date().toISOString().split("T")[0];
+        const reminders = computeCalendarReminders(pState.calendar||[], today);
+        if (!reminders.length) return null;
+        return reminders.map(rem=>{
+          const doneKey = rem.instanceId+"_"+player.id;
+          const done = pState.completed?.includes(doneKey);
+          return (
+            <div key={rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":"#5DECF5"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
+              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#5DECF5",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
+              <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
+              </div>
+              {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
+                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+                ✔ J'AI ÉTUDIÉ!
+              </button>}
+            </div>
+          );
+        });
+      })()}
+
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES</div>
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucune quête assignée pour ce joueur.</div>}
@@ -2052,6 +2095,58 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
         );
       })}
+
+      {/* Calendar CRUD */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span>📅 MON CALENDRIER</span>
+        <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"3px 7px",background:calOpen?"#333":"transparent",color:calOpen?"#FFD700":"#555",border:"1px solid #333",borderRadius:2,cursor:"pointer"}}>
+          {calOpen?"✕ Fermer":"+ Ajouter"}
+        </button>
+      </div>
+      {calOpen && (
+        <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #5DECF5",borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{display:"flex",gap:6}}>
+            {[["devoir","📚 Devoir"],["examen","📝 Examen"]].map(([v,l])=>(
+              <button key={v} onClick={()=>{setCalForm(f=>({...f,type:v}));SFX.click();}}
+                style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px",background:calForm.type===v?"#5DECF5":"#1a1a1a",color:calForm.type===v?"#000":"#888",border:`2px solid ${calForm.type===v?"#5DECF5":"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <input value={calForm.label} onChange={e=>setCalForm(f=>({...f,label:e.target.value}))} placeholder={calForm.type==="examen"?"Maths, Français...":"Devoir de sciences..."} maxLength={40}
+            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
+          <input type="date" value={calForm.date} onChange={e=>setCalForm(f=>({...f,date:e.target.value}))}
+            style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
+          <button onClick={()=>{
+            if(!calForm.label.trim()||!calForm.date) return;
+            const newEntry={id:`cal_${Date.now()}`,type:calForm.type,label:calForm.label.trim(),date:calForm.date};
+            const newCal=[...(pState.calendar||[]),newEntry];
+            onUpdateCalendar&&onUpdateCalendar(newCal);
+            setCalForm({type:"devoir",label:"",date:""});
+            SFX.click();
+          }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:"#5DECF5",color:"#000",border:"none",borderRadius:3,cursor:"pointer"}}>
+            ✓ Enregistrer
+          </button>
+        </div>
+      )}
+      {(pState.calendar||[]).length>0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+          {[...(pState.calendar||[])].sort((a,b)=>a.date.localeCompare(b.date)).map(entry=>(
+            <div key={entry.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"rgba(0,0,0,0.4)",border:"1px solid #222",borderRadius:3}}>
+              <span style={{fontSize:14}}>{entry.type==="examen"?"📝":"📚"}</span>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{entry.label}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666"}}>{entry.date}</div>
+              </div>
+              {(parentMode||true)&&<button onClick={()=>{
+                const newCal=(pState.calendar||[]).filter(e=>e.id!==entry.id);
+                onUpdateCalendar&&onUpdateCalendar(newCal); SFX.click();
+              }} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Shop */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:4}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
@@ -2220,10 +2315,11 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
 
       {/* Tabs */}
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111"}}>
-        <TabBtn k="actions" l="⚡ Actions"/>
-        <TabBtn k="log"     l="📋 Log"/>
-        <TabBtn k="pin"     l="🔐 PIN"/>
-        <TabBtn k="export"  l="💾 Data"/>
+        <TabBtn k="actions"  l="⚡ Actions"/>
+        <TabBtn k="cal"      l="📅 Calendrier"/>
+        <TabBtn k="log"      l="📋 Log"/>
+        <TabBtn k="pin"      l="🔐 PIN"/>
+        <TabBtn k="export"   l="💾 Data"/>
       </div>
 
       {/* Content */}
@@ -2262,6 +2358,34 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
         </>}
 
         {/* LOG TAB */}
+        {/* CALENDAR TAB */}
+        {tab==="cal" && (()=>{
+          const allEntries = (gameStates||[]).flatMap((gs,i)=>{
+            const pl = config.players[i];
+            return (gs.calendar||[]).map(e=>({...e, playerName: pl?.name||"?", playerColor: pl?.color||"#888"}));
+          }).sort((a,b)=>a.date.localeCompare(b.date));
+          const today = new Date().toISOString().split("T")[0];
+          return (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>CALENDRIER COMMUN</div>
+              {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun devoir ou examen.</div>}
+              {allEntries.map(e=>(
+                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${e.date<today?"#333":e.date===today?"#FFD700":"#444"}`,borderRadius:4,marginBottom:6,opacity:e.date<today?0.4:1}}>
+                  <span style={{fontSize:16}}>{e.type==="examen"?"📝":"📚"}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
+                    <div style={{display:"flex",gap:6,marginTop:2}}>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.playerColor}}>{e.playerName}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#FFD700":"#666"}}>{e.date}</span>
+                      <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:e.type==="examen"?"#FF6B35":"#5DECF5"}}>{e.type}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {tab==="log" && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
           {/* Changelog de mise à jour */}
@@ -2351,137 +2475,369 @@ function PinKeypad({ onDigit, onBack, onClose, closeLabel="✕" }) {
 // ═══════════════════════════════════════════════════════════════
 // LOGIN SCREEN — "Qui joue?" + PIN par joueur
 // ═══════════════════════════════════════════════════════════════
-function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin }) {
-  // mode: "cards" | "player" | "parent"
-  const [mode, setMode] = useState("cards");
+// ─── CALENDAR HELPERS ────────────────────────────────────────────────────────
+// Compter N jours ouvrables (lun-ven) en remontant depuis une date
+const subWeekdays = (dateISO, n) => {
+  const d = new Date(dateISO); d.setHours(0,0,0,0);
+  let count = 0;
+  while (count < n) {
+    d.setDate(d.getDate() - 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  return d;
+};
+
+// Retourne les rappels actifs pour aujourd'hui
+const computeCalendarReminders = (calendar, today) => {
+  const t = new Date(today); t.setHours(0,0,0,0);
+  return (calendar || []).flatMap(entry => {
+    const examDate = new Date(entry.date); examDate.setHours(0,0,0,0);
+    if (t > examDate) return []; // dépassé
+    const triggerDate = subWeekdays(entry.date, 3);
+    if (t < triggerDate) return []; // trop tôt
+    const daysLeft = Math.round((examDate - t) / (1000*60*60*24));
+    return [{
+      id: `cal_${entry.id}`,
+      instanceId: `cal_${entry.id}`,
+      title: entry.type==="examen" ? `📅 Étudier: ${entry.label}` : `📅 Devoir: ${entry.label}`,
+      xp: entry.type==="examen" ? 20 : 10,
+      coins: entry.type==="examen" ? 5 : 3,
+      assignedTo: [],
+      _isCalendar: true,
+      _daysLeft: daysLeft,
+      _entryId: entry.id,
+    }];
+  });
+};
+
+function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin, onCompleteOnboarding }) {
+  // mode: "who" | "child-select" | "onboarding" | "pin" | "parent"
+  const [mode, setMode] = useState("who");
   const [selIdx, setSelIdx] = useState(null);
-  const [pPin, setPPin] = useState("");       // player pin input
-  const [ppPin, setPpPin] = useState("");     // parent pin input
-  const [confirmStep, setConfirmStep] = useState(false); // true = confirming new pin
+
+  // Onboarding steps: "theme" | "avatar" | "pseudo" | "pin-create" | "pin-confirm"
+  const [obStep, setObStep] = useState("theme");
+  const [draftTheme, setDraftTheme] = useState(null);
+  const [draftAvatar, setDraftAvatar] = useState({skin:"sk1",eyes:"ey1",mouth:"mo1",hair:"ha1"});
+  const [avatarTab, setAvatarTab] = useState("hair");
+  const [draftPseudo, setDraftPseudo] = useState("");
+  const [obFirstPin, setObFirstPin] = useState("");
+  const [obPin, setObPin] = useState("");
+
+  // Returning player PIN
+  const [pPin, setPPin] = useState("");
+  const [confirmStep, setConfirmStep] = useState(false);
   const [firstPin, setFirstPin] = useState("");
+
+  // Parent PIN
+  const [ppPin, setPpPin] = useState("");
   const [pinError, setPinError] = useState(false);
 
-  const resetToCards = () => { setMode("cards"); setSelIdx(null); setPPin(""); setPpPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false); };
+  const reset = () => {
+    setMode("who"); setSelIdx(null);
+    setObStep("theme"); setDraftTheme(null); setDraftAvatar({skin:"sk1",eyes:"ey1",mouth:"mo1",hair:"ha1"});
+    setDraftPseudo(""); setObFirstPin(""); setObPin("");
+    setPPin(""); setConfirmStep(false); setFirstPin("");
+    setPpPin(""); setPinError(false);
+  };
   const triggerError = (resetFn) => { setPinError(true); SFX.error?.(); setTimeout(()=>{ resetFn(); setPinError(false); }, 700); };
 
-  const handlePlayerCard = (i) => {
-    SFX.click(); setSelIdx(i); setMode("player");
-    setPPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false);
+  const handleChildSelect = (i) => {
+    SFX.click(); setSelIdx(i);
+    const ps = gameStates[i] || {};
+    const isFirstLogin = !ps.avatar?.configured && !ps.pin;
+    if (isFirstLogin) {
+      const pl = config.players[i];
+      const starters = pl.starterThemes || [];
+      setDraftTheme(starters[0] || pl.themeId || "none");
+      setDraftAvatar({skin:"sk1",eyes:"ey1",mouth:"mo1",hair:"ha1"});
+      setDraftPseudo(pl.pseudo || "");
+      setObStep("theme"); setObPin(""); setObFirstPin("");
+      setMode("onboarding");
+    } else {
+      setPPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false);
+      setMode("pin");
+    }
   };
 
+  // Returning player PIN
   const handlePlayerDigit = (d) => {
     const ps = gameStates[selIdx] || {};
     const next = (pPin + d).slice(0, 4);
     setPPin(next); setPinError(false);
     if (next.length < 4) return;
-
     if (!ps.pin) {
-      // ── Création du PIN ──
-      if (!confirmStep) {
-        setFirstPin(next); setPPin(""); setConfirmStep(true);
-      } else {
-        if (next === firstPin) {
-          onSetPlayerPin(selIdx, next);
-          onSelectPlayer(selIdx);
-        } else {
-          triggerError(()=>{ setPPin(""); setConfirmStep(false); setFirstPin(""); });
-        }
-      }
+      if (!confirmStep) { setFirstPin(next); setPPin(""); setConfirmStep(true); }
+      else if (next === firstPin) { onSetPlayerPin(selIdx, next); onSelectPlayer(selIdx); }
+      else triggerError(()=>{ setPPin(""); setConfirmStep(false); setFirstPin(""); });
     } else {
-      // ── Vérification ──
-      if (next === ps.pin) {
-        onSelectPlayer(selIdx);
-      } else {
-        triggerError(()=>setPPin(""));
-      }
+      if (next === ps.pin) onSelectPlayer(selIdx);
+      else triggerError(()=>setPPin(""));
     }
   };
 
+  // Parent PIN
   const handleParentDigit = (d) => {
     const next = (ppPin + d).slice(0, 4);
     setPpPin(next); setPinError(false);
     if (next.length === 4) {
-      if (next === config.pin) { resetToCards(); onParentLogin(); }
+      if (next === config.pin) { reset(); onParentLogin(); }
       else triggerError(()=>setPpPin(""));
     }
   };
 
-  // ── Rendu ──
+  // Onboarding PIN
+  const handleObPinDigit = (d) => {
+    const next = (obPin + d).slice(0, 4);
+    setObPin(next); setPinError(false);
+    if (next.length < 4) return;
+    if (obStep === "pin-create") { setObFirstPin(next); setObPin(""); setObStep("pin-confirm"); }
+    else {
+      if (next === obFirstPin) {
+        const pl = config.players[selIdx];
+        onCompleteOnboarding(selIdx, {
+          themeId: draftTheme || (pl.starterThemes||[])[0] || "none",
+          avatar: {...draftAvatar, configured: true},
+          pseudo: draftPseudo.trim() || pl.name,
+          pin: next,
+        });
+        onSelectPlayer(selIdx);
+      } else {
+        triggerError(()=>{ setObPin(""); setObStep("pin-create"); setObFirstPin(""); });
+      }
+    }
+  };
+
   const player = selIdx !== null ? config.players[selIdx] : null;
-  const ps     = selIdx !== null ? (gameStates[selIdx] || {}) : {};
-  const hasPin = !!ps.pin;
-  const pt     = player ? getPlayerTheme(player.themeId) : {};
+  const ps = selIdx !== null ? (gameStates[selIdx] || {}) : {};
   const accentColor = player?.color || "#FFD700";
 
-  // Titre du pavé PIN joueur
-  const pinTitle = !hasPin
-    ? (confirmStep ? "CONFIRME TON CODE" : "CRÉE TON CODE SECRET")
-    : "TON CODE SECRET";
-  const pinHint = !hasPin
-    ? (confirmStep ? "Entre-le une 2ème fois pour confirmer" : "Choisis 4 chiffres que tu n'oublies pas... ou que tu oublieras")
-    : null;
+  const BtnBack = ({onClick, label="← Retour"}) => (
+    <button onClick={()=>{SFX.click();onClick();}} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#444",background:"none",border:"none",cursor:"pointer",marginTop:8}}>{label}</button>
+  );
 
   return (
     <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#5DECF520 0%,transparent 60%)",pointerEvents:"none"}}/>
 
-      {mode === "cards" && (<>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,2vw,17px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6,textAlign:"center"}}>⚔️ LIVRE DE QUÊTES</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#888",marginBottom:32,textAlign:"center"}}>Qui part en quête aujourd'hui?</div>
-
-        <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:16,maxWidth:480,width:"100%",marginBottom:28}}>
-          {config.players.map((pl, i) => {
-            const psi = gameStates[i] || { xp:0, coins:0, completed:[] };
-            const lv = getLevel(psi.xp);
-            const pti = getPlayerTheme(pl.themeId);
-            const todayDone = (psi.completed||[]).filter(k=>k.includes(new Date().toDateString())).length;
-            return (
-              <div key={pl.id} onClick={()=>handlePlayerCard(i)}
-                style={{background:`linear-gradient(135deg,rgba(0,0,0,0.85),${pl.color}15)`,border:`3px solid ${pl.color}`,borderRadius:12,padding:"18px 14px",cursor:"pointer",textAlign:"center",transition:"all 0.15s"}}
-                onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 0 24px ${pl.color}55`; e.currentTarget.style.transform="translateY(-3px)"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.transform="none"; }}>
-                <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={pti.charBodyColor||pl.color} size={60}
-                  style={{border:`3px solid ${pl.color}`,borderRadius:8,marginBottom:8}}/>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,10px)",color:pl.color,marginBottom:3}}>{displayName(pl)}</div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:6}}>{pti.icon} Niv.{lv.level}</div>
-                <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>{psi.xp}⚡</span>
-                  {todayDone>0&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✓{todayDone}</span>}
-                  {psi.pin&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#555"}}>🔑</span>}
-                </div>
-              </div>
-            );
-          })}
+      {/* ── Écran 1 : Tu es...? ── */}
+      {mode === "who" && (
+        <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:24,color:"#666",marginBottom:36}}>Tu es...?</div>
+          <div style={{display:"flex",gap:16,justifyContent:"center"}}>
+            {[["🧒","Enfant","#5DECF5",()=>{SFX.click();setMode("child-select");}],
+              ["👨‍👩","Parent","#FF8C00",()=>{SFX.click();setMode("parent");setPpPin("");setPinError(false);}]
+            ].map(([icon,label,color,fn])=>(
+              <button key={label} onClick={fn}
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"20px 22px",background:"rgba(0,0,0,0.7)",color,border:`3px solid ${color}`,borderRadius:10,cursor:"pointer",lineHeight:2.2,minWidth:120,transition:"all 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 0 22px ${color}55`;e.currentTarget.style.transform="translateY(-3px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+                <span style={{fontSize:28,display:"block"}}>{icon}</span>{label}
+              </button>
+            ))}
+          </div>
         </div>
+      )}
 
-        <button onClick={()=>{ SFX.click(); setMode("parent"); setPpPin(""); setPinError(false); }}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"10px 18px",background:"transparent",color:"#444",border:"2px solid #2a2a2a",borderRadius:3,cursor:"pointer"}}>
-          🔐 Accès parent
-        </button>
-      </>)}
+      {/* ── Écran 2 : Qui es-tu? ── */}
+      {mode === "child-select" && (
+        <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#666",marginBottom:20}}>Qui es-tu?</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+            {config.players.map((pl, i) => {
+              const psi = gameStates[i] || {};
+              const isNew = !psi.avatar?.configured && !psi.pin;
+              return (
+                <button key={pl.id} onClick={()=>handleChildSelect(i)}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 16px",background:"rgba(0,0,0,0.7)",color:pl.color,border:`3px solid ${pl.color}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"all 0.15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 0 16px ${pl.color}55`;e.currentTarget.style.transform="translateX(4px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+                  <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(pl.themeId).charBodyColor||pl.color} size={36}/>
+                  <span style={{flex:1,textAlign:"left"}}>{pl.name}</span>
+                  {isNew && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#2ECC40",fontWeight:"bold"}}>NOUVEAU ✨</span>}
+                  {!isNew && psi.pin && <span style={{color:"#444",fontSize:12}}>🔑</span>}
+                </button>
+              );
+            })}
+          </div>
+          <BtnBack onClick={()=>setMode("who")}/>
+        </div>
+      )}
 
-      {mode === "player" && player && (
-        <div style={{background:`linear-gradient(160deg,rgba(0,0,0,0.9),${accentColor}10)`,border:`3px solid ${accentColor}`,borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
-          <AvatarCanvas avatarDef={ps.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||accentColor} size={52}
-            style={{border:`3px solid ${accentColor}`,borderRadius:8,marginBottom:10}}/>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accentColor,marginBottom:4}}>{displayName(player)}</div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:16,lineHeight:1.8}}>{pinTitle}</div>
-          {pinHint&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",marginBottom:12,lineHeight:1.3}}>{pinHint}</div>}
-          <PinDots value={pPin} error={pinError} color={accentColor}/>
-          <PinKeypad
-            onDigit={handlePlayerDigit}
-            onBack={()=>setPPin(p=>p.slice(0,-1))}
-            onClose={()=>{ if(confirmStep){ setConfirmStep(false); setFirstPin(""); setPPin(""); } else resetToCards(); }}
-          />
-          {confirmStep&&(
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8,cursor:"pointer"}} onClick={()=>{ setConfirmStep(false); setFirstPin(""); setPPin(""); }}>
-              ← Recommencer
+      {/* ── Onboarding 1er login ── */}
+      {mode === "onboarding" && player && (
+        <div style={{width:"100%",maxWidth:400,textAlign:"center"}}>
+
+          {/* Étape 1 : Thème */}
+          {obStep === "theme" && (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>🎨 TON THÈME</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Choisis ton univers</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginBottom:20}}>⏳ Ce thème dure toute la semaine — choisis bien!</div>
+              <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
+                {(player.starterThemes||[player.themeId||"none"]).map(tid=>{
+                  const t = getPlayerTheme(tid);
+                  const sel = draftTheme === tid;
+                  return (
+                    <button key={tid} onClick={()=>{SFX.click();setDraftTheme(tid);}}
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"14px 16px",background:sel?`${t.primary}30`:"rgba(0,0,0,0.7)",color:sel?t.accent:"#888",border:`3px solid ${sel?t.accent:"#333"}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"all 0.15s",boxShadow:sel?`0 0 16px ${t.accent}40`:"none"}}>
+                      <span style={{fontSize:28}}>{t.icon}</span>
+                      <span style={{flex:1}}>{t.name}</span>
+                      {sel&&<span style={{fontSize:16}}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {draftTheme && (
+                <button onClick={()=>{SFX.click();setObStep("avatar");}}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                  Continuer →
+                </button>
+              )}
+              <div><BtnBack onClick={()=>{setMode("child-select");setSelIdx(null);}}/></div>
+            </div>
+          )}
+
+          {/* Étape 2 : Avatar */}
+          {obStep === "avatar" && (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>👾 TON AVATAR</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:12}}>Crée ton personnage 8-bit</div>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+                <AvatarCanvas avatarDef={draftAvatar} bodyColor={getPlayerTheme(draftTheme||"none").charBodyColor||accentColor} size={80}
+                  style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
+              </div>
+              <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:10,flexWrap:"wrap"}}>
+                {[["hair","Cheveux"],["skin","Peau"],["eyes","Yeux"],["mouth","Bouche"]].map(([k,l])=>(
+                  <button key={k} onClick={()=>{setAvatarTab(k);SFX.click();}}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:avatarTab===k?accentColor:"#1a1a1a",color:avatarTab===k?"#000":"#666",border:`2px solid ${avatarTab===k?accentColor:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{maxHeight:150,overflowY:"auto",marginBottom:14}}>
+                {avatarTab === "hair" && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                    {AVATAR_PARTS.hair.map(h=>(
+                      <div key={h.id} onClick={()=>{setDraftAvatar(a=>({...a,hair:h.id}));SFX.click();}}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"6px 4px",background:draftAvatar.hair===h.id?`${h.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.hair===h.id?h.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                        <div style={{width:24,height:12,background:h.color,borderRadius:"3px 3px 0 0",border:"1px solid #000"}}/>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{h.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {avatarTab === "skin" && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                    {AVATAR_PARTS.skin.map(s=>(
+                      <div key={s.id} onClick={()=>{setDraftAvatar(a=>({...a,skin:s.id}));SFX.click();}}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"6px 4px",background:draftAvatar.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.skin===s.id?s.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                        <div style={{width:24,height:24,background:s.color,borderRadius:3,border:"1px solid #000"}}/>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {avatarTab === "eyes" && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                    {AVATAR_PARTS.eyes.map(e=>(
+                      <div key={e.id} onClick={()=>{setDraftAvatar(a=>({...a,eyes:e.id}));SFX.click();}}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",background:draftAvatar.eyes===e.id?`${e.eyeColor}20`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.eyes===e.id?e.eyeColor:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                        <span style={{fontSize:22}}>{e.emoji}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{e.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {avatarTab === "mouth" && (
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                    {AVATAR_PARTS.mouth.map(m=>(
+                      <div key={m.id} onClick={()=>{setDraftAvatar(a=>({...a,mouth:m.id}));SFX.click();}}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",background:draftAvatar.mouth===m.id?`${m.color}20`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.mouth===m.id?m.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                        <span style={{fontSize:22}}>{m.emoji}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{m.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={()=>{SFX.click();setObStep("pseudo");}}
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                Continuer →
+              </button>
+              <div><BtnBack onClick={()=>setObStep("theme")}/></div>
+            </div>
+          )}
+
+          {/* Étape 3 : Surnom */}
+          {obStep === "pseudo" && (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>✏️ TON SURNOM</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:6}}>Comment veux-tu t'appeler?</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:20}}>Ton vrai nom reste privé pour tes parents.</div>
+              <input
+                value={draftPseudo}
+                onChange={e=>setDraftPseudo(e.target.value.slice(0,16))}
+                placeholder={player.name}
+                maxLength={16}
+                autoFocus
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 16px",background:"rgba(0,0,0,0.7)",color:accentColor,border:`3px solid ${accentColor}`,borderRadius:6,width:"100%",textAlign:"center",outline:"none",marginBottom:20,boxSizing:"border-box"}}
+              />
+              <button onClick={()=>{SFX.click();setObStep("pin-create");setObPin("");setObFirstPin("");}}
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                Continuer →
+              </button>
+              <div><BtnBack onClick={()=>setObStep("avatar")}/></div>
+            </div>
+          )}
+
+          {/* Étape 4 : PIN création/confirmation */}
+          {(obStep === "pin-create" || obStep === "pin-confirm") && (
+            <div style={{background:`linear-gradient(160deg,rgba(0,0,0,0.9),${accentColor}10)`,border:`3px solid ${accentColor}`,borderRadius:12,padding:"24px 28px"}}>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
+                <AvatarCanvas avatarDef={draftAvatar} bodyColor={getPlayerTheme(draftTheme||"none").charBodyColor||accentColor} size={52}
+                  style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
+              </div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:4}}>
+                {obStep==="pin-create" ? "CRÉE TON CODE SECRET" : "CONFIRME TON CODE"}
+              </div>
+              {obStep==="pin-create"&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>4 chiffres que tu n'oublieras jamais... promis</div>}
+              <PinDots value={obPin} error={pinError} color={accentColor}/>
+              <PinKeypad
+                onDigit={handleObPinDigit}
+                onBack={()=>setObPin(p=>p.slice(0,-1))}
+                onClose={()=>{ obStep==="pin-confirm"?( setObStep("pin-create"),setObFirstPin(""),setObPin("") ):(setObStep("pseudo")); }}
+              />
             </div>
           )}
         </div>
       )}
 
+      {/* ── PIN joueur retour ── */}
+      {mode === "pin" && player && (
+        <div style={{background:`linear-gradient(160deg,rgba(0,0,0,0.9),${accentColor}10)`,border:`3px solid ${accentColor}`,borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
+            <AvatarCanvas avatarDef={ps.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(player.themeId).charBodyColor||accentColor} size={52}
+              style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
+          </div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accentColor,marginBottom:4}}>{displayName(player)}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:16,lineHeight:1.8}}>
+            {!ps.pin ? (confirmStep ? "CONFIRME TON CODE" : "CRÉE TON CODE SECRET") : "TON CODE SECRET"}
+          </div>
+          {!ps.pin&&!confirmStep&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>Choisis 4 chiffres que tu n'oublies pas...</div>}
+          <PinDots value={pPin} error={pinError} color={accentColor}/>
+          <PinKeypad
+            onDigit={handlePlayerDigit}
+            onBack={()=>setPPin(p=>p.slice(0,-1))}
+            onClose={()=>{ confirmStep?(setConfirmStep(false),setFirstPin(""),setPPin("")):(setMode("child-select"),setSelIdx(null)); }}
+          />
+        </div>
+      )}
+
+      {/* ── PIN parent ── */}
       {mode === "parent" && (
         <div style={{background:"rgba(0,0,0,0.85)",border:"3px solid #FF8C00",borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FF8C00",marginBottom:16}}>🔐 PIN PARENT</div>
@@ -2489,7 +2845,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           <PinKeypad
             onDigit={handleParentDigit}
             onBack={()=>setPpPin(p=>p.slice(0,-1))}
-            onClose={resetToCards}
+            onClose={()=>{setMode("who");setPpPin("");setPinError(false);}}
           />
         </div>
       )}
@@ -2744,6 +3100,18 @@ export default function App() {
     onSetPlayerPin={(idx, newPin)=>{
       const gs = [...gameStates]; gs[idx]={...gs[idx], pin:newPin};
       setGameStates(gs); save({config, gameStates:gs, savedAt:new Date().toISOString()});
+    }}
+    onCompleteOnboarding={(idx, {themeId, avatar, pseudo, pin})=>{
+      const now = new Date().toISOString();
+      const newConfig = {...config};
+      newConfig.players = config.players.map((pl,i)=> i===idx
+        ? {...pl, themeId, pseudo, themeChosenAt:now}
+        : pl
+      );
+      const gs = [...gameStates];
+      gs[idx] = {...gs[idx], pin, avatar:{...avatar, configured:true}};
+      setConfig(newConfig); setGameStates(gs);
+      save({config:newConfig, gameStates:gs, savedAt:now});
     }}/>;
 
 
@@ -2763,7 +3131,7 @@ export default function App() {
       <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(135deg,${th.bg}EE,#1a1a1aEE)`,borderBottom:`5px solid ${th.accent}`,padding:"8px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent,textShadow:"2px 2px 0 #000"}}>⚔️ JOURNÉE ÉPIQUE</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent,textShadow:"2px 2px 0 #000"}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{config.mode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
         {/* Clock */}
@@ -2828,7 +3196,8 @@ export default function App() {
         {typeof view==="number"&&(
           <PlayerDashboard
             player={config.players[view]}
-            pState={gameStates[view]||{xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[]}}
+            playerIdx={view}
+            pState={gameStates[view]||{xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],calendar:[]}}
             config={config}
             assignments={config.assignments}
             allTasks={allTasks}
@@ -2836,6 +3205,15 @@ export default function App() {
             onRequestComplete={requestComplete}
             onBuy={handleBuy}
             onEquip={handleEquip}
+            parentMode={parentMode}
+            onDeComplete={handleDeComplete}
+            onForceComplete={handleForceComplete}
+            onUpdateCalendar={(newCal)=>{
+              const gs=[...gameStates];
+              gs[view]={...gs[view],calendar:newCal};
+              setGameStates(gs);
+              save({config,gameStates:gs,savedAt:new Date().toISOString()});
+            }}
             th={th}
           />
         )}
