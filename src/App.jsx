@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.5.0", date:"2026-06-07", features:[
+    "🔑 Code secret par joueur — chaque aventurier protège son compte",
+  ]},
   { version:"1.4.0", date:"2026-06-07", features:[
     "👋 Écran de sélection — chaque joueur choisit sa carte au démarrage",
     "🔐 Accès parent sécurisé depuis l'écran d'accueil",
@@ -981,6 +984,7 @@ const migrateGameState = (gs) => ({
   ...gs, // données existantes gardées telles quelles
   badges: gs.badges || [],        // nouveau champ v1.3.0
   boughtRewards: gs.boughtRewards || [],
+  pin: gs.pin ?? null,            // nouveau champ v1.5.0 — null = pas encore créé
 });
 
 const migrateSavedData = (data) => {
@@ -1247,7 +1251,7 @@ function SetupWizard({ existing, onDone }) {
     { id:uid(), name:"Olivier DR",              pseudo:"", color:"#2ECC40", themeId:"none",     starterThemes: pickStarterThemes() },
   ]);
   const [theme, setTheme] = useState("minecraft");
-  const [pin, setPin] = useState("1234");
+  const [pin, setPin] = useState("1146");
 
   // Task assignments: array of { instanceId, taskId, playerIds:[], days:[], time:"" }
   const [assignments, setAssignments] = useState([]);
@@ -1272,7 +1276,7 @@ function SetupWizard({ existing, onDone }) {
       setNumPlayers(pl.length || 2);
       setPlayers(pl.length ? pl.map(p=>({themeId:"none",pseudo:"",starterThemes:p.starterThemes||pickStarterThemes(),...p})) : players);
       setTheme(existing.theme || "minecraft");
-      setPin(existing.pin || "1234");
+      setPin(existing.pin || "1146");
       setAssignments(existing.assignments || []);
       setSelectedRewards(new Set(existing.selectedRewards || ["rw01","rw02","rw03"]));
       setCustomTasks(existing.customTasks || []);
@@ -2321,90 +2325,176 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
 // ═══════════════════════════════════════════════════════════════
 // LOGIN SCREEN — "Qui joue?"
 // ═══════════════════════════════════════════════════════════════
-function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin }) {
-  const [pinOpen, setPinOpen] = useState(false);
-  const [parentPin, setParentPin] = useState("");
+// ── Mini keypad réutilisable ──────────────────────────────────
+function PinDots({ value, error, color="#FFD700" }) {
+  return (
+    <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
+      {[0,1,2,3].map(n=>(
+        <div key={n} style={{width:30,height:38,background:error?"#FF4444":(value.length>n?color:"#1a1a1a"),borderRadius:4,border:`2px solid ${error?"#FF4444":(value.length>n?color:"#444")}`,transition:"all 0.12s",transform:error?"scale(1.1)":"scale(1)"}}/>
+      ))}
+    </div>
+  );
+}
+function PinKeypad({ onDigit, onBack, onClose, closeLabel="✕" }) {
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+      {["1","2","3","4","5","6","7","8","9","⌫","0",closeLabel].map(d=>(
+        <button key={d} onClick={()=>{ SFX.click(); if(d==="⌫") onBack(); else if(d===closeLabel) onClose(); else onDigit(d); }}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,padding:"11px 0",background:d===closeLabel?"#330000":"#1a1a1a",color:d===closeLabel?"#FF4444":"#ccc",border:"2px solid #2a2a2a",borderRadius:4,cursor:"pointer"}}>
+          {d}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOGIN SCREEN — "Qui joue?" + PIN par joueur
+// ═══════════════════════════════════════════════════════════════
+function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin }) {
+  // mode: "cards" | "player" | "parent"
+  const [mode, setMode] = useState("cards");
+  const [selIdx, setSelIdx] = useState(null);
+  const [pPin, setPPin] = useState("");       // player pin input
+  const [ppPin, setPpPin] = useState("");     // parent pin input
+  const [confirmStep, setConfirmStep] = useState(false); // true = confirming new pin
+  const [firstPin, setFirstPin] = useState("");
   const [pinError, setPinError] = useState(false);
 
-  const handleParentPin = (digit) => {
-    const next = (parentPin + digit).slice(0, 4);
-    setParentPin(next);
-    setPinError(false);
-    if (next.length === 4) {
-      if (next === config.pin) {
-        setParentPin("");
-        setPinOpen(false);
-        onParentLogin();
+  const resetToCards = () => { setMode("cards"); setSelIdx(null); setPPin(""); setPpPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false); };
+  const triggerError = (resetFn) => { setPinError(true); SFX.error?.(); setTimeout(()=>{ resetFn(); setPinError(false); }, 700); };
+
+  const handlePlayerCard = (i) => {
+    SFX.click(); setSelIdx(i); setMode("player");
+    setPPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false);
+  };
+
+  const handlePlayerDigit = (d) => {
+    const ps = gameStates[selIdx] || {};
+    const next = (pPin + d).slice(0, 4);
+    setPPin(next); setPinError(false);
+    if (next.length < 4) return;
+
+    if (!ps.pin) {
+      // ── Création du PIN ──
+      if (!confirmStep) {
+        setFirstPin(next); setPPin(""); setConfirmStep(true);
       } else {
-        setPinError(true);
-        SFX.error?.();
-        setTimeout(() => { setParentPin(""); setPinError(false); }, 700);
+        if (next === firstPin) {
+          onSetPlayerPin(selIdx, next);
+          onSelectPlayer(selIdx);
+        } else {
+          triggerError(()=>{ setPPin(""); setConfirmStep(false); setFirstPin(""); });
+        }
+      }
+    } else {
+      // ── Vérification ──
+      if (next === ps.pin) {
+        onSelectPlayer(selIdx);
+      } else {
+        triggerError(()=>setPPin(""));
       }
     }
   };
 
+  const handleParentDigit = (d) => {
+    const next = (ppPin + d).slice(0, 4);
+    setPpPin(next); setPinError(false);
+    if (next.length === 4) {
+      if (next === config.pin) { resetToCards(); onParentLogin(); }
+      else triggerError(()=>setPpPin(""));
+    }
+  };
+
+  // ── Rendu ──
+  const player = selIdx !== null ? config.players[selIdx] : null;
+  const ps     = selIdx !== null ? (gameStates[selIdx] || {}) : {};
+  const hasPin = !!ps.pin;
+  const pt     = player ? getPlayerTheme(player.themeId) : {};
+  const accentColor = player?.color || "#FFD700";
+
+  // Titre du pavé PIN joueur
+  const pinTitle = !hasPin
+    ? (confirmStep ? "CONFIRME TON CODE" : "CRÉE TON CODE SECRET")
+    : "TON CODE SECRET";
+  const pinHint = !hasPin
+    ? (confirmStep ? "Entre-le une 2ème fois pour confirmer" : "Choisis 4 chiffres que tu n'oublies pas... ou que tu oublieras")
+    : null;
+
   return (
     <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
-      {/* BG glow */}
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#5DECF520 0%,transparent 60%)",pointerEvents:"none"}}/>
 
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6,textAlign:"center"}}>⚔️ LIVRE DE QUÊTES</div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#888",marginBottom:36,textAlign:"center"}}>Qui part en quête aujourd'hui?</div>
+      {mode === "cards" && (<>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,2vw,17px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6,textAlign:"center"}}>⚔️ LIVRE DE QUÊTES</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#888",marginBottom:32,textAlign:"center"}}>Qui part en quête aujourd'hui?</div>
 
-      {/* Player cards */}
-      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:16,maxWidth:480,width:"100%",marginBottom:32}}>
-        {config.players.map((player, i) => {
-          const ps = gameStates[i] || { xp:0, coins:0, completed:[] };
-          const lv = getLevel(ps.xp);
-          const pt = getPlayerTheme(player.themeId);
-          const doneTodayCount = (ps.completed||[]).filter(k=>k.includes(new Date().toDateString())).length;
-          return (
-            <div key={player.id}
-              onClick={() => { SFX.click(); onSelectPlayer(i); }}
-              style={{background:`linear-gradient(135deg,rgba(0,0,0,0.8),${player.color}18)`,border:`3px solid ${player.color}`,borderRadius:12,padding:"20px 16px",cursor:"pointer",textAlign:"center",transition:"all 0.15s",boxShadow:`0 0 0 0 ${player.color}`}}
-              onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 0 24px ${player.color}60`; e.currentTarget.style.transform="translateY(-3px)"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.transform="none"; }}>
-              <AvatarCanvas avatarDef={ps.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={64}
-                style={{border:`4px solid ${player.color}`,borderRadius:8,marginBottom:10}}/>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:player.color,marginBottom:4}}>{displayName(player)}</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",marginBottom:8}}>{pt.icon} {getLevelTitle(ps.xp,player.themeId).title}</div>
-              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>Niv.{lv.level}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>{ps.xp} ⚡</span>
-                {doneTodayCount>0&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#2ECC40"}}>✓{doneTodayCount}</span>}
+        <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:16,maxWidth:480,width:"100%",marginBottom:28}}>
+          {config.players.map((pl, i) => {
+            const psi = gameStates[i] || { xp:0, coins:0, completed:[] };
+            const lv = getLevel(psi.xp);
+            const pti = getPlayerTheme(pl.themeId);
+            const todayDone = (psi.completed||[]).filter(k=>k.includes(new Date().toDateString())).length;
+            return (
+              <div key={pl.id} onClick={()=>handlePlayerCard(i)}
+                style={{background:`linear-gradient(135deg,rgba(0,0,0,0.85),${pl.color}15)`,border:`3px solid ${pl.color}`,borderRadius:12,padding:"18px 14px",cursor:"pointer",textAlign:"center",transition:"all 0.15s"}}
+                onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 0 24px ${pl.color}55`; e.currentTarget.style.transform="translateY(-3px)"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.transform="none"; }}>
+                <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={pti.charBodyColor||pl.color} size={60}
+                  style={{border:`3px solid ${pl.color}`,borderRadius:8,marginBottom:8}}/>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,10px)",color:pl.color,marginBottom:3}}>{displayName(pl)}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:6}}>{pti.icon} Niv.{lv.level}</div>
+                <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>{psi.xp}⚡</span>
+                  {todayDone>0&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✓{todayDone}</span>}
+                  {psi.pin&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#555"}}>🔑</span>}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Parent access */}
-      {!pinOpen ? (
-        <button onClick={()=>{ SFX.click(); setPinOpen(true); }}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 20px",background:"transparent",color:"#555",border:"2px solid #333",borderRadius:3,cursor:"pointer"}}>
+        <button onClick={()=>{ SFX.click(); setMode("parent"); setPpPin(""); setPinError(false); }}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"10px 18px",background:"transparent",color:"#444",border:"2px solid #2a2a2a",borderRadius:3,cursor:"pointer"}}>
           🔐 Accès parent
         </button>
-      ) : (
-        <div style={{background:"rgba(0,0,0,0.8)",border:"3px solid #FF8C00",borderRadius:8,padding:"20px 24px",textAlign:"center",maxWidth:280,width:"100%"}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FF8C00",marginBottom:12}}>🔐 PIN PARENT</div>
-          <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
-            {[0,1,2,3].map(n=>(
-              <div key={n} style={{width:28,height:36,background:pinError?"#FF4444":(parentPin.length>n?"#FF8C00":"#222"),borderRadius:3,border:`2px solid ${pinError?"#FF4444":(parentPin.length>n?"#FF8C00":"#555")}`,transition:"all 0.15s"}}/>
-            ))}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
-            {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(d=>(
-              <button key={d} onClick={()=>{ SFX.click(); if(d==="⌫") setParentPin(p=>p.slice(0,-1)); else if(d==="✕"){ setPinOpen(false); setParentPin(""); } else handleParentPin(d); }}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,padding:"10px 0",background:d==="✕"?"#330000":"#1a1a1a",color:d==="✕"?"#FF4444":"#ccc",border:"2px solid #333",borderRadius:3,cursor:"pointer"}}>
-                {d}
-              </button>
-            ))}
-          </div>
+      </>)}
+
+      {mode === "player" && player && (
+        <div style={{background:`linear-gradient(160deg,rgba(0,0,0,0.9),${accentColor}10)`,border:`3px solid ${accentColor}`,borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
+          <AvatarCanvas avatarDef={ps.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||accentColor} size={52}
+            style={{border:`3px solid ${accentColor}`,borderRadius:8,marginBottom:10}}/>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accentColor,marginBottom:4}}>{displayName(player)}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:16,lineHeight:1.8}}>{pinTitle}</div>
+          {pinHint&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",marginBottom:12,lineHeight:1.3}}>{pinHint}</div>}
+          <PinDots value={pPin} error={pinError} color={accentColor}/>
+          <PinKeypad
+            onDigit={handlePlayerDigit}
+            onBack={()=>setPPin(p=>p.slice(0,-1))}
+            onClose={()=>{ if(confirmStep){ setConfirmStep(false); setFirstPin(""); setPPin(""); } else resetToCards(); }}
+          />
+          {confirmStep&&(
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8,cursor:"pointer"}} onClick={()=>{ setConfirmStep(false); setFirstPin(""); setPPin(""); }}>
+              ← Recommencer
+            </div>
+          )}
         </div>
       )}
 
-      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#333",marginTop:28}}>v{APP_VERSION}</div>
+      {mode === "parent" && (
+        <div style={{background:"rgba(0,0,0,0.85)",border:"3px solid #FF8C00",borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FF8C00",marginBottom:16}}>🔐 PIN PARENT</div>
+          <PinDots value={ppPin} error={pinError} color="#FF8C00"/>
+          <PinKeypad
+            onDigit={handleParentDigit}
+            onBack={()=>setPpPin(p=>p.slice(0,-1))}
+            onClose={resetToCards}
+          />
+        </div>
+      )}
+
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#2a2a2a",marginTop:24}}>v{APP_VERSION}</div>
     </div>
   );
 }
@@ -2462,7 +2552,7 @@ export default function App() {
 
   // Handle setup complete
   const handleSetupDone = useCallback((cfg) => {
-    const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[], badges:[] }));
+    const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[], badges:[], pin:null }));
     setConfig(cfg); setGameStates(gs); setScreen("login"); setView("family");
     persist(cfg,gs);
     setTimeout(()=>SFX.welcome(),300);
@@ -2650,7 +2740,11 @@ export default function App() {
   if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
     onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
-    onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}/>;
+    onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
+    onSetPlayerPin={(idx, newPin)=>{
+      const gs = [...gameStates]; gs[idx]={...gs[idx], pin:newPin};
+      setGameStates(gs); save({config, gameStates:gs, savedAt:new Date().toISOString()});
+    }}/>;
 
 
   const currentPlayerView = typeof view==="number" ? view : null;
