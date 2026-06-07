@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.3.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -109,6 +109,58 @@ const REWARD_CATALOG = [
   { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:50 },
   { id:"rw10", emoji:"🎬", label:"Choisir le film du vendredi",coins:35 },
 ];
+
+// ─── BADGE CATALOG ───────────────────────────────────────────
+// type: "general" | themeId
+// condition fn receives: (pState, completedCount, config, player)
+const BADGES = [
+  // ── GÉNÉRAUX ──
+  { id:"b_first",    emoji:"⭐", name:"Premier Sang",         desc:"Complète ta première quête",           type:"general", check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"b_5tasks",   emoji:"🔥", name:"En Feu",               desc:"Complète 5 quêtes",                    type:"general", check:(ps)=>(ps.completed?.length||0)>=5 },
+  { id:"b_20tasks",  emoji:"💪", name:"Bras de Fer",          desc:"Complète 20 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=20 },
+  { id:"b_50tasks",  emoji:"🏆", name:"Légende Vivante",      desc:"Complète 50 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=50 },
+  { id:"b_xp100",    emoji:"⚡", name:"Chargé à Bloc",        desc:"Accumule 100 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=100 },
+  { id:"b_xp300",    emoji:"🌩️", name:"Orage Intérieur",      desc:"Accumule 300 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=300 },
+  { id:"b_xp500",    emoji:"🌟", name:"Supernova",            desc:"Accumule 500 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=500 },
+  { id:"b_coins50",  emoji:"💰", name:"Boursicoteur Nul",     desc:"Accumule 50 pièces d'un coup",         type:"general", check:(ps)=>(ps.coins||0)>=50 },
+  { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Accumule 150 pièces",                  type:"general", check:(ps)=>(ps.coins||0)>=150 },
+  { id:"b_buy1",     emoji:"🛒", name:"Consommateur Compulsif",desc:"Achète une récompense",               type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=1 },
+  { id:"b_buy5",     emoji:"🛍️", name:"Problème de Shopping", desc:"Achète 5 récompenses",                 type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=5 },
+  { id:"b_streak3",  emoji:"📅", name:"Machine à Habitudes",  desc:"3 quêtes en 1 journée",               type:"general", check:(ps,c)=>c>=3 },
+  { id:"b_level2",   emoji:"🆙", name:"Ya du Progrès",        desc:"Atteins le niveau 2",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=2 },
+  { id:"b_level3",   emoji:"🚀", name:"Spationaute du Ménage",desc:"Atteins le niveau 3",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=3 },
+  { id:"b_level4",   emoji:"👑", name:"Royauté de la Patate", desc:"Atteins le niveau 4",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=4 },
+  { id:"b_level5",   emoji:"🌈", name:"Dieu du Plancher Sale",desc:"Atteins le niveau 5 (LÉGENDE)",       type:"general", check:(ps)=>getLevel(ps.xp||0).level>=5 },
+  // ── THÈMES ──
+  { id:"bt_mc1",     emoji:"⛏️", name:"Mineur du Dimanche",   desc:"Creuseuse compulsive (Minecraft)",    type:"minecraftpp", check:(ps)=>(ps.completed?.length||0)>=3 },
+  { id:"bt_mc2",     emoji:"💎", name:"Veine de Diamant",     desc:"50 XP en mode Minecraft",             type:"minecraftpp", check:(ps)=>(ps.xp||0)>=50 },
+  { id:"bt_rb1",     emoji:"🎮", name:"Noob Accompli",        desc:"Première quête Roblox",               type:"roblox",      check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"bt_rb2",     emoji:"🏗️", name:"Robux Méritée",        desc:"100 XP en mode Roblox",              type:"roblox",      check:(ps)=>(ps.xp||0)>=100 },
+  { id:"bt_hp1",     emoji:"🪄", name:"Accio Vaisselle",      desc:"Première quête Harry Potter",         type:"harrypotter", check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"bt_hp2",     emoji:"🦉", name:"Gardien de Gryffondor",desc:"5 quêtes en mode HP",                type:"harrypotter", check:(ps)=>(ps.completed?.length||0)>=5 },
+  { id:"bt_gh1",     emoji:"🌿", name:"Esprit de la Forêt",   desc:"3 quêtes en mode Ghibli",            type:"ghibli",      check:(ps)=>(ps.completed?.length||0)>=3 },
+  { id:"bt_hor1",    emoji:"💀", name:"Survivant·e",          desc:"Première quête Horreur",              type:"horreur",     check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"bt_hor2",    emoji:"🩸", name:"Bain de Sang Ménager", desc:"10 quêtes en mode Horreur",          type:"horreur",     check:(ps)=>(ps.completed?.length||0)>=10 },
+  { id:"bt_mon1",    emoji:"🦠", name:"Mucus de Champion",    desc:"3 quêtes en mode Monstres",          type:"monstres",    check:(ps)=>(ps.completed?.length||0)>=3 },
+  { id:"bt_lic1",    emoji:"🦄", name:"Paillettes Partout",   desc:"Première quête Licornes",            type:"licornes",    check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"bt_bf1",     emoji:"💥", name:"Boomerang Lancé",      desc:"5 quêtes en mode Boomerang Fu",      type:"boomerangfu", check:(ps)=>(ps.completed?.length||0)>=5 },
+  { id:"bt_mar1",    emoji:"🦸", name:"Avec Grand Pouvoir",   desc:"50 XP en mode Marvel",               type:"marvel",      check:(ps)=>(ps.xp||0)>=50 },
+  { id:"bt_jap1",    emoji:"🍜", name:"Ramen à la Maison",    desc:"3 quêtes en mode Japon",             type:"japon",       check:(ps)=>(ps.completed?.length||0)>=3 },
+  { id:"bt_sci1",    emoji:"🔬", name:"Chercheur·se en Chef", desc:"5 quêtes en mode Science",           type:"microscopique",check:(ps)=>(ps.completed?.length||0)>=5 },
+  { id:"bt_dis1",    emoji:"✨", name:"Bienvenue dans le Rêve",desc:"Première quête Disney",             type:"disney",      check:(ps)=>(ps.completed?.length||0)>=1 },
+  { id:"bt_pix1",    emoji:"💡", name:"Lampe de Chevet",      desc:"3 quêtes en mode Pixar",             type:"pixar",       check:(ps)=>(ps.completed?.length||0)>=3 },
+];
+
+// Returns array of newly earned badge IDs
+const checkBadges = (pState, player, dailyCount) => {
+  const themeId = player?.themeId || "none";
+  const alreadyEarned = new Set(pState.badges || []);
+  return BADGES
+    .filter(b => !alreadyEarned.has(b.id))
+    .filter(b => b.type === "general" || b.type === themeId)
+    .filter(b => { try { return b.check(pState, dailyCount); } catch { return false; } })
+    .map(b => b.id);
+};
 
 const THEMES = {
   minecraft: { name:"Minecraft", bg:"#1a1a2e", primary:"#5D9E34", accent:"#FFD700", card:"rgba(0,0,0,0.5)", text:"#fff" },
@@ -889,6 +941,20 @@ const resolveWeekRandomTheme = (weekSeed) => {
 
 
 // ─── STORAGE ─────────────────────────────────────────────────
+// ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
+const CHANGELOG = [
+  { version:"1.3.0", date:"2026-06-07", features:[
+    "🏅 Système de badges — débloquez des trophées en complétant des quêtes!",
+    "🎨 Thèmes XP-gatés — chaque joueur commence avec 2 thèmes aléatoires",
+    "🪪 Pseudos — les joueurs peuvent se créer un surnom visible par tous",
+    "💾 Migration automatique — vos données sont préservées entre les mises à jour",
+  ]},
+  { version:"1.2.0", date:"2026-06-01", features:[
+    "🎨 Thèmes verrouillés par XP — débloquez de nouveaux thèmes en progressant",
+    "✍️ Pseudos personnalisés pour chaque joueur",
+  ]},
+];
+
 // Structured for easy Supabase swap: replace save/load with async Supabase calls
 // Future: import { saveToSupabase, loadFromSupabase } from './lib/supabase.js'
 const STORE_KEY = "livre-de-quetes-v1";
@@ -902,6 +968,27 @@ const load = async () => {
   try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch {}
   // FUTURE SUPABASE: const { data } = await supabase.from('family_sessions').select().eq('id', familyId).single()
   return null;
+};
+
+// ─── DATA MIGRATION ── préserve les données des enfants entre les pushes ────
+// Ajoute les nouveaux champs sans jamais écraser les données existantes
+const migrateGameState = (gs) => ({
+  xp: 0, coins: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
+  ...gs, // données existantes gardées telles quelles
+  badges: gs.badges || [],        // nouveau champ v1.3.0
+  boughtRewards: gs.boughtRewards || [],
+});
+
+const migrateSavedData = (data) => {
+  if (!data) return null;
+  const seenVersions = data.seenVersions || [];
+  const newVersions = CHANGELOG.map(c=>c.version).filter(v=>!seenVersions.includes(v));
+  return {
+    ...data,
+    gameStates: (data.gameStates || []).map(migrateGameState),
+    seenVersions: [...seenVersions, ...newVersions],
+    newChangelogVersions: newVersions, // affichés dans le feed, puis effacés
+  };
 };
 
 // FUTURE: export family config as JSON for sharing / backup
@@ -1108,7 +1195,7 @@ function spawnParticles(emoji) {
 }
 
 // ─── REWARD POPUP ────────────────────────────────────────────
-function RewardPopup({ task, player, onClose, th }) {
+function RewardPopup({ task, player, newBadges, onClose, th }) {
   const T = th || THEMES.minecraft;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -1121,6 +1208,16 @@ function RewardPopup({ task, player, onClose, th }) {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#FFD700"}}>+{task.coins} 🪙</div>
         </div>
         {player && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:player.color,marginBottom:14}}>Bravo {displayName(player)}! 🎉</div>}
+        {newBadges&&newBadges.length>0&&(
+          <div style={{background:"rgba(0,0,0,0.4)",borderRadius:6,padding:"10px 14px",marginBottom:14}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FFD700",marginBottom:8}}>🏅 BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""}!</div>
+            {newBadges.map(b=>(
+              <div key={b.id} style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+                <span style={{fontSize:22}}>{b.emoji}</span> <strong>{b.name}</strong>
+              </div>
+            ))}
+          </div>
+        )}
         <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#2ECC40",color:"#000",border:"4px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>→ CONTINUER ←</button>
       </div>
     </div>
@@ -1994,6 +2091,23 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
         )}
       </div>
+      {/* ── BADGE SHELF ─────────────────────────────────────── */}
+      <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:10}}>🏅 BADGES</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {BADGES.filter(b=>b.type==="general"||b.type===resolvedThemeId).map(b=>{
+            const earned=(pState.badges||[]).includes(b.id);
+            return (
+              <div key={b.id} title={earned?`${b.name}: ${b.desc}`:`🔒 ${b.desc}`}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:0.3,transition:"opacity 0.3s",cursor:"default"}}>
+                <div style={{fontSize:26,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#FFD700"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+              </div>
+            );
+          })}
+        </div>
+        {(pState.badges||[]).length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginTop:6}}>Complète des quêtes pour débloquer des badges!</div>}
+      </div>
     {/* Avatar popup */}
     {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
       onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
@@ -2142,7 +2256,16 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
         {/* LOG TAB */}
         {tab==="log" && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
-          {actionLog.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444"}}>Aucune action encore.</div>}
+          {/* Changelog de mise à jour */}
+          {(config.updateFeedEntries||[]).map((entry,i)=>(
+            <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #5DECF555",borderRadius:6,padding:"10px 12px",marginBottom:8}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:6}}>📖 LIVRE DE QUÊTES v{entry.version} — NOUVELLES PAGES!</div>
+              {entry.features.map((f,j)=>(
+                <div key={j} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.4,paddingLeft:8}}>• {f}</div>
+              ))}
+            </div>
+          ))}
+          {actionLog.length===0 && (config.updateFeedEntries||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444"}}>Aucune action encore.</div>}
           {actionLog.map((entry,i)=>(
             <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1a1a1a"}}>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",flexShrink:0,marginTop:2}}>{entry.time}</span>
@@ -2210,11 +2333,25 @@ export default function App() {
 
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
 
-  // Load
+  // Load + migration automatique des données
   useEffect(()=>{
-    load().then(data=>{
-      if(data?.config&&data?.gameStates){ setConfig(data.config); setGameStates(data.gameStates); setScreen("game"); }
-      else setScreen("setup");
+    load().then(raw=>{
+      const data = migrateSavedData(raw);
+      if(data?.config&&data?.gameStates){
+        setConfig(data.config);
+        setGameStates(data.gameStates);
+        // Injecter les nouvelles versions dans le feed famille
+        if(data.newChangelogVersions?.length){
+          const newEntries = data.newChangelogVersions
+            .map(v=>CHANGELOG.find(c=>c.version===v))
+            .filter(Boolean)
+            .map(c=>({ type:"update", version:c.version, features:c.features, ts:new Date().toISOString() }));
+          setConfig(cfg=>({...cfg, updateFeedEntries:[...(cfg.updateFeedEntries||[]),...newEntries]}));
+          // Sauvegarder les seenVersions pour ne pas réafficher
+          save({...data, config:data.config, newChangelogVersions:[]});
+        }
+        setScreen("game");
+      } else setScreen("setup");
     });
   },[]);
 
@@ -2230,7 +2367,7 @@ export default function App() {
 
   // Handle setup complete
   const handleSetupDone = useCallback((cfg) => {
-    const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[] }));
+    const gs = cfg.players.map(()=>({ xp:0, coins:0, completed:[], pending:[], owned:[], equipped:{}, boughtRewards:[], badges:[] }));
     setConfig(cfg); setGameStates(gs); setScreen("game"); setView("family");
     persist(cfg,gs);
     setTimeout(()=>SFX.welcome(),300);
@@ -2262,13 +2399,19 @@ export default function App() {
       const prevLv=getLevel(p.xp).level;
       const newXp=p.xp+task.xp, newCoins=p.coins+task.coins;
       const newLv=getLevel(newXp).level;
-      const n=[...gs]; n[playerIdx]={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
+      // Count tasks done today for streak badge
+      const today=new Date().toDateString();
+      const todayCount=(p.completed||[]).filter(k=>k.startsWith(today)).length+1;
+      const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
+      const newBadgeIds=checkBadges(updatedPs,player,todayCount);
+      if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
+      const n=[...gs]; n[playerIdx]=updatedPs;
       persist(config,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
       setTimeout(()=>{
         spawnParticles(task.emoji);
         if(task.xp>=35){SFX.epic();}else{SFX.task();}
-        setRewardPopup({task,player});
+        setRewardPopup({task,player,newBadges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean)});
       },100);
       return n;
     });
@@ -2349,7 +2492,7 @@ export default function App() {
   const handleResetPlayer = useCallback((playerIdx) => {
     const player=config.players[playerIdx];
     if(!window.confirm(`Reset ${player?.name}? XP, pièces et tâches seront à 0.`))return;
-    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
     logAction(`🔄 Reset complet: ${player?.name}`,"#FF4444");
     showToast(`🔄 ${player?.name} réinitialisé`,"#FF4444");
   },[config,persist,logAction,showToast]);
@@ -2535,7 +2678,7 @@ export default function App() {
         <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{setParentMode(p=>!p);setParentPinOpen(false);showToast(parentMode?"🔒 Mode parent désactivé":"🔓 Mode parent activé!","#FF8C00");}} onCancel={()=>setParentPinOpen(false)} th={th}/>
       )}
       {rewardPopup&&(
-        <RewardPopup task={rewardPopup.task} player={rewardPopup.player} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
+        <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
       )}
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
