@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.8.0", date:"2026-06-07", features:[
+    "📋 Report de tâches — tâches en attente d'hier proposées au lendemain",
+    "🎮 Mini-jeu au level-up — tape les icônes thématiques pour gagner un bonus XP!",
+  ]},
   { version:"1.6.0", date:"2026-06-07", features:[
     "🧒 Nouvelle connexion — Enfant ou Parent, puis choix du joueur",
     "🎨 Onboarding 1er login — thème, avatar, surnom et code secret",
@@ -1273,12 +1277,8 @@ function SetupWizard({ existing, onDone }) {
   const [mode, setMode] = useState("routine"); // "week" | "routine"
   const [weekPersist, setWeekPersist] = useState(false);
   const [routineEnd, setRoutineEnd] = useState("08:30");
-  const [numPlayers, setNumPlayers] = useState(2);
   const [players, setPlayers] = useState([
-    { id:uid(), name:"Elli",                    pseudo:"", color:"#C060D0", themeId:"angel",    starterThemes: pickStarterThemes() },
-    { id:uid(), name:"Antoine E",               pseudo:"", color:"#4A90D9", themeId:"medieval", starterThemes: pickStarterThemes() },
-    { id:uid(), name:"Antoine DR",              pseudo:"", color:"#FF6B35", themeId:"lego",     starterThemes: pickStarterThemes() },
-    { id:uid(), name:"Olivier DR",              pseudo:"", color:"#2ECC40", themeId:"none",     starterThemes: pickStarterThemes() },
+    { id:uid(), name:"", pseudo:"", color:COLORS[0]||"#C060D0", themeId:"none", starterThemes: pickStarterThemes() },
   ]);
   const [theme, setTheme] = useState("minecraft");
   const [pin, setPin] = useState("1146");
@@ -1303,7 +1303,6 @@ function SetupWizard({ existing, onDone }) {
       setWeekPersist(true); // always persist — badges depend on it
       setRoutineEnd(existing.routineEnd || "08:30");
       const pl = existing.players || [];
-      setNumPlayers(pl.length || 2);
       setPlayers(pl.length ? pl.map(p=>({themeId:"none",pseudo:"",starterThemes:p.starterThemes||pickStarterThemes(),...p})) : players);
       setTheme(existing.theme || "minecraft");
       setPin(existing.pin || "1146");
@@ -1315,7 +1314,7 @@ function SetupWizard({ existing, onDone }) {
   }, []);
 
   const T = THEMES[theme];
-  const activePlayers = players.slice(0, numPlayers);
+  const activePlayers = players;
   const allTasks = [...TASK_CATALOG, ...customTasks];
   const allRewards = [...REWARD_CATALOG, ...customRewards];
 
@@ -1477,13 +1476,12 @@ function SetupWizard({ existing, onDone }) {
 
         {/* ── STEP 1: Players ── */}
         {step===1 && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:14}}>👥 Joueurs</div>
-          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-            {[1,2,3,4].map(n=><Btn key={n} active={numPlayers===n} onClick={()=>{ setNumPlayers(n); if(players.length<n) { const extra=Array.from({length:n-players.length},(_,i)=>({id:uid(),name:`Joueur ${players.length+i+1}`,color:COLORS[players.length+i]||"#888",feminine:false})); setPlayers(p=>[...p,...extra]); } }}>{n}</Btn>)}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent}}>👥 Joueurs</div>
+            {players.length < 6 && <Btn active={false} onClick={()=>{ setPlayers(p=>[...p,{id:uid(),name:"",pseudo:"",color:COLORS[p.length]||"#888",themeId:"none",starterThemes:pickStarterThemes()}]); }}>➕ Ajouter</Btn>}
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {Array.from({length:numPlayers},(_,i)=>{
-              const pl=players[i]||{id:uid(),name:"",color:COLORS[i]||"#888",feminine:false};
+            {players.map((pl,i)=>{
               return (
                 <div key={i} style={{...card,border:`2px solid ${pl.color}`}}>
                   <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
@@ -2512,6 +2510,128 @@ function PinKeypad({ onDigit, onBack, onClose, closeLabel="✕" }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MINI-GAME — mini-jeu whack-a-mole thématique au level-up
+// ═══════════════════════════════════════════════════════════════
+function MiniGame({ player, playerThemeId, level, onFinish }) {
+  const pt = getPlayerTheme(playerThemeId || "none");
+  const ROUNDS = 3;
+  const ROUND_MS = 1400;
+  const BONUS_XP = [0, 8, 18, 30];
+  const BONUS_COINS = [0, 4, 10, 18];
+  const TARGET = pt.platformItems?.[0] || "⭐";
+
+  const [phase, setPhase] = useState("intro"); // intro|play|done
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const [active, setActive] = useState(-1);
+  const roundRef = useRef(0);
+  const scoreRef = useRef(0);
+  const timerRef = useRef(null);
+
+  const showNext = useCallback(() => {
+    const cell = Math.floor(Math.random() * 9);
+    setActive(cell);
+    timerRef.current = setTimeout(() => {
+      setActive(-1);
+      roundRef.current++;
+      setRound(roundRef.current);
+      if (roundRef.current >= ROUNDS) { setTimeout(() => setPhase("done"), 400); }
+      else { setTimeout(showNext, 350); }
+    }, ROUND_MS);
+  }, []);
+
+  const handleHit = (i) => {
+    if (phase !== "play" || active !== i) return;
+    clearTimeout(timerRef.current);
+    scoreRef.current++; setScore(scoreRef.current);
+    setActive(-1); SFX.coin();
+    roundRef.current++; setRound(roundRef.current);
+    if (roundRef.current >= ROUNDS) { setTimeout(() => setPhase("done"), 350); }
+    else { setTimeout(showNext, 280); }
+  };
+
+  const start = () => {
+    roundRef.current = 0; scoreRef.current = 0;
+    setRound(0); setScore(0); setPhase("play");
+    setTimeout(showNext, 500);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const bonusXp = BONUS_XP[score] ?? 0;
+  const bonusCoins = BONUS_COINS[score] ?? 0;
+  const stars = Array.from({length:3}, (_,i) => i < score ? "⭐" : "⬛").join(" ");
+  const medal = score === 3 ? "🏆" : score >= 2 ? "🥈" : score === 1 ? "🥉" : "😅";
+  const msg = score === 3 ? "PARFAIT! 🔥" : score >= 2 ? "Bien joué!" : score === 1 ? "Pas mal!" : "La prochaine fois!";
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20}}>
+      {phase === "intro" && (<>
+        <div style={{fontSize:40}}>{TARGET}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent,textAlign:"center",textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>Mini-jeu!{"\n"}Tape les {TARGET} le plus vite possible!</div>
+        <button onClick={start} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8,boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 🎮</button>
+      </>)}
+
+      {phase === "play" && (<>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",letterSpacing:2}}>TOUR {round+1}/{ROUNDS} · SCORE {score}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,width:240}}>
+          {Array.from({length:9}, (_,i) => (
+            <button key={i} onClick={()=>handleHit(i)}
+              style={{height:72,fontSize:active===i?32:0,background:active===i?pt.primary:"#181818",border:`2px solid ${active===i?pt.accent:"#2a2a2a"}`,borderRadius:10,cursor:active===i?"pointer":"default",transition:"all 0.07s",transform:active===i?"scale(1.1)":"scale(1)",boxShadow:active===i?`0 0 18px ${pt.glow}60`:"none"}}>
+              {active===i ? TARGET : ""}
+            </button>
+          ))}
+        </div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#555"}}>Réflexes de champion!</div>
+      </>)}
+
+      {phase === "done" && (<>
+        <div style={{fontSize:48}}>{medal}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:14,color:pt.accent,letterSpacing:3}}>{stars}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#ddd"}}>{msg}</div>
+        {bonusXp > 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD700",textShadow:"0 0 8px #FFD700"}}>+{bonusXp} XP · +{bonusCoins} 🪙</div>}
+        {bonusXp === 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555"}}>Pas de bonus cette fois...</div>}
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+      </>)}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CARRY-OVER MODAL — tâches pending d'hier
+// ═══════════════════════════════════════════════════════════════
+function CarryOverModal({ config, gameStates, onValidate, onClear, onClose }) {
+  const playersWithPending = (config.players||[]).map((p,idx)=>({
+    player:p, idx, pending:(gameStates[idx]?.pending||[])
+  })).filter(x=>x.pending.length>0);
+
+  if (playersWithPending.length === 0) { onClose(); return null; }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:195,display:"flex",flexDirection:"column",alignItems:"center",padding:"20px 16px",overflowY:"auto"}}>
+      <div style={{width:"100%",maxWidth:380}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:"#FFD700",textAlign:"center",marginBottom:6}}>📋 Tâches d'hier</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",textAlign:"center",marginBottom:18,lineHeight:2}}>Ces tâches attendaient encore validation. Que faire?</div>
+        {playersWithPending.map(({player,idx,pending})=>(
+          <div key={idx} style={{background:"#111",borderRadius:8,padding:14,marginBottom:12,border:`1px solid ${player.color||"#444"}40`}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:player.color||"#FFD700",marginBottom:10}}>
+              {player.pseudo||player.name}
+              <span style={{color:"#666",fontSize:6}}> · {pending.length} tâche{pending.length>1?"s":""}</span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>onValidate(idx)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"8px 0",background:"#1a2e1a",color:"#5D9E34",border:"1px solid #5D9E34",borderRadius:4,cursor:"pointer",flex:1}}>✅ Valider (+XP)</button>
+              <button onClick={()=>onClear(idx)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"8px 0",background:"#1a1a1a",color:"#666",border:"1px solid #333",borderRadius:4,cursor:"pointer",flex:1}}>🗑️ Effacer</button>
+            </div>
+          </div>
+        ))}
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"10px 24px",background:"#1a1a1a",color:"#888",border:"1px solid #333",borderRadius:6,cursor:"pointer",width:"100%",marginTop:4}}>Fermer</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // LOGIN SCREEN — "Qui joue?" + PIN par joueur
 // ═══════════════════════════════════════════════════════════════
 // ─── CALENDAR HELPERS ────────────────────────────────────────────────────────
@@ -2549,7 +2669,7 @@ const computeCalendarReminders = (calendar, today) => {
   });
 };
 
-function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin, onCompleteOnboarding }) {
+function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin, onCompleteOnboarding, onNewSetup }) {
   // mode: "who" | "child-select" | "onboarding" | "pin" | "parent"
   const [mode, setMode] = useState("who");
   const [selIdx, setSelIdx] = useState(null);
@@ -2686,7 +2806,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#666",marginBottom:20}}>Qui es-tu?</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
-            {config.players.map((pl, i) => {
+            {(config?.players||[]).map((pl, i) => {
               const psi = gameStates[i] || {};
               const isNew = !psi.avatar?.configured && !psi.pin;
               return (
@@ -2701,6 +2821,12 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                 </button>
               );
             })}
+            <button onClick={()=>{SFX.click();onNewSetup?.();}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px 16px",background:"rgba(0,0,0,0.5)",color:"#4ade80",border:"3px dashed #4ade8066",borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ade80";e.currentTarget.style.boxShadow="0 0 16px #4ade8033";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="#4ade8066";e.currentTarget.style.boxShadow="none";}}>
+              📖 Nouveau livre de quêtes
+            </button>
           </div>
           <BtnBack onClick={()=>setMode("who")}/>
         </div>
@@ -2909,6 +3035,8 @@ export default function App() {
   const [newPin, setNewPin] = useState("");
   const [toast, setToast] = useState(null);
   const [rewardPopup, setRewardPopup] = useState(null);
+  const [miniGame, setMiniGame] = useState(null); // {player,playerIdx,level,playerThemeId,pendingReward}
+  const [carryoverModal, setCarryoverModal] = useState(false);
   const [now, setNow] = useState(new Date());
 
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
@@ -2930,8 +3058,14 @@ export default function App() {
           // Sauvegarder les seenVersions pour ne pas réafficher
           save({...data, config:data.config, newChangelogVersions:[]});
         }
+        // Carry-over: si date changée et des tâches pending → proposer report
+        const savedDate = data.savedAt ? new Date(data.savedAt).toDateString() : null;
+        if (savedDate && savedDate !== new Date().toDateString()) {
+          const hasPending = data.gameStates.some(gs=>(gs.pending||[]).length>0);
+          if (hasPending) setCarryoverModal(true);
+        }
         setScreen("login");
-      } else setScreen("setup");
+      } else setScreen("login");
     });
   },[]);
 
@@ -2988,10 +3122,15 @@ export default function App() {
       const n=[...gs]; n[playerIdx]=updatedPs;
       persist(config,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
+      const pendingRwd={task,player,newBadges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean)};
       setTimeout(()=>{
         spawnParticles(task.emoji);
         if(task.xp>=35){SFX.epic();}else{SFX.task();}
-        setRewardPopup({task,player,newBadges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean)});
+        if(prevLv<newLv){
+          setMiniGame({player,playerIdx,level:newLv,playerThemeId:player.themeId||"none",pendingReward:pendingRwd});
+        } else {
+          setRewardPopup(pendingRwd);
+        }
       },100);
       return n;
     });
@@ -3003,6 +3142,57 @@ export default function App() {
     setPendingValidation(null);
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
   },[pendingValidation,config,persist]);
+
+  // Mini-game ended — apply bonus then show reward popup
+  const handleMiniGameEnd = useCallback((bonusXp,bonusCoins)=>{
+    if(!miniGame)return;
+    const {playerIdx,pendingReward}=miniGame;
+    setMiniGame(null);
+    if(bonusXp>0||bonusCoins>0){
+      setGameStates(gs=>{
+        const n=[...gs];
+        n[playerIdx]={...n[playerIdx],xp:n[playerIdx].xp+bonusXp,coins:n[playerIdx].coins+bonusCoins};
+        persist(config,n);
+        return n;
+      });
+      showToast(`🎮 Bonus mini-jeu! +${bonusXp} XP · +${bonusCoins} 🪙`,"#FFD700",4000);
+    }
+    setRewardPopup(pendingReward);
+  },[miniGame,config,persist,showToast]);
+
+  // Carry-over: valider toutes les tâches pending d'un joueur (leur donner XP)
+  const handleCarryoverValidate = useCallback((playerIdx)=>{
+    setGameStates(gs=>{
+      const p=gs[playerIdx];
+      const pending=p.pending||[];
+      let bonusXp=0,bonusCoins=0;
+      const newCompleted=[...(p.completed||[])];
+      pending.forEach(key=>{
+        const instanceId=key.slice(0,key.lastIndexOf("_"));
+        const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+        if(ass){
+          const task=[...(config.customTasks||[]),...TASK_CATALOG].find(t=>t.id===ass.taskId);
+          if(task){bonusXp+=task.xp;bonusCoins+=task.coins;}
+          if(!newCompleted.includes(key))newCompleted.push(key);
+        }
+      });
+      const n=[...gs];
+      n[playerIdx]={...p,xp:p.xp+bonusXp,coins:p.coins+bonusCoins,completed:newCompleted,pending:[]};
+      persist(config,n);
+      return n;
+    });
+    showToast("✅ Tâches validées!","#5D9E34");
+  },[config,persist,showToast]);
+
+  // Carry-over: effacer les pending sans XP
+  const handleCarryoverClear = useCallback((playerIdx)=>{
+    setGameStates(gs=>{
+      const n=[...gs];
+      n[playerIdx]={...n[playerIdx],pending:[]};
+      persist(config,n);
+      return n;
+    });
+  },[config,persist]);
 
   // Buy / equip
   const handleBuy = useCallback((item,playerId)=>{
@@ -3136,6 +3326,7 @@ export default function App() {
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
     onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
     onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
+    onNewSetup={()=>setScreen("setup")}
     onSetPlayerPin={(idx, newPin)=>{
       const gs = [...gameStates]; gs[idx]={...gs[idx], pin:newPin};
       setGameStates(gs); save({config, gameStates:gs, savedAt:new Date().toISOString()});
@@ -3289,6 +3480,17 @@ export default function App() {
       )}
       {rewardPopup&&(
         <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
+      )}
+      {miniGame&&(
+        <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} onFinish={handleMiniGameEnd}/>
+      )}
+      {carryoverModal&&(
+        <CarryOverModal
+          config={config} gameStates={gameStates}
+          onValidate={(idx)=>{ handleCarryoverValidate(idx); const rem=gameStates.filter((gs,i)=>i!==idx&&(gs.pending||[]).length>0); if(!rem.length) setCarryoverModal(false); }}
+          onClear={(idx)=>{ handleCarryoverClear(idx); const rem=gameStates.filter((gs,i)=>i!==idx&&(gs.pending||[]).length>0); if(!rem.length) setCarryoverModal(false); }}
+          onClose={()=>setCarryoverModal(false)}
+        />
       )}
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
