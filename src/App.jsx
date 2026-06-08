@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.8.2";
+const APP_VERSION = "1.9.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.9.0", date:"2026-06-08", features:[
+    "📱 Interface responsive — optimisée tablette et bureau",
+    "👤 Profil Duolingo — stats, XP, badges et classement famille par joueur",
+    "😂 Messages humoristiques — quand tu complètes une tâche... ou rates le code PIN",
+  ]},
   { version:"1.8.2", date:"2026-06-08", features:[
     "📚 Bonus calendrier — +5 XP et +2 🪙 à chaque devoir ou examen ajouté",
   ]},
@@ -1037,6 +1042,28 @@ const importConfig = (file, onSuccess) => {
   r.readAsText(file);
 };
 
+// ─── FUNNY MESSAGES (#12) ────────────────────────────────────
+const FUNNY_MSGS = [
+  "Wow. La tâche est faite. La Terre continue de tourner. 🌎",
+  "T'as prouvé que tu peux faire des choses! Maintenant recommence.",
+  "ALERTE: un enfant a accompli une tâche! NASA informé. 🚀",
+  "Légendaire! (C'est-à-dire: ça s'est produit une fois.) 📜",
+  "Félicitations! T'es officiellement moins paresseux·se qu'une plante. 🌱",
+  "La famille a confirmé: t'as pas juste dit que t'allais le faire. 👀",
+  "C'est tellement impressionnant... même le chat fait semblant d'être fier. 🐱",
+  "Performance historique. Les archéologues en parleront dans 3000 ans.",
+  "Le plancher était là depuis tout ce temps. T'as enfin remarqué. 🧹",
+  "Des XP! Des pièces! Et toujours aucun médaillon d'or dans la vraie vie.",
+  "INCROYABLE. Ça a pris 45 secondes. Bon, c'est mieux que jamais, disons.",
+  "Voilà ce qu'on appelle un niveau de productivité tout à fait acceptable. 👑",
+];
+const FUNNY_PIN_MSGS = [
+  "...ou peut-être que le code, c'est pas ça non plus? 🤔",
+  "Y'a quelqu'un ici qui connaît le code? Non? OK.",
+  "À ce rythme-là, t'as jusqu'en 2087 pour le trouver.",
+  "PSST: ton parent va finir par changer le code pour 0000.",
+];
+
 // ─── UTILS ───────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2,9);
 const todayStr = () => new Date().toISOString().slice(0,10);
@@ -1076,6 +1103,14 @@ const GLOBAL_CSS = `
   .xp-step-fill{background:var(--xp-clr);height:100%;border-radius:2px;transition:width 0.5s ease}
   input:focus{outline:none;}
   button:focus{outline:none;}
+  @media(min-width:768px){
+    .game-root{font-size:108%;}
+    .fo-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))!important;}
+  }
+  @media(min-width:1024px){
+    .game-root{font-size:114%;}
+    .fo-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))!important;}
+  }
 `;
 
 // ═══════════════════════════════════════════════════════════════
@@ -1185,6 +1220,7 @@ const darken = (hex) => { try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex
 function PinPad({ pin, label, onSuccess, onCancel, th }) {
   const [buf, setBuf] = useState("");
   const [err, setErr] = useState(false);
+  const [failCount, setFailCount] = useState(0);
   const press = v => {
     SFX.pinKey();
     if (v === "del") { setBuf(b => b.slice(0,-1)); return; }
@@ -1193,7 +1229,7 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
     setBuf(next);
     if (next.length === 4) setTimeout(() => {
       if (next === pin) { SFX.pinOk(); onSuccess(); }
-      else { SFX.pinErr(); setErr(true); setBuf(""); setTimeout(() => setErr(false), 1500); }
+      else { SFX.pinErr(); setErr(true); setFailCount(f=>f+1); setBuf(""); setTimeout(() => setErr(false), 1500); }
     }, 150);
   };
   const T = th || THEMES.minecraft;
@@ -1206,7 +1242,8 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
         <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:14}}>
           {[0,1,2,3].map(i=><div key={i} style={{width:20,height:20,borderRadius:"50%",border:`3px solid ${T.accent}`,background:i<buf.length?T.accent:"transparent",boxShadow:i<buf.length?`0 0 10px ${T.accent}`:"none",transition:"all 0.15s"}}/>)}
         </div>
-        {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF4444",marginBottom:8,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
+        {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF4444",marginBottom:4,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
+        {failCount>=2&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:6,textAlign:"center"}}>{FUNNY_PIN_MSGS[Math.min(failCount-2,FUNNY_PIN_MSGS.length-1)]}</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
           {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
             <button key={k} onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
@@ -2264,13 +2301,84 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 }
 
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
+// ─── PLAYER PROFILE MODAL (#8) ───────────────────────────────
+function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
+  const gs = pState;
+  const lt = getLevelTitle(gs.xp||0, player.themeId);
+  const bar = xpBar(gs.xp||0);
+  const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
+  const myBadges = (gs.badges||[]).map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).slice(-6);
+  const myDone = config.assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
+  const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
+  const maxXp = Math.max(...siblings.map(s=>s.xp),1);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#111",border:`4px solid ${player.color}`,borderRadius:12,padding:20,maxWidth:380,width:"100%",boxShadow:`0 0 40px ${player.color}60`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
+          <AvatarCanvas avatarDef={gs.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(player.themeId).charBodyColor||player.color} size={64} style={{border:`4px solid ${player.color}`,borderRadius:8}}/>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:player.color,marginBottom:4}}>{displayName(player)}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:th.accent}}>Niv.{lt.level} — {lt.title}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{gs.xp||0} XP</div>
+          </div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>Prochain niveau</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>{pct}%</span>
+          </div>
+          <div style={{height:14,background:"#0d2010",border:"2px solid #1a3820",borderRadius:3,overflow:"hidden"}}>
+            <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#4ade80,#22c55e)",transition:"width 1s ease",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)",animation:"shimmer 2s infinite"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+          {[["⚡",gs.xp||0,"XP"],["🪙",gs.coins||0,"Pièces"],["✅",myDone,"Quêtes"]].map(([icon,val,lbl])=>(
+            <div key={lbl} style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:6,padding:"8px 4px",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:2}}>{icon}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#fff"}}>{val}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+        {myBadges.length>0&&(
+          <div style={{marginBottom:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🏅 BADGES</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{myBadges.map(b=><span key={b.id} title={b.name} style={{fontSize:24}}>{b.emoji}</span>)}</div>
+          </div>
+        )}
+        {siblings.length>1&&(
+          <div style={{marginBottom:14}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🏆 CLASSEMENT FAMILLE</div>
+            {siblings.map((s,rank)=>(
+              <div key={s.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#FFD700":"#666",width:14}}>#{rank+1}</span>
+                <span style={{fontFamily:"'VT323',monospace",fontSize:16,color:s.isMe?s.color:"#aaa",flex:1,minWidth:50}}>{s.name}</span>
+                <div style={{flex:2,height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${Math.round(s.xp/maxXp*100)}%`,background:s.isMe?s.color:"#444",transition:"width 0.8s ease"}}/>
+                </div>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",width:34,textAlign:"right"}}>{s.xp}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:10,background:player.color,color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>✕ FERMER</button>
+      </div>
+    </div>
+  );
+}
+
 function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
-  const totalAssignments = config.assignments.length;
+  const [profileIdx, setProfileIdx] = useState(null);
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
+      {profileIdx!==null&&(
+        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} onClose={()=>setProfileIdx(null)}/>
+      )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
       {/* Player cards grid */}
-      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:10}}>
+      <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:10}}>
         {config.players.map((player,i)=>{
           const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
           const myDone=config.assignments.filter(a=>a.playerIds.includes(player.id)&&ps.completed?.some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
@@ -2302,7 +2410,10 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡ {ps.xp}</span>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>🪙 {ps.coins}</span>
               </div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,marginTop:8,textAlign:"center"}}>Voir mon tableau →</div>
+              <div style={{display:"flex",gap:6,marginTop:8}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>Voir tableau →</div>
+                <button onClick={e=>{e.stopPropagation();SFX.click();setProfileIdx(i);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:th.accent,border:`1px solid ${th.accent}`,borderRadius:3,cursor:"pointer",flexShrink:0}}>📊 Profil</button>
+              </div>
             </div>
           );
         })}
@@ -3194,6 +3305,7 @@ export default function App() {
       setTimeout(()=>{
         spawnParticles(task.emoji);
         if(task.xp>=35){SFX.epic();}else{SFX.task();}
+        setTimeout(()=>showToast(FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)],"#555",2800),1400);
         if(prevLv<newLv){
           setMiniGame({player,playerIdx,level:newLv,playerThemeId:player.themeId||"none",pendingReward:pendingRwd});
         } else {
@@ -3418,7 +3530,7 @@ export default function App() {
   const currentPlayerState = currentPlayerView!==null ? gameStates[currentPlayerView] : null;
 
   return (
-    <div style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
+    <div className="game-root" style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
       <style>{GLOBAL_CSS+`
         .nav-btn:hover{opacity:0.85;}
         .task-card:hover{transform:translateY(-1px);}
