@@ -1,19 +1,30 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-07 — v1.8.0_
+_Mis à jour: 2026-06-08 — v1.10.1_
 
 ---
 
 ## Stack & déploiement
 
-- **React 18 + Vite 5 PWA** — single-file `src/App.jsx` (~3600 lignes)
+- **React 18 + Vite 5 PWA** — single-file `src/App.jsx` (~4250 lignes)
 - **Persistance:** `localStorage` uniquement, clé `livre-de-quetes-v1`, aucun backend
-- **Deploy:** GitHub Pages via GitHub Actions — push `src/App.jsx` sur `main` → CI/CD automatique
-- **Repo:** `genevievebergeron-web/livre-quete`
+- **Deploy:** Push sur `main` → **Canner** (hébergeur canadien style Vercel) déploie automatiquement
+  - Pas de build local nécessaire — Canner s'en charge
+  - Repo GitHub : `genevievebergeron-web/livre-quete`
+  - Remote git : `https://genevievebergeron-web@github.com/genevievebergeron-web/livre-quete.git`
 - **Dossier local:** `~/Downloads/livre-de-quetes/`
+- **Push depuis terminal:** `cd ~/Downloads/livre-de-quetes && git push`
+
+> ⚠️ **Lock files git dans le sandbox** — si erreur de push, supprimer manuellement :
+> ```bash
+> rm ~/Downloads/livre-de-quetes/.git/HEAD.lock
+> rm ~/Downloads/livre-de-quetes/.git/index.lock
+> ```
+
+---
 
 ## Joueurs
 
-4 garçons : Elli, Antoine E (Emery), Antoine DR (Dumont-Rocheleau), Olivier DR
+4 garçons : **Elli**, **Antoine E** (Emery), **Antoine DR** (Dumont-Rocheleau), **Olivier DR**
 
 **Couleurs par défaut (SetupWizard):**
 - Elli → `#C060D0` (mauve)
@@ -30,8 +41,7 @@ _Mis à jour: 2026-06-07 — v1.8.0_
 ### v1.0–1.2
 - App complète de quêtes gamifiées avec XP, pièces, niveaux, récompenses
 - Thèmes visuels (13 thèmes) XP-gatés — chaque joueur commence avec 2 thèmes aléatoires
-- Pseudos personnalisés (`player.pseudo`)
-- `displayName(player)` → pseudo ou prénom
+- Pseudos personnalisés (`player.pseudo`) — `displayName(player)` → pseudo ou prénom
 - Footer version + bouton bug report
 - Sauvegarde toujours active (toggle retiré)
 
@@ -46,74 +56,41 @@ _Mis à jour: 2026-06-07 — v1.8.0_
 - `migrateGameState(gs)` — ajoute les nouveaux champs sans écraser les données existantes
 - `migrateSavedData(data)` — applique migration + détecte nouvelles versions
 - `CHANGELOG` constant — alimente le feed famille à chaque push
-- `seenVersions` en localStorage — évite de réafficher le changelog
 
 ### v1.4.0 — Écran login
-- Nouvelle machine d'états: `"loading" | "setup" | "login" | "game"`
-- `LoginScreen` — cartes joueurs tappables + bouton accès parent
-- Après setup → `"login"` (pas `"game"` directement)
-- Après chargement → `"login"`
-
-### v1.8.0 — Carry-over + Mini-jeu
-- `carryoverModal` — à l'ouverture si date changée, propose valider ou effacer les tâches pending d'hier
-- `handleCarryoverValidate(playerIdx)` — donne XP pour toutes les tâches pending d'un joueur
-- `handleCarryoverClear(playerIdx)` — efface les pending sans XP
-- `MiniGame` component — whack-a-mole thématique 3x3, 3 rounds, 1.4s/cible
-- `miniGame` state — déclenché dans `handlePinSuccess` quand `prevLv < newLv`
-- `handleMiniGameEnd(bonusXp, bonusCoins)` — applique bonus et affiche RewardPopup
+- Machine d'états: `"loading" | "setup" | "login" | "game"`
+- `LoginScreen` — sélection Enfant/Parent + flow par joueur
 
 ### v1.5.0 — PIN par joueur
 - `gameState[i].pin` — `null` = pas encore créé, string 4 chiffres = défini
-- Premier tap sur carte → flow création PIN (entrée + confirmation)
-- Taps suivants → vérification PIN
-- Indicateur 🔑 discret sur la carte si PIN existe
-- Composants extraits: `PinDots`, `PinKeypad` (réutilisables)
-- PIN parent par défaut dans SetupWizard: **1146**
+- Premier login → flow création PIN (entrée + confirmation)
+- Logins suivants → vérification PIN
+- Indicateur 🔑 discret sur carte si PIN existe
+- `PinDots`, `PinKeypad` — composants extraits réutilisables
+- **PIN parent par défaut dans SetupWizard : 1146** ← NE PAS afficher côté enfant
 - `migrateGameState` inclut `pin: gs.pin ?? null`
 
----
+### v1.8.0 — Carry-over + Mini-jeu whack-a-mole
+- `carryoverModal` — à l'ouverture si date changée, propose valider ou effacer les tâches pending d'hier
+- `handleCarryoverValidate(playerIdx)` — donne XP pour toutes les tâches pending
+- `handleCarryoverClear(playerIdx)` — efface les pending sans XP
+- `MiniGame` component — whack-a-mole thématique 3x3, 3 rounds, 1.4s/cible
+- Déclenché dans `handlePinSuccess` quand `prevLv < newLv`
+- Bonus XP 0/8/18/30 + coins 0/4/10/18 selon score
 
-## Règles UX / Design décisions 🎨
+### v1.9.0 — Fix PIN login (stale closure mobile)
+- `handlePlayerDigit` / `handleParentDigit` refactorisés avec `useRef` pour éviter stale closure sur mobile
+- Pattern : `pPinRef.current` + `ppPinRef.current` au lieu de state React dans les handlers
 
-### Thèmes joueur
-- Chaque joueur commence avec **2 thèmes aléatoires** (`pickStarterThemes()` — déjà codé)
-- Les autres thèmes se **débloquent par XP** (`isThemeUnlocked()` — déjà codé)
-- Le thème choisi est **verrouillé pour la semaine** (lundi → dimanche)
-  - Champ à ajouter: `player.themeChosenAt` (timestamp ISO)
-  - Logique: si même semaine ISO → bloqué côté enfant; parent peut override
-  - Message: "Ton thème dure toute la semaine — choisis bien! 🎯"
-- Changer de thème = action parent uniquement en cours de semaine
+### v1.10.0 — Fix PIN login (suppression useCallback inutile)
+- Suppression des `useCallback` sur les handlers PIN (deps changeaient à chaque render de toute façon)
+- Extraction de `doPlayerSubmit()` et `doParentSubmit()` — fonctions pures qui lisent depuis les refs
+- Ces fonctions sont appelées par auto-submit (4e chiffre) ET par le bouton VALIDER
 
-### Flow login (À IMPLÉMENTER — v1.6.0)
-
-```
-Écran 1 — "Tu es...?"
-  [🧒 Enfant]   [👨‍👩 Parent/Adulte]
-        ↓                ↓
-Écran 2             PIN parent
-  "Qui es-tu?"
-  Liste: Elli / Antoine E. / Antoine D-R. / Olivier D-R.
-        ↓
-  [1er login — onboarding]       [2e login+]
-    1. Choisir thème               → PIN → jeu
-       (parmi 2 starters)
-       "Ce thème dure toute
-        la semaine!"
-    2. Créer avatar 8-bit
-       (coupe cheveux, couleur
-        cheveux, couleur chandail,
-        couleur pantalon)
-    3. Choisir surnom ingame
-    4. Créer son PIN (4 chiffres)
-        ↓
-       Jeu
-```
-
-**Détection 1er login:** `gameState[i].pin === null && !gameState[i].avatar?.configured`
-→ Ajouter champ `avatar.configured: bool` dans `migrateGameState`
-
-**Surnom:** affiché partout dans le jeu (feed, profil, cartes)
-**Vrai nom:** affiché seulement dans le panneau parent
+### v1.10.1 — Boutons VALIDER sur écrans login ← DERNIER COMMIT
+- Bouton `✅ VALIDER` ajouté sous `PinKeypad` dans le mode `"pin"` (joueur) — visible quand `pPin.length===4`
+- Bouton `✅ VALIDER` ajouté sous `PinKeypad` dans le mode `"parent"` — visible quand `ppPin.length===4`
+- Fix critique UX : avant, si auto-submit mobile avait un bug timing → l'utilisateur était bloqué sans aucun bouton
 
 ---
 
@@ -146,9 +123,41 @@ Composants principaux:
   ParentPanel       — gestion tâches/récompenses/PIN/export
   RewardPopup       — popup après tâche complétée (XP + badges)
   AvatarCanvas      — rendu pixel-art personnage
-  PinPad            — pavé numérique validation tâche/mode parent (in-game)
+  PinPad            — pavé PIN validation tâche/mode parent (in-game) — A UN BOUTON VALIDER
   PinDots           — indicateur 4 points PIN (login screen)
-  PinKeypad         — clavier numérique (login screen)
+  PinKeypad         — clavier numérique (login screen) — PAS de bouton valider intégré
+                      → le bouton VALIDER est ajouté dans le JSX parent selon le contexte
+  MiniGame          — whack-a-mole au level-up
+```
+
+### Différence PinPad vs PinKeypad (important!)
+- `PinPad` (ligne ~1231) : utilisé **in-game** pour valider tâche ou accéder au mode parent. **A son propre bouton VALIDER intégré.**
+- `PinKeypad` (ligne ~2682) : utilisé sur l'**écran login**. Clavier uniquement, **pas de bouton VALIDER intégré** — le bouton est ajouté dans le JSX appelant (`mode==="pin"` et `mode==="parent"` dans `LoginScreen`).
+
+### Pattern handlers PIN login (ref-based, anti-stale-closure)
+```js
+// Refs pour éviter stale closure sur mobile
+const pPinRef = useRef("");
+const ppPinRef = useRef("");
+const confirmStepRef = useRef(false);
+const firstPinRef = useRef("");
+const gameStatesRef = useRef(gameStates);
+gameStatesRef.current = gameStates;
+const selIdxRef = useRef(selIdx);
+selIdxRef.current = selIdx;
+const configPinRef = useRef(config?.pin);
+configPinRef.current = config?.pin;
+
+// Appelé par auto-submit (4e chiffre) ET par bouton VALIDER
+const doPlayerSubmit = () => { /* lit depuis pPinRef.current */ };
+const doParentSubmit = () => { /* lit depuis ppPinRef.current */ };
+
+const handlePlayerDigit = (d) => {
+  if (pPinRef.current.length >= 4) return;
+  pPinRef.current = pPinRef.current + d;
+  setPPin(pPinRef.current);
+  if (pPinRef.current.length === 4) doPlayerSubmit();
+};
 ```
 
 ### Pattern persist
@@ -157,70 +166,59 @@ const persist = useCallback((cfg, gs) =>
   save({ config:cfg, gameStates:gs, savedAt:new Date().toISOString() }), []);
 ```
 
-### Pattern badge check (dans handlePinSuccess)
-```js
-const today = new Date().toDateString();
-const todayCount = (p.completed||[]).filter(k=>k.startsWith(today)).length + 1;
-const updatedPs = { ...p, xp:newXp, coins:newCoins, completed:[...], pending:[...] };
-const newBadgeIds = checkBadges(updatedPs, player, todayCount);
-if (newBadgeIds.length) updatedPs.badges = [...(p.badges||[]), ...newBadgeIds];
+### App-level props pour LoginScreen
+```jsx
+<LoginScreen
+  config={config}
+  gameStates={gameStates}
+  onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
+  onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
+  onSetPlayerPin={(idx, pin)=>{ /* met à jour gameStates[idx].pin */ }}
+  onCompleteOnboarding={...}
+  onNewSetup={()=>{ setScreen("setup"); }}
+/>
 ```
+
+---
+
+## Règles UX / Design décisions 🎨
+
+### Sécurité PIN
+- **PIN parent par défaut = 1146** — NE JAMAIS afficher dans une UI côté enfant
+- Le vrai PIN d'une famille = celui créé au setup original. Pour changer : panneau parent → onglet PIN.
+
+### Thèmes joueur
+- Chaque joueur commence avec **2 thèmes aléatoires** (`pickStarterThemes()`)
+- Les autres thèmes se **débloquent par XP** (`isThemeUnlocked()`)
+- **Thèmes disponibles :** minecraftpp, roblox, harrypotter, ghibli, horreur, monstres, licornes, boomerangfu, marvel, japon, microscopique, disney, pixar
+
+### Versioning
+- Bump `APP_VERSION` à chaque feature/fix
+- Ajouter entrée dans `CHANGELOG` constant
 
 ---
 
 ## Ce qui reste à faire 📋
 
-### #6 — Refonte login (v1.6.0) ← PRIORITÉ IMMÉDIATE
+### #6 — Refonte login (v1.6.0)
 - Écran "Enfant / Parent" comme point d'entrée
-- Liste des 4 joueurs par nom (pas cartes avec stats)
+- Liste des joueurs par nom + cartes
 - Flow onboarding 1er login : thème → avatar → surnom → PIN
 - Lock thème hebdomadaire (`themeChosenAt` + vérif semaine ISO)
-- Surnom ingame vs vrai nom dans panneau parent
 - `avatar.configured: bool` dans `migrateGameState`
 
-### #7 — Responsive cell/tablette/ordinateur
+### #7 — Responsive tablette/ordinateur
 - L'app est actuellement optimisée mobile uniquement
-- Adapter les layouts pour tablette (≥768px) et desktop (≥1024px)
-- Grilles, tailles de police, marges — tout clamp/responsive
-- Tester sur les 3 formats avant chaque déploiement
+- Adapter layouts pour tablette (≥768px) et desktop (≥1024px)
 
 ### #8 — Pages profil famille (Duolingo-style)
-- Vue dédiée par joueur accessible depuis FamilyOverview
-- Stats historiques, progression XP visuelle, badges en vitrine
-- Style Duolingo: streak, ligues, comparaison fraternelle
+- Vue dédiée par joueur depuis FamilyOverview
+- Stats historiques, progression XP, badges en vitrine, streak, ligues
 
-### #9 — Report automatique des tâches non complétées ✅ FAIT v1.8.0
-- CarryOverModal affiché si date changée + tâches pending
-- Valider (+XP) ou Effacer par joueur
+### #10 — Calendrier devoirs/examens
+- Saisie d'examens/devoirs avec date dans `gameStates[i].calendar[]`
+- Rappel contextuel dans le dashboard
 
-### #10 — Calendrier devoirs/examens avec prompt quotidien
-- Section dans PlayerDashboard ou vue séparée
-- Saisie d'examens/devoirs avec date
-- Rappel contextuel: "Ton exam de math est dans 3 jours!"
-- Stocké dans `gameStates[i].calendar[]`
-
-### #11 — Mini-jeux sur montée de niveau ✅ FAIT v1.8.0
-- Whack-a-mole thématique 3x3, 3 rounds 1.4s/cible
-- Bonus XP 0/8/18/30 + coins 0/4/10/18 selon score
-- Thème = thème actif du joueur (emoji + couleurs)
-
-### #12 — Humour et trolling dans l'app
-- Messages aléatoires sarcastiques/drôles dans l'UI
-- Ex: commentaires sur les tâches ménagères, noms de niveau absurdes
+### #12 — Humour et trolling
+- Messages sarcastiques/drôles aléatoires dans l'UI
 - Easter eggs, réactions aux actions répétées
-
----
-
-## Notes importantes
-
-- **Jamais de build local** — GitHub Actions s'en charge, push App.jsx suffit
-- **Lock files git** dans le sandbox: supprimer `HEAD.lock` + `index.lock` manuellement si besoin
-  ```bash
-  rm ~/Downloads/livre-de-quetes/.git/HEAD.lock
-  rm ~/Downloads/livre-de-quetes/.git/index.lock
-  ```
-- **Versioning:** bump `APP_VERSION` + ajouter entrée `CHANGELOG` à chaque feature
-- **PIN parent existant** = celui créé au setup original (pas 1146 rétroactivement)
-  → Pour changer: panneau parent → onglet PIN
-- **Thèmes disponibles:** minecraftpp, roblox, harrypotter, ghibli, horreur, monstres,
-  licornes, boomerangfu, marvel, japon, microscopique, disney, pixar
