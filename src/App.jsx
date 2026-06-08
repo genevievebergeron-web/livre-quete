@@ -3448,8 +3448,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs et les titres. Tu choisis le tien lors de ton inscription!"],
             ["🏅","Badges","Des badges secrets à débloquer en faisant des tâches. Streaks, premières fois, défis épiques… survole un badge pour voir comment le gagner!"],
             ["📅","Calendrier","Note tes devoirs et examens ici! Un rappel va apparaître automatiquement quand la date approche, avec de l'XP bonus pour compléter."],
-            ["🎮","Mini-jeu","Quand tu montes de niveau, un mini-jeu surprise s'active! Fais un score parfait pour gagner du XP bonus. 🏆"],
-            ["🔒","Portail parent","La section Parent est réservée aux adultes. C'est là qu'ils valident tes quêtes et créent des récompenses pour toi."],
+            ["🎮","Mini-jeux","Quand tu montes de niveau, un mini-jeu surprise s'active — choisi au hasard! 🎲 Trois jeux possibles: Whack-a-Mole (tape les monstres!), Runner (saute les obstacles!) ou Pac-Quest (mange les pellets, évite le fantôme!). Fais un score parfait pour gagner du XP et des pièces bonus. 🏆"],
+            ["🔒","Portail parent","La section Parent est réservée aux adultes (protégée par un code secret). C'est là qu'ils valident tes quêtes et créent des récompenses. Tu peux aussi avoir ton propre code PIN pour protéger ton profil!"],
           ].map(([icon,title,desc])=>(
             <div key={title} style={{display:"flex",gap:12,background:"rgba(0,0,0,0.35)",border:"1px solid #222",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
               <span style={{fontSize:22,flexShrink:0,marginTop:2}}>{icon}</span>
