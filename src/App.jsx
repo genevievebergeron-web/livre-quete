@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.8.2", date:"2026-06-08", features:[
+    "📚 Bonus calendrier — +5 XP et +2 🪙 à chaque devoir ou examen ajouté",
+  ]},
+  { version:"1.8.1", date:"2026-06-08", features:[
+    "ℹ️ Présentation de l'appli — guide pour les parents sur l'écran d'accueil",
+  ]},
   { version:"1.8.0", date:"2026-06-07", features:[
     "📋 Report de tâches — tâches en attente d'hier proposées au lendemain",
     "🎮 Mini-jeu au level-up — tape les icônes thématiques pour gagner un bonus XP!",
@@ -2002,7 +2008,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, onUpdateCalendar, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
@@ -2160,6 +2166,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             const newEntry={id:`cal_${Date.now()}`,type:calForm.type,label:calForm.label.trim(),date:calForm.date};
             const newCal=[...(pState.calendar||[]),newEntry];
             onUpdateCalendar&&onUpdateCalendar(newCal);
+            onCalendarAdd&&onCalendarAdd(calForm.type);
             setCalForm({type:"devoir",label:"",date:""});
             SFX.click();
           }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:"#5DECF5",color:"#000",border:"none",borderRadius:3,cursor:"pointer"}}>
@@ -2670,7 +2677,7 @@ const computeCalendarReminders = (calendar, today) => {
 };
 
 function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin, onCompleteOnboarding, onNewSetup }) {
-  // mode: "who" | "child-select" | "onboarding" | "pin" | "parent"
+  // mode: "who" | "child-select" | "onboarding" | "pin" | "parent" | "info"
   const [mode, setMode] = useState("who");
   const [selIdx, setSelIdx] = useState(null);
 
@@ -2796,6 +2803,67 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                 <span style={{fontSize:28,display:"block"}}>{icon}</span>{label}
               </button>
             ))}
+          </div>
+          <button onClick={()=>{SFX.click();setMode("info");}}
+            style={{marginTop:28,fontFamily:"'VT323',monospace",fontSize:16,color:"#444",background:"none",border:"none",cursor:"pointer",letterSpacing:1,transition:"color 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.color="#888"}
+            onMouseLeave={e=>e.currentTarget.style.color="#444"}>
+            ℹ️ C'est quoi cette appli?
+          </button>
+        </div>
+      )}
+
+      {/* ── Écran info : Présentation pour parents ── */}
+      {mode === "info" && (
+        <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:0}}>
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,2.2vw,13px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6}}>⚔️ MON LIVRE DE QUÊTES</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#888"}}>Guide pour les parents</div>
+          </div>
+
+          <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#5DECF5",marginBottom:8}}>💡 Concept</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.5}}>
+              Une appli de tâches ménagères gamifiée pour les enfants. Chaque tâche complétée rapporte de l'XP et des pièces. Les enfants montent de niveau, débloquent des thèmes et échangent leurs pièces contre de vraies récompenses que vous définissez.
+            </div>
+          </div>
+
+          {[
+            ["📋","Quêtes","Les tâches du quotidien (vaisselle, chambre, devoirs…) sont des quêtes. L'enfant clique «J'AI FAIT ÇA!» et vous validez via le portail parent."],
+            ["⭐","XP & Niveaux","Chaque tâche validée donne de l'XP. En montant de niveau, l'enfant débloque un mini-jeu bonus et un titre thématique."],
+            ["🪙","Pièces & Boutique","Les tâches donnent aussi des pièces. Dans la boutique, l'enfant achète les récompenses que vous avez créées (sorties, écrans, bonbons…)."],
+            ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs, les titres et les icônes. Les thèmes se débloquent par XP."],
+            ["🏆","Badges","16 badges généraux + des badges spécifiques à chaque thème. Streaks, premières tâches, tâches épiques…"],
+            ["📅","Calendrier","Chaque enfant peut noter ses devoirs et examens. Un rappel contextuel s'affiche («Ton exam de math dans 3 jours!»)."],
+            ["🎮","Mini-jeu","Quand un enfant monte de niveau, un mini-jeu whack-a-mole thématique s'affiche. Score parfait = bonus XP."],
+            ["👨‍👩","Portail parent","PIN protégé. Gérez les tâches, validez les quêtes, créez les récompenses, modifiez les paramètres, forcez une complétion, annulez une validation."],
+          ].map(([icon,title,desc])=>(
+            <div key={title} style={{display:"flex",gap:12,background:"rgba(0,0,0,0.35)",border:"1px solid #222",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
+              <span style={{fontSize:22,flexShrink:0,marginTop:2}}>{icon}</span>
+              <div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginBottom:4}}>{title}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#aaa",lineHeight:1.45}}>{desc}</div>
+              </div>
+            </div>
+          ))}
+
+          <div style={{background:"rgba(255,140,0,0.08)",border:"2px solid #FF8C0044",borderRadius:10,padding:"12px 16px",marginTop:4,marginBottom:4}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:6}}>🚀 Pour commencer</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.6}}>
+              1. Cliquez <span style={{color:"#FF8C00"}}>Parent</span> → PIN par défaut: <span style={{color:"#FFD700",fontFamily:"'Press Start 2P',monospace",fontSize:12}}>1146</span><br/>
+              2. Ajoutez des tâches et des récompenses dans le portail<br/>
+              3. Chaque enfant fait son onboarding la première fois (thème + surnom + PIN)
+            </div>
+          </div>
+
+          <div style={{textAlign:"center",marginTop:4,marginBottom:8}}>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#333",marginBottom:12}}>v{APP_VERSION}</div>
+            <button onClick={()=>{SFX.click();setMode("who");}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 24px",background:"rgba(0,0,0,0.7)",color:"#FFD700",border:"3px solid #FFD700",borderRadius:8,cursor:"pointer",transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 0 16px #FFD70055";}}
+              onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
+              ← RETOUR
+            </button>
           </div>
         </div>
       )}
@@ -3443,6 +3511,16 @@ export default function App() {
               gs[view]={...gs[view],calendar:newCal};
               setGameStates(gs);
               save({config,gameStates:gs,savedAt:new Date().toISOString()});
+            }}
+            onCalendarAdd={(type)=>{
+              const XP_CAL=5, COINS_CAL=2;
+              setGameStates(gs=>{
+                const n=[...gs];
+                n[view]={...n[view],xp:(n[view].xp||0)+XP_CAL,coins:(n[view].coins||0)+COINS_CAL};
+                persist(config,n); return n;
+              });
+              const label=type==="examen"?"📝 Examen noté!":"📚 Devoir noté!";
+              showToast(`${label} +${XP_CAL} XP · +${COINS_CAL} 🪙`,"#5DECF5",3000);
             }}
             th={th}
           />
