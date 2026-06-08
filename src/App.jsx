@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.10.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -3343,19 +3343,16 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     }
   };
 
-  // Returning player PIN — ref-based to avoid stale closure on mobile
+  // Returning player PIN — ref-based (no useCallback needed: deps change every render anyway)
   const gameStatesRef = useRef(gameStates);
   gameStatesRef.current = gameStates;
   const selIdxRef = useRef(selIdx);
   selIdxRef.current = selIdx;
 
-  const handlePlayerDigit = useCallback((d) => {
-    if (pPinRef.current.length >= 4) return;
-    pPinRef.current = pPinRef.current + d;
-    setPPin(pPinRef.current);
-    setPinError(false);
-    if (pPinRef.current.length < 4) return;
+  // Core submit logic — reads from refs, safe to call anytime
+  const doPlayerSubmit = () => {
     const entered = pPinRef.current;
+    if (entered.length !== 4) return;
     const ps = gameStatesRef.current[selIdxRef.current] || {};
     if (!ps.pin) {
       if (!confirmStepRef.current) {
@@ -3372,22 +3369,34 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
       if (entered === ps.pin) { onSelectPlayer(selIdxRef.current); }
       else triggerError(()=>{ pPinRef.current=""; setPPin(""); });
     }
-  }, [onSetPlayerPin, onSelectPlayer]); // eslint-disable-line
+  };
+
+  const handlePlayerDigit = (d) => {
+    if (pPinRef.current.length >= 4) return;
+    pPinRef.current = pPinRef.current + d;
+    setPPin(pPinRef.current);
+    setPinError(false);
+    if (pPinRef.current.length === 4) doPlayerSubmit();
+  };
 
   // Parent PIN — ref-based
   const configPinRef = useRef(config?.pin);
   configPinRef.current = config?.pin;
 
-  const handleParentDigit = useCallback((d) => {
+  const doParentSubmit = () => {
+    const entered = ppPinRef.current;
+    if (entered.length !== 4) return;
+    if (entered === configPinRef.current) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
+    else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
+  };
+
+  const handleParentDigit = (d) => {
     if (ppPinRef.current.length >= 4) return;
     ppPinRef.current = ppPinRef.current + d;
     setPpPin(ppPinRef.current);
     setPinError(false);
-    if (ppPinRef.current.length < 4) return;
-    const entered = ppPinRef.current;
-    if (entered === configPinRef.current) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
-    else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
-  }, [onParentLogin]); // eslint-disable-line
+    if (ppPinRef.current.length === 4) doParentSubmit();
+  };
 
   // Onboarding PIN
   const handleObPinDigit = (d) => {
@@ -3706,6 +3715,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             onBack={()=>{ pPinRef.current=pPinRef.current.slice(0,-1); setPPin(pPinRef.current); }}
             onClose={()=>{ if(confirmStepRef.current){confirmStepRef.current=false;setConfirmStep(false);firstPinRef.current="";setFirstPin("");pPinRef.current="";setPPin("");}else{setMode("child-select");setSelIdx(null);} }}
           />
+          {pPin.length===4&&<button onClick={doPlayerSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
       )}
 
@@ -3719,6 +3729,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             onBack={()=>{ ppPinRef.current=ppPinRef.current.slice(0,-1); setPpPin(ppPinRef.current); }}
             onClose={()=>{setMode("who");setPpPin("");setPinError(false);}}
           />
+          {ppPin.length===4&&<button onClick={doParentSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:"#FF8C00",color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
       )}
 
