@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.10.1";
+const APP_VERSION = "1.10.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -2679,7 +2679,16 @@ function PinDots({ value, error, color="#FFD700" }) {
     </div>
   );
 }
-function PinKeypad({ onDigit, onBack, onClose, closeLabel="✕" }) {
+function PinKeypad({ onDigit, onBack, onClose, onSubmit, closeLabel="✕" }) {
+  useEffect(() => {
+    const handle = (e) => {
+      if (e.key >= "0" && e.key <= "9") { SFX.click(); onDigit(e.key); }
+      else if (e.key === "Backspace") { SFX.click(); onBack(); }
+      else if (e.key === "Enter" && onSubmit) { SFX.click(); onSubmit(); }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [onDigit, onBack, onClose, onSubmit]);
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
       {["1","2","3","4","5","6","7","8","9","⌫","0",closeLabel].map(d=>(
@@ -3366,7 +3375,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
         triggerError(()=>{ pPinRef.current=""; setPPin(""); confirmStepRef.current=false; setConfirmStep(false); firstPinRef.current=""; setFirstPin(""); });
       }
     } else {
-      if (entered === ps.pin) { onSelectPlayer(selIdxRef.current); }
+      if (entered === String(ps.pin)) { onSelectPlayer(selIdxRef.current); }
       else triggerError(()=>{ pPinRef.current=""; setPPin(""); });
     }
   };
@@ -3376,7 +3385,6 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     pPinRef.current = pPinRef.current + d;
     setPPin(pPinRef.current);
     setPinError(false);
-    if (pPinRef.current.length === 4) doPlayerSubmit();
   };
 
   // Parent PIN — ref-based
@@ -3386,7 +3394,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
   const doParentSubmit = () => {
     const entered = ppPinRef.current;
     if (entered.length !== 4) return;
-    if (entered === configPinRef.current) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
+    if (entered === String(configPinRef.current)) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
     else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
   };
 
@@ -3395,7 +3403,6 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     ppPinRef.current = ppPinRef.current + d;
     setPpPin(ppPinRef.current);
     setPinError(false);
-    if (ppPinRef.current.length === 4) doParentSubmit();
   };
 
   // Onboarding PIN
@@ -3714,6 +3721,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             onDigit={handlePlayerDigit}
             onBack={()=>{ pPinRef.current=pPinRef.current.slice(0,-1); setPPin(pPinRef.current); }}
             onClose={()=>{ if(confirmStepRef.current){confirmStepRef.current=false;setConfirmStep(false);firstPinRef.current="";setFirstPin("");pPinRef.current="";setPPin("");}else{setMode("child-select");setSelIdx(null);} }}
+            onSubmit={pPin.length===4?doPlayerSubmit:undefined}
           />
           {pPin.length===4&&<button onClick={doPlayerSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
@@ -3728,6 +3736,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             onDigit={handleParentDigit}
             onBack={()=>{ ppPinRef.current=ppPinRef.current.slice(0,-1); setPpPin(ppPinRef.current); }}
             onClose={()=>{setMode("who");setPpPin("");setPinError(false);}}
+            onSubmit={ppPin.length===4?doParentSubmit:undefined}
           />
           {ppPin.length===4&&<button onClick={doParentSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:"#FF8C00",color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
