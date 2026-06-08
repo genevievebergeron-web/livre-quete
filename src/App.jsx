@@ -1302,6 +1302,17 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
             </button>
           ))}
         </div>
+        <button
+          onClick={()=>{
+            if(bufRef.current.length!==4)return;
+            const entered=bufRef.current;
+            if(entered===pinRef.current){SFX.pinOk();onSuccessRef.current();}
+            else{SFX.pinErr();setErr(true);setFailCount(f=>f+1);bufRef.current="";setBuf("");setTimeout(()=>setErr(false),1500);}
+          }}
+          disabled={buf.length!==4}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 0",width:"100%",maxWidth:200,display:"block",margin:"0 auto 10px",background:buf.length===4?T.accent:"#222",color:buf.length===4?"#000":"#444",border:`3px solid ${buf.length===4?T.accent:"#333"}`,cursor:buf.length===4?"pointer":"not-allowed",borderRadius:4,boxShadow:buf.length===4?`0 0 12px ${T.accent}80`:"none",transition:"all 0.15s"}}>
+          ✅ VALIDER
+        </button>
         <button onClick={onCancel} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#888",border:"2px solid #555",cursor:"pointer",borderRadius:2}}>Annuler</button>
       </div>
     </div>
