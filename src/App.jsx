@@ -3307,17 +3307,21 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
   const [pPin, setPPin] = useState("");
   const [confirmStep, setConfirmStep] = useState(false);
   const [firstPin, setFirstPin] = useState("");
+  const pPinRef = useRef("");
+  const firstPinRef = useRef("");
+  const confirmStepRef = useRef(false);
 
   // Parent PIN
   const [ppPin, setPpPin] = useState("");
   const [pinError, setPinError] = useState(false);
+  const ppPinRef = useRef("");
 
   const reset = () => {
     setMode("who"); setSelIdx(null);
     setObStep("theme"); setDraftTheme(null); setDraftAvatar({skin:"sk1",eyes:"ey1",mouth:"mo1",hair:"ha1"});
     setDraftPseudo(""); setObFirstPin(""); setObPin("");
-    setPPin(""); setConfirmStep(false); setFirstPin("");
-    setPpPin(""); setPinError(false);
+    setPPin(""); pPinRef.current = ""; setConfirmStep(false); confirmStepRef.current = false; setFirstPin(""); firstPinRef.current = "";
+    setPpPin(""); ppPinRef.current = ""; setPinError(false);
   };
   const triggerError = (resetFn) => { setPinError(true); SFX.error?.(); setTimeout(()=>{ resetFn(); setPinError(false); }, 700); };
 
@@ -3334,36 +3338,56 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
       setObStep("theme"); setObPin(""); setObFirstPin("");
       setMode("onboarding");
     } else {
-      setPPin(""); setConfirmStep(false); setFirstPin(""); setPinError(false);
+      pPinRef.current = ""; setPPin(""); confirmStepRef.current = false; setConfirmStep(false); firstPinRef.current = ""; setFirstPin(""); setPinError(false);
       setMode("pin");
     }
   };
 
-  // Returning player PIN
-  const handlePlayerDigit = (d) => {
-    const ps = gameStates[selIdx] || {};
-    const next = (pPin + d).slice(0, 4);
-    setPPin(next); setPinError(false);
-    if (next.length < 4) return;
-    if (!ps.pin) {
-      if (!confirmStep) { setFirstPin(next); setPPin(""); setConfirmStep(true); }
-      else if (next === firstPin) { onSetPlayerPin(selIdx, next); onSelectPlayer(selIdx); }
-      else triggerError(()=>{ setPPin(""); setConfirmStep(false); setFirstPin(""); });
-    } else {
-      if (next === ps.pin) onSelectPlayer(selIdx);
-      else triggerError(()=>setPPin(""));
-    }
-  };
+  // Returning player PIN — ref-based to avoid stale closure on mobile
+  const gameStatesRef = useRef(gameStates);
+  gameStatesRef.current = gameStates;
+  const selIdxRef = useRef(selIdx);
+  selIdxRef.current = selIdx;
 
-  // Parent PIN
-  const handleParentDigit = (d) => {
-    const next = (ppPin + d).slice(0, 4);
-    setPpPin(next); setPinError(false);
-    if (next.length === 4) {
-      if (next === config.pin) { reset(); onParentLogin(); }
-      else triggerError(()=>setPpPin(""));
+  const handlePlayerDigit = useCallback((d) => {
+    if (pPinRef.current.length >= 4) return;
+    pPinRef.current = pPinRef.current + d;
+    setPPin(pPinRef.current);
+    setPinError(false);
+    if (pPinRef.current.length < 4) return;
+    const entered = pPinRef.current;
+    const ps = gameStatesRef.current[selIdxRef.current] || {};
+    if (!ps.pin) {
+      if (!confirmStepRef.current) {
+        firstPinRef.current = entered; setFirstPin(entered);
+        pPinRef.current = ""; setPPin("");
+        confirmStepRef.current = true; setConfirmStep(true);
+      } else if (entered === firstPinRef.current) {
+        onSetPlayerPin(selIdxRef.current, entered);
+        onSelectPlayer(selIdxRef.current);
+      } else {
+        triggerError(()=>{ pPinRef.current=""; setPPin(""); confirmStepRef.current=false; setConfirmStep(false); firstPinRef.current=""; setFirstPin(""); });
+      }
+    } else {
+      if (entered === ps.pin) { onSelectPlayer(selIdxRef.current); }
+      else triggerError(()=>{ pPinRef.current=""; setPPin(""); });
     }
-  };
+  }, [onSetPlayerPin, onSelectPlayer]); // eslint-disable-line
+
+  // Parent PIN — ref-based
+  const configPinRef = useRef(config?.pin);
+  configPinRef.current = config?.pin;
+
+  const handleParentDigit = useCallback((d) => {
+    if (ppPinRef.current.length >= 4) return;
+    ppPinRef.current = ppPinRef.current + d;
+    setPpPin(ppPinRef.current);
+    setPinError(false);
+    if (ppPinRef.current.length < 4) return;
+    const entered = ppPinRef.current;
+    if (entered === configPinRef.current) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
+    else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
+  }, [onParentLogin]); // eslint-disable-line
 
   // Onboarding PIN
   const handleObPinDigit = (d) => {
@@ -3679,8 +3703,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           <PinDots value={pPin} error={pinError} color={accentColor}/>
           <PinKeypad
             onDigit={handlePlayerDigit}
-            onBack={()=>setPPin(p=>p.slice(0,-1))}
-            onClose={()=>{ confirmStep?(setConfirmStep(false),setFirstPin(""),setPPin("")):(setMode("child-select"),setSelIdx(null)); }}
+            onBack={()=>{ pPinRef.current=pPinRef.current.slice(0,-1); setPPin(pPinRef.current); }}
+            onClose={()=>{ if(confirmStepRef.current){confirmStepRef.current=false;setConfirmStep(false);firstPinRef.current="";setFirstPin("");pPinRef.current="";setPPin("");}else{setMode("child-select");setSelIdx(null);} }}
           />
         </div>
       )}
@@ -3692,7 +3716,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           <PinDots value={ppPin} error={pinError} color="#FF8C00"/>
           <PinKeypad
             onDigit={handleParentDigit}
-            onBack={()=>setPpPin(p=>p.slice(0,-1))}
+            onBack={()=>{ ppPinRef.current=ppPinRef.current.slice(0,-1); setPpPin(ppPinRef.current); }}
             onClose={()=>{setMode("who");setPpPin("");setPinError(false);}}
           />
         </div>
