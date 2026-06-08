@@ -3394,6 +3394,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
 
   const doParentSubmit = () => {
     const entered = ppPinRef.current;
+    console.log("[PIN DEBUG] entered:", JSON.stringify(entered), "stored:", JSON.stringify(configPinRef.current), "config.pin:", JSON.stringify(config?.pin));
     if (entered.length !== 4) return;
     if (entered === String(configPinRef.current)) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
     else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
