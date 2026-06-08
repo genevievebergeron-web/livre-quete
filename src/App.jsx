@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "1.10.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.10.0", date:"2026-06-08", features:[
+    "🎮 Runner au level-up — mini-jeu style Chrome Dino: saute les obstacles, ramasse les pièces",
+    "👻 Pac-Quest au level-up — mini-jeu style Pac-Man: mange les pellets, évite le fantôme",
+    "🎲 Jeu choisi aléatoirement — whack-a-mole, runner ou pac-quest au level-up",
+    "⌨️ PIN clavier corrigé — Enter fonctionne, plus de blocage de saisie rapide",
+  ]},
   { version:"1.9.1", date:"2026-06-08", features:[
     "⌨️ Saisie PIN au clavier — chiffres, Backspace et Escape fonctionnent maintenant",
     "👧 Écran «C'est quoi cette appli» reécrit pour les enfants — ton/conseils XP adaptés",
@@ -1226,26 +1232,56 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   const [buf, setBuf] = useState("");
   const [err, setErr] = useState(false);
   const [failCount, setFailCount] = useState(0);
+  const bufRef = useRef("");
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+  const setErrRef = useRef(setErr);
+  const setFailRef = useRef(setFailCount);
+
+  const press = useCallback(v => {
+    SFX.pinKey();
+    if (v === "del") {
+      bufRef.current = bufRef.current.slice(0, -1);
+      setBuf(bufRef.current);
+      return;
+    }
+    if (bufRef.current.length >= 4) return;
+    bufRef.current = bufRef.current + v;
+    setBuf(bufRef.current);
+    if (bufRef.current.length === 4) {
+      const entered = bufRef.current;
+      setTimeout(() => {
+        if (entered === pinRef.current) { SFX.pinOk(); onSuccessRef.current(); }
+        else {
+          SFX.pinErr();
+          setErrRef.current(true);
+          setFailRef.current(f=>f+1);
+          bufRef.current = "";
+          setBuf("");
+          setTimeout(() => setErrRef.current(false), 1500);
+        }
+      }, 150);
+    }
+  }, []);
+
   useEffect(() => {
     const onKey = e => {
       if (e.key >= "0" && e.key <= "9") press(e.key);
       else if (e.key === "Backspace" || e.key === "Delete") press("del");
-      else if (e.key === "Escape") onCancel();
+      else if (e.key === "Escape") onCancelRef.current();
+      else if (e.key === "Enter" && bufRef.current.length === 4) {
+        const entered = bufRef.current;
+        if (entered === pinRef.current) { SFX.pinOk(); onSuccessRef.current(); }
+        else { SFX.pinErr(); setErrRef.current(true); setFailRef.current(f=>f+1); bufRef.current=""; setBuf(""); setTimeout(()=>setErrRef.current(false),1500); }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
-  const press = v => {
-    SFX.pinKey();
-    if (v === "del") { setBuf(b => b.slice(0,-1)); return; }
-    if (buf.length >= 4) return;
-    const next = buf + v;
-    setBuf(next);
-    if (next.length === 4) setTimeout(() => {
-      if (next === pin) { SFX.pinOk(); onSuccess(); }
-      else { SFX.pinErr(); setErr(true); setFailCount(f=>f+1); setBuf(""); setTimeout(() => setErr(false), 1500); }
-    }, 150);
-  };
+  }, [press]);
   const T = th || THEMES.minecraft;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -2646,10 +2682,433 @@ function PinKeypad({ onDigit, onBack, onClose, closeLabel="✕" }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MINI-GAME — mini-jeu whack-a-mole thématique au level-up
+// MINI-GAME RUNNER — dino-style endless runner
 // ═══════════════════════════════════════════════════════════════
-function MiniGame({ player, playerThemeId, level, onFinish }) {
-  const pt = getPlayerTheme(playerThemeId || "none");
+function MiniGameRunner({ pt, level, onFinish }) {
+  const canvasRef = useRef(null);
+  const stRef = useRef(null);
+  const [phase, setPhase] = useState("intro");
+  const phaseRef = useRef("intro");
+
+  const BONUS_XP    = [0, 5, 12, 22, 35];
+  const BONUS_COINS = [0, 2,  6, 12, 20];
+  const W = 320, H = 160, GROUND = 120;
+  const GRAVITY = 0.6, JUMP_VY = -11;
+  const DURATION = 16000;
+
+  const initState = () => ({
+    px: 50, py: GROUND, vy: 0, onGround: true,
+    obstacles: [], coins: [], score: 0,
+    startTime: performance.now(), lastObs: 0, lastCoin: 0,
+    rafId: null,
+  });
+
+  const startGame = () => {
+    stRef.current = initState();
+    phaseRef.current = "play";
+    setPhase("play");
+  };
+
+  useEffect(() => {
+    if (phase !== "play") return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const st = stRef.current;
+
+    const jump = () => { if (st.onGround) { st.vy = JUMP_VY; st.onGround = false; SFX.click(); } };
+    const onKey = e => { if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); } };
+    const onTap = () => jump();
+    window.addEventListener("keydown", onKey);
+    canvas.addEventListener("pointerdown", onTap);
+
+    const loop = (now) => {
+      if (phaseRef.current !== "play") return;
+      const elapsed = now - st.startTime;
+
+      // Physics
+      st.vy += GRAVITY;
+      st.py += st.vy;
+      if (st.py >= GROUND) { st.py = GROUND; st.vy = 0; st.onGround = true; }
+
+      // Speed ramps up over time
+      const speed = 3 + elapsed / 4000;
+
+      // Spawn obstacles
+      if (now - st.lastObs > 1200 - elapsed / 50) {
+        const h = 16 + Math.random() * 16;
+        st.obstacles.push({ x: W + 10, h });
+        st.lastObs = now;
+      }
+      // Spawn coins
+      if (now - st.lastCoin > 1800) {
+        st.coins.push({ x: W + 10, y: GROUND - 30 - Math.random() * 30, collected: false });
+        st.lastCoin = now;
+      }
+
+      // Move & collide obstacles
+      st.obstacles = st.obstacles.filter(o => {
+        o.x -= speed;
+        // collision with player (rect 20×28)
+        if (o.x < st.px + 18 && o.x + 12 > st.px && GROUND - o.h < st.py + 4) {
+          // hit — end game
+          phaseRef.current = "done";
+          setPhase("done");
+        }
+        return o.x > -20;
+      });
+
+      // Move & collect coins
+      st.coins = st.coins.filter(c => {
+        c.x -= speed;
+        if (!c.collected && Math.abs(c.x - st.px) < 22 && Math.abs(c.y - st.py) < 22) {
+          c.collected = true; st.score++; SFX.coin();
+        }
+        return c.x > -20 && !c.collected;
+      });
+
+      // End by time
+      if (elapsed >= DURATION && phaseRef.current === "play") {
+        phaseRef.current = "done";
+        setPhase("done");
+      }
+
+      // Draw
+      ctx.clearRect(0, 0, W, H);
+      // Sky gradient
+      ctx.fillStyle = "#0d0d1a";
+      ctx.fillRect(0, 0, W, H);
+      // Ground
+      ctx.fillStyle = pt.primary + "99";
+      ctx.fillRect(0, GROUND + 28, W, H - GROUND - 28);
+      ctx.fillStyle = pt.accent;
+      ctx.fillRect(0, GROUND + 27, W, 2);
+
+      // Player (character body)
+      ctx.fillStyle = pt.charBodyColor || "#4A90D9";
+      ctx.fillRect(st.px - 10, st.py - 24, 20, 28);
+      // Eyes
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(st.px + 2, st.py - 20, 5, 5);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(st.px + 4, st.py - 19, 3, 3);
+
+      // Obstacles (themed cacti/blocks)
+      ctx.fillStyle = pt.accent;
+      st.obstacles.forEach(o => {
+        ctx.fillRect(o.x - 6, GROUND + 28 - o.h, 12, o.h);
+        ctx.fillRect(o.x - 10, GROUND + 28 - o.h * 0.6, 20, o.h * 0.3);
+      });
+
+      // Coins
+      ctx.fillStyle = "#FFD700";
+      st.coins.forEach(c => {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff9";
+        ctx.beginPath();
+        ctx.arc(c.x - 2, c.y - 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#FFD700";
+      });
+
+      // Score & timer
+      ctx.fillStyle = pt.accent;
+      ctx.font = "bold 10px 'Press Start 2P', monospace";
+      ctx.fillText(`🪙 ${st.score}`, 10, 18);
+      const tLeft = Math.max(0, Math.ceil((DURATION - elapsed) / 1000));
+      ctx.fillText(`${tLeft}s`, W - 30, 18);
+
+      st.rafId = requestAnimationFrame(loop);
+    };
+
+    st.rafId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(st.rafId);
+      window.removeEventListener("keydown", onKey);
+      canvas.removeEventListener("pointerdown", onTap);
+    };
+  }, [phase]);
+
+  const score = stRef.current?.score ?? 0;
+  const tier = Math.min(4, score);
+  const bonusXp = BONUS_XP[tier];
+  const bonusCoins = BONUS_COINS[tier];
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16}}>
+      {phase === "intro" && (<>
+        <div style={{fontSize:36}}>🏃</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>RUNNER!{"\n"}Saute les obstacles, ramasse les pièces!{"\n"}ESPACE ou TAP pour sauter</div>
+        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>COURIR! 🏃</button>
+      </>)}
+
+      {phase === "play" && (
+        <canvas ref={canvasRef} width={W} height={H}
+          style={{border:`3px solid ${pt.accent}`,borderRadius:8,imageRendering:"pixelated",boxShadow:`0 0 20px ${pt.glow||pt.accent}60`,cursor:"pointer"}}/>
+      )}
+
+      {phase === "done" && (<>
+        <div style={{fontSize:36}}>{tier>=4?"🏆":tier>=3?"🥇":tier>=2?"🥈":tier>=1?"🥉":"😅"}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent}}>NIVEAU {level}!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#fff",marginTop:4}}>PIÈCES: {score} 🪙</div>
+        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#FFD700"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+      </>)}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MINI-GAME PACMAN — pac-man style maze
+// ═══════════════════════════════════════════════════════════════
+function MiniGamePacman({ pt, level, onFinish }) {
+  const canvasRef = useRef(null);
+  const stRef = useRef(null);
+  const [phase, setPhase] = useState("intro");
+  const phaseRef = useRef("intro");
+
+  const BONUS_XP    = [0, 5, 12, 24, 40];
+  const BONUS_COINS = [0, 2,  7, 14, 22];
+  const CS = 22; // cell size
+  const MOVE_INTERVAL = 180;
+  const GHOST_INTERVAL = 260;
+  const DURATION = 30000;
+
+  const MAZE_TEMPLATE = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,2,0,2,0,2,0,2,0,2,0,2,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,2,1,0,2,0,0,0,2,0,1,2,1],
+    [1,0,0,2,1,1,0,1,1,2,0,0,1],
+    [1,2,0,0,0,2,0,2,0,0,0,2,1],
+    [1,0,0,2,1,1,0,1,1,2,0,0,1],
+    [1,2,1,0,2,0,0,0,2,0,1,2,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,2,0,2,0,2,0,2,0,2,0,2,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ];
+  const COLS = 13, ROWS = 11;
+  const CW = COLS * CS, CH = ROWS * CS;
+
+  const initState = () => {
+    const maze = MAZE_TEMPLATE.map(r => [...r]);
+    const total = maze.reduce((s,r) => s + r.filter(c=>c===2).length, 0);
+    return {
+      maze, total,
+      px: 6, py: 5, pdir: {dx:1,dy:0}, pNextDir: {dx:1,dy:0},
+      pMoveTimer: 0,
+      gx: 1, gy: 1, gdir: {dx:1,dy:0},
+      gMoveTimer: 0,
+      score: 0, eaten: 0,
+      startTime: performance.now(),
+      rafId: null, lastTime: performance.now(),
+    };
+  };
+
+  const canMove = (maze, col, row) =>
+    col >= 0 && col < COLS && row >= 0 && row < ROWS && maze[row][col] !== 1;
+
+  const ghostAI = (st) => {
+    const { gx, gy, px, py, gdir, maze } = st;
+    const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+    const reverse = {dx:-gdir.dx,dy:-gdir.dy};
+    // prefer moving toward player, avoid reversing
+    const valid = dirs.filter(d =>
+      !(d.dx===reverse.dx && d.dy===reverse.dy) &&
+      canMove(maze, gx+d.dx, gy+d.dy)
+    );
+    if (valid.length === 0) return gdir;
+    return valid.reduce((best, d) => {
+      const nx = gx+d.dx, ny = gy+d.dy;
+      const nb = gx+best.dx, nb2 = gy+best.dy;
+      return (Math.abs(nx-px)+Math.abs(ny-py)) < (Math.abs(nb-px)+Math.abs(nb2-py)) ? d : best;
+    }, valid[0]);
+  };
+
+  const startGame = () => {
+    stRef.current = initState();
+    phaseRef.current = "play";
+    setPhase("play");
+  };
+
+  useEffect(() => {
+    if (phase !== "play") return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const st = stRef.current;
+
+    const DIRS = { ArrowLeft:{dx:-1,dy:0}, ArrowRight:{dx:1,dy:0}, ArrowUp:{dx:0,dy:-1}, ArrowDown:{dx:0,dy:1},
+                   a:{dx:-1,dy:0}, d:{dx:1,dy:0}, w:{dx:0,dy:-1}, s:{dx:0,dy:1} };
+    const onKey = e => {
+      const d = DIRS[e.key];
+      if (d) { e.preventDefault(); st.pNextDir = d; }
+    };
+    window.addEventListener("keydown", onKey);
+
+    const loop = (now) => {
+      if (phaseRef.current !== "play") return;
+      const dt = now - st.lastTime;
+      st.lastTime = now;
+      const elapsed = now - st.startTime;
+
+      // Move player
+      st.pMoveTimer += dt;
+      if (st.pMoveTimer >= MOVE_INTERVAL) {
+        st.pMoveTimer -= MOVE_INTERVAL;
+        const nd = st.pNextDir;
+        const nx = st.px + nd.dx, ny = st.py + nd.dy;
+        if (canMove(st.maze, nx, ny)) { st.pdir = nd; st.px = nx; st.py = ny; }
+        else {
+          const nx2 = st.px + st.pdir.dx, ny2 = st.py + st.pdir.dy;
+          if (canMove(st.maze, nx2, ny2)) { st.px = nx2; st.py = ny2; }
+        }
+        // Eat pellet
+        if (st.maze[st.py][st.px] === 2) {
+          st.maze[st.py][st.px] = 0;
+          st.score++; st.eaten++;
+          SFX.coin();
+        }
+      }
+
+      // Move ghost
+      st.gMoveTimer += dt;
+      if (st.gMoveTimer >= GHOST_INTERVAL) {
+        st.gMoveTimer -= GHOST_INTERVAL;
+        const gd = ghostAI(st);
+        st.gdir = gd;
+        st.gx += gd.dx; st.gy += gd.dy;
+      }
+
+      // Ghost catches player
+      if (st.gx === st.px && st.gy === st.py) {
+        phaseRef.current = "done";
+        setPhase("done");
+      }
+
+      // All pellets eaten or time up
+      if (st.eaten >= st.total || elapsed >= DURATION) {
+        phaseRef.current = "done";
+        setPhase("done");
+      }
+
+      // Draw
+      ctx.clearRect(0, 0, CW, CH);
+      ctx.fillStyle = "#0d0d1a";
+      ctx.fillRect(0, 0, CW, CH);
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const x = c*CS, y = r*CS;
+          if (st.maze[r][c] === 1) {
+            ctx.fillStyle = pt.primary;
+            ctx.fillRect(x+1, y+1, CS-2, CS-2);
+            ctx.strokeStyle = pt.accent;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x+1.5, y+1.5, CS-3, CS-3);
+          } else if (st.maze[r][c] === 2) {
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath();
+            ctx.arc(x+CS/2, y+CS/2, 3, 0, Math.PI*2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // Pac-man (mouth opens/closes)
+      const mouthAngle = (Math.floor(now/80) % 2 === 0) ? 0.3 : 0.05;
+      const angle = st.pdir.dx===1 ? 0 : st.pdir.dx===-1 ? Math.PI : st.pdir.dy===1 ? Math.PI/2 : -Math.PI/2;
+      ctx.fillStyle = pt.charBodyColor || "#FFD700";
+      ctx.beginPath();
+      ctx.moveTo(st.px*CS+CS/2, st.py*CS+CS/2);
+      ctx.arc(st.px*CS+CS/2, st.py*CS+CS/2, CS/2-2, angle+mouthAngle, angle+Math.PI*2-mouthAngle);
+      ctx.closePath();
+      ctx.fill();
+
+      // Ghost
+      const gx2 = st.gx*CS, gy2 = st.gy*CS;
+      ctx.fillStyle = pt.accent;
+      ctx.beginPath();
+      ctx.arc(gx2+CS/2, gy2+CS/2-2, CS/2-2, Math.PI, 0);
+      ctx.lineTo(gx2+CS-2, gy2+CS-2);
+      for (let i=0;i<3;i++) {
+        ctx.arc(gx2+CS-2-(i*(CS-4)/3)-(CS-4)/6, gy2+CS-2, (CS-4)/6, 0, Math.PI, true);
+      }
+      ctx.lineTo(gx2+2, gy2+CS-2);
+      ctx.closePath();
+      ctx.fill();
+      // Ghost eyes
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(gx2+CS/2-4, gy2+CS/2-3, 3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(gx2+CS/2+4, gy2+CS/2-3, 3, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#00f";
+      ctx.beginPath(); ctx.arc(gx2+CS/2-3, gy2+CS/2-2, 1.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(gx2+CS/2+5, gy2+CS/2-2, 1.5, 0, Math.PI*2); ctx.fill();
+
+      // HUD
+      ctx.fillStyle = pt.accent;
+      ctx.font = "bold 9px 'Press Start 2P', monospace";
+      const tLeft = Math.max(0, Math.ceil((DURATION - elapsed)/1000));
+      ctx.fillText(`${st.score}/${st.total} 🪙  ${tLeft}s`, 6, CH - 5);
+
+      st.rafId = requestAnimationFrame(loop);
+    };
+
+    st.rafId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(st.rafId);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [phase]);
+
+  const score = stRef.current?.score ?? 0;
+  const total = stRef.current?.total ?? 1;
+  const tier = Math.min(4, Math.floor(score/total * 4 * 1.6));
+  const bonusXp = BONUS_XP[tier];
+  const bonusCoins = BONUS_COINS[tier];
+
+  const dpad = (dx, dy) => { if (stRef.current) stRef.current.pNextDir = {dx,dy}; };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:12}}>
+      {phase === "intro" && (<>
+        <div style={{fontSize:36}}>👻</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>PAC-QUEST!{"\n"}Mange les pellets, évite le fantôme!{"\n"}Flèches ou WASD</div>
+        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 👾</button>
+      </>)}
+
+      {phase === "play" && (<>
+        <canvas ref={canvasRef} width={CW} height={CH}
+          style={{border:`3px solid ${pt.accent}`,borderRadius:4,imageRendering:"pixelated",boxShadow:`0 0 20px ${pt.glow||pt.accent}60`,maxWidth:"95vw",maxHeight:"50vh"}}/>
+        {/* Touch D-pad */}
+        <div style={{display:"grid",gridTemplateColumns:"44px 44px 44px",gridTemplateRows:"44px 44px",gap:4,marginTop:4}}>
+          {[null,{dx:0,dy:-1,"l":"▲"},null,{dx:-1,dy:0,"l":"◀"},{dx:0,dy:1,"l":"▼"},{dx:1,dy:0,"l":"▶"}].map((d,i)=>
+            d ? <button key={i} onPointerDown={()=>dpad(d.dx,d.dy)}
+              style={{fontFamily:"monospace",fontSize:18,background:"#222",border:`2px solid ${pt.accent}`,color:pt.accent,borderRadius:6,cursor:"pointer",userSelect:"none"}}>{d.l}</button>
+              : <div key={i}/>
+          )}
+        </div>
+      </>)}
+
+      {phase === "done" && (<>
+        <div style={{fontSize:36}}>{tier>=4?"🏆":tier>=3?"🥇":tier>=2?"🥈":tier>=1?"🥉":"😅"}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent}}>NIVEAU {level}!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#fff"}}>PELLETS: {score}/{total}</div>
+        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#FFD700"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+      </>)}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MINI-GAME WHACK — mini-jeu whack-a-mole thématique au level-up
+// ═══════════════════════════════════════════════════════════════
+function MiniGameWhack({ pt, level, onFinish }) {
   const ROUNDS = 3;
   const ROUND_MS = 1400;
   const BONUS_XP = [0, 8, 18, 30];
@@ -2732,6 +3191,20 @@ function MiniGame({ player, playerThemeId, level, onFinish }) {
       </>)}
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MINI-GAME ROUTER — choisi aléatoirement au level-up
+// ═══════════════════════════════════════════════════════════════
+function MiniGame({ player, playerThemeId, level, onFinish }) {
+  const pt = getPlayerTheme(playerThemeId || "none");
+  const [type] = useState(() => {
+    const games = ["whack", "runner", "pacman"];
+    return games[Math.floor(Math.random() * games.length)];
+  });
+  if (type === "runner") return <MiniGameRunner pt={pt} level={level} onFinish={onFinish}/>;
+  if (type === "pacman") return <MiniGamePacman pt={pt} level={level} onFinish={onFinish}/>;
+  return <MiniGameWhack pt={pt} level={level} onFinish={onFinish}/>;
 }
 
 // ═══════════════════════════════════════════════════════════════
