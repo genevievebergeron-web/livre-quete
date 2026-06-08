@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.9.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.9.1", date:"2026-06-08", features:[
+    "⌨️ Saisie PIN au clavier — chiffres, Backspace et Escape fonctionnent maintenant",
+    "👧 Écran «C'est quoi cette appli» reécrit pour les enfants — ton/conseils XP adaptés",
+    "💬 Descriptions contextuelles — petites phrases d'aide dans le tableau de bord",
+  ]},
   { version:"1.9.0", date:"2026-06-08", features:[
     "📱 Interface responsive — optimisée tablette et bureau",
     "👤 Profil Duolingo — stats, XP, badges et classement famille par joueur",
@@ -1221,6 +1226,15 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   const [buf, setBuf] = useState("");
   const [err, setErr] = useState(false);
   const [failCount, setFailCount] = useState(0);
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key >= "0" && e.key <= "9") press(e.key);
+      else if (e.key === "Backspace" || e.key === "Delete") press("del");
+      else if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const press = v => {
     SFX.pinKey();
     if (v === "del") { setBuf(b => b.slice(0,-1)); return; }
@@ -2138,6 +2152,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>C'est ici que tu coches tes tâches du jour — clique et attends la validation!</div>
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucune quête assignée pour ce joueur.</div>}
       {myAssignments.map(ass=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
@@ -2177,7 +2192,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       })}
 
       {/* Calendar CRUD */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Note tes devoirs et examens ici — un rappel apparaîtra avant la date avec du XP bonus!</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span>📅 MON CALENDRIER</span>
         <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"3px 7px",background:calOpen?"#333":"transparent",color:calOpen?"#FFD700":"#555",border:"1px solid #333",borderRadius:2,cursor:"pointer"}}>
@@ -2230,7 +2246,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       )}
 
       {/* Shop */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:4}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
       <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #FFD700",borderRadius:5,padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>(
@@ -2277,7 +2294,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       </div>
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:10}}>🏅 BADGES</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:4}}>🏅 BADGES</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Survole un badge pour voir comment le débloquer — certains sont secrets! 🕵️</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {BADGES.filter(b=>b.type==="general"||b.type===resolvedThemeId).map(b=>{
             const earned=(pState.badges||[]).includes(b.id);
@@ -2924,30 +2942,30 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
         </div>
       )}
 
-      {/* ── Écran info : Présentation pour parents ── */}
+      {/* ── Écran info : Présentation pour enfants ── */}
       {mode === "info" && (
         <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:0}}>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,2.2vw,13px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6}}>⚔️ MON LIVRE DE QUÊTES</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#888"}}>Guide pour les parents</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#888"}}>Ton guide d'aventurier·ère</div>
           </div>
 
           <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#5DECF5",marginBottom:8}}>💡 Concept</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#5DECF5",marginBottom:8}}>💡 C'est quoi cette appli?</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.5}}>
-              Une appli de tâches ménagères gamifiée pour les enfants. Chaque tâche complétée rapporte de l'XP et des pièces. Les enfants montent de niveau, débloquent des thèmes et échangent leurs pièces contre de vraies récompenses que vous définissez.
+              Tu fais des tâches dans la vraie vie, et ici tu gagnes des XP et des pièces! Monte de niveau, choisis ton thème, débloque des badges et échange tes pièces contre de vraies récompenses. C'est comme un jeu vidéo, mais les points sont vrais. 🎮
             </div>
           </div>
 
           {[
-            ["📋","Quêtes","Les tâches du quotidien (vaisselle, chambre, devoirs…) sont des quêtes. L'enfant clique «J'AI FAIT ÇA!» et vous validez via le portail parent."],
-            ["⭐","XP & Niveaux","Chaque tâche validée donne de l'XP. En montant de niveau, l'enfant débloque un mini-jeu bonus et un titre thématique."],
-            ["🪙","Pièces & Boutique","Les tâches donnent aussi des pièces. Dans la boutique, l'enfant achète les récompenses que vous avez créées (sorties, écrans, bonbons…)."],
-            ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs, les titres et les icônes. Les thèmes se débloquent par XP."],
-            ["🏆","Badges","16 badges généraux + des badges spécifiques à chaque thème. Streaks, premières tâches, tâches épiques…"],
-            ["📅","Calendrier","Chaque enfant peut noter ses devoirs et examens. Un rappel contextuel s'affiche («Ton exam de math dans 3 jours!»)."],
-            ["🎮","Mini-jeu","Quand un enfant monte de niveau, un mini-jeu whack-a-mole thématique s'affiche. Score parfait = bonus XP."],
-            ["👨‍👩","Portail parent","PIN protégé. Gérez les tâches, validez les quêtes, créez les récompenses, modifiez les paramètres, forcez une complétion, annulez une validation."],
+            ["📋","Tes Quêtes","C'est ici que tu vois ce que tu dois faire (ranger ta chambre, la vaisselle…). Une fois que tu l'as fait, clique «J'AI FAIT ÇA!» et attends que ton parent valide!"],
+            ["⚡","XP & Niveaux","Chaque quête validée te donne de l'XP. Plus tu en accumules, plus tu montes de niveau et débloques un titre cool selon ton thème. Il y a 5 niveaux!"],
+            ["🪙","Pièces & Boutique","Les quêtes donnent aussi des pièces. Dans la boutique, tu peux acheter des accessoires pour ton perso ET les récompenses créées par tes parents."],
+            ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs et les titres. Tu choisis le tien lors de ton inscription!"],
+            ["🏅","Badges","Des badges secrets à débloquer en faisant des tâches. Streaks, premières fois, défis épiques… survole un badge pour voir comment le gagner!"],
+            ["📅","Calendrier","Note tes devoirs et examens ici! Un rappel va apparaître automatiquement quand la date approche, avec de l'XP bonus pour compléter."],
+            ["🎮","Mini-jeu","Quand tu montes de niveau, un mini-jeu surprise s'active! Fais un score parfait pour gagner du XP bonus. 🏆"],
+            ["🔒","Portail parent","La section Parent est réservée aux adultes. C'est là qu'ils valident tes quêtes et créent des récompenses pour toi."],
           ].map(([icon,title,desc])=>(
             <div key={title} style={{display:"flex",gap:12,background:"rgba(0,0,0,0.35)",border:"1px solid #222",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
               <span style={{fontSize:22,flexShrink:0,marginTop:2}}>{icon}</span>
@@ -2958,12 +2976,14 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             </div>
           ))}
 
-          <div style={{background:"rgba(255,140,0,0.08)",border:"2px solid #FF8C0044",borderRadius:10,padding:"12px 16px",marginTop:4,marginBottom:4}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:6}}>🚀 Pour commencer</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.6}}>
-              1. Cliquez <span style={{color:"#FF8C00"}}>Parent</span> → PIN par défaut: <span style={{color:"#FFD700",fontFamily:"'Press Start 2P',monospace",fontSize:12}}>1146</span><br/>
-              2. Ajoutez des tâches et des récompenses dans le portail<br/>
-              3. Chaque enfant fait son onboarding la première fois (thème + surnom + PIN)
+          <div style={{background:"rgba(93,236,245,0.07)",border:"2px solid #5DECF544",borderRadius:10,padding:"12px 16px",marginTop:4,marginBottom:4}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:8}}>⚡ COMMENT GAGNER PLUS D'XP?</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.7}}>
+              📋 Faire tes quêtes du jour (surtout les épiques!)<br/>
+              🔥 Garder un <span style={{color:"#FFD700"}}>streak</span> — plusieurs jours de suite<br/>
+              📅 Valider tes devoirs et examens dans le calendrier<br/>
+              🎮 Faire un score parfait au mini-jeu de niveau<br/>
+              🏅 Débloquer de nouveaux badges
             </div>
           </div>
 
