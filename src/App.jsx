@@ -1034,6 +1034,7 @@ const migrateSavedData = (data) => {
   const newVersions = CHANGELOG.map(c=>c.version).filter(v=>!seenVersions.includes(v));
   return {
     ...data,
+    config: { pin: "1146", ...(data.config || {}) }, // assure rétrocompat: pin manquant → défaut 1146
     gameStates: (data.gameStates || []).map(migrateGameState),
     seenVersions: [...seenVersions, ...newVersions],
     newChangelogVersions: newVersions, // affichés dans le feed, puis effacés
