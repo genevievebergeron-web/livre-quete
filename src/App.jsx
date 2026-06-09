@@ -3401,7 +3401,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     const entered = ppPinRef.current;
     if (entered.length !== 4) return;
     const storedPin = configPinRef.current != null ? String(configPinRef.current) : "1146";
-    if (entered === storedPin) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
+    if (entered === storedPin) { ppPinRef.current = ""; onParentLogin(); }
     else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
   };
 
