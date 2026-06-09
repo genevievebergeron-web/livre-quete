@@ -1032,12 +1032,17 @@ const migrateSavedData = (data) => {
   if (!data) return null;
   const seenVersions = data.seenVersions || [];
   const newVersions = CHANGELOG.map(c=>c.version).filter(v=>!seenVersions.includes(v));
+  // Merge stored config, then apply defaults for missing/undefined fields
+  const mergedConfig = { ...(data.config || {}) };
+  if (mergedConfig.pin == null) mergedConfig.pin = "1146"; // fix: spread can't override undefined
+  if (!Array.isArray(mergedConfig.players)) mergedConfig.players = [];
+  if (!Array.isArray(mergedConfig.assignments)) mergedConfig.assignments = [];
   return {
     ...data,
-    config: { pin: "1146", ...(data.config || {}) }, // assure rétrocompat: pin manquant → défaut 1146
+    config: mergedConfig,
     gameStates: (data.gameStates || []).map(migrateGameState),
     seenVersions: [...seenVersions, ...newVersions],
-    newChangelogVersions: newVersions, // affichés dans le feed, puis effacés
+    newChangelogVersions: newVersions,
   };
 };
 
@@ -2444,11 +2449,11 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
       {/* Player cards grid */}
-      <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(config.players.length,2)},1fr)`,gap:10}}>
-        {config.players.map((player,i)=>{
+      <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10}}>
+        {(config.players||[]).map((player,i)=>{
           const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
-          const myDone=config.assignments.filter(a=>a.playerIds.includes(player.id)&&ps.completed?.some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
-          const myTotal=config.assignments.filter(a=>a.playerIds.includes(player.id)).length;
+          const myDone=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)&&ps.completed?.some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
+          const myTotal=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)).length;
           const pct=myTotal>0?Math.round((myDone/myTotal)*100):0;
           const lv=getLevel(ps.xp);
           return (
@@ -3394,7 +3399,6 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
 
   const doParentSubmit = () => {
     const entered = ppPinRef.current;
-    console.log("[PIN DEBUG] entered:", JSON.stringify(entered), "stored:", JSON.stringify(configPinRef.current), "config.pin:", JSON.stringify(config?.pin));
     if (entered.length !== 4) return;
     const storedPin = configPinRef.current != null ? String(configPinRef.current) : "1146";
     if (entered === storedPin) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
@@ -4137,7 +4141,7 @@ export default function App() {
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
         </button>
-        {config.players.map((pl,i)=>(
+        {(config.players||[]).map((pl,i)=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none",textShadow:view===i?"none":`0 0 8px ${getPlayerTheme(pl.themeId).glow}40`}}>
             {displayName(pl)}
