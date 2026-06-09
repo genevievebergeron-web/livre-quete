@@ -3799,7 +3799,7 @@ export default function App() {
           if (hasPending) setCarryoverModal(true);
         }
         setScreen("login");
-      } else setScreen("login");
+      } else setScreen("setup"); // No valid saved data → first-time setup
     });
   },[]);
 
@@ -4058,6 +4058,7 @@ export default function App() {
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
+  if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
     onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
     onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
