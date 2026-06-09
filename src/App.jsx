@@ -3396,7 +3396,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     const entered = ppPinRef.current;
     console.log("[PIN DEBUG] entered:", JSON.stringify(entered), "stored:", JSON.stringify(configPinRef.current), "config.pin:", JSON.stringify(config?.pin));
     if (entered.length !== 4) return;
-    if (entered === String(configPinRef.current)) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
+    const storedPin = configPinRef.current != null ? String(configPinRef.current) : "1146";
+    if (entered === storedPin) { ppPinRef.current = ""; setPpPin(""); reset(); onParentLogin(); }
     else triggerError(()=>{ ppPinRef.current=""; setPpPin(""); });
   };
 
@@ -3777,6 +3778,8 @@ export default function App() {
       if(data?.config&&data?.gameStates){
         setConfig(data.config);
         setGameStates(data.gameStates);
+        // Toujours persister les données migrées (pin par défaut, seenVersions, etc.)
+        save({...data, newChangelogVersions:[]});
         // Injecter les nouvelles versions dans le feed famille
         if(data.newChangelogVersions?.length){
           const newEntries = data.newChangelogVersions
@@ -3784,8 +3787,6 @@ export default function App() {
             .filter(Boolean)
             .map(c=>({ type:"update", version:c.version, features:c.features, ts:new Date().toISOString() }));
           setConfig(cfg=>({...cfg, updateFeedEntries:[...(cfg.updateFeedEntries||[]),...newEntries]}));
-          // Sauvegarder les seenVersions pour ne pas réafficher
-          save({...data, config:data.config, newChangelogVersions:[]});
         }
         // Carry-over: si date changée et des tâches pending → proposer report
         const savedDate = data.savedAt ? new Date(data.savedAt).toDateString() : null;
