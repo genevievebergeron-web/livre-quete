@@ -1,18 +1,19 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-12 — v1.11.0_
+_Mis à jour: 2026-06-12 — v1.12.0_
 
 ---
 
 ## Stack & déploiement
 
-- **React 18 + Vite 5 PWA** — single-file `src/App.jsx` (~4250 lignes)
-- **Persistance:** `localStorage` uniquement, clé `livre-de-quetes-v1`, aucun backend
+- **React 18 + Vite 5 PWA** — single-file `src/App.jsx` (~4400 lignes)
+- **Persistance:** `localStorage` (clé `livre-de-quetes-v1`) + **sync cloud optionnelle** (Supabase, voir `SYNC.md`)
+  - ⚠️ Canner = hébergement statique seulement, il ne stocke AUCUNE donnée. Sans sync activée, la progression reste par appareil.
 - **Deploy:** Push sur `main` → **Canner** (hébergeur canadien style Vercel) déploie automatiquement
   - Pas de build local nécessaire — Canner s'en charge
   - Repo GitHub : `genevievebergeron-web/livre-quete`
-  - Remote git : `https://genevievebergeron-web@github.com/genevievebergeron-web/livre-quete.git`
-- **Dossier local:** `~/Downloads/livre-de-quetes/`
-- **Push depuis terminal:** `cd ~/Downloads/livre-de-quetes && git push`
+- **Dossier canonique (GitHub Desktop) : `~/Downloads/livre-de-quetes/livre-quete/`** ← travailler ICI
+  - Le dossier parent `~/Downloads/livre-de-quetes/` est un second clone du même repo — ne pas committer dedans (risque de divergence)
+- **Push :** GitHub Desktop (bouton « Push origin ») ou `cd ~/Downloads/livre-de-quetes/livre-quete && git push`
 
 > ⚠️ **Lock files git dans le sandbox** — si erreur de push, supprimer manuellement :
 > ```bash
@@ -87,7 +88,16 @@ _Mis à jour: 2026-06-12 — v1.11.0_
 - Extraction de `doPlayerSubmit()` et `doParentSubmit()` — fonctions pures qui lisent depuis les refs
 - Ces fonctions sont appelées par auto-submit (4e chiffre) ET par le bouton VALIDER
 
-### v1.11.0 — Fusion thème/ambiance + scroll tâches + textes enfants ← DERNIER COMMIT
+### v1.12.0 — Autonomie + portail parent + sync ← DERNIER COMMIT
+- **FIX LOGIN/PIN (bug rapporté par Gen)** : l'auto-submit au 4e chiffre avait disparu dans la refactorisation v1.10.1 — taper son code ne faisait RIEN à moins de remarquer le bouton VALIDER. Restauré (`setTimeout(doPlayerSubmit/doParentSubmit, 120)` dans `handlePlayerDigit`/`handleParentDigit`), reproduit et re-testé en headless.
+- **Nouveau flux de validation** : enfant tape «J'AI FAIT ÇA!» → tâche en `pending` + toast (plus de popup PIN par tâche). Parent valide/refuse depuis le portail → onglet **«✅ À valider»** (`approvePending`/`refusePending` dans App). Pastille rouge avec compteur sur le bouton 🔐 du header.
+- `resolvePendingTask(playerIdx, doneKey)` — résout tâche catalogue/perso/**calendrier** (fix: les rappels calendrier ne donnaient JAMAIS l'XP — `handlePinSuccess` cherchait `ass.taskId` inexistant sur les rappels)
+- **Onglet «📋 Tâches» du portail parent** : ajouter une tâche du catalogue à des joueurs (copies indépendantes), créer une tâche perso, retirer une assignation (`handleAddAssignment`/`handleRemoveAssignment`/`handleAddCustomTask`)
+- **CarryOverModal supprimé** (faille: les enfants pouvaient s'auto-valider les tâches d'hier) — les pending restent simplement dans la file du portail
+- **Couche sync cloud** (`SYNC_URL`/`SYNC_KEY`/`FAMILY_ID` en haut de App.jsx, vides = local seulement) : `remotePush` (debounce 1.5s) à chaque save, `remotePull` au chargement + toutes les 25s + au retour sur l'app, last-write-wins par `savedAt`. Guide: `SYNC.md`. Table Supabase `familles(id,data,saved_at)`.
+- `PinPad` ne sert plus qu'à l'accès mode parent in-game
+
+### v1.11.0 — Fusion thème/ambiance + scroll tâches + textes enfants
 - **Un seul thème à choisir** : étape "Ambiance" retirée du SetupWizard (STEPS = Mode/Joueurs/Tâches/Récompenses/PIN, indices décalés)
 - En vue joueur, le shell complet (fond, header, accents) dérive du thème perso via `getPlayerTheme()` (useMemo dans App) ; vue famille = ambiance par défaut (`config.theme` conservé pour rétrocompat, plus d'UI)
 - **Fix scroll** : colonnes catalogue/assignées de l'étape Tâches → `maxHeight:62vh + overflowY:auto` chacune (avant : conteneur `overflow:hidden` qui coupait tout) ; `paddingBottom:48` sur le contenu jeu pour dégager le footer fixe

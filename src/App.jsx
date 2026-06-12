@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.11.0";
+const APP_VERSION = "1.12.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,14 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.12.0", date:"2026-06-12", features:[
+    "🔑 Fix connexion — le code se valide à nouveau tout seul au 4e chiffre!",
+    "📨 Tâches autonomes — l'enfant envoie sa tâche faite, plus besoin du code parent sur place!",
+    "✅ Portail parent — nouvel onglet «À valider» pour confirmer ou refuser les demandes",
+    "📋 Gestion des tâches — ajouter/retirer des tâches directement du portail parent",
+    "📚 Fix calendrier — valider un devoir/examen donne maintenant vraiment l'XP (c'était cassé!)",
+    "☁️ Prêt pour la synchronisation multi-appareils (voir SYNC.md)",
+  ]},
   { version:"1.11.0", date:"2026-06-12", features:[
     "🎨 Un seul thème à choisir — l'écran entier suit maintenant le thème du joueur, fini l'ambiance globale séparée",
     "📜 Liste de tâches déroulante — on peut enfin voir toutes les tâches dans la configuration",
@@ -1003,15 +1011,69 @@ const CHANGELOG = [
 // Future: import { saveToSupabase, loadFromSupabase } from './lib/supabase.js'
 const STORE_KEY = "livre-de-quetes-v1";
 
+// ─── SYNC CLOUD (multi-appareils) ────────────────────────────
+// Remplir SYNC_URL et SYNC_KEY (voir SYNC.md à la racine du repo) pour activer
+// la synchronisation : la progression suit alors les enfants sur tous les
+// appareils (tablette, téléphone, ordi). Vide = sauvegarde locale seulement.
+const SYNC_URL = "";  // ex: "https://abcdefgh.supabase.co"
+const SYNC_KEY = "";  // clé "anon public" du projet Supabase
+const FAMILY_ID = "livre-quetes-bergeron-2026"; // identifiant unique de la famille (agit comme mot de passe — garder original)
+
+const syncEnabled = () => Boolean(SYNC_URL && SYNC_KEY);
+const syncHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY}`, "Content-Type": "application/json" });
+let LAST_SAVED_AT = null; // horodatage de la dernière sauvegarde connue localement
+let _pushTimer = null;
+
+// Pousse l'état complet vers le cloud (debounce 1.5s pour regrouper les actions rapides)
+const remotePush = (data) => {
+  if (!syncEnabled()) return;
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => {
+    fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
+      method: "POST",
+      headers: { ...syncHeaders(), Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ id: FAMILY_ID, data, saved_at: data.savedAt || new Date().toISOString() }),
+    }).catch((e) => console.warn("Sync: push échoué (mode local conservé)", e));
+  }, 1500);
+};
+
+// Récupère l'état depuis le cloud — null si indisponible (on reste en local)
+const remotePull = async () => {
+  if (!syncEnabled()) return null;
+  try {
+    const r = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: syncHeaders() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return rows?.[0]?.data || null;
+  } catch { return null; }
+};
+
+const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant aux absents)
+  if (!a) return false;
+  if (!b) return true;
+  try { return new Date(a) > new Date(b); } catch { return false; }
+};
+
 const save = async (data) => {
+  LAST_SAVED_AT = data.savedAt || LAST_SAVED_AT;
   try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { console.warn("Storage save failed:", e); }
-  // FUTURE SUPABASE: await supabase.from('family_sessions').upsert({ id: familyId, data })
+  remotePush(data);
 };
 
 const load = async () => {
-  try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch {}
-  // FUTURE SUPABASE: const { data } = await supabase.from('family_sessions').select().eq('id', familyId).single()
-  return null;
+  let local = null;
+  try { const r = localStorage.getItem(STORE_KEY); if (r) local = JSON.parse(r); } catch {}
+  if (syncEnabled()) {
+    const remote = await remotePull();
+    if (remote?.savedAt && isNewer(remote.savedAt, local?.savedAt)) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
+      LAST_SAVED_AT = remote.savedAt;
+      return remote;
+    }
+    if (local && !remote) remotePush(local); // premier appareil : seeder le cloud
+  }
+  LAST_SAVED_AT = local?.savedAt || null;
+  return local;
 };
 
 // ─── DATA MIGRATION ── préserve les données des enfants entre les pushes ────
@@ -2198,7 +2260,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES</div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>C'est ici que tu coches tes tâches du jour — clique et attends la validation!</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucune quête assignée pour ce joueur.</div>}
       {myAssignments.map(ass=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
@@ -2512,12 +2574,16 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onRemoveAssignment, onAddCustomTask,
   onClose, onUndo, onReset, onResetPlayer, onAdjustXP, onChangePin,
   onExport, onImport, onSetup, players, th }) {
-  const [tab, setTab] = useState("actions"); // actions | log | pin | export
+  const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
+  const [tab, setTab] = useState(nbPending>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
   const [xpPlayer, setXpPlayer] = useState(0);
   const [xpDelta, setXpDelta] = useState(10);
   const [pinVal, setPinVal] = useState("");
+  const [addTaskId, setAddTaskId] = useState("");
+  const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
   const T = th;
 
   const TabBtn = ({k,l}) => (
@@ -2551,16 +2617,119 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111"}}>
+      <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
+        <TabBtn k="valid"    l={`✅ À valider${nbPending>0?` (${nbPending})`:""}`}/>
+        <TabBtn k="tasks"    l="📋 Tâches"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
         <TabBtn k="cal"      l="📅 Calendrier"/>
-        <TabBtn k="log"      l="📋 Journal"/>
+        <TabBtn k="log"      l="🕐 Journal"/>
         <TabBtn k="pin"      l="🔐 Code"/>
         <TabBtn k="export"   l="💾 Sauvegarde"/>
       </div>
 
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",padding:"12px 14px"}}>
+
+        {/* À VALIDER TAB */}
+        {tab==="valid" && (()=>{
+          const items=[];
+          gameStates.forEach((gs,i)=>{
+            const pl=players[i];
+            (gs.pending||[]).forEach(k=>{
+              const instanceId=k.slice(0,k.lastIndexOf("_"));
+              let emoji="📋", label="Tâche", xp=null, coins=null;
+              if(instanceId.startsWith("cal_")){
+                const entry=(gs.calendar||[]).find(e=>"cal_"+e.id===instanceId);
+                const exam=entry?.type==="examen";
+                emoji=exam?"📝":"📚";
+                label=entry?(exam?"Étudier: ":"Devoir: ")+entry.label:"Devoir/examen";
+                xp=exam?20:10; coins=exam?5:3;
+              } else {
+                const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+                const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
+                if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;}
+              }
+              items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins});
+            });
+          });
+          return (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>DEMANDES DES ENFANTS</div>
+              {items.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
+              {items.map(it=>(
+                <div key={it.doneKey} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${it.pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:18}}>{it.emoji}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{it.label}</div>
+                      <div style={{display:"flex",gap:8,marginTop:2}}>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:it.pl?.color||"#888"}}>{displayName(it.pl)}</span>
+                        {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{it.xp}</span>}
+                        {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙{it.coins}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#2ECC40" style={{flex:1}}>✅ Valider</PBtn>
+                    <PBtn onClick={()=>onRefusePending(it.playerIdx,it.doneKey)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Refuser</PBtn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* TÂCHES TAB */}
+        {tab==="tasks" && (
+          <div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>AJOUTER UNE TÂCHE</div>
+            <select value={addTaskId} onChange={e=>setAddTaskId(e.target.value)}
+              style={{width:"100%",background:"#111",border:"2px solid #FF8C00",color:"#fff",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8}}>
+              <option value="">— Choisir dans le catalogue —</option>
+              {allTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.label} (⚡{t.xp} 🪙{t.coins})</option>)}
+            </select>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+              {players.map(pl=>{
+                const sel=addPlayerIds.includes(pl.id);
+                return <div key={pl.id} onClick={()=>setAddPlayerIds(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  {displayName(pl)}
+                </div>;
+              })}
+            </div>
+            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length){ onAddAssignment(addTaskId,addPlayerIds); setAddTaskId(""); } }}
+              color={addTaskId&&addPlayerIds.length?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length?1:0.5,marginBottom:8}}>
+              ➕ Ajouter aux joueurs cochés
+            </PBtn>
+            <button onClick={()=>{ const id=onAddCustomTask(); if(id)setAddTaskId(id); }}
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #FF8C0060",color:"#FF8C00",borderRadius:4,cursor:"pointer",marginBottom:14}}>
+              + Créer une tâche personnalisée
+            </button>
+
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"6px 0 10px"}}>TÂCHES ACTUELLES ({(config.assignments||[]).length})</div>
+            {(config.assignments||[]).map(ass=>{
+              const task=allTasks.find(t=>t.id===ass.taskId);
+              const assignees=players.filter(p=>ass.playerIds.includes(p.id));
+              if(!task)return null;
+              return (
+                <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:"rgba(0,0,0,0.4)",border:"1px solid #333",borderRadius:4,marginBottom:5}}>
+                  <span style={{fontSize:16}}>{task.emoji}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
+                      {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
+                    </div>
+                  </div>
+                  <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#FF4444",cursor:"pointer",fontSize:16,padding:4}}>×</button>
+                </div>
+              );
+            })}
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:8,lineHeight:1.4}}>
+              Pour les horaires et les jours de la semaine, passe par ⚙️ Modifier le livre (onglet Actions).
+            </div>
+          </div>
+        )}
 
         {/* ACTIONS TAB */}
         {tab==="actions" && <>
@@ -3241,38 +3410,6 @@ function MiniGame({ player, playerThemeId, level, onFinish }) {
   return <MiniGameWhack pt={pt} level={level} onFinish={onFinish}/>;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CARRY-OVER MODAL — tâches pending d'hier
-// ═══════════════════════════════════════════════════════════════
-function CarryOverModal({ config, gameStates, onValidate, onClear, onClose }) {
-  const playersWithPending = (config.players||[]).map((p,idx)=>({
-    player:p, idx, pending:(gameStates[idx]?.pending||[])
-  })).filter(x=>x.pending.length>0);
-
-  if (playersWithPending.length === 0) { onClose(); return null; }
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:195,display:"flex",flexDirection:"column",alignItems:"center",padding:"20px 16px",overflowY:"auto"}}>
-      <div style={{width:"100%",maxWidth:380}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:"#FFD700",textAlign:"center",marginBottom:6}}>📋 Tâches d'hier</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",textAlign:"center",marginBottom:18,lineHeight:2}}>Ces tâches attendaient encore validation. Que faire?</div>
-        {playersWithPending.map(({player,idx,pending})=>(
-          <div key={idx} style={{background:"#111",borderRadius:8,padding:14,marginBottom:12,border:`1px solid ${player.color||"#444"}40`}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:player.color||"#FFD700",marginBottom:10}}>
-              {player.pseudo||player.name}
-              <span style={{color:"#666",fontSize:6}}> · {pending.length} tâche{pending.length>1?"s":""}</span>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>onValidate(idx)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"8px 0",background:"#1a2e1a",color:"#5D9E34",border:"1px solid #5D9E34",borderRadius:4,cursor:"pointer",flex:1}}>✅ Valider (+XP)</button>
-              <button onClick={()=>onClear(idx)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"8px 0",background:"#1a1a1a",color:"#666",border:"1px solid #333",borderRadius:4,cursor:"pointer",flex:1}}>🗑️ Effacer</button>
-            </div>
-          </div>
-        ))}
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"10px 24px",background:"#1a1a1a",color:"#888",border:"1px solid #333",borderRadius:6,cursor:"pointer",width:"100%",marginTop:4}}>Fermer</button>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════
 // LOGIN SCREEN — "Qui joue?" + PIN par joueur
@@ -3399,6 +3536,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     pPinRef.current = pPinRef.current + d;
     setPPin(pPinRef.current);
     setPinError(false);
+    // Auto-submit au 4e chiffre (régression v1.10.1 — le bouton VALIDER reste en filet de sécurité)
+    if (pPinRef.current.length === 4) setTimeout(doPlayerSubmit, 120);
   };
 
   // Parent PIN — ref-based
@@ -3418,6 +3557,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
     ppPinRef.current = ppPinRef.current + d;
     setPpPin(ppPinRef.current);
     setPinError(false);
+    // Auto-submit au 4e chiffre (régression v1.10.1 — le bouton VALIDER reste en filet de sécurité)
+    if (ppPinRef.current.length === 4) setTimeout(doParentSubmit, 120);
   };
 
   // Onboarding PIN
@@ -3767,7 +3908,6 @@ export default function App() {
   const [config, setConfig] = useState(null);
   const [gameStates, setGameStates] = useState([]); // per-player
   const [view, setView] = useState("family"); // "family"|0|1|2|3
-  const [pendingValidation, setPendingValidation] = useState(null); // {ass,playerId,playerIdx,clickX,clickY}
   const [parentPinOpen, setParentPinOpen] = useState(false);
   const [parentMode, setParentMode] = useState(false);
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
@@ -3778,7 +3918,6 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [rewardPopup, setRewardPopup] = useState(null);
   const [miniGame, setMiniGame] = useState(null); // {player,playerIdx,level,playerThemeId,pendingReward}
-  const [carryoverModal, setCarryoverModal] = useState(false);
   const [now, setNow] = useState(new Date());
 
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
@@ -3800,18 +3939,37 @@ export default function App() {
             .map(c=>({ type:"update", version:c.version, features:c.features, ts:new Date().toISOString() }));
           setConfig(cfg=>({...cfg, updateFeedEntries:[...(cfg.updateFeedEntries||[]),...newEntries]}));
         }
-        // Carry-over: si date changée et des tâches pending → proposer report
-        const savedDate = data.savedAt ? new Date(data.savedAt).toDateString() : null;
-        if (savedDate && savedDate !== new Date().toDateString()) {
-          const hasPending = data.gameStates.some(gs=>(gs.pending||[]).length>0);
-          if (hasPending) setCarryoverModal(true);
-        }
+        // Les tâches en attente d'hier restent simplement dans la file
+        // "À valider" du portail parent (plus de modal en libre-service).
         setScreen("login");
       } else setScreen("setup"); // No valid saved data → first-time setup
     });
   },[]);
 
   const persist = useCallback((cfg,gs) => save({config:cfg,gameStates:gs,savedAt:new Date().toISOString()}), []);
+
+  // ── Boucle de sync : tire les changements faits sur les autres appareils ──
+  useEffect(()=>{
+    if(!syncEnabled())return;
+    let stop=false;
+    const tick=async()=>{
+      const remote=await remotePull();
+      if(stop||!remote?.savedAt)return;
+      if(isNewer(remote.savedAt, LAST_SAVED_AT)){
+        const data=migrateSavedData(remote);
+        if(data?.config&&data?.gameStates){
+          LAST_SAVED_AT=data.savedAt;
+          try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch{}
+          setConfig(data.config);
+          setGameStates(data.gameStates);
+        }
+      }
+    };
+    const iv=setInterval(tick,25000); // toutes les 25s
+    const onVis=()=>{ if(document.visibilityState==="visible") tick(); }; // + au retour sur l'app
+    document.addEventListener("visibilitychange",onVis);
+    return ()=>{ stop=true; clearInterval(iv); document.removeEventListener("visibilitychange",onVis); };
+  },[]);
 
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
   const logAction = useCallback((msg,color="#FF8C00")=>{
@@ -3830,28 +3988,43 @@ export default function App() {
   },[persist]);
 
   // Request complete
-  const requestComplete = useCallback((ass,playerId,evt) => {
+  // L'enfant envoie sa tâche en validation — autonome, pas de code à entrer.
+  // Le parent valide ensuite depuis le portail (onglet "À valider").
+  const requestComplete = useCallback((ass,playerId) => {
     const playerIdx = config.players.findIndex(p=>p.id===playerId);
     if(playerIdx<0)return;
     const gs=gameStates[playerIdx];
     const doneKey=ass.instanceId+"_"+playerId;
     if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
-    const rect=evt?.target?.getBoundingClientRect?.()||{left:window.innerWidth/2,top:window.innerHeight/2,width:0,height:0};
-    setPendingValidation({ass,playerId,playerIdx,clickX:rect.left+rect.width/2,clickY:rect.top+rect.height/2,doneKey});
-    // mark pending
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
-  },[config,gameStates,persist]);
+    showToast("📨 Envoyée à tes parents pour validation!","#5DECF5",3500);
+  },[config,gameStates,persist,showToast]);
 
-  // PIN success
-  const handlePinSuccess = useCallback(()=>{
-    if(!pendingValidation)return;
-    const {ass,playerId,playerIdx,clickX,clickY,doneKey}=pendingValidation;
-    setPendingValidation(null);
-    const task=(config.customTasks||[]).concat(TASK_CATALOG).find(t=>t.id===ass.taskId);
-    if(!task)return;
+  // Retrouve la tâche (catalogue, perso ou calendrier) derrière un doneKey
+  const resolvePendingTask = useCallback((playerIdx, doneKey)=>{
+    const instanceId=doneKey.slice(0,doneKey.lastIndexOf("_"));
+    if(instanceId.startsWith("cal_")){
+      const entry=(gameStates[playerIdx]?.calendar||[]).find(e=>"cal_"+e.id===instanceId);
+      if(!entry)return null;
+      const exam=entry.type==="examen";
+      return { emoji:exam?"📝":"📚", label:(exam?"Étudier: ":"Devoir: ")+entry.label, xp:exam?20:10, coins:exam?5:3 };
+    }
+    const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+    if(!ass)return null;
+    return [...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId)||null;
+  },[config,gameStates]);
+
+  // Validation parent (portail) : donne XP/pièces/badges + popup/mini-jeu
+  const approvePending = useCallback((playerIdx, doneKey)=>{
+    const task=resolvePendingTask(playerIdx,doneKey);
     const player=config.players[playerIdx];
+    if(!task){ // assignation disparue → on nettoie sans récompense
+      setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
+      return;
+    }
     setGameStates(gs=>{
       const p=gs[playerIdx];
+      if(p.completed?.includes(doneKey))return gs;
       const prevLv=getLevel(p.xp).level;
       const newXp=p.xp+task.xp, newCoins=p.coins+task.coins;
       const newLv=getLevel(newXp).level;
@@ -3877,14 +4050,17 @@ export default function App() {
       },100);
       return n;
     });
-  },[pendingValidation,config,persist]);
+    logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#2ECC40");
+  },[config,persist,resolvePendingTask,logAction,showToast]);
 
-  const handlePinCancel = useCallback(()=>{
-    if(!pendingValidation)return;
-    const {playerIdx,doneKey}=pendingValidation;
-    setPendingValidation(null);
+  // Refus parent : retire la demande sans XP
+  const refusePending = useCallback((playerIdx, doneKey)=>{
+    const task=resolvePendingTask(playerIdx,doneKey);
+    const player=config.players[playerIdx];
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
-  },[pendingValidation,config,persist]);
+    logAction(`✗ Refusé: ${displayName(player)} — ${task?.label||doneKey}`,"#FF8C00");
+    showToast(`✗ Demande refusée`,"#FF8C00");
+  },[config,persist,resolvePendingTask,logAction,showToast]);
 
   // Mini-game ended — apply bonus then show reward popup
   const handleMiniGameEnd = useCallback((bonusXp,bonusCoins)=>{
@@ -3902,40 +4078,6 @@ export default function App() {
     }
     setRewardPopup(pendingReward);
   },[miniGame,config,persist,showToast]);
-
-  // Carry-over: valider toutes les tâches pending d'un joueur (leur donner XP)
-  const handleCarryoverValidate = useCallback((playerIdx)=>{
-    setGameStates(gs=>{
-      const p=gs[playerIdx];
-      const pending=p.pending||[];
-      let bonusXp=0,bonusCoins=0;
-      const newCompleted=[...(p.completed||[])];
-      pending.forEach(key=>{
-        const instanceId=key.slice(0,key.lastIndexOf("_"));
-        const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
-        if(ass){
-          const task=[...(config.customTasks||[]),...TASK_CATALOG].find(t=>t.id===ass.taskId);
-          if(task){bonusXp+=task.xp;bonusCoins+=task.coins;}
-          if(!newCompleted.includes(key))newCompleted.push(key);
-        }
-      });
-      const n=[...gs];
-      n[playerIdx]={...p,xp:p.xp+bonusXp,coins:p.coins+bonusCoins,completed:newCompleted,pending:[]};
-      persist(config,n);
-      return n;
-    });
-    showToast("✅ Tâches validées!","#5D9E34");
-  },[config,persist,showToast]);
-
-  // Carry-over: effacer les pending sans XP
-  const handleCarryoverClear = useCallback((playerIdx)=>{
-    setGameStates(gs=>{
-      const n=[...gs];
-      n[playerIdx]={...n[playerIdx],pending:[]};
-      persist(config,n);
-      return n;
-    });
-  },[config,persist]);
 
   // Buy / equip
   const handleBuy = useCallback((item,playerId)=>{
@@ -3982,7 +4124,7 @@ export default function App() {
     const player = config.players[playerIdx];
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],xp:Math.max(0,n[playerIdx].xp+delta),coins:Math.max(0,n[playerIdx].coins+(delta>0?Math.abs(Math.floor(delta/2)):0))}; persist(config,n); return n; });
     logAction(`${delta>0?"+":""}${delta} XP → ${player?.name}`,"#5DECF5");
-    showToast(`${delta>0?"+":""}}${delta} XP pour ${player?.name}`,"#5DECF5");
+    showToast(`${delta>0?"+":""}${delta} XP pour ${player?.name}`,"#5DECF5");
   },[config,persist,logAction,showToast]);
 
   const handleForceComplete = useCallback((ass, playerId) => {
@@ -4001,6 +4143,37 @@ export default function App() {
     showToast(`✅ Tâche forcée pour ${player?.name}`,"#2ECC40");
     spawnParticles(task.emoji);
   },[config,persist,logAction,showToast]);
+
+  // ── Gestion des tâches depuis le portail parent ──────────
+  // Ajoute une tâche pour chaque joueur coché (copies indépendantes, comme le wizard)
+  const handleAddAssignment = useCallback((taskId, playerIds)=>{
+    if(!taskId||!playerIds?.length)return;
+    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days:config.mode==="week"?[0]:[],time:""}));
+    const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
+    logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#2ECC40");
+    showToast("➕ Tâche ajoutée!","#2ECC40");
+  },[config,gameStates,persist,logAction,showToast]);
+
+  const handleRemoveAssignment = useCallback((instanceId)=>{
+    const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+    const task=ass?[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId):null;
+    const newCfg={...config,assignments:(config.assignments||[]).filter(a=>a.instanceId!==instanceId)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    logAction(`🗑️ Tâche retirée: ${task?.label||instanceId}`,"#FF8C00");
+    showToast("🗑️ Tâche retirée","#FF8C00");
+  },[config,gameStates,persist,logAction,showToast]);
+
+  const handleAddCustomTask = useCallback(()=>{
+    const label=prompt("Nom de la tâche:"); if(!label?.trim())return null;
+    const emoji=prompt("Emoji (ex: 🌟):")||"⭐";
+    const newTask={id:"cust_"+uid(),emoji,label:label.trim(),xp:20,coins:10,diff:"medium",cat:"custom"};
+    const newCfg={...config,customTasks:[...(config.customTasks||[]),newTask]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast(`${emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#2ECC40",4000);
+    return newTask.id;
+  },[config,gameStates,persist,showToast]);
 
   const handleResetPlayer = useCallback((playerIdx) => {
     const player=config.players[playerIdx];
@@ -4125,8 +4298,10 @@ export default function App() {
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",
               background:parentMode?"#FF8C00":"#222",color:parentMode?"#000":"#888",
               border:`2px solid ${parentMode?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer",
-              boxShadow:parentMode?"0 0 10px #FF8C0060":"none"}}>
+              boxShadow:parentMode?"0 0 10px #FF8C0060":"none",position:"relative"}}>
             {parentMode?"🔓 PARENT ▸":"🔐"}
+            {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
+              return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#FF4444",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #000"}}>{nb}</span>:null; })()}
           </button>
         </div>
       </div>
@@ -4217,14 +4392,17 @@ export default function App() {
       </div>
 
       {/* ── MODALS ── */}
-      {pendingValidation&&(
-        <PinPad pin={config.pin} label={`${(allTasks.find(t=>t.id===pendingValidation.ass.taskId))||{emoji:"",label:"Tâche"}}`.length>0?`${allTasks.find(t=>t.id===pendingValidation.ass.taskId)?.emoji||""} ${allTasks.find(t=>t.id===pendingValidation.ass.taskId)?.label||"Tâche"}`:"Tâche"} onSuccess={handlePinSuccess} onCancel={handlePinCancel} th={th}/>
-      )}
       {/* Parent Panel slide-out */}
       {parentMode && parentPanel && (
         <ParentPanel
           config={config} gameStates={gameStates} parentMode={parentMode}
           actionLog={actionLog} undoStack={undoStack} players={config.players} th={th}
+          allTasks={allTasks}
+          onApprovePending={approvePending}
+          onRefusePending={refusePending}
+          onAddAssignment={handleAddAssignment}
+          onRemoveAssignment={handleRemoveAssignment}
+          onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
           onUndo={handleUndo}
           onReset={()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
@@ -4245,14 +4423,6 @@ export default function App() {
       )}
       {miniGame&&(
         <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} onFinish={handleMiniGameEnd}/>
-      )}
-      {carryoverModal&&(
-        <CarryOverModal
-          config={config} gameStates={gameStates}
-          onValidate={(idx)=>{ handleCarryoverValidate(idx); const rem=gameStates.filter((gs,i)=>i!==idx&&(gs.pending||[]).length>0); if(!rem.length) setCarryoverModal(false); }}
-          onClear={(idx)=>{ handleCarryoverClear(idx); const rem=gameStates.filter((gs,i)=>i!==idx&&(gs.pending||[]).length>0); if(!rem.length) setCarryoverModal(false); }}
-          onClose={()=>setCarryoverModal(false)}
-        />
       )}
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
