@@ -94,7 +94,8 @@ _Mis à jour: 2026-06-12 — v1.12.0_
 - `resolvePendingTask(playerIdx, doneKey)` — résout tâche catalogue/perso/**calendrier** (fix: les rappels calendrier ne donnaient JAMAIS l'XP — `handlePinSuccess` cherchait `ass.taskId` inexistant sur les rappels)
 - **Onglet «📋 Tâches» du portail parent** : ajouter une tâche du catalogue à des joueurs (copies indépendantes), créer une tâche perso, retirer une assignation (`handleAddAssignment`/`handleRemoveAssignment`/`handleAddCustomTask`)
 - **CarryOverModal supprimé** (faille: les enfants pouvaient s'auto-valider les tâches d'hier) — les pending restent simplement dans la file du portail
-- **Couche sync cloud** (`SYNC_URL`/`SYNC_KEY`/`FAMILY_ID` en haut de App.jsx, vides = local seulement) : `remotePush` (debounce 1.5s) à chaque save, `remotePull` au chargement + toutes les 25s + au retour sur l'app, last-write-wins par `savedAt`. Guide: `SYNC.md`. Table Supabase `familles(id,data,saved_at)`.
+- **Couche sync cloud à 2 modes auto-détectés** (`SYNC.md`) : (1) **API même-origine `/api/famille`** servie par `server.cjs` (Node, `npm start`) branché sur le **Postgres Canner** via `DATABASE_URL` — détection client via `/api/sante`; (2) **Supabase** si `SYNC_URL`/`SYNC_KEY` remplis. `remotePush` (debounce 1.5s) à chaque save, `remotePull` au chargement + 25s + retour sur l'app, last-write-wins par `savedAt` (le serveur refuse d'écraser plus récent). Repli : local seulement, comportement historique. `FAMILY_ID` = clé de la famille.
+- **`server.cjs`** : sert `dist/` (fallback SPA) + API famille; stockage Postgres si `DATABASE_URL`, sinon fichier JSON local (dev). `package.json` : `start: node server.cjs`, dépendance `pg`. ⚠️ Vérifier après déploiement que Canner roule le projet en Node (tester `/api/sante`) et que Postgres est activé pour le projet.
 - `PinPad` ne sert plus qu'à l'accès mode parent in-game
 
 ### v1.11.0 — Fusion thème/ambiance + scroll tâches + textes enfants

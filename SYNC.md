@@ -1,58 +1,60 @@
-# ☁️ Activer la synchronisation multi-appareils
+# ☁️ Synchronisation multi-appareils
 
 Sans la sync, la progression est sauvegardée **dans le navigateur de chaque appareil**
-(Canner héberge seulement les fichiers de l'app — il ne stocke aucune donnée).
-Avec la sync, les enfants retrouvent leur progression partout : tablette, téléphone, ordi.
+(Canner héberge l'app, mais ne stocke pas les données toute seule).
+Avec la sync, les enfants retrouvent leur progression partout — tablette, téléphone, ordi —
+et tu peux valider leurs tâches de ton propre téléphone.
 
-## Étapes (~5 minutes, gratuit)
+## ✅ Option 1 (recommandée) : Postgres de Canner
 
-1. Crée un compte sur [supabase.com](https://supabase.com) → **New project**
-   (choisis n'importe quel nom, ex. `livre-de-quetes`, et une région proche, ex. `ca-central-1`).
+Canner fournit une base Postgres isolée par projet, injectée via `DATABASE_URL`.
+Tout reste au Québec (Loi 25), aucun compte supplémentaire. L'app contient déjà :
 
-2. Dans le projet : menu **SQL Editor** → colle et exécute ceci :
+- `server.cjs` — petit serveur Node qui sert l'app **et** l'API `/api/famille`
+- la détection automatique côté client : si l'API répond, la sync s'active toute seule
+
+### Étapes
+
+1. Pousse ce commit sur GitHub (Canner redéploie).
+2. Dans le tableau de bord Canner → ton projet → vérifie que la base **Postgres**
+   est activée (elle injecte `DATABASE_URL` automatiquement au build).
+3. Vérifie que le projet roule bien en mode **Node** (commande `npm start`) et non
+   en site statique. Si la page `https://<ton-projet>.app.canner.ca/api/sante`
+   affiche `{"ok":true,"stockage":"postgres"}` → la sync est active. 🎉
+   - Si tu vois du HTML à la place : le projet est encore servi en statique —
+     écris au support Canner (support@canner.ca) ou vérifie la détection du
+     framework dans les réglages du projet.
+4. Ouvre l'app sur chaque appareil : le premier envoie sa sauvegarde, les autres la reçoivent.
+
+> ⚠️ Forfait Starter (gratuit) : l'app « s'endort » après quelques heures sans visite
+> et met 1 à 4 secondes à se réveiller à la première ouverture. Normal.
+
+### Choisir le `FAMILY_ID`
+
+Dans `src/App.jsx` (haut du fichier), la constante `FAMILY_ID` identifie vos données —
+elle agit comme un mot de passe. Mets une phrase originale difficile à deviner.
+
+## Option 2 (rechange) : Supabase
+
+Si jamais le mode Node ne fonctionne pas chez Canner, l'app supporte aussi Supabase :
+
+1. Compte gratuit sur supabase.com → New project.
+2. SQL Editor → exécuter :
 
    ```sql
-   create table familles (
-     id text primary key,
-     data jsonb,
-     saved_at timestamptz
-   );
+   create table familles (id text primary key, data jsonb, saved_at timestamptz);
    alter table familles enable row level security;
-   create policy "famille_ouverte" on familles
-     for all using (true) with check (true);
+   create policy "famille_ouverte" on familles for all using (true) with check (true);
    ```
 
-3. Menu **Settings → API** : copie deux valeurs :
-   - **Project URL** (ex. `https://abcdefgh.supabase.co`)
-   - **anon public key** (longue chaîne `eyJ...`)
+3. Settings → API : copier **Project URL** et **anon public key** dans
+   `SYNC_URL` et `SYNC_KEY` en haut de `src/App.jsx`, puis pousser.
 
-4. Dans `src/App.jsx`, près du haut du fichier, remplis :
+## Comment ça marche (les deux modes)
 
-   ```js
-   const SYNC_URL = "https://abcdefgh.supabase.co";
-   const SYNC_KEY = "eyJ...";
-   const FAMILY_ID = "choisis-une-phrase-unique-difficile-a-deviner";
-   ```
-
-   ⚠️ Le `FAMILY_ID` agit comme mot de passe de vos données : mets quelque chose
-   d'original (pas « famille » tout court).
-
-5. Pousse sur GitHub → Canner redéploie → ouvre l'app sur chaque appareil.
-   Le premier appareil qui ouvre l'app envoie sa sauvegarde au nuage; les autres la récupèrent.
-
-## Comment ça marche
-
-- Chaque action (tâche, XP, achat…) est sauvegardée localement **et** poussée au nuage (délai ~1,5 s).
+- Chaque action (tâche, XP, achat…) est sauvegardée localement **et** poussée au nuage (~1,5 s).
 - Chaque appareil vérifie le nuage toutes les 25 secondes et au retour sur l'app.
-- En cas de panne réseau, l'app continue en local sans rien perdre.
-- Limite connue : si deux appareils modifient en même temps à la seconde près,
-  la dernière sauvegarde gagne. Pour une famille, c'est très rarement un problème.
-
-## Note de sécurité
-
-La clé `anon` est visible dans le code de l'app — c'est prévu ainsi par Supabase.
-La protection réelle de vos données est le `FAMILY_ID` : garde-le original et privé.
-Les données stockées sont uniquement la progression du jeu (aucun vrai nom requis si
-les pseudos sont utilisés, aucun courriel, aucun mot de passe).
-
-Si tu préfères, demande à Claude de faire ces étapes avec toi.
+- Panne de réseau? L'app continue en local, rien n'est perdu.
+- Limite : si deux appareils modifient à la même seconde, la dernière sauvegarde gagne
+  (le serveur refuse d'écraser du plus récent par du plus ancien).
+- Données stockées : uniquement la progression du jeu — pseudos, XP, badges. Pas de courriels ni mots de passe.

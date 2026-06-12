@@ -1,0 +1,6 @@
+node_modules/
+dist/
+dist-validation/
+familles-local.json
+.DS_Store
+*.timestamp-*.mjs

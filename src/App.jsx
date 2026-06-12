@@ -949,7 +949,7 @@ const CHANGELOG = [
     "✅ Portail parent — nouvel onglet «À valider» pour confirmer ou refuser les demandes",
     "📋 Gestion des tâches — ajouter/retirer des tâches directement du portail parent",
     "📚 Fix calendrier — valider un devoir/examen donne maintenant vraiment l'XP (c'était cassé!)",
-    "☁️ Prêt pour la synchronisation multi-appareils (voir SYNC.md)",
+    "☁️ Synchronisation multi-appareils — la progression suit partout via la base Postgres de Canner (voir SYNC.md)",
   ]},
   { version:"1.11.0", date:"2026-06-12", features:[
     "🎨 Un seul thème à choisir — l'écran entier suit maintenant le thème du joueur, fini l'ambiance globale séparée",
@@ -1012,40 +1012,67 @@ const CHANGELOG = [
 const STORE_KEY = "livre-de-quetes-v1";
 
 // ─── SYNC CLOUD (multi-appareils) ────────────────────────────
-// Remplir SYNC_URL et SYNC_KEY (voir SYNC.md à la racine du repo) pour activer
-// la synchronisation : la progression suit alors les enfants sur tous les
-// appareils (tablette, téléphone, ordi). Vide = sauvegarde locale seulement.
-const SYNC_URL = "";  // ex: "https://abcdefgh.supabase.co"
-const SYNC_KEY = "";  // clé "anon public" du projet Supabase
+// Deux modes, détectés automatiquement (voir SYNC.md) :
+//   1. API même-origine /api/famille — active quand l'app roule sur le serveur
+//      Node (server.cjs) avec le Postgres Canner. RIEN à configurer ici.
+//   2. Supabase — remplir SYNC_URL et SYNC_KEY ci-dessous (solution de rechange).
+// Si aucun des deux n'est disponible : sauvegarde locale seulement, comme avant.
+const SYNC_URL = "";  // (optionnel) ex: "https://abcdefgh.supabase.co"
+const SYNC_KEY = "";  // (optionnel) clé "anon public" Supabase
 const FAMILY_ID = "livre-quetes-bergeron-2026"; // identifiant unique de la famille (agit comme mot de passe — garder original)
 
-const syncEnabled = () => Boolean(SYNC_URL && SYNC_KEY);
-const syncHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY}`, "Content-Type": "application/json" });
+const supaEnabled = () => Boolean(SYNC_URL && SYNC_KEY);
+const supaHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY}`, "Content-Type": "application/json" });
 let LAST_SAVED_AT = null; // horodatage de la dernière sauvegarde connue localement
 let _pushTimer = null;
+let API_OK = null; // détection unique de l'API même-origine
+
+// L'API même-origine est-elle là? (un déploiement statique renverrait du HTML → non)
+const apiAvailable = async () => {
+  if (API_OK !== null) return API_OK;
+  try {
+    const r = await fetch("/api/sante", { cache: "no-store" });
+    const ct = r.headers.get("content-type") || "";
+    API_OK = r.ok && ct.includes("json") && (await r.json())?.ok === true;
+  } catch { API_OK = false; }
+  return API_OK;
+};
 
 // Pousse l'état complet vers le cloud (debounce 1.5s pour regrouper les actions rapides)
 const remotePush = (data) => {
-  if (!syncEnabled()) return;
   clearTimeout(_pushTimer);
-  _pushTimer = setTimeout(() => {
-    fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
-      method: "POST",
-      headers: { ...syncHeaders(), Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify({ id: FAMILY_ID, data, saved_at: data.savedAt || new Date().toISOString() }),
-    }).catch((e) => console.warn("Sync: push échoué (mode local conservé)", e));
+  _pushTimer = setTimeout(async () => {
+    try {
+      if (await apiAvailable()) {
+        await fetch("/api/famille", { method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: FAMILY_ID, data }) });
+      } else if (supaEnabled()) {
+        await fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
+          method: "POST",
+          headers: { ...supaHeaders(), Prefer: "resolution=merge-duplicates" },
+          body: JSON.stringify({ id: FAMILY_ID, data, saved_at: data.savedAt || new Date().toISOString() }),
+        });
+      }
+    } catch (e) { console.warn("Sync: push échoué (mode local conservé)", e); }
   }, 1500);
 };
 
 // Récupère l'état depuis le cloud — null si indisponible (on reste en local)
 const remotePull = async () => {
-  if (!syncEnabled()) return null;
   try {
-    const r = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: syncHeaders() });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    return rows?.[0]?.data || null;
-  } catch { return null; }
+    if (await apiAvailable()) {
+      const r = await fetch(`/api/famille?id=${encodeURIComponent(FAMILY_ID)}`, { cache: "no-store" });
+      if (!r.ok) return null;
+      return (await r.json())?.data || null;
+    }
+    if (supaEnabled()) {
+      const r = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: supaHeaders() });
+      if (!r.ok) return null;
+      const rows = await r.json();
+      return rows?.[0]?.data || null;
+    }
+  } catch {}
+  return null;
 };
 
 const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant aux absents)
@@ -1063,15 +1090,13 @@ const save = async (data) => {
 const load = async () => {
   let local = null;
   try { const r = localStorage.getItem(STORE_KEY); if (r) local = JSON.parse(r); } catch {}
-  if (syncEnabled()) {
-    const remote = await remotePull();
-    if (remote?.savedAt && isNewer(remote.savedAt, local?.savedAt)) {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
-      LAST_SAVED_AT = remote.savedAt;
-      return remote;
-    }
-    if (local && !remote) remotePush(local); // premier appareil : seeder le cloud
+  const remote = await remotePull(); // null si aucun mode sync disponible
+  if (remote?.savedAt && isNewer(remote.savedAt, local?.savedAt)) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
+    LAST_SAVED_AT = remote.savedAt;
+    return remote;
   }
+  if (local && !remote && (API_OK || supaEnabled())) remotePush(local); // premier appareil : seeder le cloud
   LAST_SAVED_AT = local?.savedAt || null;
   return local;
 };
@@ -3949,8 +3974,8 @@ export default function App() {
   const persist = useCallback((cfg,gs) => save({config:cfg,gameStates:gs,savedAt:new Date().toISOString()}), []);
 
   // ── Boucle de sync : tire les changements faits sur les autres appareils ──
+  // (remotePull retourne null en ~0ms si aucun mode sync n'est disponible)
   useEffect(()=>{
-    if(!syncEnabled())return;
     let stop=false;
     const tick=async()=>{
       const remote=await remotePull();
