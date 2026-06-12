@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.10.2";
+const APP_VERSION = "1.11.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -943,6 +943,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.11.0", date:"2026-06-12", features:[
+    "🎨 Un seul thème à choisir — l'écran entier suit maintenant le thème du joueur, fini l'ambiance globale séparée",
+    "📜 Liste de tâches déroulante — on peut enfin voir toutes les tâches dans la configuration",
+    "🏅 Badges tactiles — appuie sur un badge pour voir comment le débloquer (fini le survol souris)",
+    "✏️ Textes revus — vocabulaire simplifié partout, plus de mots techniques",
+  ]},
   { version:"1.10.0", date:"2026-06-08", features:[
     "🎮 Runner au level-up — mini-jeu style Chrome Dino: saute les obstacles, ramasse les pièces",
     "👻 Pac-Quest au level-up — mini-jeu style Pac-Man: mange les pellets, évite le fantôme",
@@ -1380,8 +1386,8 @@ function RewardPopup({ task, player, newBadges, onClose, th }) {
 // SETUP WIZARD
 // ═══════════════════════════════════════════════════════════════
 function SetupWizard({ existing, onDone }) {
-  const [step, setStep] = useState(0); // 0=mode 1=players 2=theme 3=tasks 4=rewards 5=pin
-  const STEPS = ["Mode","Joueurs","Ambiance","Tâches","Récompenses","PIN"];
+  const [step, setStep] = useState(0); // 0=mode 1=players 2=tasks 3=rewards 4=pin
+  const STEPS = ["Mode","Joueurs","Tâches","Récompenses","PIN"];
 
   // Config state
   const [mode, setMode] = useState("routine"); // "week" | "routine"
@@ -1513,8 +1519,8 @@ function SetupWizard({ existing, onDone }) {
 
   const canProceed = () => {
     if (step===1) return activePlayers.every(p=>p.name.trim());
-    if (step===3) return assignments.length>0;
-    if (step===5) return pin.length===4;
+    if (step===2) return assignments.length>0;
+    if (step===4) return pin.length===4;
     return true;
   };
 
@@ -1630,26 +1636,12 @@ function SetupWizard({ existing, onDone }) {
           </div>
         </>}
 
-        {/* ── STEP 2: Theme ── */}
+        {/* ── STEP 2: Tasks ── */}
         {step===2 && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:6}}>🎨 Ambiance globale</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12}}>Fond et header seulement — chaque joueur garde son thème perso dans son panel.</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-            {[...Object.entries(THEMES), ["random_week", RANDOM_THEME_WEEK]].map(([k,th])=>(
-              <div key={k} onClick={()=>{setTheme(k);SFX.click();}} style={{border:`3px solid ${theme===k?th.accent:"#444"}`,borderRadius:6,padding:"14px 10px",cursor:"pointer",background:theme===k?`${th.accent}18`:"rgba(0,0,0,0.4)",boxShadow:theme===k?`0 0 14px ${th.accent}50`:"none",textAlign:"center",transition:"all 0.15s"}}>
-                <div style={{fontSize:30,marginBottom:6}}>{k==="random_week"?"🎲":k==="minecraft"?"⛏️":k==="galaxy"?"🌌":k==="ocean"?"🌊":k==="volcano"?"🌋":"🌲"}</div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:theme===k?th.accent:"#aaa"}}>{th.name}</div>
-              </div>
-            ))}
-          </div>
-        </>}
-
-        {/* ── STEP 3: Tasks ── */}
-        {step===3 && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:12}}>📋 Tâches & Quêtes ({assignments.length})</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,maxHeight:"65vh",overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             {/* Catalog left */}
-            <div style={{display:"flex",flexDirection:"column",gap:8,overflowY:"auto",paddingRight:4}}>
+            <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"62vh",overflowY:"auto",paddingRight:4,WebkitOverflowScrolling:"touch"}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>CATALOGUE — cliquer pour ajouter</div>
               {/* Category filter */}
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
@@ -1674,7 +1666,7 @@ function SetupWizard({ existing, onDone }) {
             </div>
 
             {/* Assigned right */}
-            <div style={{display:"flex",flexDirection:"column",gap:6,overflowY:"auto",paddingRight:2}}>
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"62vh",overflowY:"auto",paddingRight:2,WebkitOverflowScrolling:"touch"}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>TÂCHES ASSIGNÉES — glisser pour réordonner</div>
               {assignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",textAlign:"center",marginTop:20}}>Clique sur une tâche à gauche pour l'ajouter →</div>}
               {assignments.map(ass=>{
@@ -1736,8 +1728,8 @@ function SetupWizard({ existing, onDone }) {
           </div>
         </>}
 
-        {/* ── STEP 4: Rewards ── */}
-        {step===4 && <>
+        {/* ── STEP 3: Rewards ── */}
+        {step===3 && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:12}}>🎁 Récompenses disponibles</div>
           <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"55vh",overflowY:"auto"}}>
             {allRewards.map(r=>{
@@ -1758,13 +1750,13 @@ function SetupWizard({ existing, onDone }) {
           <button onClick={addCustomReward} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${T.accent}60`,color:T.accent,borderRadius:4,cursor:"pointer",marginTop:10,width:"100%"}}>+ Récompense personnalisée</button>
         </>}
 
-        {/* ── STEP 5: PIN ── */}
-        {step===5 && <>
+        {/* ── STEP 4: PIN ── */}
+        {step===4 && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:14}}>🔐 Code secret parent</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",marginBottom:14}}>Demandé à chaque validation. Les enfants ne le voient pas!</div>
           <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="4 chiffres"
             style={{width:"100%",background:"#111",border:`3px solid ${T.accent}`,color:"#fff",padding:"14px",fontFamily:"'Press Start 2P',monospace",fontSize:20,borderRadius:4,textAlign:"center",letterSpacing:10}}/>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8}}>Code actuel: {pin} — défaut: 1234</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8}}>Code choisi : {pin||"—"}</div>
         </>}
 
         {/* NAV */}
@@ -2116,6 +2108,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
+  const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
   const [calOpen, setCalOpen] = useState(false);
   const [calForm, setCalForm] = useState({type:"devoir", label:"", date:""});
   const T = th;
@@ -2232,7 +2225,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
               style={{width:"100%",padding:"6px",fontFamily:"'Press Start 2P',monospace",fontSize:"7px",
                 color:"#000",background:"#FF8C00",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
-              ⚡ OVERRIDE (parent)
+              ⚡ VALIDER SANS CODE (parent)
             </button>}
             {done&&parentMode&&<button onClick={()=>onDeComplete(ass.instanceId+"_"+player.id, playerIdx)}
               style={{position:"absolute",top:4,right:4,padding:"3px 7px",fontFamily:"'Press Start 2P',monospace",fontSize:"6px",
@@ -2309,6 +2302,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
         {shopTab==="rewards" && (
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas encore de récompenses ici — demande à tes parents d'en ajouter! 🎁</div>}
             {myRewards.map(r=>{
               const canBuy=pState.coins>=r.coins;
               const bought=pState.boughtRewards?.includes(r.id);
@@ -2348,19 +2342,36 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:4}}>🏅 BADGES</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Survole un badge pour voir comment le débloquer — certains sont secrets! 🕵️</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Appuie sur un badge pour voir comment le gagner — certains sont secrets! 🕵️</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {BADGES.filter(b=>b.type==="general"||b.type===resolvedThemeId).map(b=>{
             const earned=(pState.badges||[]).includes(b.id);
+            const showing=badgeInfo===b.id;
             return (
               <div key={b.id} title={earned?`${b.name}: ${b.desc}`:`🔒 ${b.desc}`}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:0.3,transition:"opacity 0.3s",cursor:"default"}}>
+                onClick={()=>{SFX.click();setBadgeInfo(showing?null:b.id);}}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:showing?0.7:0.3,transition:"opacity 0.3s",cursor:"pointer",borderRadius:6,outline:showing?`2px solid ${pt.accent||"#FFD700"}`:"none",padding:2}}>
                 <div style={{fontSize:26,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#FFD700"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
               </div>
             );
           })}
         </div>
+        {badgeInfo&&(()=>{
+          const b=BADGES.find(x=>x.id===badgeInfo);
+          if(!b)return null;
+          const earned=(pState.badges||[]).includes(b.id);
+          return (
+            <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${earned?(pt.accent||"#FFD700"):"#444"}`,borderRadius:6,padding:"8px 12px",display:"flex",gap:10,alignItems:"center"}}>
+              <span style={{fontSize:24,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</span>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#FFD700"):"#aaa"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",lineHeight:1.3}}>{b.desc}</div>
+              </div>
+              <button onClick={()=>setBadgeInfo(null)} style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:14}}>✕</button>
+            </div>
+          );
+        })()}
         {(pState.badges||[]).length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginTop:6}}>Complète des quêtes pour débloquer des badges!</div>}
       </div>
     {/* Avatar popup */}
@@ -2482,7 +2493,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>🪙 {ps.coins}</span>
               </div>
               <div style={{display:"flex",gap:6,marginTop:8}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>Voir tableau →</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>Voir mes quêtes →</div>
                 <button onClick={e=>{e.stopPropagation();SFX.click();setProfileIdx(i);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:th.accent,border:`1px solid ${th.accent}`,borderRadius:3,cursor:"pointer",flexShrink:0}}>📊 Profil</button>
               </div>
             </div>
@@ -2543,9 +2554,9 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111"}}>
         <TabBtn k="actions"  l="⚡ Actions"/>
         <TabBtn k="cal"      l="📅 Calendrier"/>
-        <TabBtn k="log"      l="📋 Log"/>
-        <TabBtn k="pin"      l="🔐 PIN"/>
-        <TabBtn k="export"   l="💾 Data"/>
+        <TabBtn k="log"      l="📋 Journal"/>
+        <TabBtn k="pin"      l="🔐 Code"/>
+        <TabBtn k="export"   l="💾 Sauvegarde"/>
       </div>
 
       {/* Content */}
@@ -2560,7 +2571,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
               : <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#444"}}>Rien à annuler</div>}
           </Row>
           <Row>
-            <PBtn onClick={()=>onSetup()} color="#333" textColor="#888" style={{flex:1}}>⚙️ Reconfigurer</PBtn>
+            <PBtn onClick={()=>onSetup()} color="#333" textColor="#888" style={{flex:1}}>⚙️ Modifier le livre (joueurs, tâches…)</PBtn>
           </Row>
 
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"14px 0 8px"}}>PAR JOUEUR</div>
@@ -2577,7 +2588,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                 <PBtn onClick={()=>onAdjustXP(i,10)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 XP</PBtn>
                 <PBtn onClick={()=>onAdjustXP(i,25)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+25 XP</PBtn>
                 <PBtn onClick={()=>onAdjustXP(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 XP</PBtn>
-                <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#FF4444" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 Reset</PBtn>
+                <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#FF4444" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 À zéro</PBtn>
               </div>
             </div>
           ))}
@@ -2634,8 +2645,8 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
 
         {/* PIN TAB */}
         {tab==="pin" && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>CHANGER LE PIN</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:10}}>PIN actuel: {config.pin}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>CHANGER LE CODE PARENT</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:10}}>Code actuel : {config.pin}</div>
           <input type="password" inputMode="numeric" maxLength={4} value={pinVal}
             onChange={e=>setPinVal(e.target.value.replace(/\D/g,"").slice(0,4))}
             placeholder="Nouveau PIN (4 chiffres)"
@@ -2650,22 +2661,19 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
 
         {/* EXPORT TAB */}
         {tab==="export" && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>DONNÉES</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>SAUVEGARDE</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12,lineHeight:1.4}}>
-            Exporte la config pour la partager avec un autre appareil ou faire une sauvegarde.
+            Télécharge une copie du livre de quêtes pour le transférer sur un autre appareil ou garder une sauvegarde.
           </div>
           <PBtn onClick={onExport} color="#1a3a1a" textColor="#2ECC40" style={{width:"100%",marginBottom:10}}>
-            📤 Exporter config JSON
+            📤 Télécharger la sauvegarde
           </PBtn>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Importer une config sauvegardée:</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Restaurer une sauvegarde :</div>
           <label style={{display:"block",padding:"10px",background:"#111",border:"2px dashed #444",
             borderRadius:3,cursor:"pointer",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",textAlign:"center"}}>
-            📥 Choisir un fichier .json
+            📥 Choisir le fichier de sauvegarde
             <input type="file" accept=".json" onChange={e=>e.target.files[0]&&onImport(e.target.files[0])} style={{display:"none"}}/>
           </label>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:10,lineHeight:1.4}}>
-            Futur: synchronisation Supabase temps réel entre tous les appareils.
-          </div>
         </>}
       </div>
     </div>
@@ -3492,7 +3500,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             ["📋","Tes Quêtes","C'est ici que tu vois ce que tu dois faire (ranger ta chambre, la vaisselle…). Une fois que tu l'as fait, clique «J'AI FAIT ÇA!» et attends que ton parent valide!"],
             ["⚡","XP & Niveaux","Chaque quête validée te donne de l'XP. Plus tu en accumules, plus tu montes de niveau et débloques un titre cool selon ton thème. Il y a 5 niveaux!"],
             ["🪙","Pièces & Boutique","Les quêtes donnent aussi des pièces. Dans la boutique, tu peux acheter des accessoires pour ton perso ET les récompenses créées par tes parents."],
-            ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs et les titres. Tu choisis le tien lors de ton inscription!"],
+            ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs et les titres de toute la page. Tu choisis le tien à ta première connexion!"],
             ["🏅","Badges","Des badges secrets à débloquer en faisant des tâches. Streaks, premières fois, défis épiques… survole un badge pour voir comment le gagner!"],
             ["📅","Calendrier","Note tes devoirs et examens ici! Un rappel va apparaître automatiquement quand la date approche, avec de l'XP bonus pour compléter."],
             ["🎮","Mini-jeux","Quand tu montes de niveau, un mini-jeu surprise s'active — choisi au hasard! 🎲 Trois jeux possibles: Whack-a-Mole (tape les monstres!), Runner (saute les obstacles!) ou Pac-Quest (mange les pellets, évite le fantôme!). Fais un score parfait pour gagner du XP et des pièces bonus. 🏆"],
@@ -4036,12 +4044,19 @@ export default function App() {
 
   const allTasks = [...TASK_CATALOG,...(config?.customTasks||[])];
   const allRewards = [...REWARD_CATALOG,...(config?.customRewards||[])];
-  // Resolve week theme (random_week → pick based on current week number)
+  // Resolve week theme (random_week → pick based on current week number) — fallback famille
   const weekNum = Math.ceil(new Date().getDate()/7) + new Date().getMonth()*4;
   const resolvedWeekTheme = config?.theme==="random_week"
     ? THEMES[resolveWeekRandomTheme(weekNum)] || THEMES.minecraft
     : THEMES[config?.theme||"minecraft"];
-  const th = resolvedWeekTheme;
+  // Un seul thème à choisir : en vue joueur, tout l'écran (fond, bordures, titres)
+  // suit le thème personnel du joueur. La vue famille garde l'ambiance par défaut.
+  const viewedPlayer = typeof view==="number" ? config?.players?.[view] : null;
+  const th = useMemo(()=>{
+    if (!viewedPlayer) return resolvedWeekTheme;
+    const ptv = getPlayerTheme(viewedPlayer.themeId==="random" ? resolveRandomTheme(viewedPlayer.id) : viewedPlayer.themeId);
+    return { name:ptv.name, bg:ptv.bg, primary:ptv.primary, accent:ptv.accent, card:"rgba(0,0,0,0.5)", text:"#fff" };
+  },[viewedPlayer, resolvedWeekTheme]);
 
   // Clock display
   const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0"), S=String(now.getSeconds()).padStart(2,"0");
@@ -4155,7 +4170,8 @@ export default function App() {
       </div>
 
       {/* ── CONTENT ── */}
-      <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto"}}>
+      {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
+      <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="family"&&(
           <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} th={th}/>
         )}
@@ -4211,7 +4227,7 @@ export default function App() {
           actionLog={actionLog} undoStack={undoStack} players={config.players} th={th}
           onClose={()=>setParentPanel(false)}
           onUndo={handleUndo}
-          onReset={()=>{ if(window.confirm("Reset tous les joueurs?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
+          onReset={()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
           onResetPlayer={handleResetPlayer}
           onAdjustXP={handleAdjustXP}
           onChangePin={handleChangePin}
