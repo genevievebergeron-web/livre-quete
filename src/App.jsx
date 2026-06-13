@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.14.1";
+const APP_VERSION = "1.15.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -945,6 +945,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.15.0", date:"2026-06-13", features:[
+    "🎨 Choix du thème chaque semaine — touche « Mon thème » pour en changer (un nouveau choix par semaine)",
+    "🔓 Débloque de nouveaux thèmes en gagnant de l'XP — l'écran montre lesquels et combien d'XP il manque",
+    "🏅 Chaque thème a ses propres badges et items de boutique",
+  ]},
   { version:"1.14.1", date:"2026-06-13", features:[
     "💬 Plus d'explications partout pour les enfants — quoi toucher, quoi cocher, comment ça marche",
     "🔢 Étapes numérotées (1/4, 2/4…) quand on crée son compte",
@@ -1320,7 +1325,7 @@ const FUNNY_PIN_MSGS = [
 // ─── UTILS ───────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2,9);
 const todayStr = () => new Date().toISOString().slice(0,10);
-const weekKey = () => { const d=new Date(); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
+const weekKey = (dd=new Date()) => { const d=new Date(dd); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
 
 // ─── CSS ─────────────────────────────────────────────────────
 const GLOBAL_CSS = `
@@ -2334,8 +2339,9 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
+  const [themePicker, setThemePicker] = useState(false);
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
@@ -2416,6 +2422,52 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#FFD700"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
         </div>
       </div>
+
+      {/* Bouton thème (choix hebdomadaire) */}
+      <button onClick={()=>{SFX.click();setThemePicker(true);}}
+        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px",background:"rgba(0,0,0,0.4)",border:`2px solid ${pt.accent||player.color}55`,color:pt.accent||player.color,borderRadius:5,cursor:"pointer"}}>
+        🎨 Mon thème : {pt.name} — toucher pour changer
+      </button>
+
+      {/* Sélecteur de thème — un thème par semaine, débloqué par XP */}
+      {themePicker && (()=>{
+        const canChange = !player.themeChosenAt || weekKey(new Date(player.themeChosenAt)) !== weekKey();
+        const list = PT_LIST.filter(t=>!t.secret);
+        const nextLocked = list.filter(t=>!isThemeUnlocked(t.id,pState.xp,player.starterThemes||[])).sort((a,b)=>(a.xpUnlock||0)-(b.xpUnlock||0))[0];
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2500,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:pt.accent||player.color}}>🎨 Choisis ton thème</div>
+              <button onClick={()=>{SFX.click();setThemePicker(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:canChange?"#9fe":"#FFA94D",marginBottom:4,lineHeight:1.3}}>
+              {canChange ? "Touche un thème débloqué pour le choisir. Il dure toute la semaine 🗓️" : "Tu as déjà choisi ton thème cette semaine. Tu pourras en changer lundi prochain! 🗓️"}
+            </div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:10}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+              {list.map(t=>{
+                const unlocked=isThemeUnlocked(t.id,pState.xp,player.starterThemes||[]);
+                const current=player.themeId===t.id;
+                const selectable=unlocked&&canChange&&!current;
+                return (
+                  <button key={t.id} disabled={!selectable}
+                    onClick={()=>{ if(selectable){ onChangeTheme&&onChangeTheme(t.id); setThemePicker(false); } }}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 8px",
+                      background:current?`${t.accent}25`:unlocked?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.3)",
+                      border:`3px solid ${current?t.accent:unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
+                      cursor:selectable?"pointer":"default",opacity:unlocked?1:0.5,boxShadow:current?`0 0 14px ${t.glow||t.accent}50`:"none"}}>
+                    <span style={{fontSize:30,filter:unlocked?"none":"grayscale(1)"}}>{t.icon}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:current?t.accent:unlocked?"#ddd":"#666",textAlign:"center",lineHeight:1.3}}>{t.name}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#2ECC40":unlocked?(t.accent||"#FFD700"):"#777"}}>
+                      {current?"✅ ACTUEL":unlocked?"Choisir":`🔒 ${t.xpUnlock} XP`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Calendar reminders */}
       {(()=>{
@@ -4817,6 +4869,12 @@ export default function App() {
             onPatchState={(patch)=>{
               setGameStates(gs=>{ const n=[...gs]; n[view]={...n[view],...patch}; persist(config,n); return n; });
               SFX.click();
+            }}
+            onChangeTheme={(themeId)=>{
+              const now=new Date().toISOString();
+              const newCfg={...config, players: config.players.map((pl,i)=> i===view ? {...pl, themeId, themeChosenAt:now} : pl)};
+              setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
+              showToast("🎨 Nouveau thème activé pour la semaine!","#FFD700",3000);
             }}
             onDeComplete={handleDeComplete}
             onForceComplete={handleForceComplete}

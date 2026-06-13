@@ -1,5 +1,5 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-13 — v1.14.0_
+_Mis à jour: 2026-06-13 — v1.15.0_
 
 ---
 
@@ -39,7 +39,14 @@ _Mis à jour: 2026-06-13 — v1.14.0_
 
 ## Ce qui est fait ✅
 
-### v1.14.0 — Reset quotidien + heures de routine + édition + économie + sécurité données ← DERNIER COMMIT
+### v1.15.0 — Thème hebdomadaire + déblocage par XP (UI) ← DERNIER COMMIT
+- **Sélecteur de thème** (`themePicker` dans PlayerDashboard) : bouton « 🎨 Mon thème » → modale listant tous les thèmes non-secrets. Débloqués (starter ou `pState.xp>=xpUnlock`) = sélectionnables; verrouillés = grisés avec « 🔒 X XP ». Affiche le prochain thème à débloquer + XP manquant.
+- **Un thème par semaine** : `weekKey(date)` (accepte une date) compare `player.themeChosenAt` à la semaine courante. `canChange = !themeChosenAt || weekKey(themeChosenAt)!==weekKey()`. Sinon « reviens lundi prochain ».
+- `onChangeTheme(themeId)` (App) met à jour `config.players[i].themeId` + `themeChosenAt`. Le système de déblocage par XP (`isThemeUnlocked`, `THEME_XP_UNLOCK`) existait déjà — il manquait l'UI. (Résout le #6 « Lock thème hebdomadaire ».)
+- Rappel : badges et items de boutique sont déjà spécifiques au thème (BADGES type=themeId; `pt.shopCategory.items`).
+- v1.14.1 : microcopie enfant partout (quoi toucher/cocher) + étapes onboarding 1/4…4/4.
+
+### v1.14.0 — Reset quotidien + heures de routine + édition + économie + sécurité données
 - **Reset quotidien (clés datées)** : doneKey des tâches = `instanceId_player#YYYY-MM-DD` (`todayStamp()`). « Fait aujourd'hui » se remet à zéro chaque jour, l'XP reste. **Compatible fusion** (chaque jour = clé distincte → union sans conflit, pas de suppression). Calendrier = clé sans date (persiste jusqu'à l'examen). Sites touchés : requestComplete, resolvePendingTask (strip `#`), dashboard render, deComplete, forceComplete, compteurs « fait aujourd'hui », streak.
 - **Heure de fin par routine** : `routine.endTime`; le countdown App utilise l'heure de la routine active (sinon `config.routineEnd`); `showCountdown` masqué hors fenêtre matin (et en vue famille/parent).
 - **Éditer une routine** : builder avec `editId` (prérempli) + bouton ✏️ Modifier dans la vue routine.
