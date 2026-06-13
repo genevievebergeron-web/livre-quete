@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.12.0";
+const APP_VERSION = "1.13.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -107,7 +107,6 @@ const REWARD_CATALOG = [
   { id:"rw07", emoji:"🍪", label:"Fudgee-O ou pépites",       coins:18 },
   { id:"rw08", emoji:"🍬", label:"Sweet Tarts au choix",      coins:12 },
   { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:50 },
-  { id:"rw10", emoji:"🎬", label:"Choisir le film du vendredi",coins:35 },
 ];
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
@@ -943,6 +942,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.13.0", date:"2026-06-13", features:[
+    "🔀 Chaque enfant peut basculer entre ⏰ Routine et 📅 Semaine — son XP et sa progression se cumulent dans les deux modes!",
+    "🎨 Un seul thème par enfant, le même en mode Routine et en mode Semaine",
+    "☁️ Synchro plus prudente — la progression de chaque appareil se fusionne sans jamais s'écraser (l'XP ne peut que monter)",
+    "📋 Portail parent — on choisit maintenant si une tâche est de type Routine ou Semaine en l'ajoutant",
+  ]},
   { version:"1.12.0", date:"2026-06-12", features:[
     "🔑 Fix connexion — le code se valide à nouveau tout seul au 4e chiffre!",
     "📨 Tâches autonomes — l'enfant envoie sa tâche faite, plus besoin du code parent sur place!",
@@ -1081,6 +1086,92 @@ const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant
   try { return new Date(a) > new Date(b); } catch { return false; }
 };
 
+// ─── FUSION NON-DESTRUCTIVE (multi-appareils) ────────────────
+// Quand deux appareils ont chacun leur progression non synchronisée, on FUSIONNE
+// au lieu d'écraser : l'XP ne peut que monter, rien n'est perdu. C'est ce qui
+// permet de réunir « l'ordi (2 modes) » et « le cell (1 mode) » sans tout casser.
+const _uniq = (arr) => [...new Set(arr || [])];
+const _mergeCalendar = (a, b) => {
+  const out = []; const seen = new Set();
+  for (const e of [...(a || []), ...(b || [])]) {
+    const k = e && e.id != null ? "id:" + e.id : JSON.stringify(e);
+    if (!seen.has(k)) { seen.add(k); out.push(e); }
+  }
+  return out;
+};
+// Fusion d'un état de joueur — non régressive (max XP/pièces, union des listes)
+const mergeGS = (a, b) => {
+  a = a || {}; b = b || {};
+  const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
+  const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
+  return {
+    ...a, ...b,
+    xp: Math.max(a.xp || 0, b.xp || 0),
+    coins: Math.max(a.coins || 0, b.coins || 0),
+    completed,
+    pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k)),
+    owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
+    boughtRewards: _uniq([...(a.boughtRewards || []), ...(b.boughtRewards || [])]),
+    badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
+    equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
+    calendar: _mergeCalendar(a.calendar, b.calendar),
+    avatar: avatarConfigured,
+    pin: a.pin ?? b.pin ?? null,
+    mode: b.mode ?? a.mode ?? null,
+    routines: (() => { const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
+  };
+};
+// Fusion d'un joueur (config) — garde UN seul thème par enfant
+const _mergePlayer = (a, b) => ({
+  ...a, ...b,
+  name: a.name || b.name,
+  pseudo: a.pseudo || b.pseudo,
+  color: a.color || b.color,
+  themeId: (a.themeId && a.themeId !== "none") ? a.themeId : (b.themeId || a.themeId || "none"),
+  starterThemes: _uniq([...(a.starterThemes || []), ...(b.starterThemes || [])]).slice(0, 4),
+  themeChosenAt: a.themeChosenAt || b.themeChosenAt,
+});
+// Fusion complète de deux instantanés famille { config, gameStates, savedAt }
+const mergeFamily = (base, incoming) => {
+  if (!base) return incoming;
+  if (!incoming) return base;
+  const bC = base.config || {}, iC = incoming.config || {};
+  const bP = bC.players || [], iP = iC.players || [];
+  const bG = base.gameStates || [], iG = incoming.gameStates || [];
+  const byId = new Map();
+  bP.forEach((p, i) => byId.set(p.id, { player: { ...p }, gs: bG[i] }));
+  iP.forEach((p, i) => {
+    if (byId.has(p.id)) { const e = byId.get(p.id); e.player = _mergePlayer(e.player, p); e.gs = mergeGS(e.gs, iG[i]); }
+    else byId.set(p.id, { player: { ...p }, gs: iG[i] });
+  });
+  const players = [...byId.values()].map((e) => e.player);
+  const gameStates = [...byId.values()].map((e) => e.gs);
+  // Assignations : union par instanceId
+  const assignMap = new Map();
+  (bC.assignments || []).forEach((a) => assignMap.set(a.instanceId, a));
+  (iC.assignments || []).forEach((a) => { if (!assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
+  // Tâches perso : union par id
+  const taskMap = new Map();
+  (bC.customTasks || []).forEach((t) => taskMap.set(t.id, t));
+  (iC.customTasks || []).forEach((t) => { if (!taskMap.has(t.id)) taskMap.set(t.id, t); });
+  const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
+  const newerC = newer.config || {};
+  const config = {
+    ...bC, ...iC,
+    players,
+    assignments: [...assignMap.values()],
+    customTasks: [...taskMap.values()],
+    selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
+    pin: (bC.pin && bC.pin !== "1146") ? bC.pin : (iC.pin || bC.pin),
+    mode: newerC.mode || bC.mode || iC.mode || "routine",
+    routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+  };
+  return { ...newer, config, gameStates, savedAt: isNewer(incoming.savedAt, base.savedAt) ? incoming.savedAt : base.savedAt };
+};
+// Signature de contenu (ignore savedAt) pour détecter un vrai changement
+const _famSig = (d) => { try { return JSON.stringify({ c: d?.config, g: d?.gameStates }); } catch { return Math.random() + ""; } };
+
 const save = async (data) => {
   LAST_SAVED_AT = data.savedAt || LAST_SAVED_AT;
   try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { console.warn("Storage save failed:", e); }
@@ -1091,9 +1182,23 @@ const load = async () => {
   let local = null;
   try { const r = localStorage.getItem(STORE_KEY); if (r) local = JSON.parse(r); } catch {}
   const remote = await remotePull(); // null si aucun mode sync disponible
-  if (remote?.savedAt && isNewer(remote.savedAt, local?.savedAt)) {
+  // Les deux existent → on FUSIONNE (rien n'est écrasé, l'XP ne peut que monter)
+  if (remote && local) {
+    const merged = mergeFamily(local, remote);
+    if (_famSig(merged) !== _famSig(local)) {
+      merged.savedAt = new Date().toISOString();
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(merged)); } catch {}
+      LAST_SAVED_AT = merged.savedAt;
+      remotePush(merged); // on renvoie la fusion au cloud pour converger
+      return merged;
+    }
+    LAST_SAVED_AT = local.savedAt || merged.savedAt || null;
+    return local;
+  }
+  // Seul le cloud a des données → on les prend
+  if (remote && !local) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
-    LAST_SAVED_AT = remote.savedAt;
+    LAST_SAVED_AT = remote.savedAt || null;
     return remote;
   }
   if (local && !remote && (API_OK || supaEnabled())) remotePush(local); // premier appareil : seeder le cloud
@@ -1112,6 +1217,9 @@ const migrateGameState = (gs) => {
     badges: gs.badges || [],
     boughtRewards: gs.boughtRewards || [],
     pin: gs.pin ?? null,
+    mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
+    routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
+    activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -2191,7 +2299,8 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+  const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
@@ -2209,7 +2318,20 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const lvTitle = getLevelTitle(pState.xp, player.themeId);
   const xbr = xpBar(pState.xp);
   const xpPct = Math.min(100, (xbr.cur/xbr.needed)*100);
-  const myAssignments = assignments.filter(a=>a.playerIds.includes(player.id));
+  const pMode = playerMode || config.mode || "routine";
+  const allMine = assignments.filter(a=>a.playerIds.includes(player.id));
+  const isWeekAss = (a)=> Array.isArray(a.days) && a.days.length>0;
+  const routineMine = allMine.filter(a=>!isWeekAss(a));
+  const weekMine = allMine.filter(isWeekAss);
+  const myRoutines = pState.routines || [];
+  const activeRoutine = pMode==="routine" && pState.activeRoutineId ? myRoutines.find(r=>r.id===pState.activeRoutineId) : null;
+  // Tâches affichées selon le mode choisi par l'enfant (l'XP des deux se cumule)
+  // - mode semaine → tâches de semaine
+  // - routine ciblée → seulement les tâches choisies pour cette routine
+  // - mode routine sans routine ciblée → toutes les tâches de routine
+  const myAssignments = pMode==="week"
+    ? weekMine
+    : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine);
   const themedCat = pt.shopCategory;
   const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
   const SHOP_ITEMS = {
@@ -2283,10 +2405,78 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         });
       })()}
 
+      {/* Bascule Semaine / Routines — propre à chaque enfant, l'XP de tout se cumule */}
+      {(()=>{
+        const acc = th.accent||player.color;
+        const chip = (active,key,label,onClick)=>(
+          <button key={key} onClick={onClick}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 10px",whiteSpace:"nowrap",
+              background:active?acc:"#1a1a1a",color:active?"#000":"#999",
+              border:`2px solid ${active?acc:"#333"}`,borderRadius:4,cursor:"pointer",
+              boxShadow:active?`0 0 10px ${acc}50`:"none",transition:"all 0.15s"}}>
+            {label}
+          </button>
+        );
+        return (
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginTop:2}}>
+            {chip(pMode==="week","wk","📅 Semaine",()=>{ if(pMode!=="week") onPatchState({mode:"week",activeRoutineId:null}); })}
+            {myRoutines.map(r=>chip(pMode==="routine"&&pState.activeRoutineId===r.id,r.id,`${r.emoji||"⏰"} ${r.name}`,
+              ()=>onPatchState({mode:"routine",activeRoutineId:r.id})))}
+            {routineMine.length>0 && chip(pMode==="routine"&&!pState.activeRoutineId,"allr","⏰ Toutes",
+              ()=>onPatchState({mode:"routine",activeRoutineId:null}))}
+            {chip(false,"newr","➕ Routine",()=>{ SFX.click(); setRoutineBuilder({name:"",emoji:"🌅",taskIds:[]}); })}
+          </div>
+        );
+      })()}
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",textAlign:"center",marginTop:-2}}>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
+
+      {/* Créateur de routine (enfant autonome) */}
+      {routineBuilder && (
+        <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>🌟 Ma nouvelle routine</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {["🌅","🌙","☀️","🌆","⭐","🏃","🦷","📚"].map(em=>(
+              <button key={em} onClick={()=>{SFX.click();setRoutineBuilder(b=>({...b,emoji:em}));}}
+                style={{fontSize:18,padding:"5px 8px",background:routineBuilder.emoji===em?`${th.accent||player.color}30`:"#1a1a1a",border:`2px solid ${routineBuilder.emoji===em?(th.accent||player.color):"#333"}`,borderRadius:5,cursor:"pointer"}}>{em}</button>
+            ))}
+          </div>
+          <input value={routineBuilder.name} onChange={e=>setRoutineBuilder(b=>({...b,name:e.target.value.slice(0,16)}))} placeholder="Nom (ex: Matin, Soir...)"
+            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>Choisis tes tâches pour cette routine :</div>
+          <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
+            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de routine assignée. Demande à un parent d'en ajouter (type ⏰ Routine).</div>}
+            {routineMine.map(a=>{
+              const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null;
+              const sel=routineBuilder.taskIds.includes(a.instanceId);
+              return (
+                <div key={a.instanceId} onClick={()=>{SFX.click();setRoutineBuilder(b=>({...b,taskIds:sel?b.taskIds.filter(x=>x!==a.instanceId):[...b.taskIds,a.instanceId]}));}}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:sel?`${th.accent||player.color}25`:"rgba(0,0,0,0.4)",border:`2px solid ${sel?(th.accent||player.color):"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                  <span style={{fontSize:18}}>{sel?"✅":t.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{t.label}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{t.xp}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{SFX.click();setRoutineBuilder(null);}}
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>Annuler</button>
+            <button disabled={!routineBuilder.name.trim()||routineBuilder.taskIds.length===0}
+              onClick={()=>{
+                const name=routineBuilder.name.trim(); if(!name||routineBuilder.taskIds.length===0)return;
+                const newR={id:"rt_"+uid(),name,emoji:routineBuilder.emoji,taskIds:routineBuilder.taskIds};
+                onPatchState({routines:[...myRoutines,newR],mode:"routine",activeRoutineId:newR.id});
+                setRoutineBuilder(null);
+              }}
+              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>✅ Créer ma routine</button>
+          </div>
+        </div>
+      )}
+
       {/* Tasks */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?"SEMAINE 📅":(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"ROUTINE ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
-      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucune quête assignée pour ce joueur.</div>}
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine)." : (activeRoutine?"Cette routine est vide. Modifie-la ou crée-en une nouvelle.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Routine).")}</div>}
       {myAssignments.map(ass=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
         if(!task)return null;
@@ -2296,7 +2486,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         return (
           <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":pending?"#FFD700":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
             {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
@@ -2324,15 +2514,32 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         );
       })}
 
-      {/* Calendar CRUD */}
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Note tes devoirs et examens ici — un rappel apparaîtra avant la date avec du XP bonus!</div>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span>📅 MON CALENDRIER</span>
-        <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"3px 7px",background:calOpen?"#333":"transparent",color:calOpen?"#FFD700":"#555",border:"1px solid #333",borderRadius:2,cursor:"pointer"}}>
-          {calOpen?"✕ Fermer":"+ Ajouter"}
+      {/* Terminer la routine → retour au mode Semaine */}
+      {activeRoutine && (
+        <button onClick={()=>{
+            if(window.confirm("Terminer la routine et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
+          }}
+          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#2ECC40",border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"4px 4px 0 #000",marginTop:4}}>
+          ✅ J'ai fini ma routine — revenir au mode Semaine 📅
         </button>
-      </div>
+      )}
+      {activeRoutine && (
+        <button onClick={()=>{ if(window.confirm(`Supprimer la routine «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
+          style={{width:"100%",padding:"7px",fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FF6B6B",background:"transparent",border:"1px solid #FF6B6B40",borderRadius:3,cursor:"pointer"}}>
+          🗑️ Supprimer cette routine
+        </button>
+      )}
+
+      {/* Calendar CRUD */}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5DECF5",marginTop:10,paddingBottom:3,borderBottom:"2px solid #5DECF540"}}>📅 MON CALENDRIER</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:4}}>Note tes devoirs et examens — un rappel avec du XP bonus apparaîtra avant la date!</div>
+      <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
+        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"12px",
+          background:calOpen?"#1a1a1a":"#5DECF5",color:calOpen?"#5DECF5":"#000",
+          border:`3px solid ${calOpen?"#5DECF5":"#000"}`,borderRadius:5,cursor:"pointer",
+          boxShadow:calOpen?"none":"4px 4px 0 #000",transition:"all 0.12s"}}>
+        {calOpen?"✕ Fermer":"➕ Ajouter un devoir ou un examen"}
+      </button>
       {calOpen && (
         <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #5DECF5",borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
           <div style={{display:"flex",gap:6}}>
@@ -2609,6 +2816,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [pinVal, setPinVal] = useState("");
   const [addTaskId, setAddTaskId] = useState("");
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
+  const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const T = th;
 
   const TabBtn = ({k,l}) => (
@@ -2722,9 +2930,19 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                 </div>;
               })}
             </div>
-            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length){ onAddAssignment(addTaskId,addPlayerIds); setAddTaskId(""); } }}
+            {/* Type de tâche : routine (sans jour) ou semaine (Lun–Ven) */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>TYPE DE TÂCHE</div>
+            <div style={{display:"flex",gap:6,marginBottom:8}}>
+              {[["routine","⏰ Routine"],["week","📅 Semaine"]].map(([k,l])=>(
+                <button key={k} onClick={()=>{setAddType(k);SFX.click();}}
+                  style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:addType===k?"#FF8C00":"#1a1a1a",color:addType===k?"#000":"#888",border:`2px solid ${addType===k?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length){ onAddAssignment(addTaskId,addPlayerIds,addType); setAddTaskId(""); } }}
               color={addTaskId&&addPlayerIds.length?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length?1:0.5,marginBottom:8}}>
-              ➕ Ajouter aux joueurs cochés
+              ➕ Ajouter ({addType==="week"?"semaine":"routine"})
             </PBtn>
             <button onClick={()=>{ const id=onAddCustomTask(); if(id)setAddTaskId(id); }}
               style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #FF8C0060",color:"#FF8C00",borderRadius:4,cursor:"pointer",marginBottom:14}}>
@@ -2743,6 +2961,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
                     <div style={{display:"flex",gap:6}}>
                       {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#5DECF5":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?"📅 semaine":"⏰ routine"}</span>
                       {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
                     </div>
                   </div>
@@ -3979,15 +4198,33 @@ export default function App() {
     let stop=false;
     const tick=async()=>{
       const remote=await remotePull();
-      if(stop||!remote?.savedAt)return;
-      if(isNewer(remote.savedAt, LAST_SAVED_AT)){
-        const data=migrateSavedData(remote);
+      if(stop||!remote)return;
+      let local=null; try{const r=localStorage.getItem(STORE_KEY); if(r)local=JSON.parse(r);}catch{}
+      // Pas de local : on adopte le remote s'il est plus récent (comportement d'origine)
+      if(!local){
+        if(isNewer(remote.savedAt, LAST_SAVED_AT)){
+          const data=migrateSavedData(remote);
+          if(data?.config&&data?.gameStates){
+            LAST_SAVED_AT=data.savedAt;
+            try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch{}
+            setConfig(data.config); setGameStates(data.gameStates);
+          }
+        }
+        return;
+      }
+      // Les deux existent → fusion non-destructive
+      const merged=mergeFamily(local, remote);
+      if(_famSig(merged)!==_famSig(local)){
+        merged.savedAt=new Date().toISOString();
+        const data=migrateSavedData(merged);
         if(data?.config&&data?.gameStates){
           LAST_SAVED_AT=data.savedAt;
           try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch{}
-          setConfig(data.config);
-          setGameStates(data.gameStates);
+          setConfig(data.config); setGameStates(data.gameStates);
+          remotePush(data);
         }
+      } else if(isNewer(local.savedAt, remote.savedAt)){
+        remotePush(local); // contenu identique mais le cloud est en retard → on le remet à jour
       }
     };
     const iv=setInterval(tick,25000); // toutes les 25s
@@ -4171,9 +4408,11 @@ export default function App() {
 
   // ── Gestion des tâches depuis le portail parent ──────────
   // Ajoute une tâche pour chaque joueur coché (copies indépendantes, comme le wizard)
-  const handleAddAssignment = useCallback((taskId, playerIds)=>{
+  const handleAddAssignment = useCallback((taskId, playerIds, assType)=>{
     if(!taskId||!playerIds?.length)return;
-    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days:config.mode==="week"?[0]:[],time:""}));
+    // assType: "week" → tâche de semaine (jours Lun–Ven par défaut); sinon → routine (sans jour)
+    const days = assType==="week" ? [0,1,2,3,4] : [];
+    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:""}));
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
@@ -4256,6 +4495,9 @@ export default function App() {
     return { name:ptv.name, bg:ptv.bg, primary:ptv.primary, accent:ptv.accent, card:"rgba(0,0,0,0.5)", text:"#fff" };
   },[viewedPlayer, resolvedWeekTheme]);
 
+  // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille = défaut famille.
+  const effectiveMode = (typeof view==="number" ? (gameStates[view]?.mode || config?.mode) : config?.mode) || "routine";
+
   // Clock display
   const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0"), S=String(now.getSeconds()).padStart(2,"0");
   const daysArr=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"],mthArr=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
@@ -4264,10 +4506,10 @@ export default function App() {
   // Day progress (routine: 6h–routineEnd, week: Mon–Sun)
   const dayPct = useMemo(()=>{
     if(!config)return 0;
-    if(config.mode==="routine"){ const [eh,em]=(config.routineEnd||"08:30").split(":").map(Number); const s=new Date();s.setHours(6,0,0,0); const e=new Date();e.setHours(eh,em,0,0); return Math.max(0,Math.min(100,((now-s)/(e-s))*100)); }
-    if(config.mode==="week"){ return Math.round((todayDayIdx/6)*100); }
+    if(effectiveMode==="routine"){ const [eh,em]=(config.routineEnd||"08:30").split(":").map(Number); const s=new Date();s.setHours(6,0,0,0); const e=new Date();e.setHours(eh,em,0,0); return Math.max(0,Math.min(100,((now-s)/(e-s))*100)); }
+    if(effectiveMode==="week"){ return Math.round((todayDayIdx/6)*100); }
     return 0;
-  },[config,now,todayDayIdx]);
+  },[config,now,todayDayIdx,effectiveMode]);
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
@@ -4311,7 +4553,7 @@ export default function App() {
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent,textShadow:"2px 2px 0 #000"}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{config.mode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
         {/* Clock */}
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(14px,2.5vw,22px)",color:"#5DECF5",textShadow:`0 0 12px #5DECF5`,animation:"clkPulse 1s infinite alternate"}}>{H}:{M}:{S}</div>
@@ -4332,22 +4574,22 @@ export default function App() {
       </div>
 
       {/* ── ROUTINE COUNTDOWN (sticky below header) ── */}
-      {config.mode==="routine"&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={config.routineEnd||"08:30"} th={th}/></div>}
+      {effectiveMode==="routine"&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={config.routineEnd||"08:30"} th={th}/></div>}
 
       {/* ── DAY PROGRESS ── */}
       <div style={{padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{config.mode==="routine"?"6h00":"Lun"}</span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{effectiveMode==="routine"?"6h00":"Lun"}</span>
           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>
-            {config.mode==="routine"?"⏱ Progression":"📅 Semaine — "+DAYS_SHORT[todayDayIdx]}
+            {effectiveMode==="routine"?"⏱ Progression":"📅 Semaine — "+DAYS_SHORT[todayDayIdx]}
           </span>
-          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{config.mode==="routine"?config.routineEnd:"Dim"}</span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{effectiveMode==="routine"?config.routineEnd:"Dim"}</span>
         </div>
         <div style={{height:12,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden",position:"relative"}}>
           <div style={{height:"100%",width:dayPct+"%",background:`linear-gradient(90deg,${th.primary},${th.accent})`,transition:"width 1s ease",position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",animation:"shimmer 2s infinite"}}/>
           </div>
-          {config.mode==="week"&&DAYS_SHORT.map((d,i)=><div key={i} style={{position:"absolute",top:0,left:`${(i/6)*100}%`,width:1,height:"100%",background:"rgba(255,255,255,0.1)"}}/>)}
+          {effectiveMode==="week"&&DAYS_SHORT.map((d,i)=><div key={i} style={{position:"absolute",top:0,left:`${(i/6)*100}%`,width:1,height:"100%",background:"rgba(255,255,255,0.1)"}}/>)}
         </div>
       </div>
 
@@ -4363,10 +4605,6 @@ export default function App() {
             {displayName(pl)}
           </button>
         ))}
-        {config.mode==="week"&&<button onClick={()=>{setView("week");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="week"?th.accent:"transparent",color:view==="week"?"#000":"#888",border:"none",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,marginLeft:"auto"}}>
-          📅 Semaine
-        </button>}
       </div>
 
       {/* ── CONTENT ── */}
@@ -4388,6 +4626,12 @@ export default function App() {
             onBuy={handleBuy}
             onEquip={handleEquip}
             parentMode={parentMode}
+            playerMode={gameStates[view]?.mode || config.mode || "routine"}
+            todayDayIdx={todayDayIdx}
+            onPatchState={(patch)=>{
+              setGameStates(gs=>{ const n=[...gs]; n[view]={...n[view],...patch}; persist(config,n); return n; });
+              SFX.click();
+            }}
             onDeComplete={handleDeComplete}
             onForceComplete={handleForceComplete}
             onUpdateCalendar={(newCal)=>{
@@ -4408,11 +4652,6 @@ export default function App() {
             }}
             th={th}
           />
-        )}
-        {view==="week"&&config.mode==="week"&&(
-          <div style={{padding:12}}>
-            <WeekView config={config} gameState={gameStates[0]||{completed:[]}} onCompleteTask={(ass,pid,dayIdx)=>{}} th={th} todayDayIdx={todayDayIdx}/>
-          </div>
         )}
       </div>
 

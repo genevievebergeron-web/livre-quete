@@ -1,13 +1,13 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-12 — v1.12.0_
+_Mis à jour: 2026-06-13 — v1.13.0_
 
 ---
 
 ## Stack & déploiement
 
 - **React 18 + Vite 5 PWA** — single-file `src/App.jsx` (~4400 lignes)
-- **Persistance:** `localStorage` (clé `livre-de-quetes-v1`) + **sync cloud optionnelle** (Supabase, voir `SYNC.md`)
-  - ⚠️ Canner = hébergement statique seulement, il ne stocke AUCUNE donnée. Sans sync activée, la progression reste par appareil.
+- **Persistance:** `localStorage` (clé `livre-de-quetes-v1`) + **sync cloud** (Postgres Canner via `server.cjs`/`DATABASE_URL`, repli Supabase — voir `SYNC.md`)
+  - Multi-appareils = **fusion non-destructive** (`mergeFamily`) : last-write-wins remplacé par une union par joueur où l'XP ne peut que monter. Aucune donnée perdue quand 2 appareils non synchronisés se rejoignent (même `FAMILY_ID`).
 - **Deploy:** Push sur `main` → **Canner** (hébergeur canadien style Vercel) déploie automatiquement
   - Pas de build local nécessaire — Canner s'en charge
   - Repo GitHub : `genevievebergeron-web/livre-quete`
@@ -38,6 +38,15 @@ _Mis à jour: 2026-06-12 — v1.12.0_
 ---
 
 ## Ce qui est fait ✅
+
+### v1.13.0 — Modes par enfant + routines autonomes + fusion sync ← DERNIER COMMIT
+- **FIX BUILD CANNER** : `package-lock.json` ne contenait pas `pg` (ajouté en v1.12.0) → `npm ci` échouait (`EUSAGE`, déploiement `failed`). Lock régénéré (`npm install --package-lock-only`), `npm ci` validé. C'est LA raison pour laquelle la sync v1.12.0 ne s'était jamais déployée.
+- **Mode par enfant** : `gameStates[i].mode` (`"routine"|"week"`, défaut = `config.mode`). Chaque enfant bascule lui-même entre ⏰ Routine et 📅 Semaine via des chips dans son dashboard. L'XP/pièces sont un **seul pool par enfant** → se cumulent dans les deux modes (aucun changement de logique XP nécessaire). `effectiveMode` (App) pilote countdown/barre de progression/entête selon le joueur vu. Ancien onglet global « 📅 Semaine » retiré (la semaine est maintenant par-enfant).
+- **Routines autonomes créées par l'enfant** : `gameStates[i].routines = [{id,name,emoji,taskIds:[instanceId]}]` + `activeRoutineId`. L'enfant crée « Matin », « Soir »… en choisissant parmi ses tâches de routine assignées (XP intègre, pas d'invention). Bouton **« ✅ J'ai fini ma routine — revenir au mode Semaine »** (confirm). Builder dans `PlayerDashboard` (`routineBuilder` state).
+- **Un thème par enfant pour les 2 modes** : le thème dérive de `player.themeId` peu importe le mode (déjà le cas) → confirmé/garanti. Plus de thème mélangé routine/semaine.
+- **Type de tâche au portail parent** : `handleAddAssignment(taskId,playerIds,assType)` → `assType==="week"` met `days:[0..4]`, sinon `days:[]`. Sélecteur ⏰/📅 dans l'onglet Tâches + badge type dans la liste.
+- **Sync = FUSION non-destructive** (au lieu d'écraser) : `mergeFamily`/`mergeGS` (près du bloc SYNC). Union des joueurs par `id`, **max** XP/pièces (l'XP ne peut que monter), union completed/pending/owned/badges/boughtRewards/routines, **un seul thème** par enfant. Branché dans `load()` ET la boucle 25s. Anti-churn via `_famSig` (push seulement si le contenu change). ⇒ réunir « l'ordi 2 modes » + « le cell 1 mode » + nouveaux comptes enfants **sans perte**. Testé : 16/16 scénarios (node), parcours headless OK, 0 erreur console.
+- **UX** : bouton calendrier proéminent (gros bouton cyan « ➕ Ajouter un devoir ou un examen »). Récompense « 🎬 Choisir le film » (`rw10`) retirée du catalogue.
 
 ### v1.0–1.2
 - App complète de quêtes gamifiées avec XP, pièces, niveaux, récompenses
