@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.16.0";
+const APP_VERSION = "1.17.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -951,6 +951,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.17.0", date:"2026-06-13", features:[
+    "📊 Progrès de la semaine — graphique de l'XP gagné par jour pour chaque membre, dans la vue Famille",
+    "🏆 Qui est en tête cette semaine — petite compétition amicale pour se motiver",
+  ]},
   { version:"1.16.0", date:"2026-06-13", features:[
     "⚙️ Mes réglages (par enfant) : 🔊 son, 🎬 mode calme (moins d'animations/flash), ⏱ décompte calme, 😄 messages rigolos, 🎯 une tâche à la fois",
     "♿ Plus accessible pour tout le monde — respecte aussi le réglage « moins d'animations » de l'appareil",
@@ -2998,8 +3002,45 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
           );
         })}
       </div>
-      {/* Week view if mode=week */}
-      {config.mode==="week"&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginTop:4}}>📅 Plan de la semaine — défiler →</div>}
+      {/* 📊 Progrès de la semaine — XP par jour par membre (calculé depuis les quêtes validées) */}
+      {(()=>{
+        const ds = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        const monday = new Date(); monday.setHours(0,0,0,0); monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
+        const weekDates = [...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return ds(d); });
+        const todayDs = ds(new Date());
+        const assXp = {}; (config.assignments||[]).forEach(a=>{ const t=(allTasks||[]).find(x=>x.id===a.taskId); assXp[a.instanceId]= t?(t.xp||0):0; });
+        const xpFor = (ps,dateStr)=> (ps.completed||[]).reduce((sum,k)=>{ if(!k.endsWith("#"+dateStr)) return sum; const inst=k.split("#")[0].slice(0,k.split("#")[0].lastIndexOf("_")); return sum + (assXp[inst]||0); },0);
+        const players=config.players||[];
+        const perPlayer = players.map((p,i)=>{ const ps=gameStates[i]||{completed:[]}; const days=weekDates.map(d=>xpFor(ps,d)); return {p, days, total:days.reduce((a,b)=>a+b,0)}; });
+        const maxDay = Math.max(1, ...perPlayer.flatMap(x=>x.days));
+        const leader = [...perPlayer].sort((a,b)=>b.total-a.total);
+        const anyXp = perPlayer.some(x=>x.total>0);
+        return (
+          <div style={{marginTop:6,background:"rgba(0,0,0,0.4)",border:`2px solid ${th.accent}33`,borderRadius:8,padding:"12px 12px"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent,marginBottom:8}}>📊 PROGRÈS DE LA SEMAINE</div>
+            {!anyXp && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Pas encore d'XP cette semaine. Faites des quêtes pour remplir le graphique! 💪</div>}
+            {anyXp && perPlayer.map(({p,days,total})=>(
+              <div key={p.id} style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:p.color}}>{displayName(p)}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡{total}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,alignItems:"end",height:46}}>
+                  {days.map((v,di)=>(
+                    <div key={di} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%"}}>
+                      <div style={{width:"100%",height:`${Math.max(3,(v/maxDay)*38)}px`,background:weekDates[di]===todayDs?p.color:`${p.color}99`,borderRadius:"2px 2px 0 0",border:weekDates[di]===todayDs?`1px solid #fff`:"none"}} title={`${v} XP`}/>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:weekDates[di]===todayDs?th.accent:"#666",marginTop:2}}>{DAYS_SHORT[di]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {anyXp && leader.length>1 && leader[0].total>0 && (
+              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD700",marginTop:4,textAlign:"center"}}>🏆 En tête cette semaine : <b style={{color:leader[0].p.color}}>{displayName(leader[0].p)}</b> ({leader[0].total} XP) — continuez! 🔥</div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
