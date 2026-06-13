@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.17.0";
+const APP_VERSION = "1.18.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -951,6 +951,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.18.0", date:"2026-06-13", features:[
+    "🔒 Confidentialité — un enfant connecté ne voit que SON onglet (plus possible de modifier la routine d'un frère)",
+    "🎨 Design allégé — moins de lueurs, de bordures et de clignotements (plus reposant pour les yeux)",
+    "👀 Les avatars clignent des yeux! Et ton familier (animal) apparaît dans la fenêtre de ton perso",
+  ]},
   { version:"1.17.0", date:"2026-06-13", features:[
     "📊 Progrès de la semaine — graphique de l'XP gagné par jour pour chaque membre, dans la vue Famille",
     "🏆 Qui est en tête cette semaine — petite compétition amicale pour se motiver",
@@ -1489,7 +1494,7 @@ const Platformer = ({ player, onClose }) => {
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent}}>
         {pt.platformItems[0]} ×{collected} ramassés!
       </div>
-      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>🏆 CONTINUER →</button>}
+      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🏆 CONTINUER →</button>}
       {!done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer"}}>Passer</button>}
     </div>
   );
@@ -1634,7 +1639,7 @@ function RewardPopup({ task, player, newBadges, onClose, th }) {
             ))}
           </div>
         )}
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#2ECC40",color:"#000",border:"4px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>→ CONTINUER ←</button>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#2ECC40",color:"#000",border:"4px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>→ CONTINUER ←</button>
       </div>
     </div>
   );
@@ -2163,7 +2168,7 @@ const AVATAR_PARTS = {
 const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
 
 // Render avatar to canvas (used both in-panel and in popup)
-function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72) {
+function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false) {
   const av = {...DEFAULT_AVATAR, ...avatarDef};
   const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
   const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
@@ -2186,7 +2191,10 @@ function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72) {
   ctx.fillRect(s(3),s(2),s(30),s(5));
   // Eyes
   ctx.fillStyle = eyePart.eyeColor;
-  if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
+  if(blink){ // yeux fermés (clignement) — petites lignes plates
+    ctx.fillStyle="#000"; ctx.fillRect(s(9),s(12),s(6),s(2)); ctx.fillRect(s(21),s(12),s(6),s(2));
+  }
+  else if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
   else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#000";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
   else if(eyePart.eyeShape==="star"){ctx.font=`${s(10)}px serif`;ctx.textAlign="center";ctx.fillText("★",s(12),s(15));ctx.fillText("★",s(24),s(15));}
   else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
@@ -2218,14 +2226,21 @@ function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72) {
   ctx.strokeRect(s(20),s(50),s(12),s(14));
 }
 
-// Inline avatar component (renders canvas)
-function AvatarCanvas({ avatarDef, bodyColor, size=72, style={} }) {
+// Inline avatar component (renders canvas) — clignement subtil des yeux (sauf mode calme)
+function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true }) {
   const canvasRef = useRef(null);
+  const [blink, setBlink] = useState(false);
   useEffect(()=>{
     const c=canvasRef.current; if(!c)return;
-    const ctx=c.getContext("2d");
-    renderAvatarToCtx(ctx, avatarDef||DEFAULT_AVATAR, bodyColor, size, size);
-  },[avatarDef, bodyColor, size]);
+    renderAvatarToCtx(c.getContext("2d"), avatarDef||DEFAULT_AVATAR, bodyColor, size, size, blink);
+  },[avatarDef, bodyColor, size, blink]);
+  useEffect(()=>{
+    if(!animate || CALM) return; // pas de clignement en mode calme
+    let t, stop=false;
+    const next=()=>{ t=setTimeout(()=>{ if(stop)return; setBlink(true); setTimeout(()=>{ if(!stop) setBlink(false); },130); next(); }, 2800+Math.random()*3600); };
+    next();
+    return ()=>{ stop=true; clearTimeout(t); };
+  },[animate]);
   return <canvas ref={canvasRef} width={size} height={size}
     style={{imageRendering:"pixelated",borderRadius:4,...style}}/>;
 }
@@ -2246,7 +2261,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
-      <div style={{background:pt.bg||"#1a1a2e",border:`5px solid ${pt.accent||"#FFD700"}`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,boxShadow:`0 0 40px ${pt.glow||"#FFD700"}60`,overflowY:"auto"}}>
+      <div style={{background:pt.bg||"#1a1a2e",border:`2px solid ${pt.accent||"#FFD700"}88`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#FFD700"}}>{displayName(player)} — Mon Perso</div>
@@ -2423,7 +2438,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px"}}>
       {/* Player header card */}
-      <div style={{background:"rgba(0,0,0,0.55)",border:`4px solid #000`,borderTop:`4px solid ${player.color}`,borderRadius:6,padding:12,display:"flex",gap:12,alignItems:"center",boxShadow:`0 0 24px ${player.color}40`}}>
+      <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         {/* Avatar — clickable → opens creator/inventory */}
         <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setAvatarOpen(true);SFX.click();}} title="Personnaliser mon perso">
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
@@ -2491,7 +2506,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             );
           })}
           <button onClick={()=>{SFX.click();setSettingsOpen(false);}}
-            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
             ← Retour
           </button>
         </div>
@@ -2534,7 +2549,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               })}
             </div>
             <button onClick={()=>{SFX.click();setThemePicker(false);}}
-              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
               ← Retour
             </button>
           </div>
@@ -2559,7 +2574,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
               </div>
               {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
-                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
                 ✔ J'AI ÉTUDIÉ!
               </button>}
             </div>
@@ -2679,7 +2694,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {!done&&!pending&&<button onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
               style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
                 color:"#000",background:player.color,border:"3px solid #000",borderRadius:3,cursor:"pointer",
-                boxShadow:"4px 4px 0 #000",transition:"all 0.08s"}}>
+                boxShadow:"2px 2px 0 #000",transition:"all 0.08s"}}>
               ✔ J'AI FAIT ÇA!
             </button>}
             {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
@@ -2720,7 +2735,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         <button onClick={()=>{
             if(window.confirm("Terminer la routine et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
           }}
-          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#2ECC40",border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"4px 4px 0 #000",marginTop:4}}>
+          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#2ECC40",border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
           ✅ J'ai fini ma routine — revenir au mode Semaine 📅
         </button>
       )}
@@ -2953,8 +2968,9 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
   );
 }
 
-function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
+function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th }) {
   const [profileIdx, setProfileIdx] = useState(null);
+  const mayOpen = (i)=> canOpen ? canOpen(i) : true;
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
       {profileIdx!==null&&(
@@ -2970,8 +2986,8 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
           const pct=myTotal>0?Math.round((myDone/myTotal)*100):0;
           const lv=getLevel(ps.xp);
           return (
-            <div key={player.id} onClick={()=>{SFX.click();onSelectPlayer(i);}}
-              style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${player.color}`,borderRadius:8,padding:14,cursor:"pointer",transition:"all 0.15s",boxShadow:`0 0 0 0 ${player.color}`}} onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 16px ${player.color}60`} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+            <div key={player.id} onClick={()=>{SFX.click(); mayOpen(i)?onSelectPlayer(i):setProfileIdx(i);}}
+              style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${player.color}99`,borderRadius:8,padding:14,cursor:"pointer",transition:"all 0.15s"}}>
               <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
                 <AvatarCanvas avatarDef={gameStates[i]?.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(player.themeId).charBodyColor||player.color} size={44}
                   style={{border:`3px solid ${player.color}`,borderRadius:5}}/>
@@ -2995,7 +3011,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>🪙 {ps.coins}</span>
               </div>
               <div style={{display:"flex",gap:6,marginTop:8}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>Voir mes quêtes →</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>{mayOpen(i)?"Voir mes quêtes →":"Voir le profil →"}</div>
                 <button onClick={e=>{e.stopPropagation();SFX.click();setProfileIdx(i);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:th.accent,border:`1px solid ${th.accent}`,borderRadius:3,cursor:"pointer",flexShrink:0}}>📊 Profil</button>
               </div>
             </div>
@@ -4453,6 +4469,7 @@ export default function App() {
   const [view, setView] = useState("family"); // "family"|0|1|2|3
   const [parentPinOpen, setParentPinOpen] = useState(false);
   const [parentMode, setParentMode] = useState(false);
+  const [sessionPlayer, setSessionPlayer] = useState(null); // enfant connecté (idx) — null = parent/aucun
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
@@ -4855,9 +4872,9 @@ export default function App() {
     onSelectPlayer={(idx)=>{
       // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine)
       setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],mode:"week",activeRoutineId:null}; persist(config,n); return n; });
-      setView(idx); setScreen("game"); SFX.click();
+      setSessionPlayer(idx); setParentMode(false); setView(idx); setScreen("game"); SFX.click();
     }}
-    onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
+    onParentLogin={()=>{ setParentMode(true); setSessionPlayer(null); setView("family"); setScreen("game"); SFX.click(); }}
     onNewSetup={()=>setScreen("setup")}
     onSetPlayerPin={(idx, newPin)=>{
       const gs = [...gameStates]; gs[idx]={...gs[idx], pin:newPin};
@@ -4887,19 +4904,17 @@ export default function App() {
         .nav-btn:hover{opacity:0.85;}
         .task-card:hover{transform:translateY(-1px);}
       `}</style>
-      <div style={{position:"fixed",inset:0,background:`radial-gradient(ellipse at 30% 0%,${th.primary}18 0%,transparent 60%)`,zIndex:0,pointerEvents:"none"}}/>
+      <div style={{position:"fixed",inset:0,background:`radial-gradient(ellipse at 30% 0%,${th.primary}0E 0%,transparent 55%)`,zIndex:0,pointerEvents:"none"}}/>
 
       {/* ── HEADER ── */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(135deg,${th.bg}EE,#1a1a1aEE)`,borderBottom:`5px solid ${th.accent}`,padding:"8px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div style={{position:"sticky",top:0,zIndex:100,background:`${th.bg}F2`,borderBottom:`2px solid ${th.accent}55`,padding:"9px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent,textShadow:"2px 2px 0 #000"}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
-        {/* Clock */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(14px,2.5vw,22px)",color:"#5DECF5",textShadow:`0 0 12px #5DECF5`,animation:"clkPulse 1s infinite alternate"}}>{H}:{M}:{S}</div>
-        {/* Date */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#666"}}>{dateStr}</div>
+        {/* Clock (discrète : heure:minute, sans clignotement) */}
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",color:"#7aa"}}>{H}:{M}</div>
         {/* Indicateur de synchro cloud */}
         {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
           return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
@@ -4921,7 +4936,7 @@ export default function App() {
             🔒
           </button>}
           {/* Déconnexion / changer d'enfant */}
-          <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
+          <button onClick={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Changer d'enfant / déconnexion">
             🚪
           </button>
@@ -4954,9 +4969,10 @@ export default function App() {
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
         </button>
-        {(config.players||[]).map((pl,i)=>(
+        {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde. */}
+        {(config.players||[]).map((pl,i)=>({pl,i})).filter(({i})=> parentMode || sessionPlayer===null || sessionPlayer===i).map(({pl,i})=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none",textShadow:view===i?"none":`0 0 8px ${getPlayerTheme(pl.themeId).glow}40`}}>
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
             {displayName(pl)}
           </button>
         ))}
@@ -4966,7 +4982,7 @@ export default function App() {
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
       <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="family"&&(
-          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} th={th}/>
+          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===null || sessionPlayer===i} th={th}/>
         )}
         {typeof view==="number"&&(
           <PlayerDashboard
