@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.21.1";
+const APP_VERSION = "1.22.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -968,6 +968,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.22.0", date:"2026-06-13", features:[
+    "🏅 Badges en pixel-art (médaillons dorés avec un symbole du défi) — fini les emojis sur les badges!",
+  ]},
   { version:"1.21.1", date:"2026-06-13", features:[
     "🐛 Fix : la quête ajoutée par l'enfant apparaît maintenant tout de suite dans sa vue",
   ]},
@@ -2338,6 +2341,51 @@ function BossSprite({ boss, size=120, style={} }){
   return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
 
+// ─── BADGES PIXEL-ART (médaillon + symbole représentatif, sans emoji) ─────────
+// Symbole déduit du badge (représentatif du défi)
+const badgeSymbol = (b)=>{
+  const id=b.id||"";
+  if(id==="b_first") return "star";
+  if(id==="b_5tasks") return "flame";
+  if(id==="b_20tasks") return "dumbbell";
+  if(id==="b_50tasks") return "trophy";
+  if(id.startsWith("b_xp")) return "bolt";
+  if(id.startsWith("b_coins")) return "coin";
+  if(id.startsWith("b_buy")) return "bag";
+  if(id==="b_streak3") return "calendar";
+  if(id==="b_level5") return "crown";
+  if(id.startsWith("b_level")) return "arrow";
+  return "gem"; // badges de thème
+};
+function renderBadgeToCtx(ctx, b, earned, W=44){
+  const sc=W/24, s=v=>Math.round(v*sc); ctx.clearRect(0,0,W,W);
+  const gold=earned?"#FFCB2E":"#4a4a4a", goldD=earned?"#C7860A":"#333", sym=earned?"#3a2400":"#222";
+  // Médaillon (disque)
+  ctx.fillStyle=goldD; ctx.beginPath(); ctx.arc(W/2,W/2,s(11.5),0,7); ctx.fill();
+  ctx.fillStyle=gold;  ctx.beginPath(); ctx.arc(W/2,W/2,s(10),0,7); ctx.fill();
+  ctx.fillStyle=earned?"#FFE48A":"#5a5a5a"; ctx.beginPath(); ctx.arc(W/2,W/2,s(8.2),0,7); ctx.fill();
+  ctx.fillStyle=gold; ctx.beginPath(); ctx.arc(W/2,W/2,s(7),0,7); ctx.fill();
+  ctx.fillStyle=sym; const R=(x,y,w,h)=>ctx.fillRect(s(x),s(y),s(w),s(h));
+  switch(badgeSymbol(b)){
+    case "star": R(11,5,2,14);R(5,11,14,2);R(8,8,8,8);ctx.fillStyle=gold;R(9,9,6,6);break;
+    case "flame": R(11,6,2,3);R(10,9,4,3);R(9,12,6,4);R(10,16,4,2);break;
+    case "dumbbell": R(7,11,10,2);R(5,8,3,8);R(16,8,3,8);break;
+    case "trophy": R(8,6,8,5);R(6,7,2,3);R(16,7,2,3);R(11,11,2,3);R(9,14,6,2);break;
+    case "bolt": R(12,5,4,6);R(9,10,5,3);R(11,11,5,8);break;
+    case "coin": ctx.fillStyle=sym;ctx.beginPath();ctx.arc(W/2,W/2,s(5.5),0,7);ctx.fill();ctx.fillStyle=gold;ctx.beginPath();ctx.arc(W/2,W/2,s(3.5),0,7);ctx.fill();ctx.fillStyle=sym;R(11,9,2,6);break;
+    case "bag": R(8,9,8,8);R(9,6,2,3);R(13,6,2,3);R(10,5,4,2);break;
+    case "calendar": R(6,7,12,11);ctx.fillStyle=gold;R(8,10,2,2);R(11,10,2,2);R(14,10,2,2);R(8,13,2,2);R(11,13,2,2);break;
+    case "crown": R(7,13,10,3);R(7,8,2,6);R(11,7,2,7);R(15,8,2,6);break;
+    case "arrow": R(11,9,2,9);R(9,9,6,2);R(8,11,2,2);R(14,11,2,2);R(10,7,4,2);R(11,5,2,2);break;
+    default: R(9,7,6,2);R(7,9,10,2);R(8,11,8,3);R(10,14,4,2); // gem
+  }
+}
+function BadgeIcon({ badge, earned, size=44, style={} }){
+  const ref=useRef(null);
+  useEffect(()=>{ const c=ref.current; if(c) renderBadgeToCtx(c.getContext("2d"), badge, earned, size); },[badge,earned,size]);
+  return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
 // ─── CHOIX D'EMOJI + CRÉATION DE TÂCHE (picker au lieu de taper) ──────────────
 const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
 function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
@@ -3011,7 +3059,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               <div key={b.id} title={earned?`${b.name}: ${b.desc}`:`🔒 ${b.desc}`}
                 onClick={()=>{SFX.click();setBadgeInfo(showing?null:b.id);}}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:showing?0.7:0.3,transition:"opacity 0.3s",cursor:"pointer",borderRadius:6,outline:showing?`2px solid ${pt.accent||"#FFD700"}`:"none",padding:2}}>
-                <div style={{fontSize:26,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</div>
+                <BadgeIcon badge={b} earned={earned} size={40}/>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#FFD700"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
               </div>
             );
