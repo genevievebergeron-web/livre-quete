@@ -1,5 +1,5 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-13 — v1.13.0_
+_Mis à jour: 2026-06-13 — v1.14.0_
 
 ---
 
@@ -39,7 +39,17 @@ _Mis à jour: 2026-06-13 — v1.13.0_
 
 ## Ce qui est fait ✅
 
-### v1.13.1 — Accueil Semaine + déconnexion + intro mini-jeux + fix chrono ← DERNIER COMMIT
+### v1.14.0 — Reset quotidien + heures de routine + édition + économie + sécurité données ← DERNIER COMMIT
+- **Reset quotidien (clés datées)** : doneKey des tâches = `instanceId_player#YYYY-MM-DD` (`todayStamp()`). « Fait aujourd'hui » se remet à zéro chaque jour, l'XP reste. **Compatible fusion** (chaque jour = clé distincte → union sans conflit, pas de suppression). Calendrier = clé sans date (persiste jusqu'à l'examen). Sites touchés : requestComplete, resolvePendingTask (strip `#`), dashboard render, deComplete, forceComplete, compteurs « fait aujourd'hui », streak.
+- **Heure de fin par routine** : `routine.endTime`; le countdown App utilise l'heure de la routine active (sinon `config.routineEnd`); `showCountdown` masqué hors fenêtre matin (et en vue famille/parent).
+- **Éditer une routine** : builder avec `editId` (prérempli) + bouton ✏️ Modifier dans la vue routine.
+- **Vue Semaine = focus du jour** : tâches d'aujourd'hui en avant (`todayWeek`), reste de la semaine en section grisée (`laterWeek`).
+- **Indicateur de synchro ☁️** : `markSynced()` (event `lq-synced`) sur push/pull réussis → badge ☁️✓ dans l'entête.
+- **PWA mise à jour fiable** : `injectRegister:null` + `registerSW` manuel dans main.jsx avec `r.update()` chaque minute → les appareils passent vite à la dernière version (c'était LA cause du « je vois juste Antoine » : les cells restaient sur l'ancienne version sans sync).
+- **Sécurité données renforcée** : `remotePull` distingue cloud-vide (null → on peut semer) vs échec-réseau (`PULL_FAILED` → on NE touche PAS au cloud). Plus aucun risque qu'une erreur réseau fasse écraser le cloud à la reconnexion. Testé node : reconnexion Elli+cloud = 2 joueurs gardés; vieux device = XP non régressif. 
+- **Bugs/économie** : shop thématique (Minecraft etc.) affiche et vend enfin ses items (`SHOP_ITEMS[shopTab]||themedCat.items`); exploit calendrier retiré (ajouter un devoir ne donne plus +5XP/+2🪙); coûts récompenses relevés (5$=150, écrans=40, skin=120…); **ajustement de pièces / remboursement** dans le portail parent (+10/+50/montant/-10 🪙).
+
+### v1.13.1 — Accueil Semaine + déconnexion + intro mini-jeux + fix chrono
 - **Connexion → accueil Semaine** : `onSelectPlayer` force `mode:"week", activeRoutineId:null` (on n'arrive plus au milieu d'une routine d'hier).
 - **Bouton « ➕ Créer une nouvelle routine »** bien en vue (au lieu d'une petite puce). Puce d'accueil renommée 🏠 Semaine.
 - **Déconnexion / changer d'enfant** (🚪 dans l'entête → retour `screen:"login"`) + **sortir du mode parent** (🔒 dans l'entête ET dans le portail via `onExitParent`). Avant : aucun moyen de quitter le mode parent.

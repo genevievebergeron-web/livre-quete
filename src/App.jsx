@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.13.1";
+const APP_VERSION = "1.14.0";
+// Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
+// tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
+const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -98,15 +101,15 @@ const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", bos
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
 const REWARD_CATALOG = [
-  { id:"rw01", emoji:"📱", label:"15 min d'écrans",          coins:20 },
-  { id:"rw02", emoji:"🍬", label:"Collation sucrée",          coins:15 },
-  { id:"rw03", emoji:"💝", label:"15 min privées avec parent",coins:25 },
-  { id:"rw04", emoji:"💵", label:"5$ au dépanneur",           coins:50 },
-  { id:"rw05", emoji:"💆", label:"Massage au dodo (avant 20h)",coins:30 },
-  { id:"rw06", emoji:"🎮", label:"Choix du jeu vidéo",        coins:30 },
-  { id:"rw07", emoji:"🍪", label:"Fudgee-O ou pépites",       coins:18 },
-  { id:"rw08", emoji:"🍬", label:"Sweet Tarts au choix",      coins:12 },
-  { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:50 },
+  { id:"rw01", emoji:"📱", label:"15 min d'écrans",          coins:40 },
+  { id:"rw02", emoji:"🍬", label:"Collation sucrée",          coins:30 },
+  { id:"rw03", emoji:"💝", label:"15 min privées avec parent",coins:35 },
+  { id:"rw04", emoji:"💵", label:"5$ au dépanneur",           coins:150 },
+  { id:"rw05", emoji:"💆", label:"Massage au dodo (avant 20h)",coins:40 },
+  { id:"rw06", emoji:"🎮", label:"Choix du jeu vidéo",        coins:50 },
+  { id:"rw07", emoji:"🍪", label:"Fudgee-O ou pépites",       coins:30 },
+  { id:"rw08", emoji:"🍬", label:"Sweet Tarts au choix",      coins:25 },
+  { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:120 },
 ];
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
@@ -942,6 +945,13 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.14.0", date:"2026-06-13", features:[
+    "🔄 Les tâches se remettent à zéro chaque jour — la routine est à refaire chaque matin (l'XP gagné reste pour toujours!)",
+    "⏰ Chaque routine peut avoir sa propre heure de fin (Matin, Soir…)",
+    "✏️ On peut modifier une routine déjà créée (ajouter/retirer des tâches, renommer)",
+    "📅 Vue Semaine — les tâches d'aujourd'hui sont mises en avant",
+    "☁️ Petit indicateur quand la progression est synchronisée sur tous les appareils",
+  ]},
   { version:"1.13.1", date:"2026-06-13", features:[
     "🏠 Connexion → on arrive direct sur l'accueil Semaine",
     "➕ Bouton bien en vue pour créer une nouvelle routine",
@@ -1038,6 +1048,8 @@ const supaHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY
 let LAST_SAVED_AT = null; // horodatage de la dernière sauvegarde connue localement
 let _pushTimer = null;
 let API_OK = null; // détection unique de l'API même-origine
+// Signale à l'UI qu'une synchro cloud vient de réussir (pour l'indicateur ☁️)
+const markSynced = () => { try { window.dispatchEvent(new CustomEvent("lq-synced")); } catch {} };
 
 // L'API même-origine est-elle là? (un déploiement statique renverrait du HTML → non)
 const apiAvailable = async () => {
@@ -1058,33 +1070,42 @@ const remotePush = (data) => {
       if (await apiAvailable()) {
         await fetch("/api/famille", { method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: FAMILY_ID, data }) });
+        markSynced();
       } else if (supaEnabled()) {
         await fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
           method: "POST",
           headers: { ...supaHeaders(), Prefer: "resolution=merge-duplicates" },
           body: JSON.stringify({ id: FAMILY_ID, data, saved_at: data.savedAt || new Date().toISOString() }),
         });
+        markSynced();
       }
     } catch (e) { console.warn("Sync: push échoué (mode local conservé)", e); }
   }, 1500);
 };
 
-// Récupère l'état depuis le cloud — null si indisponible (on reste en local)
+// Récupère l'état depuis le cloud.
+//   → objet data  : le cloud a des données
+//   → null        : le cloud est JOINT mais VIDE (aucune famille encore)  → on peut semer sans risque
+//   → PULL_FAILED : échec réseau / pas de sync  → NE PAS écraser le cloud (on garde le local et on réessaiera)
+const PULL_FAILED = Symbol("pull_failed");
 const remotePull = async () => {
   try {
     if (await apiAvailable()) {
       const r = await fetch(`/api/famille?id=${encodeURIComponent(FAMILY_ID)}`, { cache: "no-store" });
-      if (!r.ok) return null;
-      return (await r.json())?.data || null;
+      if (!r.ok) return PULL_FAILED;
+      const d = (await r.json())?.data;
+      markSynced();
+      return d || null;
     }
     if (supaEnabled()) {
       const r = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: supaHeaders() });
-      if (!r.ok) return null;
+      if (!r.ok) return PULL_FAILED;
       const rows = await r.json();
+      markSynced();
       return rows?.[0]?.data || null;
     }
-  } catch {}
-  return null;
+  } catch { return PULL_FAILED; }
+  return PULL_FAILED; // aucune sync disponible
 };
 
 const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant aux absents)
@@ -1188,9 +1209,10 @@ const save = async (data) => {
 const load = async () => {
   let local = null;
   try { const r = localStorage.getItem(STORE_KEY); if (r) local = JSON.parse(r); } catch {}
-  const remote = await remotePull(); // null si aucun mode sync disponible
+  const remote = await remotePull();
+  const hasRemoteData = remote && remote !== PULL_FAILED; // objet data réel
   // Les deux existent → on FUSIONNE (rien n'est écrasé, l'XP ne peut que monter)
-  if (remote && local) {
+  if (hasRemoteData && local) {
     const merged = mergeFamily(local, remote);
     if (_famSig(merged) !== _famSig(local)) {
       merged.savedAt = new Date().toISOString();
@@ -1203,12 +1225,14 @@ const load = async () => {
     return local;
   }
   // Seul le cloud a des données → on les prend
-  if (remote && !local) {
+  if (hasRemoteData && !local) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
     LAST_SAVED_AT = remote.savedAt || null;
     return remote;
   }
-  if (local && !remote && (API_OK || supaEnabled())) remotePush(local); // premier appareil : seeder le cloud
+  // Cloud JOINT mais VIDE (remote===null) → on peut semer le local sans risque d'écraser quoi que ce soit
+  if (remote === null && local) remotePush(local);
+  // remote===PULL_FAILED → échec réseau : on NE touche PAS au cloud, on garde le local et la boucle réessaiera
   LAST_SAVED_AT = local?.savedAt || null;
   return local;
 };
@@ -2332,12 +2356,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const weekMine = allMine.filter(isWeekAss);
   const myRoutines = pState.routines || [];
   const activeRoutine = pMode==="routine" && pState.activeRoutineId ? myRoutines.find(r=>r.id===pState.activeRoutineId) : null;
+  // Vue Semaine : on met en avant les tâches d'AUJOURD'HUI; le reste de la semaine va dans une section grisée
+  const todayWeek = weekMine.filter(a=>Array.isArray(a.days)&&a.days.includes(todayDayIdx));
+  const laterWeek = weekMine.filter(a=>!(Array.isArray(a.days)&&a.days.includes(todayDayIdx)));
   // Tâches affichées selon le mode choisi par l'enfant (l'XP des deux se cumule)
-  // - mode semaine → tâches de semaine
+  // - mode semaine → tâches d'aujourd'hui
   // - routine ciblée → seulement les tâches choisies pour cette routine
   // - mode routine sans routine ciblée → toutes les tâches de routine
   const myAssignments = pMode==="week"
-    ? weekMine
+    ? todayWeek
     : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine);
   const themedCat = pt.shopCategory;
   const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
@@ -2446,7 +2473,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
         <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>🌟 Ma nouvelle routine</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier ma routine":"🌟 Ma nouvelle routine"}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {["🌅","🌙","☀️","🌆","⭐","🏃","🦷","📚"].map(em=>(
               <button key={em} onClick={()=>{SFX.click();setRoutineBuilder(b=>({...b,emoji:em}));}}
@@ -2455,6 +2482,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
           <input value={routineBuilder.name} onChange={e=>setRoutineBuilder(b=>({...b,name:e.target.value.slice(0,16)}))} placeholder="Nom (ex: Matin, Soir...)"
             style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>⏰ Heure de fin (optionnel) :</span>
+            <input type="time" value={routineBuilder.endTime||""} onChange={e=>setRoutineBuilder(b=>({...b,endTime:e.target.value}))}
+              style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
+          </div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>Choisis tes tâches pour cette routine :</div>
           <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
             {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de routine assignée. Demande à un parent d'en ajouter (type ⏰ Routine).</div>}
@@ -2477,23 +2509,28 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <button disabled={!routineBuilder.name.trim()||routineBuilder.taskIds.length===0}
               onClick={()=>{
                 const name=routineBuilder.name.trim(); if(!name||routineBuilder.taskIds.length===0)return;
-                const newR={id:"rt_"+uid(),name,emoji:routineBuilder.emoji,taskIds:routineBuilder.taskIds};
-                onPatchState({routines:[...myRoutines,newR],mode:"routine",activeRoutineId:newR.id});
+                const data={name,emoji:routineBuilder.emoji,endTime:routineBuilder.endTime||"",taskIds:routineBuilder.taskIds};
+                if(routineBuilder.editId){
+                  onPatchState({routines:myRoutines.map(r=>r.id===routineBuilder.editId?{...r,...data}:r),mode:"routine",activeRoutineId:routineBuilder.editId});
+                } else {
+                  const newR={id:"rt_"+uid(),...data};
+                  onPatchState({routines:[...myRoutines,newR],mode:"routine",activeRoutineId:newR.id});
+                }
                 setRoutineBuilder(null);
               }}
-              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>✅ Créer ma routine</button>
+              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>{routineBuilder.editId?"✅ Enregistrer":"✅ Créer ma routine"}</button>
           </div>
         </div>
       )}
 
       {/* Tasks */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?"SEMAINE 📅":(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"ROUTINE ⏰")}</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"ROUTINE ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
-      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine)." : (activeRoutine?"Cette routine est vide. Modifie-la ou crée-en une nouvelle.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Routine).")}</div>}
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?(weekMine.length?"Rien de prévu aujourd'hui! 🎉":"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).") : (activeRoutine?"Cette routine est vide. Modifie-la ou crée-en une nouvelle.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Routine).")}</div>}
       {myAssignments.map(ass=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
         if(!task)return null;
-        const doneKey=ass.instanceId+"_"+player.id;
+        const doneKey=ass.instanceId+"_"+player.id+"#"+todayStamp(); // clé du jour → se remet à zéro chaque jour
         const done=pState.completed?.includes(doneKey);
         const pending=pState.pending?.includes(doneKey);
         return (
@@ -2517,7 +2554,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 color:"#000",background:"#FF8C00",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
               ⚡ VALIDER SANS CODE (parent)
             </button>}
-            {done&&parentMode&&<button onClick={()=>onDeComplete(ass.instanceId+"_"+player.id, playerIdx)}
+            {done&&parentMode&&<button onClick={()=>onDeComplete(ass.instanceId+"_"+player.id+"#"+todayStamp(), playerIdx)}
               style={{position:"absolute",top:4,right:4,padding:"3px 7px",fontFamily:"'Press Start 2P',monospace",fontSize:"6px",
                 color:"#FF4444",background:"rgba(0,0,0,0.7)",border:"1px solid #FF4444",borderRadius:2,cursor:"pointer",zIndex:10}}>
               ↩️ Annuler
@@ -2526,6 +2563,24 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
         );
       })}
+
+      {/* Plus tard cette semaine (vue Semaine seulement) — aperçu grisé */}
+      {pMode==="week" && laterWeek.length>0 && (
+        <div style={{marginTop:6,opacity:0.7}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666",borderBottom:"1px solid #2a2a2a",paddingBottom:3,marginBottom:5}}>📅 PLUS TARD CETTE SEMAINE</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {laterWeek.map(ass=>{ const t=allTasks.find(x=>x.id===ass.taskId); if(!t)return null;
+              return (
+                <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:4}}>
+                  <span style={{fontSize:15}}>{t.emoji}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",flex:1}}>{t.label}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#5DECF5"}}>{ass.days.map(d=>DAYS_SHORT[d]).join(" ")}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
@@ -2537,10 +2592,16 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </button>
       )}
       {activeRoutine && (
-        <button onClick={()=>{ if(window.confirm(`Supprimer la routine «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
-          style={{width:"100%",padding:"7px",fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FF6B6B",background:"transparent",border:"1px solid #FF6B6B40",borderRadius:3,cursor:"pointer"}}>
-          🗑️ Supprimer cette routine
-        </button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{ SFX.click(); setRoutineBuilder({editId:activeRoutine.id,name:activeRoutine.name,emoji:activeRoutine.emoji||"🌅",endTime:activeRoutine.endTime||"",taskIds:[...(activeRoutine.taskIds||[])]}); }}
+            style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:th.accent||player.color,background:"transparent",border:`1px solid ${th.accent||player.color}55`,borderRadius:3,cursor:"pointer"}}>
+            ✏️ Modifier
+          </button>
+          <button onClick={()=>{ if(window.confirm(`Supprimer la routine «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
+            style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF6B6B",background:"transparent",border:"1px solid #FF6B6B40",borderRadius:3,cursor:"pointer"}}>
+            🗑️ Supprimer
+          </button>
+        </div>
       )}
 
       {/* Calendar CRUD */}
@@ -2630,7 +2691,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         )}
         {shopTab!=="rewards" && (
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
-            {(SHOP_ITEMS[shopTab]||[]).map(item=>{
+            {(SHOP_ITEMS[shopTab] || (shopTab===themedCat.id ? themedCat.items : []) || []).map(item=>{
               const owned=pState.owned?.includes(item.id);
               const equipped=eq[item.slot]===item.id;
               const canAfford=pState.coins>=item.cost;
@@ -2697,7 +2758,7 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
   const bar = xpBar(gs.xp||0);
   const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
   const myBadges = (gs.badges||[]).map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).slice(-6);
-  const myDone = config.assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
+  const myDone = config.assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
   const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
   const maxXp = Math.max(...siblings.map(s=>s.xp),1);
   return (
@@ -2770,7 +2831,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
       <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10}}>
         {(config.players||[]).map((player,i)=>{
           const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
-          const myDone=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)&&ps.completed?.some(k=>k.startsWith(a.instanceId+"_"+player.id))).length;
+          const myDone=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)&&ps.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
           const myTotal=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)).length;
           const pct=myTotal>0?Math.round((myDone/myTotal)*100):0;
           const lv=getLevel(ps.xp);
@@ -2820,7 +2881,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onRemoveAssignment, onAddCustomTask,
-  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onChangePin,
+  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const [tab, setTab] = useState(nbPending>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
@@ -3019,6 +3080,12 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                 <PBtn onClick={()=>onAdjustXP(i,25)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+25 XP</PBtn>
                 <PBtn onClick={()=>onAdjustXP(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 XP</PBtn>
                 <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#FF4444" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 À zéro</PBtn>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,10)} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 🪙</PBtn>
+                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,50)} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+50 🪙</PBtn>
+                <PBtn onClick={()=>{const v=parseInt(prompt("Combien de pièces ajouter (ou négatif pour retirer)?","50")||"0",10); if(v)onAdjustCoins&&onAdjustCoins(i,v);}} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🪙 Montant…</PBtn>
+                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 🪙</PBtn>
               </div>
             </div>
           ))}
@@ -4222,6 +4289,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [rewardPopup, setRewardPopup] = useState(null);
   const [miniGame, setMiniGame] = useState(null); // {player,playerIdx,level,playerThemeId,pendingReward}
+  const [syncedAt, setSyncedAt] = useState(0); // dernier instant de synchro cloud réussie
   const [now, setNow] = useState(new Date());
 
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
@@ -4258,7 +4326,7 @@ export default function App() {
     let stop=false;
     const tick=async()=>{
       const remote=await remotePull();
-      if(stop||!remote)return;
+      if(stop||!remote||remote===PULL_FAILED)return; // rien à faire si cloud vide ou échec réseau
       let local=null; try{const r=localStorage.getItem(STORE_KEY); if(r)local=JSON.parse(r);}catch{}
       // Pas de local : on adopte le remote s'il est plus récent (comportement d'origine)
       if(!local){
@@ -4293,6 +4361,13 @@ export default function App() {
     return ()=>{ stop=true; clearInterval(iv); document.removeEventListener("visibilitychange",onVis); };
   },[]);
 
+  // Indicateur de synchro : écoute les synchros cloud réussies (push/pull)
+  useEffect(()=>{
+    const onSync=()=>setSyncedAt(Date.now());
+    window.addEventListener("lq-synced",onSync);
+    return ()=>window.removeEventListener("lq-synced",onSync);
+  },[]);
+
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
   const logAction = useCallback((msg,color="#FF8C00")=>{
     const entry={time:new Date().toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"}),msg,color};
@@ -4316,7 +4391,9 @@ export default function App() {
     const playerIdx = config.players.findIndex(p=>p.id===playerId);
     if(playerIdx<0)return;
     const gs=gameStates[playerIdx];
-    const doneKey=ass.instanceId+"_"+playerId;
+    // Calendrier = clé sans date (persiste jusqu'à l'examen); tâches = clé du jour (reset quotidien)
+    const isCal=String(ass.instanceId).startsWith("cal_");
+    const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
     showToast("📨 Envoyée à tes parents pour validation!","#5DECF5",3500);
@@ -4324,7 +4401,8 @@ export default function App() {
 
   // Retrouve la tâche (catalogue, perso ou calendrier) derrière un doneKey
   const resolvePendingTask = useCallback((playerIdx, doneKey)=>{
-    const instanceId=doneKey.slice(0,doneKey.lastIndexOf("_"));
+    const base=doneKey.split("#")[0]; // retire le tampon de date éventuel
+    const instanceId=base.slice(0,base.lastIndexOf("_"));
     if(instanceId.startsWith("cal_")){
       const entry=(gameStates[playerIdx]?.calendar||[]).find(e=>"cal_"+e.id===instanceId);
       if(!entry)return null;
@@ -4350,9 +4428,9 @@ export default function App() {
       const prevLv=getLevel(p.xp).level;
       const newXp=p.xp+task.xp, newCoins=p.coins+task.coins;
       const newLv=getLevel(newXp).level;
-      // Count tasks done today for streak badge
-      const today=new Date().toDateString();
-      const todayCount=(p.completed||[]).filter(k=>k.startsWith(today)).length+1;
+      // Count tasks done today for streak badge (clés du jour: ..._player#YYYY-MM-DD)
+      const today="#"+todayStamp();
+      const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
       const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount);
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
@@ -4449,10 +4527,19 @@ export default function App() {
     showToast(`${delta>0?"+":""}${delta} XP pour ${player?.name}`,"#5DECF5");
   },[config,persist,logAction,showToast]);
 
+  // Ajuster les pièces seulement (ex: rembourser une récompense)
+  const handleAdjustCoins = useCallback((playerIdx, delta) => {
+    const player = config.players[playerIdx];
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],coins:Math.max(0,(n[playerIdx].coins||0)+delta)}; persist(config,n); return n; });
+    logAction(`${delta>0?"+":""}${delta} 🪙 → ${player?.name}`,"#FFD700");
+    showToast(`${delta>0?"+":""}${delta} 🪙 pour ${player?.name}`,"#FFD700");
+  },[config,persist,logAction,showToast]);
+
   const handleForceComplete = useCallback((ass, playerId) => {
     const playerIdx=config.players.findIndex(p=>p.id===playerId); if(playerIdx<0)return;
     const player=config.players[playerIdx];
-    const doneKey=ass.instanceId+"_"+playerId;
+    const isCal=String(ass.instanceId).startsWith("cal_");
+    const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId);
     if(!task)return;
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
@@ -4559,9 +4646,15 @@ export default function App() {
   const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
   // (sinon une routine d'hier soir laisse un gros « EN RETARD » rouge en permanence).
+  // Heure de fin: celle de la routine active si elle en a une, sinon l'heure de routine famille
+  const activeRoutineObj = (typeof view==="number" && effectiveMode==="routine" && gameStates[view]?.activeRoutineId)
+    ? (gameStates[view].routines||[]).find(r=>r.id===gameStates[view].activeRoutineId) : null;
+  const countdownEnd = activeRoutineObj
+    ? (activeRoutineObj.endTime || "")               // routine ciblée: seulement si elle a une heure de fin
+    : (config?.routineEnd || "08:30");               // mode "Toutes les routines": heure famille
   const showCountdown = (()=>{
-    if(typeof view!=="number" || effectiveMode!=="routine" || !config) return false;
-    const [eh,em]=(config.routineEnd||"08:30").split(":").map(Number);
+    if(typeof view!=="number" || effectiveMode!=="routine" || !config || !countdownEnd) return false;
+    const [eh,em]=countdownEnd.split(":").map(Number);
     const nowMin=now.getHours()*60+now.getMinutes();
     return nowMin <= (eh*60+em+90); // jusqu'à 90 min après l'heure de fin
   })();
@@ -4631,6 +4724,10 @@ export default function App() {
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(14px,2.5vw,22px)",color:"#5DECF5",textShadow:`0 0 12px #5DECF5`,animation:"clkPulse 1s infinite alternate"}}>{H}:{M}:{S}</div>
         {/* Date */}
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#666"}}>{dateStr}</div>
+        {/* Indicateur de synchro cloud */}
+        {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
+          return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
+            style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#2ECC40":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
         {/* Parent controls */}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           <button onClick={()=>{SFX.click();if(parentMode){setParentPanel(p=>!p);}else{setParentPinOpen(true);}}}
@@ -4656,7 +4753,7 @@ export default function App() {
       </div>
 
       {/* ── ROUTINE COUNTDOWN (sticky below header) ── */}
-      {effectiveMode==="routine"&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={config.routineEnd||"08:30"} th={th}/></div>}
+      {showCountdown&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={countdownEnd} th={th}/></div>}
 
       {/* ── DAY PROGRESS ── */}
       <div style={{padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
@@ -4723,14 +4820,10 @@ export default function App() {
               save({config,gameStates:gs,savedAt:new Date().toISOString()});
             }}
             onCalendarAdd={(type)=>{
-              const XP_CAL=5, COINS_CAL=2;
-              setGameStates(gs=>{
-                const n=[...gs];
-                n[view]={...n[view],xp:(n[view].xp||0)+XP_CAL,coins:(n[view].coins||0)+COINS_CAL};
-                persist(config,n); return n;
-              });
-              const label=type==="examen"?"📝 Examen noté!":"📚 Devoir noté!";
-              showToast(`${label} +${XP_CAL} XP · +${COINS_CAL} 🪙`,"#5DECF5",3000);
+              // Plus de XP/pièces juste pour AVOIR noté un devoir (c'était exploitable en spammant).
+              // La récompense vient quand l'enfant ÉTUDIE vraiment (rappel → validation parent).
+              const label=type==="examen"?"📝 Examen noté au calendrier!":"📚 Devoir noté au calendrier!";
+              showToast(`${label} Un rappel apparaîtra avant la date.`,"#5DECF5",3000);
             }}
             th={th}
           />
@@ -4755,6 +4848,7 @@ export default function App() {
           onReset={()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
           onResetPlayer={handleResetPlayer}
           onAdjustXP={handleAdjustXP}
+          onAdjustCoins={handleAdjustCoins}
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}

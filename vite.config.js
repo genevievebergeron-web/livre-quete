@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null, // on enregistre nous-mêmes dans main.jsx (avec vérification périodique)
       manifest: {
         name: 'Livre de Quêtes',
         short_name: 'Quêtes',
