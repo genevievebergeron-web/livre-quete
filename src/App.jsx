@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.18.0";
+const APP_VERSION = "1.19.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -951,6 +951,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.19.0", date:"2026-06-13", features:[
+    "📣 Fil de famille — vois ce que tout le monde accomplit, mets des ❤️ et écris un petit mot à la famille!",
+    "🧩 Le parent peut préparer une routine pour un enfant depuis le portail",
+  ]},
   { version:"1.18.0", date:"2026-06-13", features:[
     "🔒 Confidentialité — un enfant connecté ne voit que SON onglet (plus possible de modifier la routine d'un frère)",
     "🎨 Design allégé — moins de lueurs, de bordures et de clignotements (plus reposant pour les yeux)",
@@ -1221,6 +1225,16 @@ const mergeFamily = (base, incoming) => {
     assignments: [...assignMap.values()],
     customTasks: [...taskMap.values()],
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
+    feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
+      const m = new Map();
+      for (const f of [...(bC.feed || []), ...(iC.feed || [])]) {
+        if (!f || f.id == null) continue;
+        const prev = m.get(f.id);
+        if (prev) prev.likes = _uniq([...(prev.likes || []), ...(f.likes || [])]);
+        else m.set(f.id, { ...f, likes: [...(f.likes || [])] });
+      }
+      return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
+    })(),
     pin: (bC.pin && bC.pin !== "1146") ? bC.pin : (iC.pin || bC.pin),
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
@@ -1300,6 +1314,7 @@ const migrateSavedData = (data) => {
   if (mergedConfig.pin == null) mergedConfig.pin = "1146"; // fix: spread can't override undefined
   if (!Array.isArray(mergedConfig.players)) mergedConfig.players = [];
   if (!Array.isArray(mergedConfig.assignments)) mergedConfig.assignments = [];
+  if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   return {
     ...data,
     config: mergedConfig,
@@ -2968,9 +2983,13 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
   );
 }
 
-function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th }) {
+function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat }) {
   const [profileIdx, setProfileIdx] = useState(null);
+  const [chatText, setChatText] = useState("");
   const mayOpen = (i)=> canOpen ? canOpen(i) : true;
+  const feedName = (pid)=> pid==="parent" ? "👤 Parent" : (displayName((config.players||[]).find(p=>p.id===pid))||"?");
+  const feedColor = (pid)=> pid==="parent" ? "#FF8C00" : ((config.players||[]).find(p=>p.id===pid)?.color||"#888");
+  const timeAgo = (ts)=>{ const s=Math.floor((Date.now()-(ts||0))/1000); if(s<60)return "à l'instant"; const m=Math.floor(s/60); if(m<60)return `il y a ${m} min`; const h=Math.floor(m/60); if(h<24)return `il y a ${h} h`; return `il y a ${Math.floor(h/24)} j`; };
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
       {profileIdx!==null&&(
@@ -3057,6 +3076,39 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
           </div>
         );
       })()}
+
+      {/* 📣 Fil de famille — accomplissements + ❤️ + petit chat */}
+      <div style={{marginTop:6,background:"rgba(0,0,0,0.4)",border:`2px solid ${th.accent}33`,borderRadius:8,padding:"12px 12px"}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent,marginBottom:8}}>📣 FIL DE FAMILLE</div>
+        {/* Chat */}
+        <div style={{display:"flex",gap:6,marginBottom:10}}>
+          <input value={chatText} onChange={e=>setChatText(e.target.value.slice(0,140))} placeholder="Écris un mot à la famille…" maxLength={140}
+            style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none"}}/>
+          <button onClick={()=>{ if(chatText.trim()){ onPostChat&&onPostChat(chatText.trim()); setChatText(""); SFX.click(); } }}
+            style={{flexShrink:0,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 12px",background:th.accent,color:"#000",border:"2px solid #000",borderRadius:5,cursor:"pointer"}}>Envoyer</button>
+        </div>
+        {(config.feed||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Rien encore. Les accomplissements de chacun s'afficheront ici! 🌟</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"40vh",overflowY:"auto"}}>
+          {(config.feed||[]).map(f=>{
+            const liked=(f.likes||[]).includes(meId);
+            return (
+              <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`1px solid ${f.type==="chat"?(feedColor(f.playerId)+"55"):"#2a2a2a"}`,borderRadius:6}}>
+                <span style={{fontSize:18}}>{f.emoji||"✨"}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  {f.type==="chat"
+                    ? <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.25}}><b style={{color:feedColor(f.playerId)}}>{feedName(f.playerId)}:</b> {f.text}</div>
+                    : <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",lineHeight:1.25}}>{f.text}</div>}
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666",marginTop:2}}>{timeAgo(f.ts)}</div>
+                </div>
+                <button onClick={()=>{onLike&&onLike(f.id);SFX.click();}}
+                  style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#FF6B6B":"#888",border:`1px solid ${liked?"#FF6B6B":"#444"}`,borderRadius:14,cursor:"pointer"}}>
+                  {liked?"❤️":"🤍"} {(f.likes||[]).length||""}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3067,7 +3119,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onRemoveAssignment, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onRemoveAssignment, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -3078,6 +3130,9 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addTaskId, setAddTaskId] = useState("");
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
+  const [rChildIdx, setRChildIdx] = useState(0); // assignation de routine: enfant ciblé
+  const [rName, setRName] = useState("");
+  const [rTaskIds, setRTaskIds] = useState([]);
   const T = th;
 
   const TabBtn = ({k,l}) => (
@@ -3237,6 +3292,42 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:8,lineHeight:1.4}}>
               Pour les horaires et les jours de la semaine, passe par ⚙️ Modifier le livre (onglet Actions).
             </div>
+
+            {/* ── Assigner une routine à un enfant ───────────────── */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UNE ROUTINE</div>
+            {(()=>{
+              const child=players[rChildIdx];
+              const childRoutineTasks=child?(config.assignments||[]).filter(a=>a.playerIds.includes(child.id)&&!(Array.isArray(a.days)&&a.days.length>0)):[];
+              return (
+                <div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:6}}>Crée une routine prête pour un enfant (il pourra la lancer sans la refaire).</div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                    {players.map((pl,i)=>(
+                      <div key={pl.id} onClick={()=>{setRChildIdx(i);setRTaskIds([]);SFX.click();}}
+                        style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:rChildIdx===i?pl.color:"#1a1a1a",color:rChildIdx===i?"#000":"#666",border:`2px solid ${rChildIdx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                    ))}
+                  </div>
+                  <input value={rName} onChange={e=>setRName(e.target.value.slice(0,16))} placeholder="Nom de la routine (ex: Matin)"
+                    style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none"}}/>
+                  {childRoutineTasks.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666",marginBottom:8}}>Cet enfant n'a pas encore de tâche de type ⏰ Routine. Ajoute-lui-en en haut (type Routine).</div>}
+                  <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8,maxHeight:"26vh",overflowY:"auto"}}>
+                    {childRoutineTasks.map(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null; const sel=rTaskIds.includes(a.instanceId);
+                      return (
+                        <div key={a.instanceId} onClick={()=>{SFX.click();setRTaskIds(ids=>sel?ids.filter(x=>x!==a.instanceId):[...ids,a.instanceId]);}}
+                          style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:sel?"#1a3a1a":"rgba(0,0,0,0.4)",border:`2px solid ${sel?"#2ECC40":"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                          <span style={{fontSize:15}}>{sel?"✅":t.emoji}</span>
+                          <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1}}>{t.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <PBtn onClick={()=>{ if(rName.trim()&&rTaskIds.length){ onAssignRoutine&&onAssignRoutine(rChildIdx,{name:rName.trim(),emoji:"🌅",taskIds:rTaskIds}); setRName("");setRTaskIds([]); } }}
+                    color={rName.trim()&&rTaskIds.length?"#2ECC40":"#333"} textColor="#000" style={{width:"100%",opacity:rName.trim()&&rTaskIds.length?1:0.5}}>
+                    🧩 Assigner cette routine à {child?displayName(child):"…"}
+                  </PBtn>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -4509,6 +4600,21 @@ export default function App() {
 
   const persist = useCallback((cfg,gs) => save({config:cfg,gameStates:gs,savedAt:new Date().toISOString()}), []);
 
+  // Refs pour lire l'état courant dans des callbacks (fil de famille)
+  const cfgRef = useRef(config); cfgRef.current = config;
+  const gsRef = useRef(gameStates); gsRef.current = gameStates;
+  // Ajoute une entrée au fil de famille (auto: quêtes, niveaux; manuel: chat)
+  const pushFeed = useCallback((entry)=>{
+    const cfg=cfgRef.current||{}; const fe={ id:"f_"+uid(), ts:Date.now(), likes:[], ...entry };
+    const n={...cfg, feed:[fe,...(cfg.feed||[])].slice(0,60)};
+    setConfig(n); persist(n, gsRef.current);
+  },[persist]);
+  const toggleFeedLike = useCallback((feedId, byId)=>{
+    const cfg=cfgRef.current||{};
+    const feed=(cfg.feed||[]).map(f=> f.id!==feedId ? f : {...f, likes: (f.likes||[]).includes(byId) ? f.likes.filter(x=>x!==byId) : [...(f.likes||[]),byId]});
+    const n={...cfg, feed}; setConfig(n); persist(n, gsRef.current);
+  },[persist]);
+
   // ── Boucle de sync : tire les changements faits sur les autres appareils ──
   // (remotePull retourne null en ~0ms si aucun mode sync n'est disponible)
   useEffect(()=>{
@@ -4624,7 +4730,13 @@ export default function App() {
       const newBadgeIds=checkBadges(updatedPs,player,todayCount);
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       const n=[...gs]; n[playerIdx]=updatedPs;
-      persist(config,n);
+      // Fil de famille : on enregistre l'accomplissement (+ niveau / badges) dans le MÊME save
+      const now=Date.now(); const fents=[{ id:"f_"+uid(), ts:now, likes:[], type:"task", playerId:player.id, text:`${displayName(player)} a accompli « ${task.label} »`, emoji:task.emoji||"✅" }];
+      if(prevLv<newLv) fents.unshift({ id:"f_"+uid(), ts:now+1, likes:[], type:"level", playerId:player.id, text:`${displayName(player)} passe au niveau ${newLv}!`, emoji:"⭐" });
+      for(const bid of newBadgeIds){ const b=BADGES.find(x=>x.id===bid); if(b) fents.unshift({ id:"f_"+uid(), ts:now+2, likes:[], type:"badge", playerId:player.id, text:`${displayName(player)} a gagné le badge « ${b.name} »`, emoji:b.emoji||"🏅" }); }
+      const newCfg={...config, feed:[...fents, ...((config.feed)||[])].slice(0,60)};
+      setConfig(newCfg);
+      persist(newCfg,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
       const pendingRwd={task,player,newBadges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean)};
       setTimeout(()=>{
@@ -4755,6 +4867,14 @@ export default function App() {
     logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#2ECC40");
     showToast("➕ Tâche ajoutée!","#2ECC40");
   },[config,gameStates,persist,logAction,showToast]);
+
+  // Le parent crée/assigne une routine à un enfant (atterrit dans gs[idx].routines)
+  const handleAssignRoutine = useCallback((playerIdx, routine)=>{
+    if(playerIdx==null||!routine?.name?.trim()||!(routine.taskIds||[]).length)return;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; const r={id:"rt_"+uid(), emoji:"🌅", endTime:"", ...routine, name:routine.name.trim()}; n[playerIdx]={...p, routines:[...(p.routines||[]), r]}; persist(config,n); return n; });
+    logAction(`🧩 Routine « ${routine.name.trim()} » assignée à ${config.players[playerIdx]?.name||""}`,"#2ECC40");
+    showToast("✅ Routine assignée à l'enfant!","#2ECC40");
+  },[config,persist,logAction,showToast]);
 
   const handleRemoveAssignment = useCallback((instanceId)=>{
     const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
@@ -4982,7 +5102,10 @@ export default function App() {
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
       <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="family"&&(
-          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===null || sessionPlayer===i} th={th}/>
+          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===null || sessionPlayer===i} th={th}
+            meId={parentMode ? "parent" : (sessionPlayer!=null ? config.players[sessionPlayer]?.id : "parent")}
+            onLike={(fid)=>toggleFeedLike(fid, parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"))}
+            onPostChat={(text)=>{ const mid=parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"); pushFeed({type:"chat",playerId:mid,text,emoji:"💬"}); }}/>
         )}
         {typeof view==="number"&&(
           <PlayerDashboard
@@ -5038,6 +5161,7 @@ export default function App() {
           onApprovePending={approvePending}
           onRefusePending={refusePending}
           onAddAssignment={handleAddAssignment}
+          onAssignRoutine={handleAssignRoutine}
           onRemoveAssignment={handleRemoveAssignment}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
