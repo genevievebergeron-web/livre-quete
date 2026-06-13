@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.14.0";
+const APP_VERSION = "1.14.1";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -945,6 +945,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.14.1", date:"2026-06-13", features:[
+    "💬 Plus d'explications partout pour les enfants — quoi toucher, quoi cocher, comment ça marche",
+    "🔢 Étapes numérotées (1/4, 2/4…) quand on crée son compte",
+  ]},
   { version:"1.14.0", date:"2026-06-13", features:[
     "🔄 Les tâches se remettent à zéro chaque jour — la routine est à refaire chaque matin (l'XP gagné reste pour toujours!)",
     "⏰ Chaque routine peut avoir sa propre heure de fin (Matin, Soir…)",
@@ -2468,7 +2472,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           borderRadius:5,cursor:"pointer"}}>
         ➕ Créer une nouvelle routine
       </button>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",textAlign:"center"}}>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",textAlign:"center",lineHeight:1.4}}>🏠 <b>Semaine</b> = ta page d'accueil. Touche une routine (⏰) pour la commencer.<br/>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
 
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
@@ -2487,7 +2491,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <input type="time" value={routineBuilder.endTime||""} onChange={e=>setRoutineBuilder(b=>({...b,endTime:e.target.value}))}
               style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
           </div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>Choisis tes tâches pour cette routine :</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>👇 Touche les tâches que tu VEUX faire dans cette routine.</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Une tâche choisie devient verte avec un ✅. Touche encore pour l'enlever.</div>
           <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
             {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de routine assignée. Demande à un parent d'en ajouter (type ⏰ Routine).</div>}
             {routineMine.map(a=>{
@@ -2662,6 +2667,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Shop */}
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
       <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #FFD700",borderRadius:5,padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>(
@@ -4089,8 +4095,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           {/* Étape 1 : Thème */}
           {obStep === "theme" && (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>🎨 TON THÈME</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Choisis ton univers</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>🎨 TON THÈME · ÉTAPE 1/4</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Touche l'univers que tu préfères</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginBottom:20}}>⏳ Ce thème dure toute la semaine — choisis bien!</div>
               <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
                 {(player.starterThemes||[player.themeId||"none"]).map(tid=>{
@@ -4119,8 +4125,9 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           {/* Étape 2 : Avatar */}
           {obStep === "avatar" && (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>👾 TON AVATAR</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:12}}>Crée ton personnage 8-bit</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>👾 TON AVATAR · ÉTAPE 2/4</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Crée ton personnage 8-bit</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginBottom:12}}>Touche un onglet (Cheveux, Peau…) puis touche ce que tu aimes.</div>
               <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
                 <AvatarCanvas avatarDef={draftAvatar} bodyColor={getPlayerTheme(draftTheme||"none").charBodyColor||accentColor} size={80}
                   style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
@@ -4190,7 +4197,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           {/* Étape 3 : Surnom */}
           {obStep === "pseudo" && (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>✏️ TON SURNOM</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>✏️ TON SURNOM · ÉTAPE 3/4</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:6}}>Comment veux-tu t'appeler?</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:20}}>Ton vrai nom reste privé pour tes parents.</div>
               <input
@@ -4217,9 +4224,9 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                   style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
               </div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:4}}>
-                {obStep==="pin-create" ? "CRÉE TON CODE SECRET" : "CONFIRME TON CODE"}
+                {obStep==="pin-create" ? "CRÉE TON CODE SECRET · ÉTAPE 4/4" : "CONFIRME TON CODE · ÉTAPE 4/4"}
               </div>
-              {obStep==="pin-create"&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>4 chiffres que tu n'oublieras jamais... promis</div>}
+              {obStep==="pin-create"&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>Choisis 4 chiffres faciles à retenir pour TOI. C'est ton code pour entrer dans ton compte.</div>}
               <PinDots value={obPin} error={pinError} color={accentColor}/>
               <PinKeypad
                 onDigit={handleObPinDigit}
