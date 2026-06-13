@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.19.0";
+const APP_VERSION = "1.20.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -951,6 +951,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.20.0", date:"2026-06-13", features:[
+    "🐉 Boss de famille! Un monstre surprise apparaît — toute la famille gagne de l'XP ensemble pour le vaincre, et tout le monde reçoit une récompense!",
+    "🎨 Boss en pixel-art original (le parent le lance depuis le portail, onglet Actions)",
+  ]},
   { version:"1.19.0", date:"2026-06-13", features:[
     "📣 Fil de famille — vois ce que tout le monde accomplit, mets des ❤️ et écris un petit mot à la famille!",
     "🧩 Le parent peut préparer une routine pour un enfant depuis le portail",
@@ -1234,6 +1238,12 @@ const mergeFamily = (base, incoming) => {
         else m.set(f.id, { ...f, likes: [...(f.likes || [])] });
       }
       return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
+    })(),
+    boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
+      const a = bC.boss, b = iC.boss;
+      if (!a) return b || null; if (!b) return a;
+      if (a.startedAt === b.startedAt) return { ...a, ...b, defeatedAt: a.defeatedAt || b.defeatedAt };
+      return (new Date(b.startedAt||0) >= new Date(a.startedAt||0)) ? b : a;
     })(),
     pin: (bC.pin && bC.pin !== "1146") ? bC.pin : (iC.pin || bC.pin),
     mode: newerC.mode || bC.mode || iC.mode || "routine",
@@ -2260,6 +2270,45 @@ function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true })
     style={{imageRendering:"pixelated",borderRadius:4,...style}}/>;
 }
 
+// ─── BOSS DE FAMILLE — sprites pixel-art ORIGINAUX (dessinés sur canvas) ──────
+const BOSSES = [
+  { id:"dragon", name:"Dragon du Chaos",     color:"#7B3FF2", belly:"#C9B3F7", eye:"#FFE14D", emoji:"🐉" },
+  { id:"slime",  name:"Slime Gluant Géant",  color:"#27AE60", belly:"#B6F0C9", eye:"#FFFFFF", emoji:"🟢" },
+  { id:"golem",  name:"Golem de Pierre",     color:"#8A6A45", belly:"#CBB089", eye:"#9BE3FF", emoji:"🪨" },
+  { id:"kraken", name:"Kraken des Corvées",  color:"#2E6FD6", belly:"#A9C9F4", eye:"#FFD93B", emoji:"🐙" },
+];
+// Dessine un monstre pixel original (corps, ventre, cornes, yeux, dents, taches)
+function renderBossToCtx(ctx, boss, W=120, H=120){
+  const sc=W/24, s=v=>Math.round(v*sc);
+  ctx.clearRect(0,0,W,H);
+  const col=boss?.color||"#7B3FF2", belly=boss?.belly||"#C9B3F7", eye=boss?.eye||"#FFE14D";
+  // Cornes
+  ctx.fillStyle="#2a2230";
+  ctx.fillRect(s(4),s(1),s(3),s(4)); ctx.fillRect(s(17),s(1),s(3),s(4));
+  // Corps (bloc arrondi par retraits de coins)
+  ctx.fillStyle=col;
+  ctx.fillRect(s(3),s(5),s(18),s(15));
+  ctx.fillRect(s(2),s(7),s(20),s(11));
+  ctx.fillRect(s(1),s(9),s(22),s(7));
+  // Ventre
+  ctx.fillStyle=belly; ctx.fillRect(s(7),s(13),s(10),s(6));
+  // Taches
+  ctx.fillStyle="rgba(0,0,0,0.18)"; ctx.fillRect(s(4),s(7),s(2),s(2)); ctx.fillRect(s(18),s(8),s(2),s(2)); ctx.fillRect(s(15),s(6),s(2),s(2));
+  // Yeux
+  ctx.fillStyle=eye; ctx.fillRect(s(6),s(8),s(4),s(4)); ctx.fillRect(s(14),s(8),s(4),s(4));
+  ctx.fillStyle="#111"; ctx.fillRect(s(8),s(10),s(2),s(2)); ctx.fillRect(s(16),s(10),s(2),s(2));
+  // Bouche + dents
+  ctx.fillStyle="#1a0d1a"; ctx.fillRect(s(8),s(15),s(8),s(3));
+  ctx.fillStyle="#fff"; ctx.fillRect(s(9),s(15),s(1),s(2)); ctx.fillRect(s(12),s(15),s(1),s(2)); ctx.fillRect(s(15),s(15),s(1),s(1));
+  // Contour
+  ctx.strokeStyle="#000"; ctx.lineWidth=Math.max(1,s(0.4));
+}
+function BossSprite({ boss, size=120, style={} }){
+  const ref=useRef(null);
+  useEffect(()=>{ const c=ref.current; if(c) renderBossToCtx(c.getContext("2d"), boss, size, size); },[boss,size]);
+  return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
 // ─── AVATAR POPUP (creator + inventory) ──────────────────────
 function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShopItems, th }) {
   const [tab, setTab] = useState("creator"); // creator | inventory
@@ -2996,6 +3045,28 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
         <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} onClose={()=>setProfileIdx(null)}/>
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
+
+      {/* ⚔️ Boss de famille — objectif d'XP collectif */}
+      {config.boss && (()=>{
+        const b=config.boss;
+        const total=gameStates.reduce((s,g)=>s+(g.xp||0),0);
+        const prog=Math.max(0,total-(b.startXpTotal||0));
+        const pct=Math.min(100,Math.round(prog/(b.goalXp||1)*100));
+        const won=!!b.defeatedAt;
+        return (
+          <div style={{background:won?"rgba(20,55,25,0.5)":"rgba(50,18,35,0.5)",border:`2px solid ${won?"#2ECC40":b.color}`,borderRadius:10,padding:12,display:"flex",gap:12,alignItems:"center"}}>
+            <BossSprite boss={b} size={84} style={{flexShrink:0,filter:won?"grayscale(0.6) opacity(0.7)":"none"}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:won?"#2ECC40":b.color}}>{won?`🏆 ${b.name} vaincu!`:`${b.emoji} ${b.name}`}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",margin:"3px 0"}}>{won?"Bravo la famille! Vous l'avez battu ensemble! 🎉":"Gagnez de l'XP en faisant vos quêtes — ensemble vous le vaincrez!"}</div>
+              <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${b.color},#FFD700)`,transition:"width 0.6s ease"}}/>
+              </div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{prog} / {b.goalXp} XP{won?" ✓":` (${pct}%)`}</div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Player cards grid */}
       <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10}}>
         {(config.players||[]).map((player,i)=>{
@@ -3119,7 +3190,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onRemoveAssignment, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -3334,6 +3405,14 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
         {/* ACTIONS TAB */}
         {tab==="actions" && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>ACTIONS GLOBALES</div>
+          {/* Boss de famille surprise */}
+          <div style={{background:"rgba(50,18,35,0.4)",border:"2px solid #7B3FF2",borderRadius:6,padding:"10px",marginBottom:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#C9B3F7",marginBottom:5}}>🐉 BOSS DE FAMILLE</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#999",marginBottom:8}}>Lance un boss surprise : toute la famille doit gagner de l'XP ensemble pour le vaincre (récompense pour tout le monde!).</div>
+            <PBtn onClick={()=>{ if(!bossActive){ onLaunchBoss&&onLaunchBoss(); } }} color={bossActive?"#333":"#7B3FF2"} textColor="#fff" style={{width:"100%",opacity:bossActive?0.6:1}}>
+              {bossActive?"⚔️ Un boss est déjà en cours…":"🐉 Lancer un boss surprise!"}
+            </PBtn>
+          </div>
           <Row>
             {undoStack.length>0
               ? <PBtn onClick={onUndo} color="#FF6464" textColor="#000" style={{flex:1}}>↩️ Annuler dernière</PBtn>
@@ -4734,7 +4813,20 @@ export default function App() {
       const now=Date.now(); const fents=[{ id:"f_"+uid(), ts:now, likes:[], type:"task", playerId:player.id, text:`${displayName(player)} a accompli « ${task.label} »`, emoji:task.emoji||"✅" }];
       if(prevLv<newLv) fents.unshift({ id:"f_"+uid(), ts:now+1, likes:[], type:"level", playerId:player.id, text:`${displayName(player)} passe au niveau ${newLv}!`, emoji:"⭐" });
       for(const bid of newBadgeIds){ const b=BADGES.find(x=>x.id===bid); if(b) fents.unshift({ id:"f_"+uid(), ts:now+2, likes:[], type:"badge", playerId:player.id, text:`${displayName(player)} a gagné le badge « ${b.name} »`, emoji:b.emoji||"🏅" }); }
-      const newCfg={...config, feed:[...fents, ...((config.feed)||[])].slice(0,60)};
+      let feedAcc=[...fents, ...((config.feed)||[])];
+      let bossNow=config.boss;
+      // Victoire de boss : l'XP collectif depuis le lancement atteint l'objectif
+      if(bossNow && !bossNow.defeatedAt){
+        const total=n.reduce((s,g)=>s+(g.xp||0),0);
+        if(total - (bossNow.startXpTotal||0) >= (bossNow.goalXp||999999)){
+          bossNow={...bossNow, defeatedAt:new Date().toISOString()};
+          // récompense d'équipe : +15 pièces à chaque joueur
+          for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+15}; }
+          feedAcc=[{id:"f_"+uid(),ts:Date.now()+3,likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a vaincu le ${bossNow.name}! +15 🪙 pour tout le monde!`},...feedAcc];
+          setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu en famille! +15 🪙 chacun`,"#FFD700",5000); },200);
+        }
+      }
+      const newCfg={...config, boss:bossNow, feed:feedAcc.slice(0,60)};
       setConfig(newCfg);
       persist(newCfg,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
@@ -4867,6 +4959,18 @@ export default function App() {
     logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#2ECC40");
     showToast("➕ Tâche ajoutée!","#2ECC40");
   },[config,gameStates,persist,logAction,showToast]);
+
+  // Lance un boss de famille surprise (objectif d'XP collectif)
+  const handleLaunchBoss = useCallback(()=>{
+    const startXpTotal = gameStates.reduce((s,g)=>s+(g.xp||0),0);
+    const nPlayers = Math.max(1,(config.players||[]).length);
+    const base = BOSSES[Math.floor(Math.random()*BOSSES.length)];
+    const boss = {...base, startXpTotal, goalXp: 40*nPlayers, startedAt:new Date().toISOString(), defeatedAt:null};
+    const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:boss.emoji,text:`⚔️ Un ${boss.name} apparaît! Gagnez ${boss.goalXp} XP en famille pour le vaincre ensemble!`};
+    const newCfg={...config, boss, feed:[fe,...(config.feed||[])].slice(0,60)};
+    setConfig(newCfg); persist(newCfg, gameStates);
+    showToast(`${boss.emoji} ${boss.name} apparaît! Battez-le en famille!`,"#FF6B6B",4500);
+  },[config,gameStates,persist,showToast]);
 
   // Le parent crée/assigne une routine à un enfant (atterrit dans gs[idx].routines)
   const handleAssignRoutine = useCallback((playerIdx, routine)=>{
@@ -5162,6 +5266,8 @@ export default function App() {
           onRefusePending={refusePending}
           onAddAssignment={handleAddAssignment}
           onAssignRoutine={handleAssignRoutine}
+          onLaunchBoss={handleLaunchBoss}
+          bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onRemoveAssignment={handleRemoveAssignment}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
