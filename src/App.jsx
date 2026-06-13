@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.21.0";
+const APP_VERSION = "1.21.1";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -968,6 +968,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.21.1", date:"2026-06-13", features:[
+    "🐛 Fix : la quête ajoutée par l'enfant apparaît maintenant tout de suite dans sa vue",
+  ]},
   { version:"1.21.0", date:"2026-06-13", features:[
     "🎁 Nouvelles récompenses + elles changent au hasard chaque semaine (fini de choisir, place à la surprise!)",
     "🛠️ Fix « Modifier le livre » — ça ouvre bien tes enfants et tâches (au lieu d'un nouveau livre vide)",
@@ -5084,7 +5087,11 @@ export default function App() {
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
     const taskId="cust_"+uid();
     const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:15,coins:8,diff:"easy",cat:"custom"};
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days:[],time:""};
+    // La quête doit apparaître dans la vue ACTUELLE de l'enfant : si mode Semaine → aujourd'hui; si Routine → tâche de routine
+    const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
+    const todayIdx=(new Date().getDay()+6)%7;
+    const days=pmode==="week" ? [todayIdx] : [];
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:""};
     const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
