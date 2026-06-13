@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.23.0";
+const APP_VERSION = "1.24.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -968,6 +968,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.24.0", date:"2026-06-13", features:[
+    "📅 Le parent ajoute des événements au calendrier (récurrents ou datés) pour un ou plusieurs enfants",
+    "🗓️ Nouvel onglet « Calendriers » — voir le calendrier de chacun",
+    "⏱ Nouvel onglet « Minuterie » — chronomètre ton rituel avec des encouragements; à la fin, ton temps et ton XP s'affichent dans le fil!",
+  ]},
   { version:"1.23.0", date:"2026-06-13", features:[
     "🧭 Fix Safari — l'app se charge maintenant même si le service worker n'est pas dispo",
     "🎁 Récompense achetée : « J'ai changé d'idée » (remboursé) + « Cacher » (une nouvelle prend sa place)",
@@ -3331,7 +3336,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -3343,6 +3348,10 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
+  // Ajout d'événement au calendrier (parent)
+  const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
+  const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
+  const [cePlayers,setCePlayers]=useState((players||[]).map(p=>p.id));
   const [rChildIdx, setRChildIdx] = useState(0); // assignation de routine: enfant ciblé
   const [rName, setRName] = useState("");
   const [rTaskIds, setRTaskIds] = useState([]);
@@ -3599,21 +3608,45 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
           const allEntries = (gameStates||[]).flatMap((gs,i)=>{
             const pl = config.players[i];
             return (gs.calendar||[]).map(e=>({...e, playerName: pl?.name||"?", playerColor: pl?.color||"#888"}));
-          }).sort((a,b)=>a.date.localeCompare(b.date));
+          }).sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999"));
           const today = new Date().toISOString().split("T")[0];
+          const recurLbl=(e)=> e.recur?.freq==="daily"?"Chaque jour":e.recur?.freq==="weekly"?("Chaque "+(DAYS[e.recur.day]||"")):(e.date||"");
           return (
             <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>➕ AJOUTER UN ÉVÉNEMENT</div>
+              <input value={ceLabel} onChange={e=>setCeLabel(e.target.value.slice(0,50))} placeholder="Ex: Cours de natation, Rendez-vous dentiste…"
+                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #5DECF5",borderRadius:4,marginBottom:8,outline:"none"}}/>
+              <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
+                {[["evenement","📅 Événement"],["devoir","📚 Devoir"],["examen","📝 Examen"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>{setCeType(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceType===v?"#5DECF5":"#1a1a1a",color:ceType===v?"#000":"#888",border:`2px solid ${ceType===v?"#5DECF5":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
+                {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>{setCeRecur(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceRecur===v?"#FF8C00":"#1a1a1a",color:ceRecur===v?"#000":"#888",border:`2px solid ${ceRecur===v?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                ))}
+              </div>
+              {ceRecur==="none" && <input type="date" value={ceDate} onChange={e=>setCeDate(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none",display:"block"}}/>}
+              {ceRecur==="weekly" && <select value={ceDay} onChange={e=>setCeDay(+e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8}}>{DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>}
+              <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                {players.map(pl=>{ const sel=cePlayers.includes(pl.id); return (
+                  <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                ); })}
+              </div>
+              <PBtn onClick={()=>{ if(ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)){ onAddCalendarEvent&&onAddCalendarEvent(cePlayers,{type:ceType,label:ceLabel.trim(),date:ceRecur==="none"?ceDate:null,recur:ceRecur==="none"?null:(ceRecur==="weekly"?{freq:"weekly",day:ceDay}:{freq:"daily"})}); setCeLabel("");setCeDate(""); } }}
+                color={ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?"#5DECF5":"#333"} textColor="#000" style={{width:"100%",marginBottom:14,opacity:ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?1:0.5}}>➕ Ajouter au calendrier</PBtn>
+
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>CALENDRIER COMMUN</div>
-              {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun devoir ou examen.</div>}
+              {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun événement.</div>}
               {allEntries.map(e=>(
-                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${e.date<today?"#333":e.date===today?"#FFD700":"#444"}`,borderRadius:4,marginBottom:6,opacity:e.date<today?0.4:1}}>
-                  <span style={{fontSize:16}}>{e.type==="examen"?"📝":"📚"}</span>
+                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#FFD700":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
+                  <span style={{fontSize:16}}>{e.type==="examen"?"📝":e.type==="devoir"?"📚":e.recur?"🔁":"📅"}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
                     <div style={{display:"flex",gap:6,marginTop:2}}>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.playerColor}}>{e.playerName}</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#FFD700":"#666"}}>{e.date}</span>
-                      <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:e.type==="examen"?"#FF6B35":"#5DECF5"}}>{e.type}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#FFD700":"#666"}}>{recurLbl(e)}</span>
                     </div>
                   </div>
                 </div>
@@ -4300,9 +4333,30 @@ const subWeekdays = (dateISO, n) => {
 };
 
 // Retourne les rappels actifs pour aujourd'hui
+// Libellé lisible d'une récurrence
+const recurLabel = (e) => {
+  if (e?.recur?.freq==="daily") return "Chaque jour";
+  if (e?.recur?.freq==="weekly") return "Chaque "+(DAYS[e.recur.day]||"?");
+  return e?.date||"";
+};
+// Prochaines dates (ISO) d'un événement sur N jours (gère récurrence)
+const upcomingOccurrences = (e, days=14) => {
+  const out=[]; const today=new Date(); today.setHours(0,0,0,0);
+  for(let d=0; d<days; d++){
+    const dt=new Date(today); dt.setDate(today.getDate()+d); const iso=dt.toISOString().slice(0,10);
+    let hit=false;
+    if(e?.recur?.freq==="daily") hit=true;
+    else if(e?.recur?.freq==="weekly") hit=((dt.getDay()+6)%7)===e.recur.day;
+    else hit=(e?.date===iso);
+    if(hit) out.push(iso);
+  }
+  return out;
+};
+
 const computeCalendarReminders = (calendar, today) => {
   const t = new Date(today); t.setHours(0,0,0,0);
   return (calendar || []).flatMap(entry => {
+    if (!entry.date || entry.recur) return []; // les événements récurrents/sans date ne génèrent pas de rappel d'étude
     const examDate = new Date(entry.date); examDate.setHours(0,0,0,0);
     if (t > examDate) return []; // dépassé
     const triggerDate = subWeekdays(entry.date, 3);
@@ -4321,6 +4375,46 @@ const computeCalendarReminders = (calendar, today) => {
     }];
   });
 };
+
+// ─── MINUTERIE (chrono + rituel + encouragements) ────────────
+const TIMER_ENCOURAGE=["Continue, tu es capable! 💪","Super rythme! ⚡","Tu gères ça comme un·e champion·ne! 🔥","Presque là, lâche pas! 🌟","Wow, quelle belle énergie! 🚀","Tu fais ça super bien! 👏"];
+function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete }){
+  const [childIdx,setChildIdx]=useState(sessionPlayer!=null?sessionPlayer:0);
+  const [ritualId,setRitualId]=useState(null);
+  const [startTs,setStartTs]=useState(null);
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{ if(!startTs)return; const i=setInterval(()=>setNow(Date.now()),500); return()=>clearInterval(i); },[startTs]);
+  const lockChild = sessionPlayer!=null && !parentMode;
+  const cidx = lockChild?sessionPlayer:childIdx;
+  const child=config.players[cidx]; const routines=(gameStates[cidx]?.routines)||[];
+  const ritual=routines.find(r=>r.id===ritualId);
+  const ms=startTs?now-startTs:0; const mm=Math.floor(ms/60000), ss=Math.floor((ms%60000)/1000);
+  const acc=th.accent||(child?.color)||"#FFD700";
+  return (
+    <div style={{padding:"12px 10px",display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:acc}}>⏱ MINUTERIE</div>
+      {!lockChild && <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+        {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#000":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
+      </div>}
+      {!startTs && (<>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Choisis un rituel à chronométrer :</div>
+        {routines.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Aucun rituel enregistré. Crée-en un dans ta page d'accueil!</div>}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 12px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#999",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
+        </div>
+        {ritual && <button onClick={()=>{SFX.epic&&SFX.epic();setStartTs(Date.now());setNow(Date.now());}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:acc,color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶️ Démarrer le chrono!</button>}
+      </>)}
+      {startTs && (<>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?.emoji} {ritual?.name}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:"#fff",textAlign:"center",letterSpacing:2}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(ms/20000)%TIMER_ENCOURAGE.length]}</div>
+        <button onClick={()=>{ const minutes=Math.max(1,Math.round(ms/60000)); onComplete&&onComplete(cidx, ritual, minutes); setStartTs(null); setRitualId(null); }}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>✅ J'ai fini mon rituel!</button>
+        <button onClick={()=>{SFX.click();setStartTs(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Annuler</button>
+      </>)}
+    </div>
+  );
+}
 
 function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetPlayerPin, onCompleteOnboarding, onNewSetup }) {
   // mode: "who" | "child-select" | "onboarding" | "pin" | "parent" | "info"
@@ -5166,6 +5260,29 @@ export default function App() {
     showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
   },[config,persist,showToast]);
 
+  // Minuterie : l'enfant a complété un rituel chronométré → bonus XP + entrée au fil
+  const handleRitualTimerDone = useCallback((playerIdx, ritual, minutes)=>{
+    const player=config.players[playerIdx]; if(!player)return;
+    const bonus=Math.min(40, 5*Math.max(1,(ritual?.taskIds?.length||1)));
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus};
+      const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:`${displayName(player)} a complété son rituel « ${ritual?.name||"?"} » en ${minutes} min! (+${bonus} XP)`};
+      const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};
+      setConfig(newCfg); persist(newCfg,n); return n; });
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("⏱"); SFX.epic&&SFX.epic(); }catch{} showToast(`⏱ Rituel fini en ${minutes} min! +${bonus} XP 🎉`,"#FFD700",4500); },150);
+  },[config,persist,showToast]);
+
+  // Parent : ajoute un événement au calendrier d'un ou plusieurs enfants (récurrent ou daté)
+  const handleAddCalendarEvent = useCallback((playerIds, entry)=>{
+    if(!playerIds?.length || !entry?.label?.trim())return;
+    setGameStates(gs=>{ const n=[...gs];
+      playerIds.forEach(pid=>{ const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
+        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, recur:entry.recur||null };
+        n[i]={...n[i], calendar:[...(n[i].calendar||[]), e]};
+      });
+      persist(config,n); return n; });
+    showToast("📅 Événement ajouté au calendrier!","#5DECF5");
+  },[config,persist,showToast]);
+
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
   const handleHideReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -5368,6 +5485,14 @@ export default function App() {
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
         </button>
+        <button onClick={()=>{setView("calendars");SFX.click();}} className="nav-btn"
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="calendars"?th.accent:"transparent",color:view==="calendars"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          📅 Calendriers
+        </button>
+        <button onClick={()=>{setView("timer");SFX.click();}} className="nav-btn"
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          ⏱ Minuterie
+        </button>
         {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde. */}
         {(config.players||[]).map((pl,i)=>({pl,i})).filter(({i})=> parentMode || sessionPlayer===null || sessionPlayer===i).map(({pl,i})=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
@@ -5380,6 +5505,34 @@ export default function App() {
       {/* ── CONTENT ── */}
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
       <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
+        {view==="calendars"&&(()=>{
+          const order=(config.players||[]).map((p,i)=>i).sort((a,b)=> (a===sessionPlayer?-1:b===sessionPlayer?1:0));
+          const fmt=(iso)=>{ const d=new Date(iso+"T00:00:00"); return DAYS_SHORT[(d.getDay()+6)%7]+" "+d.getDate(); };
+          return (
+            <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent}}>📅 CALENDRIERS</div>
+              {order.map(i=>{ const p=config.players[i]; const cal=(gameStates[i]?.calendar)||[];
+                const items=cal.flatMap(e=>upcomingOccurrences(e,14).map(d=>({d,e}))).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,12);
+                return (
+                  <div key={p.id} style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${p.color}99`,borderRadius:8,padding:12}}>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:p.color,marginBottom:6}}>{displayName(p)}{i===sessionPlayer?" (toi)":""}</div>
+                    {items.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
+                    {items.map(({d,e},k)=>(
+                      <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #222"}}>
+                        <span style={{fontSize:14}}>{e.type==="examen"?"📝":e.type==="devoir"?"📚":e.recur?"🔁":"📅"}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",minWidth:46}}>{fmt(d)}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {view==="timer"&&(
+          <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone}/>
+        )}
         {view==="family"&&(
           <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===null || sessionPlayer===i} th={th}
             meId={parentMode ? "parent" : (sessionPlayer!=null ? config.players[sessionPlayer]?.id : "parent")}
@@ -5446,6 +5599,7 @@ export default function App() {
           onAssignRoutine={handleAssignRoutine}
           onLaunchBoss={handleLaunchBoss}
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
+          onAddCalendarEvent={handleAddCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
