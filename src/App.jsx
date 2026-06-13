@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.24.0";
+const APP_VERSION = "1.25.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -968,6 +968,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.25.0", date:"2026-06-13", features:[
+    "🎮 Mini-jeux ralentis (plus doux) + plus de « OK » en trop : un seul écran d'intro puis 3·2·1·GO!",
+  ]},
   { version:"1.24.0", date:"2026-06-13", features:[
     "📅 Le parent ajoute des événements au calendrier (récurrents ou datés) pour un ou plusieurs enfants",
     "🗓️ Nouvel onglet « Calendriers » — voir le calendrier de chacun",
@@ -3775,6 +3778,9 @@ function MiniGameRunner({ pt, level, onFinish }) {
     setPhase("play");
   };
 
+  // Démarre tout seul (le wrapper a déjà fait l'intro + le décompte GO)
+  useEffect(() => { startGame(); }, []);
+
   useEffect(() => {
     if (phase !== "play") return;
     const canvas = canvasRef.current;
@@ -3797,11 +3803,11 @@ function MiniGameRunner({ pt, level, onFinish }) {
       st.py += st.vy;
       if (st.py >= GROUND) { st.py = GROUND; st.vy = 0; st.onGround = true; }
 
-      // Speed ramps up over time
-      const speed = 3 + elapsed / 4000;
+      // Speed ramps up over time (plus lent qu'avant)
+      const speed = 2 + elapsed / 9000;
 
-      // Spawn obstacles
-      if (now - st.lastObs > 1200 - elapsed / 50) {
+      // Spawn obstacles (espacés, avec un plancher pour ne jamais devenir trop rapide)
+      if (now - st.lastObs > 1700 - Math.min(800, elapsed / 120)) {
         const h = 16 + Math.random() * 16;
         st.obstacles.push({ x: W + 10, h });
         st.lastObs = now;
@@ -3939,8 +3945,8 @@ function MiniGamePacman({ pt, level, onFinish }) {
   const BONUS_XP    = [0, 5, 12, 24, 40];
   const BONUS_COINS = [0, 2,  7, 14, 22];
   const CS = 22; // cell size
-  const MOVE_INTERVAL = 180;
-  const GHOST_INTERVAL = 260;
+  const MOVE_INTERVAL = 200;
+  const GHOST_INTERVAL = 380; // fantômes plus lents (moins stressant)
   const DURATION = 30000;
 
   const MAZE_TEMPLATE = [
@@ -3999,6 +4005,9 @@ function MiniGamePacman({ pt, level, onFinish }) {
     phaseRef.current = "play";
     setPhase("play");
   };
+
+  // Démarre tout seul (le wrapper a déjà fait l'intro + le décompte GO)
+  useEffect(() => { startGame(); }, []);
 
   useEffect(() => {
     if (phase !== "play") return;
@@ -4176,7 +4185,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
 // ═══════════════════════════════════════════════════════════════
 function MiniGameWhack({ pt, level, onFinish }) {
   const ROUNDS = 3;
-  const ROUND_MS = 1400;
+  const ROUND_MS = 2300; // plus lent (était 1400)
   const BONUS_XP = [0, 8, 18, 30];
   const BONUS_COINS = [0, 4, 10, 18];
   const TARGET = pt.platformItems?.[0] || "⭐";
@@ -4197,7 +4206,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
       roundRef.current++;
       setRound(roundRef.current);
       if (roundRef.current >= ROUNDS) { setTimeout(() => setPhase("done"), 400); }
-      else { setTimeout(showNext, 350); }
+      else { setTimeout(showNext, 600); }
     }, ROUND_MS);
   }, []);
 
@@ -4208,15 +4217,17 @@ function MiniGameWhack({ pt, level, onFinish }) {
     setActive(-1); SFX.coin();
     roundRef.current++; setRound(roundRef.current);
     if (roundRef.current >= ROUNDS) { setTimeout(() => setPhase("done"), 350); }
-    else { setTimeout(showNext, 280); }
+    else { setTimeout(showNext, 500); }
   };
 
   const start = () => {
     roundRef.current = 0; scoreRef.current = 0;
     setRound(0); setScore(0); setPhase("play");
-    setTimeout(showNext, 500);
+    setTimeout(showNext, 700);
   };
 
+  // Démarre tout seul (le wrapper a déjà fait l'intro + le décompte GO)
+  useEffect(() => { start(); }, []);
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const bonusXp = BONUS_XP[score] ?? 0;
