@@ -1,15 +1,21 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.15.0";
+const APP_VERSION = "1.16.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
+// ─── RÉGLAGES D'ACCESSIBILITÉ (neurodivergence) ───────────────
+// Drapeaux globaux pilotés par App selon les réglages de l'enfant affiché.
+let SFX_MUTED = false; // couper le son
+let CALM = false;      // mode calme : pas de confettis/particules, animations réduites (+ classe CSS)
+
 // ─── AUDIO ────────────────────────────────────────────────────
 let _ac = null;
 const ac = () => { try { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); _ac.resume(); return _ac; } catch { return null; } };
 const tone = (f, type, dur, vol, delay = 0) => {
+  if (SFX_MUTED) return; // son coupé (réglage enfant)
   try { const ctx = ac(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type = type; o.frequency.setValueAtTime(f, ctx.currentTime + delay); g.gain.setValueAtTime(0, ctx.currentTime + delay); g.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + 0.01); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur); o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + dur + 0.05); } catch {}
 };
 const SFX = {
@@ -945,6 +951,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.16.0", date:"2026-06-13", features:[
+    "⚙️ Mes réglages (par enfant) : 🔊 son, 🎬 mode calme (moins d'animations/flash), ⏱ décompte calme, 😄 messages rigolos, 🎯 une tâche à la fois",
+    "♿ Plus accessible pour tout le monde — respecte aussi le réglage « moins d'animations » de l'appareil",
+    "← Boutons Retour partout (fini d'être coincé dans un écran)",
+  ]},
   { version:"1.15.0", date:"2026-06-13", features:[
     "🎨 Choix du thème chaque semaine — touche « Mon thème » pour en changer (un nouveau choix par semaine)",
     "🔓 Débloque de nouveaux thèmes en gagnant de l'XP — l'écran montre lesquels et combien d'XP il manque",
@@ -1157,6 +1168,7 @@ const mergeGS = (a, b) => {
     mode: b.mode ?? a.mode ?? null,
     routines: (() => { const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
+    settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
 // Fusion d'un joueur (config) — garde UN seul thème par enfant
@@ -1260,6 +1272,7 @@ const migrateGameState = (gs) => {
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
+    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -1353,6 +1366,11 @@ const GLOBAL_CSS = `
   .float-y-slow{animation:floatY 3.2s ease-in-out infinite}
   .glow-pulse{animation:glowPulse 2.8s ease-in-out infinite}
   .blink{animation:blink 1.1s step-end infinite}
+  /* Accessibilité : respecte le réglage système "moins d'animations" */
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms!important;animation-iteration-count:1!important;transition-duration:0.001ms!important} }
+  /* Mode calme (réglage enfant) : coupe animations, clignotements et lueurs pulsées */
+  .calm-mode *{animation:none!important;transition:none!important}
+  .calm-mode .blink{opacity:1!important}
   .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #000,0 0 28px #FFD70045,4px 4px 0 #000!important;border-radius:4px!important}
   .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#000;border:3px solid #000;box-shadow:4px 4px 0 #000;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
   .btn-pixel-primary:hover{box-shadow:2px 2px 0 #000;transform:translate(2px,2px)}
@@ -1573,6 +1591,7 @@ function Toast({ msg, color }) {
 
 // ─── PARTICLES FX ────────────────────────────────────────────
 function spawnParticles(emoji) {
+  if (CALM) return; // mode calme : pas de particules/flash
   const emojis = [emoji,"⭐","✨","💫"];
   for(let i=0;i<7;i++) setTimeout(()=>{
     const p=document.createElement("div");
@@ -2016,7 +2035,7 @@ function SetupWizard({ existing, onDone }) {
 // ═══════════════════════════════════════════════════════════════
 
 // ─── COUNTDOWN (Routine mode) ────────────────────────────────
-function Countdown({ endTime, th }) {
+function Countdown({ endTime, th, calm }) {
   const [now, setNow] = useState(new Date());
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
   const [eh,em]=endTime.split(":").map(Number);
@@ -2026,17 +2045,19 @@ function Countdown({ endTime, th }) {
   const abs=Math.abs(diff);
   const h=Math.floor(abs/3600000), m=Math.floor((abs%3600000)/60000), s=Math.floor((abs%60000)/1000);
   const pct=isLate?100:Math.max(0,100-(diff/(3600000*2))*100); // 2h window
-  const urgent=diff>0&&diff<900000; // <15min
+  const urgent=!calm && diff>0&&diff<900000; // <15min (jamais en mode calme)
+  // Mode calme : pas de rouge, pas d'urgence, pas de pulsation — juste l'heure et une barre neutre
+  const danger = !calm && isLate;
   return (
-    <div style={{padding:"10px 14px",background:isLate?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${isLate?"#FF4444":urgent?"#FFD700":th.accent}60`,borderRadius:6,animation:urgent||isLate?"redPulse 1s ease-in-out infinite":"none"}}>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isLate?"#FF4444":urgent?"#FFD700":th.accent,marginBottom:6,textAlign:"center"}}>
-        {isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ ROUTINE TERMINE À "+endTime}
+    <div style={{padding:"10px 14px",background:danger?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${danger?"#FF4444":urgent?"#FFD700":th.accent}60`,borderRadius:6,animation:(urgent||danger)?"redPulse 1s ease-in-out infinite":"none"}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:danger?"#FF4444":urgent?"#FFD700":th.accent,marginBottom:6,textAlign:"center"}}>
+        {calm ? "⏱ Routine jusqu'à "+endTime : (isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ ROUTINE TERMINE À "+endTime)}
       </div>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:isLate?"#FF4444":urgent?"#FFD700":"#fff",textAlign:"center",textShadow:`0 0 20px ${isLate?"#FF4444":urgent?"#FFD700":th.accent}`,letterSpacing:2,marginBottom:8}}>
-        {isLate?"+":""}{h>0?h+"h ":""}{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:danger?"#FF4444":urgent?"#FFD700":"#fff",textAlign:"center",textShadow:calm?"none":`0 0 20px ${danger?"#FF4444":urgent?"#FFD700":th.accent}`,letterSpacing:2,marginBottom:8}}>
+        {isLate?(calm?"":"+"):""}{h>0?h+"h ":""}{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
       </div>
       <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden"}}>
-        <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${th.primary},${isLate?"#FF4444":th.accent})`,transition:"width 1s ease"}}/>
+        <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${th.primary},${danger?"#FF4444":th.accent})`,transition:"width 1s ease"}}/>
       </div>
     </div>
   );
@@ -2342,6 +2363,9 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
 function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [themePicker, setThemePicker] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
+  const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
@@ -2423,11 +2447,51 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       </div>
 
-      {/* Bouton thème (choix hebdomadaire) */}
-      <button onClick={()=>{SFX.click();setThemePicker(true);}}
-        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px",background:"rgba(0,0,0,0.4)",border:`2px solid ${pt.accent||player.color}55`,color:pt.accent||player.color,borderRadius:5,cursor:"pointer"}}>
-        🎨 Mon thème : {pt.name} — toucher pour changer
-      </button>
+      {/* Boutons thème + réglages */}
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={()=>{SFX.click();setThemePicker(true);}}
+          style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px",background:"rgba(0,0,0,0.4)",border:`2px solid ${pt.accent||player.color}55`,color:pt.accent||player.color,borderRadius:5,cursor:"pointer"}}>
+          🎨 Thème : {pt.name}
+        </button>
+        <button onClick={()=>{SFX.click();setSettingsOpen(true);}} title="Mes réglages (son, animations…)"
+          style={{flexShrink:0,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 12px",background:"rgba(0,0,0,0.4)",border:"2px solid #555",color:"#bbb",borderRadius:5,cursor:"pointer"}}>
+          ⚙️
+        </button>
+      </div>
+
+      {/* Panneau « Mes réglages » (accessibilité par enfant) */}
+      {settingsOpen && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2500,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:pt.accent||player.color}}>⚙️ Mes réglages</div>
+            <button onClick={()=>{SFX.click();setSettingsOpen(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+          </div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:10}}>Ajuste l'app comme tu l'aimes. Touche pour activer ou désactiver.</div>
+          {[
+            ["sound","🔊 Son","Les petits sons quand tu touches et réussis"],
+            ["calm","🎬 Mode calme","Moins d'animations et de clignotements (plus doux pour les yeux)"],
+            ["calmCountdown","⏱ Décompte calme","Le minuteur sans rouge ni « dépêche-toi »"],
+            ["humor","😄 Messages rigolos","Les petits messages drôles après une quête"],
+            ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
+          ].map(([key,label,desc])=>{
+            const isOn = (key==="sound"||key==="humor") ? settings[key]!==false : !!settings[key];
+            return (
+              <div key={key} onClick={()=>{SFX.click();setSetting(key, !isOn);}}
+                style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#2ECC40"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isOn?(pt.accent||"#fff"):"#999"}}>{label}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{desc}</div>
+                </div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#2ECC40"):"#333",color:isOn?"#000":"#888",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
+              </div>
+            );
+          })}
+          <button onClick={()=>{SFX.click();setSettingsOpen(false);}}
+            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+            ← Retour
+          </button>
+        </div>
+      )}
 
       {/* Sélecteur de thème — un thème par semaine, débloqué par XP */}
       {themePicker && (()=>{
@@ -2465,6 +2529,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 );
               })}
             </div>
+            <button onClick={()=>{SFX.click();setThemePicker(false);}}
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"4px 4px 0 #000"}}>
+              ← Retour
+            </button>
           </div>
         );
       })()}
@@ -2584,7 +2652,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"ROUTINE ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?(weekMine.length?"Rien de prévu aujourd'hui! 🎉":"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).") : (activeRoutine?"Cette routine est vide. Modifie-la ou crée-en une nouvelle.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Routine).")}</div>}
-      {myAssignments.map(ass=>{
+      {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
+        if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
+        return null;
+      })()}
+      {(settings.focus ? myAssignments.filter(a=>!pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).slice(0,1) : myAssignments).map(ass=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
         if(!task)return null;
         const doneKey=ass.instanceId+"_"+player.id+"#"+todayStamp(); // clé du jour → se remet à zéro chaque jour
@@ -4500,7 +4572,7 @@ export default function App() {
       setTimeout(()=>{
         spawnParticles(task.emoji);
         if(task.xp>=35){SFX.epic();}else{SFX.task();}
-        setTimeout(()=>showToast(FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)],"#555",2800),1400);
+        if(p?.settings?.humor!==false) setTimeout(()=>showToast(FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)],"#555",2800),1400);
         if(prevLv<newLv){
           setMiniGame({player,playerIdx,level:newLv,playerThemeId:player.themeId||"none",pendingReward:pendingRwd});
         } else {
@@ -4703,6 +4775,10 @@ export default function App() {
 
   // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille/parent = accueil Semaine (pas de gros chrono rouge).
   const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
+  // Réglages d'accessibilité de l'enfant affiché → pilotent son/animations/décompte
+  const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
+  SFX_MUTED = curSettings.sound === false;
+  CALM = !!curSettings.calm;
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
   // (sinon une routine d'hier soir laisse un gros « EN RETARD » rouge en permanence).
   // Heure de fin: celle de la routine active si elle en a une, sinon l'heure de routine famille
@@ -4765,7 +4841,7 @@ export default function App() {
   const currentPlayerState = currentPlayerView!==null ? gameStates[currentPlayerView] : null;
 
   return (
-    <div className="game-root" style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
+    <div className={"game-root"+(CALM?" calm-mode":"")} style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
       <style>{GLOBAL_CSS+`
         .nav-btn:hover{opacity:0.85;}
         .task-card:hover{transform:translateY(-1px);}
@@ -4812,7 +4888,7 @@ export default function App() {
       </div>
 
       {/* ── ROUTINE COUNTDOWN (sticky below header) ── */}
-      {showCountdown&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={countdownEnd} th={th}/></div>}
+      {showCountdown&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={countdownEnd} th={th} calm={curSettings.calmCountdown}/></div>}
 
       {/* ── DAY PROGRESS ── */}
       <div style={{padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
