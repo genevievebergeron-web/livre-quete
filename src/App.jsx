@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.22.0";
+const APP_VERSION = "1.23.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -102,7 +102,7 @@ const TASK_CATALOG = [
   { id:"to04", emoji:"🌸",  label:"Arroser le jardin devant",                xp:20, coins:10, diff:"easy",   cat:"outdoor" },
 ];
 
-const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰ Routine", defi:"🎯 Défis", outdoor:"🌳 Dehors" };
+const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰ Rituel", defi:"🎯 Défis", outdoor:"🌳 Dehors" };
 const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
@@ -968,6 +968,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.23.0", date:"2026-06-13", features:[
+    "🧭 Fix Safari — l'app se charge maintenant même si le service worker n'est pas dispo",
+    "🎁 Récompense achetée : « J'ai changé d'idée » (remboursé) + « Cacher » (une nouvelle prend sa place)",
+    "✨ « Routine » devient « Rituel »!",
+  ]},
   { version:"1.22.0", date:"2026-06-13", features:[
     "🏅 Badges en pixel-art (médaillons dorés avec un symbole du défi) — fini les emojis sur les badges!",
   ]},
@@ -1028,7 +1033,7 @@ const CHANGELOG = [
     "🛑 Fini le gros chrono rouge « en retard » dans la vue parent et le soir",
   ]},
   { version:"1.13.0", date:"2026-06-13", features:[
-    "🔀 Chaque enfant peut basculer entre ⏰ Routine et 📅 Semaine — son XP et sa progression se cumulent dans les deux modes!",
+    "🔀 Chaque enfant peut basculer entre ⏰ Rituel et 📅 Semaine — son XP et sa progression se cumulent dans les deux modes!",
     "🎨 Un seul thème par enfant, le même en mode Routine et en mode Semaine",
     "☁️ Synchro plus prudente — la progression de chaque appareil se fusionne sans jamais s'écraser (l'XP ne peut que monter)",
     "📋 Portail parent — on choisit maintenant si une tâche est de type Routine ou Semaine en l'ajoutant",
@@ -1216,6 +1221,8 @@ const mergeGS = (a, b) => {
     mode: b.mode ?? a.mode ?? null,
     routines: (() => { const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
+    hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
+    hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1337,6 +1344,8 @@ const migrateGameState = (gs) => {
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
     settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant
+    hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
+    hiddenWeek: gs.hiddenWeek ?? null,
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -1884,7 +1893,7 @@ function SetupWizard({ existing, onDone }) {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent,marginBottom:16}}>🎮 Quel mode?</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             {[
-              {k:"routine",icon:"⏰",title:"Mode Routine",desc:"Matin, soir ou après-école. Compte à rebours proéminent jusqu'à l'heure cible."},
+              {k:"routine",icon:"⏰",title:"Mode Rituel",desc:"Matin, soir ou après-école. Compte à rebours proéminent jusqu'à l'heure cible."},
               {k:"week",   icon:"📅",title:"Mode Semaine", desc:"Organisation sur 7 jours. Progression hebdomadaire avec bilan."},
             ].map(({k,icon,title,desc})=>(
               <div key={k} onClick={()=>{setMode(k);SFX.click();}} style={{border:`3px solid ${mode===k?T.accent:"#444"}`,borderRadius:6,padding:16,cursor:"pointer",background:mode===k?`${T.accent}15`:"rgba(0,0,0,0.4)",boxShadow:mode===k?`0 0 16px ${T.accent}50`:"none",transition:"all 0.15s"}}>
@@ -2117,7 +2126,7 @@ function Countdown({ endTime, th, calm }) {
   return (
     <div style={{padding:"10px 14px",background:danger?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${danger?"#FF4444":urgent?"#FFD700":th.accent}60`,borderRadius:6,animation:(urgent||danger)?"redPulse 1s ease-in-out infinite":"none"}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:danger?"#FF4444":urgent?"#FFD700":th.accent,marginBottom:6,textAlign:"center"}}>
-        {calm ? "⏱ Routine jusqu'à "+endTime : (isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ ROUTINE TERMINE À "+endTime)}
+        {calm ? "⏱ Rituel jusqu'à "+endTime : (isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ RITUEL TERMINE À "+endTime)}
       </div>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:danger?"#FF4444":urgent?"#FFD700":"#fff",textAlign:"center",textShadow:calm?"none":`0 0 20px ${danger?"#FF4444":urgent?"#FFD700":th.accent}`,letterSpacing:2,marginBottom:8}}>
         {isLate?(calm?"":"+"):""}{h>0?h+"h ":""}{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
@@ -2553,7 +2562,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
@@ -2604,8 +2613,9 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const eq = pState.equipped || {};
   // hat/armor/pet resolved via allShopItemsFlat after it's declared below
 
-  // Récompenses ALÉATOIRES de la semaine (change chaque lundi) — plus de sélection fixe
-  const myRewards = weeklyRewards(8);
+  // Récompenses ALÉATOIRES de la semaine; les cachées laissent place à de nouvelles
+  const _hiddenRw = (pState.hiddenWeek===weekKey() ? (pState.hiddenRewards||[]) : []);
+  const myRewards = weeklyRewards(REWARD_CATALOG.length).filter(r=>!_hiddenRw.includes(r.id)).slice(0,8);
   const allShopItemsFlat = [
     ...SHOP_ITEMS.hats, ...SHOP_ITEMS.armors, ...SHOP_ITEMS.pets,
     ...(pt.shopCategory?.items||[]),
@@ -2785,15 +2795,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"11px",
           background:"rgba(0,0,0,0.4)",border:`2px dashed ${(th.accent||player.color)}`,color:(th.accent||player.color),
           borderRadius:5,cursor:"pointer"}}>
-        ➕ Créer une nouvelle routine
+        ➕ Créer un nouveau rituel
       </button>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",textAlign:"center",lineHeight:1.4}}>🏠 <b>Semaine</b> = ta page d'accueil. Touche une routine (⏰) pour la commencer.<br/>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",textAlign:"center",lineHeight:1.4}}>🏠 <b>Semaine</b> = ta page d'accueil. Touche un rituel (⏰) pour le commencer.<br/>Ton XP et tes pièces se cumulent dans la semaine ET les rituels ⚡</div>
 
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
         <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier ma routine":"🌟 Ma nouvelle routine"}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier mon rituel":"🌟 Mon nouveau rituel"}</div>
             <button onClick={()=>{SFX.click();setRoutineBuilder(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>✕</button>
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -2809,10 +2819,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <input type="time" value={routineBuilder.endTime||""} onChange={e=>setRoutineBuilder(b=>({...b,endTime:e.target.value}))}
               style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
           </div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>👇 Touche les tâches que tu VEUX faire dans cette routine.</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>👇 Touche les tâches que tu VEUX faire dans ce rituel.</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Une tâche choisie devient verte avec un ✅. Touche encore pour l'enlever.</div>
           <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
-            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de routine assignée. Demande à un parent d'en ajouter (type ⏰ Routine).</div>}
+            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de rituel assignée. Demande à un parent d'en ajouter (type ⏰ Rituel).</div>}
             {routineMine.map(a=>{
               const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null;
               const sel=routineBuilder.taskIds.includes(a.instanceId);
@@ -2841,15 +2851,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 }
                 setRoutineBuilder(null);
               }}
-              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>{routineBuilder.editId?"✅ Enregistrer":"✅ Créer ma routine"}</button>
+              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>{routineBuilder.editId?"✅ Enregistrer":"✅ Créer mon rituel"}</button>
           </div>
         </div>
       )}
 
       {/* Tasks */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"ROUTINE ⏰")}</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
-      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?(weekMine.length?"Rien de prévu aujourd'hui! 🎉":"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).") : (activeRoutine?"Cette routine est vide. Modifie-la ou crée-en une nouvelle.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Routine).")}</div>}
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?(weekMine.length?"Rien de prévu aujourd'hui! 🎉":"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).") : (activeRoutine?"Ce rituel est vide. Modifie-le ou crée-en un nouveau.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Rituel).")}</div>}
       {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
         if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
         return null;
@@ -2921,10 +2931,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
         <button onClick={()=>{
-            if(window.confirm("Terminer la routine et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
+            if(window.confirm("Terminer le rituel et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
           }}
           style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#2ECC40",border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
-          ✅ J'ai fini ma routine — revenir au mode Semaine 📅
+          ✅ J'ai fini mon rituel — revenir au mode Semaine 📅
         </button>
       )}
       {activeRoutine && (
@@ -2933,7 +2943,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:th.accent||player.color,background:"transparent",border:`1px solid ${th.accent||player.color}55`,borderRadius:3,cursor:"pointer"}}>
             ✏️ Modifier
           </button>
-          <button onClick={()=>{ if(window.confirm(`Supprimer la routine «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
+          <button onClick={()=>{ if(window.confirm(`Supprimer le rituel «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
             style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF6B6B",background:"transparent",border:"1px solid #FF6B6B40",borderRadius:3,cursor:"pointer"}}>
             🗑️ Supprimer
           </button>
@@ -3022,8 +3032,12 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                   </div>
                   {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
                   {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
-                  {bought&&parentMode&&<button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:"rgba(0,0,0,0.6)",color:"#FF8C00",border:"1px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Annuler cette récompense (parent)">↩️ Annuler</button>}
+                  {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
+                    <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#FF8C00",border:"1px solid #FF8C00",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
+                    <button onClick={(e)=>{e.stopPropagation();SFX.click();onHideReward&&onHideReward(r);}}
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#2ECC40",border:"1px solid #2ECC40",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Cacher</button>
+                  </div>}
                 </div>
               );
             })}
@@ -3452,7 +3466,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
             {/* Type de tâche : routine (sans jour) ou semaine (Lun–Ven) */}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>TYPE DE TÂCHE</div>
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["routine","⏰ Routine"],["week","📅 Semaine"]].map(([k,l])=>(
+              {[["routine","⏰ Rituel"],["week","📅 Semaine"]].map(([k,l])=>(
                 <button key={k} onClick={()=>{setAddType(k);SFX.click();}}
                   style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:addType===k?"#FF8C00":"#1a1a1a",color:addType===k?"#000":"#888",border:`2px solid ${addType===k?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>
                   {l}
@@ -3496,22 +3510,22 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
             </div>
 
             {/* ── Assigner une routine à un enfant ───────────────── */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UNE ROUTINE</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UN RITUEL</div>
             {(()=>{
               const child=players[rChildIdx];
               const childRoutineTasks=child?(config.assignments||[]).filter(a=>a.playerIds.includes(child.id)&&!(Array.isArray(a.days)&&a.days.length>0)):[];
               return (
                 <div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:6}}>Crée une routine prête pour un enfant (il pourra la lancer sans la refaire).</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:6}}>Crée un rituel prêt pour un enfant (il pourra le lancer sans le refaire).</div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                     {players.map((pl,i)=>(
                       <div key={pl.id} onClick={()=>{setRChildIdx(i);setRTaskIds([]);SFX.click();}}
                         style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:rChildIdx===i?pl.color:"#1a1a1a",color:rChildIdx===i?"#000":"#666",border:`2px solid ${rChildIdx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
                     ))}
                   </div>
-                  <input value={rName} onChange={e=>setRName(e.target.value.slice(0,16))} placeholder="Nom de la routine (ex: Matin)"
+                  <input value={rName} onChange={e=>setRName(e.target.value.slice(0,16))} placeholder="Nom du rituel (ex: Matin)"
                     style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none"}}/>
-                  {childRoutineTasks.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666",marginBottom:8}}>Cet enfant n'a pas encore de tâche de type ⏰ Routine. Ajoute-lui-en en haut (type Routine).</div>}
+                  {childRoutineTasks.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666",marginBottom:8}}>Cet enfant n'a pas encore de tâche de type ⏰ Rituel. Ajoute-lui-en en haut (type Routine).</div>}
                   <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8,maxHeight:"26vh",overflowY:"auto"}}>
                     {childRoutineTasks.map(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null; const sel=rTaskIds.includes(a.instanceId);
                       return (
@@ -3525,7 +3539,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                   </div>
                   <PBtn onClick={()=>{ if(rName.trim()&&rTaskIds.length){ onAssignRoutine&&onAssignRoutine(rChildIdx,{name:rName.trim(),emoji:"🌅",taskIds:rTaskIds}); setRName("");setRTaskIds([]); } }}
                     color={rName.trim()&&rTaskIds.length?"#2ECC40":"#333"} textColor="#000" style={{width:"100%",opacity:rName.trim()&&rTaskIds.length?1:0.5}}>
-                    🧩 Assigner cette routine à {child?displayName(child):"…"}
+                    🧩 Assigner ce rituel à {child?displayName(child):"…"}
                   </PBtn>
                 </div>
               );
@@ -5145,11 +5159,19 @@ export default function App() {
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
   },[config,gameStates,persist,showToast]);
 
-  // Parent : annuler une récompense réclamée par erreur (remet les pièces)
+  // Annuler une récompense réclamée (remet les pièces) — accessible enfant ET parent
   const handleUnclaimReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
     setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), coins:(p.coins||0)+(reward.coins||0)}; persist(config,n); return n; });
-    showToast("↩️ Récompense annulée — pièces remises","#FF8C00");
+    showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
+  },[config,persist,showToast]);
+
+  // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
+  const handleHideReward = useCallback((playerId, reward)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    const wk=weekKey();
+    setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; const sameWeek=p.hiddenWeek===wk; const hidden=sameWeek?[...(p.hiddenRewards||[])]:[]; if(!hidden.includes(reward.id))hidden.push(reward.id); n[idx]={...p, hiddenRewards:hidden, hiddenWeek:wk}; persist(config,n); return n; });
+    showToast("✅ Récompense rangée — une nouvelle apparaît!","#2ECC40");
   },[config,persist,showToast]);
 
   const handleResetPlayer = useCallback((playerIdx) => {
@@ -5288,7 +5310,7 @@ export default function App() {
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Routine ⏰":"Mode Semaine 📅"} — {th.name}</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
         {/* Clock (discrète : heure:minute, sans clignotement) */}
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",color:"#7aa"}}>{H}:{M}</div>
@@ -5378,6 +5400,7 @@ export default function App() {
             onEquip={handleEquip}
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
+            onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             parentMode={parentMode}
             playerMode={gameStates[view]?.mode || config.mode || "routine"}
             todayDayIdx={todayDayIdx}
