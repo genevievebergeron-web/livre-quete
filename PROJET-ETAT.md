@@ -39,7 +39,15 @@ _Mis à jour: 2026-06-13 — v1.13.0_
 
 ## Ce qui est fait ✅
 
-### v1.13.0 — Modes par enfant + routines autonomes + fusion sync ← DERNIER COMMIT
+### v1.13.1 — Accueil Semaine + déconnexion + intro mini-jeux + fix chrono ← DERNIER COMMIT
+- **Connexion → accueil Semaine** : `onSelectPlayer` force `mode:"week", activeRoutineId:null` (on n'arrive plus au milieu d'une routine d'hier).
+- **Bouton « ➕ Créer une nouvelle routine »** bien en vue (au lieu d'une petite puce). Puce d'accueil renommée 🏠 Semaine.
+- **Déconnexion / changer d'enfant** (🚪 dans l'entête → retour `screen:"login"`) + **sortir du mode parent** (🔒 dans l'entête ET dans le portail via `onExitParent`). Avant : aucun moyen de quitter le mode parent.
+- **Mini-jeux** : écran d'intro (`MiniGame` phase `intro→countdown→play`) qui explique quoi faire + décompte « 3·2·1·GO! ». Les jeux (Runner/Pacman/Whack) ne se montent qu'après GO → le chrono part quand l'enfant est prêt. Bouton « Passer » conservé.
+- **Fix gros chrono rouge** : `effectiveMode` = "week" en vue famille/parent (plus de countdown là) ; `showCountdown` limité à un enfant en mode routine ET dans une fenêtre du matin (≤ routineEnd+90 min) → fini le « EN RETARD » d'une routine d'hier soir.
+- ⚠️ Convergence multi-appareils : chaque appareil doit OUVRIR l'app en ligne (PWA `autoUpdate`) pour passer en v1.13.x et fusionner ses joueurs dans le cloud. Tant qu'un appareil n'a pas synchronisé, ses enfants n'apparaissent pas ailleurs (normal, pas un bug).
+
+### v1.13.0 — Modes par enfant + routines autonomes + fusion sync
 - **FIX BUILD CANNER** : `package-lock.json` ne contenait pas `pg` (ajouté en v1.12.0) → `npm ci` échouait (`EUSAGE`, déploiement `failed`). Lock régénéré (`npm install --package-lock-only`), `npm ci` validé. C'est LA raison pour laquelle la sync v1.12.0 ne s'était jamais déployée.
 - **Mode par enfant** : `gameStates[i].mode` (`"routine"|"week"`, défaut = `config.mode`). Chaque enfant bascule lui-même entre ⏰ Routine et 📅 Semaine via des chips dans son dashboard. L'XP/pièces sont un **seul pool par enfant** → se cumulent dans les deux modes (aucun changement de logique XP nécessaire). `effectiveMode` (App) pilote countdown/barre de progression/entête selon le joueur vu. Ancien onglet global « 📅 Semaine » retiré (la semaine est maintenant par-enfant).
 - **Routines autonomes créées par l'enfant** : `gameStates[i].routines = [{id,name,emoji,taskIds:[instanceId]}]` + `activeRoutineId`. L'enfant crée « Matin », « Soir »… en choisissant parmi ses tâches de routine assignées (XP intègre, pas d'invention). Bouton **« ✅ J'ai fini ma routine — revenir au mode Semaine »** (confirm). Builder dans `PlayerDashboard` (`routineBuilder` state).

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.13.0";
+const APP_VERSION = "1.13.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── AUDIO ────────────────────────────────────────────────────
@@ -942,6 +942,13 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.13.1", date:"2026-06-13", features:[
+    "🏠 Connexion → on arrive direct sur l'accueil Semaine",
+    "➕ Bouton bien en vue pour créer une nouvelle routine",
+    "🚪 Bouton déconnexion (changer d'enfant) + 🔒 sortir du mode parent",
+    "⏳ Les mini-jeux expliquent quoi faire et donnent un décompte « 3·2·1·GO! »",
+    "🛑 Fini le gros chrono rouge « en retard » dans la vue parent et le soir",
+  ]},
   { version:"1.13.0", date:"2026-06-13", features:[
     "🔀 Chaque enfant peut basculer entre ⏰ Routine et 📅 Semaine — son XP et sa progression se cumulent dans les deux modes!",
     "🎨 Un seul thème par enfant, le même en mode Routine et en mode Semaine",
@@ -2419,16 +2426,22 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         );
         return (
           <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginTop:2}}>
-            {chip(pMode==="week","wk","📅 Semaine",()=>{ if(pMode!=="week") onPatchState({mode:"week",activeRoutineId:null}); })}
+            {chip(pMode==="week","wk","🏠 Semaine",()=>{ if(pMode!=="week") onPatchState({mode:"week",activeRoutineId:null}); })}
             {myRoutines.map(r=>chip(pMode==="routine"&&pState.activeRoutineId===r.id,r.id,`${r.emoji||"⏰"} ${r.name}`,
               ()=>onPatchState({mode:"routine",activeRoutineId:r.id})))}
             {routineMine.length>0 && chip(pMode==="routine"&&!pState.activeRoutineId,"allr","⏰ Toutes",
               ()=>onPatchState({mode:"routine",activeRoutineId:null}))}
-            {chip(false,"newr","➕ Routine",()=>{ SFX.click(); setRoutineBuilder({name:"",emoji:"🌅",taskIds:[]}); })}
           </div>
         );
       })()}
-      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",textAlign:"center",marginTop:-2}}>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
+      {/* Option bien en vue : créer une nouvelle routine (surtout sur l'accueil Semaine) */}
+      <button onClick={()=>{ SFX.click(); setRoutineBuilder({name:"",emoji:"🌅",taskIds:[]}); }}
+        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"11px",
+          background:"rgba(0,0,0,0.4)",border:`2px dashed ${(th.accent||player.color)}`,color:(th.accent||player.color),
+          borderRadius:5,cursor:"pointer"}}>
+        ➕ Créer une nouvelle routine
+      </button>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",textAlign:"center"}}>Ton XP et tes pièces se cumulent dans la semaine ET les routines ⚡</div>
 
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
@@ -2807,7 +2820,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, th }) {
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onRemoveAssignment, onAddCustomTask,
-  onClose, onUndo, onReset, onResetPlayer, onAdjustXP, onChangePin,
+  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const [tab, setTab] = useState(nbPending>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
@@ -2845,8 +2858,12 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
       {/* Header */}
       <div style={{background:"#FF8C00",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",color:"#000"}}>🔓 MODE PARENT</div>
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,
-          padding:"5px 10px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>✕</button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={onExitParent} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,
+            padding:"6px 9px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>🔒 Quitter</button>
+          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,
+            padding:"5px 10px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>✕</button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -3649,6 +3666,49 @@ function MiniGame({ player, playerThemeId, level, onFinish }) {
     const games = ["whack", "runner", "pacman"];
     return games[Math.floor(Math.random() * games.length)];
   });
+  // Écran d'intro + décompte "GO" pour que l'enfant comprenne AVANT que le chrono parte
+  const [phase, setPhase] = useState("intro"); // intro | countdown | play
+  const [count, setCount] = useState(3);
+  const INFO = {
+    whack:  { icon:"🔨", name:"Tape vite!",   how:"Des cibles vont apparaître un peu partout. Tape dessus le plus vite possible avant qu'elles disparaissent!" },
+    runner: { icon:"🏃", name:"Cours et saute!", how:"Appuie n'importe où sur l'écran pour SAUTER par-dessus les obstacles. Ramasse les pièces au passage!" },
+    pacman: { icon:"😋", name:"Mange tout!",  how:"Glisse ton doigt (ou les flèches) pour te déplacer. Mange toutes les pastilles en évitant les fantômes!" },
+  }[type];
+
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (count < 0) { setPhase("play"); return; }
+    if (count === 0 && SFX.epic) SFX.epic();
+    const t = setTimeout(() => setCount(c => c - 1), 700);
+    return () => clearTimeout(t);
+  }, [phase, count]);
+
+  if (phase === "intro") {
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24,textAlign:"center"}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>🎉 NIVEAU {level} ATTEINT!</div>
+        <div style={{fontSize:64,lineHeight:1}}>{INFO.icon}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:pt.accent,textShadow:`0 0 14px ${pt.glow}80`}}>{INFO.name}</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.6vw,21px)",color:"#fff",maxWidth:380,lineHeight:1.35}}>{INFO.how}</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>🏆 Plus tu réussis, plus tu gagnes de bonus!</div>
+        <button onClick={()=>{SFX.click&&SFX.click();setCount(3);setPhase("countdown");}}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",padding:"16px 30px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"5px 5px 0 #000",marginTop:6}}>
+          ✅ JE SUIS PRÊT!
+        </button>
+        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
+      </div>
+    );
+  }
+  if (phase === "countdown") {
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#aaa"}}>{INFO.icon} {INFO.name}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#2ECC40",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
+          {count>0 ? count : "GO!"}
+        </div>
+      </div>
+    );
+  }
   if (type === "runner") return <MiniGameRunner pt={pt} level={level} onFinish={onFinish}/>;
   if (type === "pacman") return <MiniGamePacman pt={pt} level={level} onFinish={onFinish}/>;
   return <MiniGameWhack pt={pt} level={level} onFinish={onFinish}/>;
@@ -4495,8 +4555,16 @@ export default function App() {
     return { name:ptv.name, bg:ptv.bg, primary:ptv.primary, accent:ptv.accent, card:"rgba(0,0,0,0.5)", text:"#fff" };
   },[viewedPlayer, resolvedWeekTheme]);
 
-  // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille = défaut famille.
-  const effectiveMode = (typeof view==="number" ? (gameStates[view]?.mode || config?.mode) : config?.mode) || "routine";
+  // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille/parent = accueil Semaine (pas de gros chrono rouge).
+  const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
+  // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
+  // (sinon une routine d'hier soir laisse un gros « EN RETARD » rouge en permanence).
+  const showCountdown = (()=>{
+    if(typeof view!=="number" || effectiveMode!=="routine" || !config) return false;
+    const [eh,em]=(config.routineEnd||"08:30").split(":").map(Number);
+    const nowMin=now.getHours()*60+now.getMinutes();
+    return nowMin <= (eh*60+em+90); // jusqu'à 90 min après l'heure de fin
+  })();
 
   // Clock display
   const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0"), S=String(now.getSeconds()).padStart(2,"0");
@@ -4515,7 +4583,11 @@ export default function App() {
   if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
-    onSelectPlayer={(idx)=>{ setView(idx); setScreen("game"); SFX.click(); }}
+    onSelectPlayer={(idx)=>{
+      // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine)
+      setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],mode:"week",activeRoutineId:null}; persist(config,n); return n; });
+      setView(idx); setScreen("game"); SFX.click();
+    }}
     onParentLogin={()=>{ setParentMode(true); setView("family"); setScreen("game"); SFX.click(); }}
     onNewSetup={()=>setScreen("setup")}
     onSetPlayerPin={(idx, newPin)=>{
@@ -4569,6 +4641,16 @@ export default function App() {
             {parentMode?"🔓 PARENT ▸":"🔐"}
             {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
               return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#FF4444",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #000"}}>{nb}</span>:null; })()}
+          </button>
+          {/* Quitter le mode parent */}
+          {parentMode&&<button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#FF8C00",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">
+            🔒
+          </button>}
+          {/* Déconnexion / changer d'enfant */}
+          <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Changer d'enfant / déconnexion">
+            🚪
           </button>
         </div>
       </div>
@@ -4668,6 +4750,7 @@ export default function App() {
           onRemoveAssignment={handleRemoveAssignment}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
+          onExitParent={()=>{setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
           onUndo={handleUndo}
           onReset={()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
           onResetPlayer={handleResetPlayer}
