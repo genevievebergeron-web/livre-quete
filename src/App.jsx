@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.20.0";
+const APP_VERSION = "1.21.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -106,17 +106,34 @@ const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰
 const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
+// (emoji = placeholder temporaire — remplacé par du pixel-art dans le milestone art)
 const REWARD_CATALOG = [
-  { id:"rw01", emoji:"📱", label:"15 min d'écrans",          coins:40 },
-  { id:"rw02", emoji:"🍬", label:"Collation sucrée",          coins:30 },
-  { id:"rw03", emoji:"💝", label:"15 min privées avec parent",coins:35 },
-  { id:"rw04", emoji:"💵", label:"5$ au dépanneur",           coins:150 },
-  { id:"rw05", emoji:"💆", label:"Massage au dodo (avant 20h)",coins:40 },
-  { id:"rw06", emoji:"🎮", label:"Choix du jeu vidéo",        coins:50 },
-  { id:"rw07", emoji:"🍪", label:"Fudgee-O ou pépites",       coins:30 },
-  { id:"rw08", emoji:"🍬", label:"Sweet Tarts au choix",      coins:25 },
-  { id:"rw09", emoji:"⭐", label:"Skin Minecraft au choix",   coins:120 },
+  { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40 },
+  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35 },
+  { id:"rw_dessert", emoji:"🍰", label:"Permission de 2e dessert",           coins:30 },
+  { id:"rw_dejsoup", emoji:"🥞", label:"Permission de déjeuner au souper",   coins:35 },
+  { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60 },
+  { id:"rw_depanneur",emoji:"🏪",label:"Choix d'un achat au dépanneur",      coins:70 },
+  { id:"rw_jeu",     emoji:"🎲", label:"Choix d'un jeu de société en famille",coins:35 },
+  { id:"rw_souper",  emoji:"🍽️", label:"Choix d'un souper pendant la semaine",coins:55 },
+  { id:"rw_bonbon",  emoji:"🍬", label:"Manger un bonbon",                   coins:20 },
+  { id:"rw_ricochet",emoji:"↪️", label:"1 ricochet de tâche sur quelqu'un d'autre",coins:80 },
+  { id:"rw_debarrasse",emoji:"🧽",label:"On débarrasse ton repas",           coins:25 },
+  { id:"rw_servi",   emoji:"🍴", label:"Tu te fais servir au souper",        coins:30 },
+  { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150 },
+  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45 },
+  { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25 },
+  { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90 },
+  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40 },
 ];
+// Sélection ALÉATOIRE par semaine (déterministe via la clé de semaine) — change chaque lundi
+const weeklyRewards = (n=8) => {
+  const wk = weekKey();
+  let seed = 0; for (let i=0;i<wk.length;i++) seed = (seed*31 + wk.charCodeAt(i)) >>> 0;
+  const arr = REWARD_CATALOG.map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
+  arr.sort((a,b)=>a.k-b.k);
+  return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
+};
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -124,17 +141,17 @@ const REWARD_CATALOG = [
 const BADGES = [
   // ── GÉNÉRAUX ──
   { id:"b_first",    emoji:"⭐", name:"Premier Sang",         desc:"Complète ta première quête",           type:"general", check:(ps)=>(ps.completed?.length||0)>=1 },
-  { id:"b_5tasks",   emoji:"🔥", name:"En Feu",               desc:"Complète 5 quêtes",                    type:"general", check:(ps)=>(ps.completed?.length||0)>=5 },
-  { id:"b_20tasks",  emoji:"💪", name:"Bras de Fer",          desc:"Complète 20 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=20 },
-  { id:"b_50tasks",  emoji:"🏆", name:"Légende Vivante",      desc:"Complète 50 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=50 },
-  { id:"b_xp100",    emoji:"⚡", name:"Chargé à Bloc",        desc:"Accumule 100 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=100 },
-  { id:"b_xp300",    emoji:"🌩️", name:"Orage Intérieur",      desc:"Accumule 300 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=300 },
-  { id:"b_xp500",    emoji:"🌟", name:"Supernova",            desc:"Accumule 500 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=500 },
-  { id:"b_coins50",  emoji:"💰", name:"Boursicoteur Nul",     desc:"Accumule 50 pièces d'un coup",         type:"general", check:(ps)=>(ps.coins||0)>=50 },
-  { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Accumule 150 pièces",                  type:"general", check:(ps)=>(ps.coins||0)>=150 },
-  { id:"b_buy1",     emoji:"🛒", name:"Consommateur Compulsif",desc:"Achète une récompense",               type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=1 },
-  { id:"b_buy5",     emoji:"🛍️", name:"Problème de Shopping", desc:"Achète 5 récompenses",                 type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=5 },
-  { id:"b_streak3",  emoji:"📅", name:"Machine à Habitudes",  desc:"3 quêtes en 1 journée",               type:"general", check:(ps,c)=>c>=3 },
+  { id:"b_5tasks",   emoji:"🔥", name:"En Feu",               desc:"Complète 15 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=15 },
+  { id:"b_20tasks",  emoji:"💪", name:"Bras de Fer",          desc:"Complète 50 quêtes",                   type:"general", check:(ps)=>(ps.completed?.length||0)>=50 },
+  { id:"b_50tasks",  emoji:"🏆", name:"Légende Vivante",      desc:"Complète 150 quêtes",                  type:"general", check:(ps)=>(ps.completed?.length||0)>=150 },
+  { id:"b_xp100",    emoji:"⚡", name:"Chargé à Bloc",        desc:"Accumule 250 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=250 },
+  { id:"b_xp300",    emoji:"🌩️", name:"Orage Intérieur",      desc:"Accumule 600 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=600 },
+  { id:"b_xp500",    emoji:"🌟", name:"Supernova",            desc:"Accumule 1200 XP",                     type:"general", check:(ps)=>(ps.xp||0)>=1200 },
+  { id:"b_coins50",  emoji:"💰", name:"Petit Trésor",         desc:"Accumule 100 pièces d'un coup",        type:"general", check:(ps)=>(ps.coins||0)>=100 },
+  { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Accumule 300 pièces",                  type:"general", check:(ps)=>(ps.coins||0)>=300 },
+  { id:"b_buy1",     emoji:"🛒", name:"Première Récompense",  desc:"Achète une récompense",               type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=1 },
+  { id:"b_buy5",     emoji:"🛍️", name:"Problème de Shopping", desc:"Achète 10 récompenses",                type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=10 },
+  { id:"b_streak3",  emoji:"📅", name:"Machine à Habitudes",  desc:"6 quêtes dans la même journée",        type:"general", check:(ps,c)=>c>=6 },
   { id:"b_level2",   emoji:"🆙", name:"Ya du Progrès",        desc:"Atteins le niveau 2",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=2 },
   { id:"b_level3",   emoji:"🚀", name:"Spationaute du Ménage",desc:"Atteins le niveau 3",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=3 },
   { id:"b_level4",   emoji:"👑", name:"Royauté de la Patate", desc:"Atteins le niveau 4",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=4 },
@@ -951,6 +968,14 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.21.0", date:"2026-06-13", features:[
+    "🎁 Nouvelles récompenses + elles changent au hasard chaque semaine (fini de choisir, place à la surprise!)",
+    "🛠️ Fix « Modifier le livre » — ça ouvre bien tes enfants et tâches (au lieu d'un nouveau livre vide)",
+    "➕ Un enfant peut s'ajouter une quête à sa journée; et on choisit l'image avec une grille d'emojis",
+    "↩️ Le parent peut annuler une récompense réclamée par erreur (les pièces sont remises)",
+    "🏅 Badges plus difficiles à mériter",
+    "← Bouton Retour en haut ET en bas des écrans (jamais coincé)",
+  ]},
   { version:"1.20.0", date:"2026-06-13", features:[
     "🐉 Boss de famille! Un monstre surprise apparaît — toute la famille gagne de l'XP ensemble pour le vaincre, et tout le monde reçoit une récompense!",
     "🎨 Boss en pixel-art original (le parent le lance depuis le portail, onglet Actions)",
@@ -1674,7 +1699,8 @@ function RewardPopup({ task, player, newBadges, onClose, th }) {
 // SETUP WIZARD
 // ═══════════════════════════════════════════════════════════════
 function SetupWizard({ existing, onDone }) {
-  const [step, setStep] = useState(0); // 0=mode 1=players 2=tasks 3=rewards 4=pin
+  // En édition (« Modifier le livre »), on arrive direct sur Joueurs (le Mode global n'est plus le point d'entrée)
+  const [step, setStep] = useState(existing ? 1 : 0);
   const STEPS = ["Mode","Joueurs","Tâches","Récompenses","PIN"];
 
   // Config state
@@ -2309,6 +2335,38 @@ function BossSprite({ boss, size=120, style={} }){
   return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
 
+// ─── CHOIX D'EMOJI + CRÉATION DE TÂCHE (picker au lieu de taper) ──────────────
+const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
+function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
+  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐");
+  const acc=th?.accent||"#FFD700";
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc}}>{title}</div>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+      </div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>Nom de la quête :</div>
+      <input value={label} autoFocus onChange={e=>setLabel(e.target.value.slice(0,40))} placeholder="ex: Ranger ma chambre"
+        style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"9px 11px",background:"#111",color:"#fff",border:`2px solid ${acc}`,borderRadius:5,outline:"none",marginBottom:10}}/>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>Choisis une image : <span style={{fontSize:22}}>{emoji}</span></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:4,marginBottom:14}}>
+        {EMOJI_CHOICES.map(em=>(
+          <button key={em} onClick={()=>{SFX.click();setEmoji(em);}}
+            style={{fontSize:20,padding:"6px 0",background:emoji===em?`${acc}33`:"#1a1a1a",border:`2px solid ${emoji===em?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{em}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
+        <button disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji}); } }}
+          style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #000"}}>
+          ✅ {confirmLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── AVATAR POPUP (creator + inventory) ──────────────────────
 function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShopItems, th }) {
   const [tab, setTab] = useState("creator"); // creator | inventory
@@ -2438,14 +2496,16 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
             })}
           </div>
         </>}
+        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:6,background:pt.accent||"#FFD700",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>← Retour</button>
       </div>
     </div>
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [themePicker, setThemePicker] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
@@ -2493,7 +2553,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const eq = pState.equipped || {};
   // hat/armor/pet resolved via allShopItemsFlat after it's declared below
 
-  const myRewards = allRewards.filter(r=>config.selectedRewards?.includes(r.id));
+  // Récompenses ALÉATOIRES de la semaine (change chaque lundi) — plus de sélection fixe
+  const myRewards = weeklyRewards(8);
   const allShopItemsFlat = [
     ...SHOP_ITEMS.hats, ...SHOP_ITEMS.armors, ...SHOP_ITEMS.pets,
     ...(pt.shopCategory?.items||[]),
@@ -2680,7 +2741,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
         <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier ma routine":"🌟 Ma nouvelle routine"}</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier ma routine":"🌟 Ma nouvelle routine"}</div>
+            <button onClick={()=>{SFX.click();setRoutineBuilder(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>✕</button>
+          </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {["🌅","🌙","☀️","🌆","⭐","🏃","🦷","📚"].map(em=>(
               <button key={em} onClick={()=>{SFX.click();setRoutineBuilder(b=>({...b,emoji:em}));}}
@@ -2775,6 +2839,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
         );
       })}
+
+      {/* Enfant : ajouter une quête à sa journée à la volée */}
+      <button onClick={()=>{SFX.click();setAddTaskOpen(true);}}
+        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"10px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${player.color}`,color:player.color,borderRadius:5,cursor:"pointer",marginTop:2}}>
+        ➕ Ajouter une quête à ma journée
+      </button>
+      {addTaskOpen && <CustomTaskModal title="➕ Ma nouvelle quête" confirmLabel="Ajouter à ma journée" th={th}
+        onClose={()=>setAddTaskOpen(false)}
+        onCreate={(data)=>{ onChildAddTask&&onChildAddTask(data); setAddTaskOpen(false); }}/>}
 
       {/* Plus tard cette semaine (vue Semaine seulement) — aperçu grisé */}
       {pMode==="week" && laterWeek.length>0 && (
@@ -2883,7 +2956,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
         {shopTab==="rewards" && (
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
-            {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas encore de récompenses ici — demande à tes parents d'en ajouter! 🎁</div>}
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
+            {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
             {myRewards.map(r=>{
               const canBuy=pState.coins>=r.coins;
               const bought=pState.boughtRewards?.includes(r.id);
@@ -2897,6 +2971,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                   </div>
                   {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
                   {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
+                  {bought&&parentMode&&<button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:"rgba(0,0,0,0.6)",color:"#FF8C00",border:"1px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Annuler cette récompense (parent)">↩️ Annuler</button>}
                 </div>
               );
             })}
@@ -3201,6 +3277,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addTaskId, setAddTaskId] = useState("");
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
+  const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [rChildIdx, setRChildIdx] = useState(0); // assignation de routine: enfant ciblé
   const [rName, setRName] = useState("");
   const [rTaskIds, setRTaskIds] = useState([]);
@@ -3335,10 +3412,13 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
               color={addTaskId&&addPlayerIds.length?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length?1:0.5,marginBottom:8}}>
               ➕ Ajouter ({addType==="week"?"semaine":"routine"})
             </PBtn>
-            <button onClick={()=>{ const id=onAddCustomTask(); if(id)setAddTaskId(id); }}
+            <button onClick={()=>{ SFX.click(); setCustomOpen(true); }}
               style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #FF8C0060",color:"#FF8C00",borderRadius:4,cursor:"pointer",marginBottom:14}}>
               + Créer une tâche personnalisée
             </button>
+            {customOpen && <CustomTaskModal title="Nouvelle tâche personnalisée" confirmLabel="Créer la tâche" th={{accent:"#FF8C00"}}
+              onClose={()=>setCustomOpen(false)}
+              onCreate={(data)=>{ const id=onAddCustomTask(data); if(id)setAddTaskId(id); setCustomOpen(false); }}/>}
 
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"6px 0 10px"}}>TÂCHES ACTUELLES ({(config.assignments||[]).length})</div>
             {(config.assignments||[]).map(ass=>{
@@ -4640,6 +4720,7 @@ export default function App() {
   const [parentPinOpen, setParentPinOpen] = useState(false);
   const [parentMode, setParentMode] = useState(false);
   const [sessionPlayer, setSessionPlayer] = useState(null); // enfant connecté (idx) — null = parent/aucun
+  const [editingBook, setEditingBook] = useState(false); // true = "Modifier le livre" (édite la config existante)
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
@@ -4989,15 +5070,32 @@ export default function App() {
     showToast("🗑️ Tâche retirée","#FF8C00");
   },[config,gameStates,persist,logAction,showToast]);
 
-  const handleAddCustomTask = useCallback(()=>{
-    const label=prompt("Nom de la tâche:"); if(!label?.trim())return null;
-    const emoji=prompt("Emoji (ex: 🌟):")||"⭐";
-    const newTask={id:"cust_"+uid(),emoji,label:label.trim(),xp:20,coins:10,diff:"medium",cat:"custom"};
+  const handleAddCustomTask = useCallback((data)=>{
+    if(!data?.label?.trim())return null;
+    const newTask={id:"cust_"+uid(),emoji:data.emoji||"⭐",label:data.label.trim(),xp:20,coins:10,diff:"medium",cat:"custom"};
     const newCfg={...config,customTasks:[...(config.customTasks||[]),newTask]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast(`${emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#2ECC40",4000);
+    showToast(`${newTask.emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#2ECC40",4000);
     return newTask.id;
   },[config,gameStates,persist,showToast]);
+
+  // Enfant : ajoute une quête à SA journée (type routine, aujourd'hui). Le parent valide à la fin.
+  const handleChildAddTask = useCallback((playerIdx, data)=>{
+    const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
+    const taskId="cust_"+uid();
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:15,coins:8,diff:"easy",cat:"custom"};
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days:[],time:""};
+    const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
+  },[config,gameStates,persist,showToast]);
+
+  // Parent : annuler une récompense réclamée par erreur (remet les pièces)
+  const handleUnclaimReward = useCallback((playerId, reward)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), coins:(p.coins||0)+(reward.coins||0)}; persist(config,n); return n; });
+    showToast("↩️ Récompense annulée — pièces remises","#FF8C00");
+  },[config,persist,showToast]);
 
   const handleResetPlayer = useCallback((playerIdx) => {
     const player=config.players[playerIdx];
@@ -5090,7 +5188,7 @@ export default function App() {
   },[config,now,todayDayIdx,effectiveMode]);
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
-  if(screen==="setup") return <SetupWizard existing={null} onDone={handleSetupDone}/>;
+  if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
     onSelectPlayer={(idx)=>{
@@ -5099,7 +5197,7 @@ export default function App() {
       setSessionPlayer(idx); setParentMode(false); setView(idx); setScreen("game"); SFX.click();
     }}
     onParentLogin={()=>{ setParentMode(true); setSessionPlayer(null); setView("family"); setScreen("game"); SFX.click(); }}
-    onNewSetup={()=>setScreen("setup")}
+    onNewSetup={()=>{ setEditingBook(false); setScreen("setup"); }}
     onSetPlayerPin={(idx, newPin)=>{
       const gs = [...gameStates]; gs[idx]={...gs[idx], pin:newPin};
       setGameStates(gs); save({config, gameStates:gs, savedAt:new Date().toISOString()});
@@ -5223,6 +5321,8 @@ export default function App() {
             onRequestComplete={requestComplete}
             onBuy={handleBuy}
             onEquip={handleEquip}
+            onChildAddTask={(data)=>handleChildAddTask(view,data)}
+            onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             parentMode={parentMode}
             playerMode={gameStates[view]?.mode || config.mode || "routine"}
             todayDayIdx={todayDayIdx}
@@ -5280,7 +5380,7 @@ export default function App() {
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}
-          onSetup={()=>{ setScreen("setup"); setParentPanel(false); }}
+          onSetup={()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }}
         />
       )}
 
