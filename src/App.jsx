@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.27.0";
+const APP_VERSION = "1.28.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.28.0", date:"2026-06-13", features:[
+    "🎯 Objectifs du jour — réussis des défis quotidiens (3 quêtes, 6 quêtes, 60 XP) pour des bonus à réclamer!",
+  ]},
   { version:"1.27.0", date:"2026-06-13", features:[
     "💎 Raretés des items! Commun, Rare, Ultra Rare, Légendaire, Unique — bordures et lueurs colorées pour les plus rares",
   ]},
@@ -1247,6 +1250,7 @@ const mergeGS = (a, b) => {
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
     hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
+    dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1370,6 +1374,7 @@ const migrateGameState = (gs) => {
     settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
     hiddenWeek: gs.hiddenWeek ?? null,
+    dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -2588,7 +2593,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onClaimDaily, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
@@ -2792,6 +2797,39 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             </div>
           );
         });
+      })()}
+
+      {/* 🎯 Objectifs du jour — bonus à réclamer */}
+      {(()=>{
+        const stamp="#"+todayStamp();
+        const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));
+        const countToday=doneToday.length;
+        const axp={}; (config.assignments||[]).forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
+        const xpToday=doneToday.reduce((s,k)=>{const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); return s+(axp[inst]||0);},0);
+        const OBJ=[
+          {id:"o3",  label:"Faire 3 quêtes",  prog:Math.min(countToday,3), goal:3,  xp:10, coins:5},
+          {id:"o6",  label:"Faire 6 quêtes",  prog:Math.min(countToday,6), goal:6,  xp:15, coins:10},
+          {id:"oxp", label:"Gagner 60 XP",    prog:Math.min(xpToday,60),   goal:60, xp:0,  coins:10},
+        ];
+        const claimed=(pState.dailyClaimed&&pState.dailyClaimed.day===todayStamp())?pState.dailyClaimed.ids:[];
+        return (
+          <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${(th.accent||player.color)}44`,borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent||player.color,marginBottom:6}}>🎯 OBJECTIFS DU JOUR</div>
+            {OBJ.map(o=>{ const done=o.prog>=o.goal; const isClaimed=claimed.includes(o.id);
+              return (
+                <div key={o.id} style={{marginBottom:7}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#2ECC40":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#5DECF5"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
+                    {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#2ECC40",color:"#000",border:"2px solid #000",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
+                  </div>
+                  <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:Math.round(o.prog/o.goal*100)+"%",background:isClaimed?"#2ECC40":`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.5s"}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
       })()}
 
       {/* Bascule Semaine / Routines — propre à chaque enfant, l'XP de tout se cumule */}
@@ -5314,6 +5352,17 @@ export default function App() {
     showToast("📅 Événement ajouté au calendrier!","#5DECF5");
   },[config,persist,showToast]);
 
+  // Objectif du jour réclamé → bonus XP/pièces (une fois par jour)
+  const handleClaimDaily = useCallback((playerIdx, obj)=>{
+    const wk=todayStamp();
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]; const dc=(p.dailyClaimed&&p.dailyClaimed.day===wk)?p.dailyClaimed:{day:wk,ids:[]};
+      if(dc.ids.includes(obj.id))return gs;
+      n[playerIdx]={...p, xp:(p.xp||0)+(obj.xp||0), coins:(p.coins||0)+(obj.coins||0), dailyClaimed:{day:wk,ids:[...dc.ids,obj.id]}};
+      persist(config,n); return n; });
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎯"); SFX.epic&&SFX.epic(); }catch{} },120);
+    showToast(`🎯 Objectif réussi! +${obj.xp} XP${obj.coins?` +${obj.coins} 🪙`:""}`,"#2ECC40",3500);
+  },[config,persist,showToast]);
+
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
   const handleHideReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -5585,6 +5634,7 @@ export default function App() {
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
+            onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
             parentMode={parentMode}
             playerMode={gameStates[view]?.mode || config.mode || "routine"}
             todayDayIdx={todayDayIdx}
