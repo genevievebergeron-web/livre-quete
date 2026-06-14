@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.35.0";
+const APP_VERSION = "1.36.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -985,6 +985,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.36.0", date:"2026-06-14", features:[
+    "🐛 GROS FIX : l'argent dépensé ne revient plus à la prochaine connexion (fini les achats infinis!)",
+    "🏅 Fix : un badge ne se fête plus en double",
+    "⏱ Minuterie : tu peux partir un chrono libre, sans rituel",
+  ]},
   { version:"1.35.0", date:"2026-06-14", features:[
     "🧭 Navigation plus claire : un gros choix Semaine / Rituels, puis les rituels en dessous (fini le méli-mélo)",
     "🛟 Fini l'écran qui saute tout seul : la synchro ne te ramène plus ailleurs pendant que tu joues",
@@ -1271,7 +1276,9 @@ const mergeGS = (a, b, preferIncoming) => {
   return {
     ...a, ...b,
     xp: Math.max(a.xp || 0, b.xp || 0),
-    coins: Math.max(a.coins || 0, b.coins || 0),
+    // ⚠️ Les pièces se DÉPENSENT : un max() ramènerait l'argent dépensé (achats infinis).
+    // → dernière écriture gagne (l'appareil qui a changé le solde le plus récemment gagne).
+    coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     completed,
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k)),
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
@@ -4663,15 +4670,22 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#000":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
       </div>}
       {!startTs && (<>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Choisis un rituel à chronométrer :</div>
-        {routines.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Aucun rituel enregistré. Crée-en un dans ta page d'accueil!</div>}
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 12px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#999",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
-        </div>
-        {ritual && <button onClick={()=>{SFX.epic&&SFX.epic();setStartTs(Date.now());setNow(Date.now());}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:acc,color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶️ Démarrer le chrono!</button>}
+        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Chronomètre un rituel… ou pars un chrono libre, sans rituel!</div>
+        {/* Chrono libre — toujours disponible, même sans rituel */}
+        <button onClick={()=>{SFX.epic&&SFX.epic();setRitualId(null);setStartTs(Date.now());setNow(Date.now());}}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"15px",background:acc,color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+          ▶️ Chrono libre (sans rituel)
+        </button>
+        {routines.length>0 && <>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginTop:4}}>…ou choisis un de tes rituels :</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 12px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#999",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
+          </div>
+          {ritual && <button onClick={()=>{SFX.epic&&SFX.epic();setStartTs(Date.now());setNow(Date.now());}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶️ Démarrer « {ritual.name} »!</button>}
+        </>}
       </>)}
       {startTs && (<>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?.emoji} {ritual?.name}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?`${ritual.emoji||"⏰"} ${ritual.name}`:"⏱ Chrono libre"}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:"#fff",textAlign:"center",letterSpacing:2}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(ms/20000)%TIMER_ENCOURAGE.length]}</div>
         <button onClick={()=>{ const minutes=Math.max(1,Math.round(ms/60000)); onComplete&&onComplete(cidx, ritual, minutes); setStartTs(null); setRitualId(null); }}
@@ -5389,7 +5403,8 @@ export default function App() {
     // On regroupe la file en UNE fête (cumul XP/pièces, tous les badges, le plus haut niveau atteint)
     const totXp=queue.reduce((s,c)=>s+(c.xp||0),0);
     const totCoins=queue.reduce((s,c)=>s+(c.coins||0),0);
-    const allBadges=queue.flatMap(c=>c.badges||[]);
+    // Dédoublonne les badges par id (sinon un même badge gagné sur 2 appareils s'affiche 2 fois)
+    const allBadges=(()=>{ const seen=new Set(), out=[]; for(const b of queue.flatMap(c=>c.badges||[])){ if(b&&!seen.has(b.id)){seen.add(b.id);out.push(b);} } return out; })();
     const levels=queue.map(c=>c.level).filter(l=>l!=null);
     const topLevel=levels.length?Math.max(...levels):null;
     const label=queue.length===1?(queue[0].taskLabel||"Quête validée!"):`${queue.length} quêtes validées pendant ton absence!`;
@@ -5602,7 +5617,8 @@ export default function App() {
     const player=config.players[playerIdx]; if(!player)return;
     const bonus=Math.min(40, 5*Math.max(1,(ritual?.taskIds?.length||1)));
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus};
-      const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:`${displayName(player)} a complété son rituel « ${ritual?.name||"?"} » en ${minutes} min! (+${bonus} XP)`};
+      const txt=ritual ? `${displayName(player)} a complété son rituel « ${ritual.name} » en ${minutes} min! (+${bonus} XP)` : `${displayName(player)} s'est concentré ${minutes} min au chrono! (+${bonus} XP)`;
+      const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:txt};
       const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};
       setConfig(newCfg); persist(newCfg,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("⏱"); SFX.epic&&SFX.epic(); }catch{} showToast(`⏱ Rituel fini en ${minutes} min! +${bonus} XP 🎉`,"#FFD700",4500); },150);
