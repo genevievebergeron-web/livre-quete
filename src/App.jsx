@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.29.0";
+const APP_VERSION = "1.30.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.30.0", date:"2026-06-14", features:[
+    "🐛 Fix : l'avatar est de nouveau modifiable (les morceaux se sauvegardent)",
+    "✉️ Fix : le bouton « bug » copie l'adresse courriel et la montre (plus de cul-de-sac)",
+  ]},
   { version:"1.29.0", date:"2026-06-13", features:[
     "🎁 Coffres mystères! Ouvre un coffre (Commun/Rare/Légendaire) pour un item surprise — plus le coffre est rare, plus la chance d'un item Légendaire ou Unique!",
     "💰 Doublon = des pièces remboursées",
@@ -5715,6 +5719,10 @@ export default function App() {
             onRequestComplete={requestComplete}
             onBuy={handleBuy}
             onEquip={handleEquip}
+            onUpdateAvatar={(av,pid)=>{
+              const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
+              setGameStates(gs=>{ const n=[...gs]; n[i]={...n[i],avatar:av}; persist(config,n); return n; });
+            }}
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
@@ -5798,9 +5806,12 @@ export default function App() {
         <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#444"}}>Livre de Quêtes v{APP_VERSION}</span>
         <button
           onClick={()=>{
+            // Copie l'adresse au presse-papier + confirme (mailto ne mène nulle part sans app de courriel)
+            try{ navigator.clipboard&&navigator.clipboard.writeText(BUG_EMAIL); }catch{}
+            showToast(`🐛 Bug? Écris à ${BUG_EMAIL} (adresse copiée!)`,"#FF8C00",7000);
             const subject=encodeURIComponent(`[Bug v${APP_VERSION}] `);
             const body=encodeURIComponent(`Version: ${APP_VERSION}\nDate: ${new Date().toLocaleString("fr-CA")}\n\nDécris le bug ici:\n\n`);
-            window.location.href=`mailto:${BUG_EMAIL}?subject=${subject}&body=${body}`;
+            try{ window.open(`mailto:${BUG_EMAIL}?subject=${subject}&body=${body}`,"_blank"); }catch{}
           }}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"3px 8px",background:"transparent",color:"#444",border:"1px solid #333",borderRadius:3,cursor:"pointer"}}
           title="Rapporter un bug"
