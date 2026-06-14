@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.31.0";
+const APP_VERSION = "1.32.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.32.0", date:"2026-06-14", features:[
+    "🎁 Un parent peut offrir un mini-jeu surprise (ex: Pac-Man) à un enfant : il apparaît à sa prochaine connexion!",
+  ]},
   { version:"1.31.0", date:"2026-06-14", features:[
     "🎉 Quand un parent valide une quête sur un autre appareil, c'est l'ENFANT qui aura sa fête (popup + jeu de niveau) à sa prochaine connexion — fini les félicitations qui s'affichent sur l'écran du parent!",
   ]},
@@ -4418,10 +4421,11 @@ function MiniGameWhack({ pt, level, onFinish }) {
 // ═══════════════════════════════════════════════════════════════
 // MINI-GAME ROUTER — choisi aléatoirement au level-up
 // ═══════════════════════════════════════════════════════════════
-function MiniGame({ player, playerThemeId, level, onFinish }) {
+function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }) {
   const pt = getPlayerTheme(playerThemeId || "none");
   const [type] = useState(() => {
     const games = ["whack", "runner", "pacman"];
+    if (forcedType && games.includes(forcedType)) return forcedType; // jeu imposé (ex: cadeau Pac-Man)
     return games[Math.floor(Math.random() * games.length)];
   });
   // Écran d'intro + décompte "GO" pour que l'enfant comprenne AVANT que le chrono parte
@@ -4444,7 +4448,7 @@ function MiniGame({ player, playerThemeId, level, onFinish }) {
   if (phase === "intro") {
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24,textAlign:"center"}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>🎉 NIVEAU {level} ATTEINT!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
         <div style={{fontSize:64,lineHeight:1}}>{INFO.icon}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:pt.accent,textShadow:`0 0 14px ${pt.glow}80`}}>{INFO.name}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.6vw,21px)",color:"#fff",maxWidth:380,lineHeight:1.35}}>{INFO.how}</div>
@@ -5277,13 +5281,15 @@ export default function App() {
     const topLevel=levels.length?Math.max(...levels):null;
     const label=queue.length===1?(queue[0].taskLabel||"Quête validée!"):`${queue.length} quêtes validées pendant ton absence!`;
     const emoji=queue.length===1?(queue[0].taskEmoji||"✅"):"🎉";
-    const pendingRwd={ task:{emoji,label,xp:totXp,coins:totCoins}, player, newBadges:allBadges };
+    const forcedType=queue.map(c=>c.game).find(Boolean)||null; // jeu imposé (ex: cadeau Pac-Man)
+    // Cadeau pur (0 XP / 0 pièce / aucun badge) → on ne montre pas de popup de récompense vide
+    const pendingRwd=(totXp||totCoins||allBadges.length)?{ task:{emoji,label,xp:totXp,coins:totCoins}, player, newBadges:allBadges }:null;
     // On vide la file tout de suite (persist avec savedAt récent → reste vide après fusion cloud)
     setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],pendingCelebrations:[]}; persist(config,n); return n; });
     setTimeout(()=>{
       spawnParticles(emoji);
-      if(topLevel!=null){ SFX.epic(); setMiniGame({player,playerIdx:idx,level:topLevel,playerThemeId:player.themeId||"none",pendingReward:pendingRwd}); }
-      else { SFX.task(); setRewardPopup(pendingRwd); }
+      if(topLevel!=null||forcedType){ SFX.epic(); setMiniGame({player,playerIdx:idx,level:topLevel||getLevel(ps.xp||0).level,playerThemeId:player.themeId||"none",pendingReward:pendingRwd,forcedType,isGift:topLevel==null}); }
+      else if(pendingRwd){ SFX.task(); setRewardPopup(pendingRwd); }
     },500);
   },[gameStates,config,persist,spawnParticles]);
 
@@ -5825,7 +5831,7 @@ export default function App() {
         <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
       )}
       {miniGame&&(
-        <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} onFinish={handleMiniGameEnd}/>
+        <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} forcedType={miniGame.forcedType} isGift={miniGame.isGift} onFinish={handleMiniGameEnd}/>
       )}
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
