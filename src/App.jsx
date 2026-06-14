@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.34.0";
+const APP_VERSION = "1.35.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -144,6 +144,13 @@ const RARITIES = [
   { min:60, name:"Unique",     color:"#FF5BAE" },
 ];
 const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cost||0)>=x.min) r=x; return r; };
+
+// ─── ÉCONOMIE (équilibrage « game master ») ───────────────────
+// Prix de base montés d'un cran pour que les pièces aient de la valeur et qu'un
+// item légendaire se MÉRITE. rarityOf reste sur le coût de BASE (la rareté ne bouge pas).
+const PRICE_MULT = 2;
+const baseCost = (it) => (it?.cost ?? it?.coins ?? 0); // items: .cost — récompenses: .coins
+const priceOf  = (it) => Math.round(baseCost(it) * PRICE_MULT);
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -978,6 +985,13 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.35.0", date:"2026-06-14", features:[
+    "🧭 Navigation plus claire : un gros choix Semaine / Rituels, puis les rituels en dessous (fini le méli-mélo)",
+    "🛟 Fini l'écran qui saute tout seul : la synchro ne te ramène plus ailleurs pendant que tu joues",
+    "🪙 Échange de pièces : tu peux DONNER des pièces à un frère depuis son profil",
+    "🔒 Plus de niaiseries : tu ne peux pas ouvrir la session d'un autre ni changer ses affaires (mais voir son profil, oui!)",
+    "💰 Économie rééquilibrée : les prix montent, les coffres coûtent plus cher et les doublons rapportent moins (les pièces ont enfin de la valeur!)",
+  ]},
   { version:"1.34.0", date:"2026-06-14", features:[
     "🙂 Dans « Mes réglages », un enfant peut maintenant changer SON pseudo et SON code secret lui-même",
     "🔧 Le code parent peut être réinitialisé/changé depuis n'importe quel appareil (correctif de synchro)",
@@ -2454,9 +2468,9 @@ function BadgeIcon({ badge, earned, size=44, style={} }){
 
 // ─── COFFRES MYSTÈRES (loot boxes) ────────────────────────────
 const CHESTS = [
-  { id:"common", name:"Coffre Commun",     cost:40,  color:"#9AA0A6", bands:["Commun","Rare"],                    w:[70,30] },
-  { id:"rare",   name:"Coffre Rare",        cost:80,  color:"#4FA3FF", bands:["Rare","Ultra Rare","Légendaire"],  w:[55,35,10] },
-  { id:"epic",   name:"Coffre Légendaire",  cost:140, color:"#FFB02E", bands:["Ultra Rare","Légendaire","Unique"],w:[55,33,12] },
+  { id:"common", name:"Coffre Commun",     cost:80,  color:"#9AA0A6", bands:["Commun","Rare"],                    w:[70,30] },
+  { id:"rare",   name:"Coffre Rare",        cost:170, color:"#4FA3FF", bands:["Rare","Ultra Rare","Légendaire"],  w:[55,35,10] },
+  { id:"epic",   name:"Coffre Légendaire",  cost:320, color:"#FFB02E", bands:["Ultra Rare","Légendaire","Unique"],w:[55,33,12] },
 ];
 const pickFromChest = (pool, chest) => {
   // tire une bande selon les poids, puis un item de cette bande (repli: tout le pool)
@@ -2925,36 +2939,57 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         );
       })()}
 
-      {/* Bascule Semaine / Routines — propre à chaque enfant, l'XP de tout se cumule */}
+      {/* ── NAVIGATION CLAIRE À 2 NIVEAUX ──
+          1) Gros choix : Semaine (accueil) vs Rituels.  2) Si Rituels : quel rituel. */}
       {(()=>{
         const acc = th.accent||player.color;
-        const chip = (active,key,label,onClick)=>(
-          <button key={key} onClick={onClick}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 10px",whiteSpace:"nowrap",
-              background:active?acc:"#1a1a1a",color:active?"#000":"#999",
-              border:`2px solid ${active?acc:"#333"}`,borderRadius:4,cursor:"pointer",
-              boxShadow:active?`0 0 10px ${acc}50`:"none",transition:"all 0.15s"}}>
-            {label}
+        const seg = (active,label,sub,onClick)=>(
+          <button onClick={onClick}
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,10px)",padding:"12px 8px",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:4,lineHeight:1.3,
+              background:active?acc:"rgba(0,0,0,0.4)",color:active?"#000":"#aaa",
+              border:`3px solid ${active?acc:"#333"}`,borderRadius:8,cursor:"pointer",
+              boxShadow:active?`0 0 14px ${acc}55`:"none",transition:"all 0.15s"}}>
+            <span>{label}</span>
+            <span style={{fontFamily:"'VT323',monospace",fontSize:12,opacity:0.85,fontWeight:active?700:400}}>{sub}</span>
           </button>
         );
         return (
-          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginTop:2}}>
-            {chip(pMode==="week","wk","🏠 Semaine",()=>{ if(pMode!=="week") onPatchState({mode:"week",activeRoutineId:null}); })}
-            {myRoutines.map(r=>chip(pMode==="routine"&&pState.activeRoutineId===r.id,r.id,`${r.emoji||"⏰"} ${r.name}`,
-              ()=>onPatchState({mode:"routine",activeRoutineId:r.id})))}
-            {routineMine.length>0 && chip(pMode==="routine"&&!pState.activeRoutineId,"allr","⏰ Toutes",
-              ()=>onPatchState({mode:"routine",activeRoutineId:null}))}
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:2}}>
+            {/* Niveau 1 : Semaine vs Rituels */}
+            <div style={{display:"flex",gap:8}}>
+              {seg(pMode==="week","🏠 Semaine","ma page d'accueil",()=>{ if(pMode!=="week"){SFX.click();onPatchState({mode:"week",activeRoutineId:null});} })}
+              {seg(pMode==="routine","⏰ Rituels",myRoutines.length?`${myRoutines.length} rituel${myRoutines.length>1?"s":""}`:"à créer",()=>{
+                if(pMode!=="routine"){ SFX.click(); onPatchState({mode:"routine",activeRoutineId: myRoutines[0]?.id || null}); }
+              })}
+            </div>
+            {/* Niveau 2 : quel rituel (visible seulement en mode Rituels) */}
+            {pMode==="routine" && (
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,alignItems:"center"}}>
+                {myRoutines.map(r=>{ const on=pState.activeRoutineId===r.id; return (
+                  <button key={r.id} onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:r.id});}}
+                    style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
+                      background:on?acc:"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
+                    {r.emoji||"⏰"} {r.name}
+                  </button>
+                ); })}
+                {routineMine.length>0 && (()=>{ const on=!pState.activeRoutineId; return (
+                  <button onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:null});}}
+                    style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
+                      background:on?acc:"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
+                    🗂️ Tout
+                  </button>
+                ); })()}
+                <button onClick={()=>{ SFX.click(); setRoutineBuilder({name:"",emoji:"🌅",taskIds:[]}); }}
+                  style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
+                    background:"rgba(0,0,0,0.4)",border:`2px dashed ${acc}`,color:acc,borderRadius:20,cursor:"pointer"}}>
+                  ➕ Nouveau
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}
-      {/* Option bien en vue : créer une nouvelle routine (surtout sur l'accueil Semaine) */}
-      <button onClick={()=>{ SFX.click(); setRoutineBuilder({name:"",emoji:"🌅",taskIds:[]}); }}
-        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"11px",
-          background:"rgba(0,0,0,0.4)",border:`2px dashed ${(th.accent||player.color)}`,color:(th.accent||player.color),
-          borderRadius:5,cursor:"pointer"}}>
-        ➕ Créer un nouveau rituel
-      </button>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",textAlign:"center",lineHeight:1.4}}>🏠 <b>Semaine</b> = ta page d'accueil. Touche un rituel (⏰) pour le commencer.<br/>Ton XP et tes pièces se cumulent dans la semaine ET les rituels ⚡</div>
 
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
@@ -3182,7 +3217,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               if(pState.coins<ch.cost)return;
               const pool=allShopItemsFlat.filter(it=>it.slot);
               const item=pickFromChest(pool, ch); if(!item)return;
-              const dup=pState.owned?.includes(item.id); const refund=Math.round((item.cost||10)/2);
+              const dup=pState.owned?.includes(item.id); const refund=Math.max(3,Math.round(baseCost(item)/3));
               onOpenChest&&onOpenChest({cost:ch.cost,itemId:item.id,dup,refund});
               setChestReveal({item,dup,chest:ch,refund});
               SFX.epic&&SFX.epic(); if(!CALM) spawnParticles("🎉");
@@ -3221,7 +3256,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
             {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
             {myRewards.map(r=>{
-              const canBuy=pState.coins>=r.coins;
+              const rPrice=priceOf(r);
+              const canBuy=pState.coins>=rPrice;
               const bought=pState.boughtRewards?.includes(r.id);
               return (
                 <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)}
@@ -3229,7 +3265,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                   <span style={{fontSize:22}}>{r.emoji}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#2ECC40":"#ddd"}}>{r.label}</div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#2ECC40":"#FFD700"}}>{bought?"RÉCLAMÉ!":r.coins+" 🪙"}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#2ECC40":"#FFD700"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
                   </div>
                   {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
                   {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
@@ -3249,7 +3285,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {(SHOP_ITEMS[shopTab] || (shopTab===themedCat.id ? themedCat.items : []) || []).map(item=>{
               const owned=pState.owned?.includes(item.id);
               const equipped=eq[item.slot]===item.id;
-              const canAfford=pState.coins>=item.cost;
+              const iPrice=priceOf(item);
+              const canAfford=pState.coins>=iPrice;
               const rar=rarityOf(item.cost);
               return (
                 <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
@@ -3257,7 +3294,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   <span style={{fontSize:20,display:"block",margin:"8px 0 2px"}}>{item.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#2ECC40":owned?"#888":"#FFD700"}}>{equipped?"✅ ON":owned?"Équiper":item.cost+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#2ECC40":owned?"#888":"#FFD700"}}>{equipped?"✅ ON":owned?"Équiper":iPrice+" 🪙"}</span>
                 </div>
               );
             })}
@@ -3309,8 +3346,12 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
 // ─── PLAYER PROFILE MODAL (#8) ───────────────────────────────
-function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
+function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins }) {
   const gs = pState;
+  const [giveAmt, setGiveAmt] = useState(0);
+  const meIdx = meId && meId!=="parent" ? config.players.findIndex(p=>p.id===meId) : -1;
+  const myCoins = meIdx>=0 ? (gameStates[meIdx]?.coins||0) : 0;
+  const canTrade = meIdx>=0 && meId!==player.id; // un enfant connecté regarde un FRÈRE
   const lt = getLevelTitle(gs.xp||0, player.themeId);
   const bar = xpBar(gs.xp||0);
   const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
@@ -3370,13 +3411,31 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose }) {
             ))}
           </div>
         )}
+        {/* 🪙 Échange de pièces — un enfant peut DONNER des pièces à un frère */}
+        {canTrade && (
+          <div style={{background:"rgba(255,215,0,0.07)",border:"2px solid #FFD70055",borderRadius:8,padding:"10px 12px",marginBottom:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginBottom:6}}>🎁 DONNER DES PIÈCES</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>Tu as {myCoins} 🪙. Choisis combien donner à {displayName(player)} :</div>
+            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+              {[5,10,25].map(v=>(
+                <button key={v} disabled={v>myCoins} onClick={()=>setGiveAmt(v)}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:giveAmt===v?"#FFD700":"#1a1a1a",color:giveAmt===v?"#000":(v>myCoins?"#555":"#FFD700"),border:`2px solid ${v>myCoins?"#333":"#FFD700"}`,borderRadius:4,cursor:v>myCoins?"not-allowed":"pointer",opacity:v>myCoins?0.5:1}}>{v}</button>
+              ))}
+              <input type="number" min="1" max={myCoins} value={giveAmt||""} onChange={e=>setGiveAmt(Math.max(0,Math.min(myCoins,parseInt(e.target.value)||0)))}
+                placeholder="autre" style={{width:64,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center"}}/>
+              <button disabled={!(giveAmt>0&&giveAmt<=myCoins)}
+                onClick={()=>{ if(giveAmt>0&&giveAmt<=myCoins&&onGiveCoins){ const ok=onGiveCoins(meId,player.id,giveAmt); if(ok){SFX.coin&&SFX.coin();setGiveAmt(0);onClose&&onClose();} } }}
+                style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(giveAmt>0&&giveAmt<=myCoins)?"#FFD700":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:(giveAmt>0&&giveAmt<=myCoins)?"pointer":"not-allowed",opacity:(giveAmt>0&&giveAmt<=myCoins)?1:0.5}}>🎁 Donner</button>
+            </div>
+          </div>
+        )}
         <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:10,background:player.color,color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>✕ FERMER</button>
       </div>
     </div>
   );
 }
 
-function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat }) {
+function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat, onGiveCoins }) {
   const [profileIdx, setProfileIdx] = useState(null);
   const [chatText, setChatText] = useState("");
   const mayOpen = (i)=> canOpen ? canOpen(i) : true;
@@ -3386,7 +3445,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
       {profileIdx!==null&&(
-        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} onClose={()=>setProfileIdx(null)}/>
+        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onClose={()=>setProfileIdx(null)}/>
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
 
@@ -5129,6 +5188,7 @@ export default function App() {
   // Refs pour lire l'état courant dans des callbacks (fil de famille)
   const cfgRef = useRef(config); cfgRef.current = config;
   const gsRef = useRef(gameStates); gsRef.current = gameStates;
+  const viewRef = useRef(view); viewRef.current = view; // pour ne pas casser l'écran courant pendant la sync
   // Ajoute une entrée au fil de famille (auto: quêtes, niveaux; manuel: chat)
   const pushFeed = useCallback((entry)=>{
     const cfg=cfgRef.current||{}; const fe={ id:"f_"+uid(), ts:Date.now(), likes:[], ...entry };
@@ -5163,6 +5223,12 @@ export default function App() {
       }
       // Les deux existent → fusion non-destructive
       const merged=mergeFamily(local, remote);
+      // ⚠️ Ne pas casser l'écran de l'enfant qui joue : on garde SON mode/rituel courant
+      // (sinon la sync d'un autre appareil le ramène ailleurs au bout de 25s).
+      const vi=viewRef.current;
+      if(typeof vi==="number" && merged.gameStates?.[vi] && gsRef.current?.[vi]){
+        merged.gameStates[vi]={...merged.gameStates[vi], mode:gsRef.current[vi].mode, activeRoutineId:gsRef.current[vi].activeRoutineId};
+      }
       if(_famSig(merged)!==_famSig(local)){
         merged.savedAt=new Date().toISOString();
         const data=migrateSavedData(merged);
@@ -5346,9 +5412,10 @@ export default function App() {
     setGameStates(gs=>{
       const p=gs[idx];
       const isReward=!item.slot;
-      if(p.coins<item.cost)return gs;
+      const price=priceOf(item); // items (.cost) ET récompenses (.coins), ×PRICE_MULT
+      if((p.coins||0)<price)return gs;
       SFX.buy();
-      const n=[...gs]; n[idx]={...p,coins:p.coins-item.cost,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{})};
+      const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{})};
       persist(config,n);
       showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#FFD700");
       spawnParticles(item.emoji||"🎉");
@@ -5494,6 +5561,26 @@ export default function App() {
     showToast("➕ Tâche ajoutée à ton rituel!","#2ECC40");
     return instanceId;
   },[config,gameStates,persist,showToast]);
+
+  // Échange de pièces entre enfants (l'un DONNE à l'autre)
+  const handleGiveCoins = useCallback((fromId, toId, amount)=>{
+    const amt=Math.max(0, Math.round(amount||0));
+    const fi=config.players.findIndex(p=>p.id===fromId);
+    const ti=config.players.findIndex(p=>p.id===toId);
+    if(fi<0||ti<0||fi===ti||amt<=0) return false;
+    let ok=false;
+    setGameStates(gs=>{ const n=[...gs];
+      if((n[fi]?.coins||0) < amt) return gs; // pas assez de pièces
+      n[fi]={...n[fi], coins:(n[fi].coins||0)-amt};
+      n[ti]={...n[ti], coins:(n[ti].coins||0)+amt};
+      ok=true; persist(config,n); return n; });
+    if(ok){
+      const fromP=config.players[fi], toP=config.players[ti];
+      pushFeed({type:"gift",playerId:fromId,emoji:"🪙",text:`${displayName(fromP)} a donné ${amt} pièces à ${displayName(toP)} 💛`});
+      showToast(`🪙 ${amt} pièces envoyées à ${displayName(toP)}!`,"#FFD700",3000);
+    } else { showToast("Pas assez de pièces 😅","#FF6B6B",2500); }
+    return ok;
+  },[config,persist,showToast,pushFeed]);
 
   // L'enfant change SON pseudo (dans config.players)
   const handleUpdatePseudo = useCallback((playerIdx, pseudo)=>{
@@ -5805,7 +5892,8 @@ export default function App() {
           <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone}/>
         )}
         {view==="family"&&(
-          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===null || sessionPlayer===i} th={th}
+          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===i} th={th}
+            onGiveCoins={handleGiveCoins}
             meId={parentMode ? "parent" : (sessionPlayer!=null ? config.players[sessionPlayer]?.id : "parent")}
             onLike={(fid)=>toggleFeedLike(fid, parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"))}
             onPostChat={(text)=>{ const mid=parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"); pushFeed({type:"chat",playerId:mid,text,emoji:"💬"}); }}/>
