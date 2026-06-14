@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.39.0";
+const APP_VERSION = "1.40.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1015,6 +1015,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.40.0", date:"2026-06-14", features:[
+    "🤝 Échange de pièces : en plus de DONNER, tu peux maintenant DEMANDER des pièces à un frère depuis son profil. Il reçoit ta demande sur son Accueil (📬) et peut accepter ou refuser. (idée de D1TEXXY)",
+  ]},
   { version:"1.39.0", date:"2026-06-14", features:[
     "🎒 Quand tu regardes le profil d'un frère, tu vois son inventaire (ses items et son familier)! (idée de LE FRERO)",
   ]},
@@ -1395,6 +1398,18 @@ const mergeFamily = (base, incoming) => {
         else m.set(f.id, { ...f, likes: [...(f.likes || [])] });
       }
       return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
+    })(),
+    coinOffers: (() => { // offres de pièces : union par id; une résolution (accepté/refusé) est COLLANTE
+      const m = new Map();
+      for (const o of [...(bC.coinOffers || []), ...(iC.coinOffers || [])]) {
+        if (!o || o.id == null) continue;
+        const prev = m.get(o.id);
+        if (!prev) m.set(o.id, { ...o });
+        else if (prev.status === "pending" && o.status && o.status !== "pending") m.set(o.id, { ...o }); // garder le résolu
+      }
+      // on ne garde que les 40 plus récentes et on jette les résolues de plus de 2 jours
+      const cutoff = Date.now() - 2 * 864e5;
+      return [...m.values()].filter(o => o.status === "pending" || (o.ts || 0) > cutoff).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 40);
     })(),
     boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
       const a = bC.boss, b = iC.boss;
@@ -2771,7 +2786,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -2893,6 +2908,26 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 <div style={{fontSize:40,opacity:0.5}}>🐾</div>
                 <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒 et il évoluera avec toi!</div>
               </>)}
+          </div>
+        );
+      })()}
+      {/* 📬 Demandes de pièces reçues (offres en attente que CET enfant doit accepter) */}
+      {(()=>{ const offers=(config.coinOffers||[]).filter(o=>o.toId===player.id && o.status==="pending");
+        if(!offers.length) return null;
+        return (
+          <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #5DECF555",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:8}}>📬 DEMANDES DE PIÈCES ({offers.length})</div>
+            {offers.map(o=>{ const from=config.players.find(p=>p.id===o.fromId); const enough=(pState.coins||0)>=o.amount;
+              return (
+                <div key={o.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:120,fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}><b style={{color:from?.color||"#fff"}}>{displayName(from)}</b> te demande {o.amount} 🪙</div>
+                  <button disabled={!enough} onClick={()=>{SFX.click();onRespondOffer&&onRespondOffer(o.id,true);}} title={enough?"":"Pas assez de pièces"}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:enough?"#2ECC40":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:enough?"pointer":"not-allowed",opacity:enough?1:0.5}}>✅ Donner</button>
+                  <button onClick={()=>{SFX.click();onRespondOffer&&onRespondOffer(o.id,false);}}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:"#1a1a1a",color:"#FF6B6B",border:"2px solid #FF6B6B55",borderRadius:4,cursor:"pointer"}}>✕</button>
+                </div>
+              );
+            })}
           </div>
         );
       })()}
@@ -3497,9 +3532,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
 // ─── PLAYER PROFILE MODAL (#8) ───────────────────────────────
-function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins }) {
+function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins, onCreateOffer }) {
   const gs = pState;
   const [giveAmt, setGiveAmt] = useState(0);
+  const [reqAmt, setReqAmt] = useState(0);
   const meIdx = meId && meId!=="parent" ? config.players.findIndex(p=>p.id===meId) : -1;
   const myCoins = meIdx>=0 ? (gameStates[meIdx]?.coins||0) : 0;
   const canTrade = meIdx>=0 && meId!==player.id; // un enfant connecté regarde un FRÈRE
@@ -3599,6 +3635,22 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
                 onClick={()=>{ if(giveAmt>0&&giveAmt<=myCoins&&onGiveCoins){ const ok=onGiveCoins(meId,player.id,giveAmt); if(ok){SFX.coin&&SFX.coin();setGiveAmt(0);onClose&&onClose();} } }}
                 style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(giveAmt>0&&giveAmt<=myCoins)?"#FFD700":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:(giveAmt>0&&giveAmt<=myCoins)?"pointer":"not-allowed",opacity:(giveAmt>0&&giveAmt<=myCoins)?1:0.5}}>🎁 Donner</button>
             </div>
+            {/* 📨 Demander des pièces (offre que le frère doit accepter) */}
+            <div style={{borderTop:"1px solid #FFD70033",marginTop:10,paddingTop:8}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:6}}>📨 DEMANDER DES PIÈCES</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>{displayName(player)} a {gs.coins||0} 🪙. Demande-lui un montant — il devra accepter.</div>
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                {[5,10,25].map(v=>(
+                  <button key={v} onClick={()=>setReqAmt(v)}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:reqAmt===v?"#5DECF5":"#1a1a1a",color:reqAmt===v?"#000":"#5DECF5",border:"2px solid #5DECF5",borderRadius:4,cursor:"pointer"}}>{v}</button>
+                ))}
+                <input type="number" min="1" value={reqAmt||""} onChange={e=>setReqAmt(Math.max(0,parseInt(e.target.value)||0))}
+                  placeholder="autre" style={{width:64,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center"}}/>
+                <button disabled={!(reqAmt>0)}
+                  onClick={()=>{ if(reqAmt>0&&onCreateOffer){ const ok=onCreateOffer(meId,player.id,reqAmt); if(ok){SFX.click&&SFX.click();setReqAmt(0);onClose&&onClose();} } }}
+                  style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:reqAmt>0?"#5DECF5":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:reqAmt>0?"pointer":"not-allowed",opacity:reqAmt>0?1:0.5}}>📨 Demander</button>
+              </div>
+            </div>
           </div>
         )}
         <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:10,background:player.color,color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>✕ FERMER</button>
@@ -3607,7 +3659,7 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
   );
 }
 
-function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat, onGiveCoins }) {
+function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat, onGiveCoins, onCreateOffer }) {
   const [profileIdx, setProfileIdx] = useState(null);
   const [chatText, setChatText] = useState("");
   const mayOpen = (i)=> canOpen ? canOpen(i) : true;
@@ -3617,7 +3669,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
       {profileIdx!==null&&(
-        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onClose={()=>setProfileIdx(null)}/>
+        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onCreateOffer={onCreateOffer} onClose={()=>setProfileIdx(null)}/>
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
 
@@ -5776,6 +5828,46 @@ export default function App() {
     return ok;
   },[config,persist,showToast,pushFeed]);
 
+  // OFFRE : un enfant DEMANDE des pièces à un frère (fromId=demandeur, toId=détenteur qui paie)
+  const handleCreateOffer = useCallback((fromId, toId, amount)=>{
+    const amt=Math.max(1, Math.round(amount||0));
+    const cfg=cfgRef.current||{};
+    if(fromId===toId || amt<=0 || !cfg.players?.some(p=>p.id===fromId) || !cfg.players?.some(p=>p.id===toId)) return false;
+    const offer={ id:"of_"+uid(), fromId, toId, amount:amt, ts:Date.now(), status:"pending" };
+    const n={...cfg, coinOffers:[offer, ...(cfg.coinOffers||[])].slice(0,40)};
+    setConfig(n); persist(n, gsRef.current);
+    const toP=cfg.players.find(p=>p.id===toId);
+    showToast(`📨 Demande envoyée à ${displayName(toP)} (${amt} 🪙)`,"#5DECF5",3000);
+    return true;
+  },[persist,showToast]);
+
+  // RÉPONSE à une offre (par le détenteur toId) : accepter = transférer, refuser = marquer refusé
+  const handleRespondOffer = useCallback((offerId, accept)=>{
+    const cfg=cfgRef.current||{};
+    const offer=(cfg.coinOffers||[]).find(o=>o.id===offerId);
+    if(!offer || offer.status!=="pending") return;
+    const hi=cfg.players.findIndex(p=>p.id===offer.toId);   // détenteur (paie)
+    const ri=cfg.players.findIndex(p=>p.id===offer.fromId); // demandeur (reçoit)
+    if(!accept){
+      const ncfg={...cfg, coinOffers:(cfg.coinOffers||[]).map(o=>o.id===offerId?{...o,status:"declined"}:o)};
+      setConfig(ncfg); persist(ncfg, gsRef.current); showToast("Demande refusée","#888",2500); return;
+    }
+    let ok=false;
+    setGameStates(gs=>{ const n=[...gs];
+      if((n[hi]?.coins||0) < offer.amount) return gs; // pas assez
+      n[hi]={...n[hi], coins:(n[hi].coins||0)-offer.amount};
+      n[ri]={...n[ri], coins:(n[ri].coins||0)+offer.amount};
+      ok=true;
+      const c=cfgRef.current||{};
+      const ncfg={...c, coinOffers:(c.coinOffers||[]).map(o=>o.id===offerId?{...o,status:"accepted"}:o)};
+      setConfig(ncfg); persist(ncfg, n); return n;
+    });
+    if(ok){ const toP=cfg.players[hi], fromP=cfg.players[ri];
+      pushFeed({type:"gift",playerId:offer.toId,emoji:"🪙",text:`${displayName(toP)} a envoyé ${offer.amount} pièces à ${displayName(fromP)} 💛`});
+      showToast(`✅ ${offer.amount} 🪙 envoyées!`,"#FFD700",3000);
+    } else showToast("Tu n'as pas assez de pièces 😅","#FF6B6B",2500);
+  },[persist,showToast,pushFeed]);
+
   // L'enfant change SON pseudo (dans config.players)
   const handleUpdatePseudo = useCallback((playerIdx, pseudo)=>{
     const clean=(pseudo||"").trim().slice(0,16); if(!clean||!config.players[playerIdx])return;
@@ -6089,6 +6181,7 @@ export default function App() {
         {view==="family"&&(
           <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===i} th={th}
             onGiveCoins={handleGiveCoins}
+            onCreateOffer={handleCreateOffer}
             meId={parentMode ? "parent" : (sessionPlayer!=null ? config.players[sessionPlayer]?.id : "parent")}
             onLike={(fid)=>toggleFeedLike(fid, parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"))}
             onPostChat={(text)=>{ const mid=parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"); pushFeed({type:"chat",playerId:mid,text,emoji:"💬"}); }}/>
@@ -6112,6 +6205,7 @@ export default function App() {
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
             onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
             onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
+            onRespondOffer={handleRespondOffer}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
