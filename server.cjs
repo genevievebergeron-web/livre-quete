@@ -68,6 +68,83 @@ async function putFamille(id, data) {
   const all = readLocal(); all[id] = data; writeLocal(all);
 }
 
+// ── FUSION NON-DESTRUCTIVE (côté serveur) ─────────────────────
+// Port de mergeFamily/mergeGS du client : garantit qu'un PUT d'un appareil
+// (même une vieille version) n'écrase JAMAIS les changements d'un autre.
+const _uniq = (a) => [...new Set(a || [])];
+const isNewer = (a, b) => { if (!a) return false; if (!b) return true; try { return new Date(a) > new Date(b); } catch { return false; } };
+const _mergeCalendar = (a, b) => { const m = new Map(); for (const e of [...(a||[]), ...(b||[])]) { if (e && e.id != null) m.set(e.id, e); } return [...m.values()]; };
+const mergePetXp = (a, b) => { const out = { ...(a||{}) }; for (const k in (b||{})) out[k] = Math.max(out[k]||0, b[k]||0); return out; };
+const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
+  if (!a.bossId) return b.bossId ? b : { bossId:null, earned:0, spent:0, dmg:0 };
+  if (!b.bossId) return a;
+  if (a.bossId === b.bossId) return { bossId:a.bossId, earned:Math.max(a.earned||0,b.earned||0), spent:Math.max(a.spent||0,b.spent||0), dmg:Math.max(a.dmg||0,b.dmg||0) };
+  return (new Date(b.bossId) > new Date(a.bossId)) ? b : a;
+};
+const mergeGS = (a, b, preferIncoming) => {
+  a = a || {}; b = b || {};
+  const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]);
+  const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
+  return {
+    ...a, ...b,
+    xp: Math.max(a.xp||0, b.xp||0),
+    coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
+    completed,
+    pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k)),
+    owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
+    boughtRewards: _uniq([...(a.boughtRewards||[]), ...(b.boughtRewards||[])]),
+    badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
+    equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
+    calendar: _mergeCalendar(a.calendar, b.calendar),
+    avatar: avatarConfigured,
+    pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
+    mode: b.mode ?? a.mode ?? null,
+    routines: (() => { const m = new Map(); for (const r of [...(a.routines||[]), ...(b.routines||[])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
+    hiddenRewards: _uniq([...(a.hiddenRewards||[]), ...(b.hiddenRewards||[])]),
+    hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
+    dailyClaimed: (() => { const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
+    pendingCelebrations: preferIncoming ? (b.pendingCelebrations||[]) : (a.pendingCelebrations||[]),
+    petXp: mergePetXp(a.petXp, b.petXp),
+    energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
+    energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
+    lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null,
+    activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]),
+    bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
+    settings: { ...(a.settings||{}), ...(b.settings||{}) },
+  };
+};
+const _mergePlayer = (a, b) => ({ ...a, ...b, name:a.name||b.name, pseudo:a.pseudo||b.pseudo, color:a.color||b.color,
+  themeId:(a.themeId && a.themeId!=="none") ? a.themeId : (b.themeId||a.themeId||"none"),
+  starterThemes:_uniq([...(a.starterThemes||[]), ...(b.starterThemes||[])]).slice(0,4), themeChosenAt:a.themeChosenAt||b.themeChosenAt });
+const mergeFamily = (base, incoming) => {
+  if (!base) return incoming; if (!incoming) return base;
+  const bC = base.config||{}, iC = incoming.config||{};
+  const bP = bC.players||[], iP = iC.players||[]; const bG = base.gameStates||[], iG = incoming.gameStates||[];
+  const preferIncoming = isNewer(incoming.savedAt, base.savedAt);
+  const byId = new Map();
+  bP.forEach((p, i) => byId.set(p.id, { player:{ ...p }, gs:bG[i] }));
+  iP.forEach((p, i) => { if (byId.has(p.id)) { const e=byId.get(p.id); e.player=_mergePlayer(e.player,p); e.gs=mergeGS(e.gs,iG[i],preferIncoming); } else byId.set(p.id, { player:{ ...p }, gs:iG[i] }); });
+  const players = [...byId.values()].map(e => e.player);
+  const gameStates = [...byId.values()].map(e => e.gs);
+  const assignMap = new Map(); (bC.assignments||[]).forEach(a => assignMap.set(a.instanceId, a)); (iC.assignments||[]).forEach(a => { if (!assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
+  const taskMap = new Map(); (bC.customTasks||[]).forEach(t => taskMap.set(t.id, t)); (iC.customTasks||[]).forEach(t => { if (!taskMap.has(t.id)) taskMap.set(t.id, t); });
+  const newer = preferIncoming ? incoming : base; const newerC = newer.config||{};
+  const config = {
+    ...bC, ...iC, players, assignments:[...assignMap.values()], customTasks:[...taskMap.values()],
+    selectedRewards:_uniq([...(bC.selectedRewards||[]), ...(iC.selectedRewards||[])]),
+    feed: (() => { const m=new Map(); for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); else m.set(f.id,{ ...f, likes:[...(f.likes||[])] }); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
+    coinOffers: (() => { const m=new Map(); for (const o of [...(bC.coinOffers||[]), ...(iC.coinOffers||[])]) { if (!o||o.id==null) continue; const prev=m.get(o.id); if (!prev) m.set(o.id,{ ...o }); else if (prev.status==="pending"&&o.status&&o.status!=="pending") m.set(o.id,{ ...o }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(o=>o.status==="pending"||(o.ts||0)>cut).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,40); })(),
+    boss: (() => { const a=bC.boss, b=iC.boss; if (!a) return b||null; if (!b) return a;
+      if (a.startedAt===b.startedAt) { const lastHitTs=[a.lastHitTs,b.lastHitTs].filter(Boolean).sort().pop()||a.lastHitTs; return { ...a, ...b, defeatedAt:a.defeatedAt||b.defeatedAt, lastHitTs }; }
+      return (new Date(b.startedAt||0) >= new Date(a.startedAt||0)) ? b : a; })(),
+    pin: newerC.pin || bC.pin || iC.pin || "1146",
+    mode: newerC.mode || bC.mode || iC.mode || "routine",
+    routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+  };
+  return { ...newer, config, gameStates, savedAt: preferIncoming ? incoming.savedAt : base.savedAt };
+};
+
 // ── Helpers HTTP ──────────────────────────────────────────────
 const sendJson = (res, code, obj) => {
   const body = JSON.stringify(obj);
@@ -112,13 +189,14 @@ http.createServer(async (req, res) => {
       const { id, data } = body || {};
       if (!validId(id)) return sendJson(res, 400, { erreur: "id invalide" });
       if (!data || typeof data !== "object" || !data.savedAt) return sendJson(res, 400, { erreur: "data.savedAt requis" });
-      // Anti-écrasement: on ne remplace que par plus récent (last-write-wins par savedAt)
+      // ⚠️ FUSION NON-DESTRUCTIVE : on FUSIONNE l'arrivant avec l'état serveur au lieu d'écraser.
+      // Ça empêche un appareil (même une vieille version) d'annuler les changements d'un autre
+      // (ex: une validation qui « revient »). XP/complétions ne peuvent que progresser.
       const existing = await getFamille(id);
-      if (existing?.savedAt && new Date(existing.savedAt) > new Date(data.savedAt)) {
-        return sendJson(res, 200, { ok: true, ignore: "plus ancien que l'état serveur", data: existing });
-      }
-      await putFamille(id, data);
-      return sendJson(res, 200, { ok: true });
+      let merged = data;
+      try { if (existing && existing.config) merged = mergeFamily(existing, data); } catch (e) { console.error("merge serveur échoué, fallback écrasement:", e.message); merged = data; }
+      await putFamille(id, merged);
+      return sendJson(res, 200, { ok: true, data: merged });
     }
 
     if (u.pathname.startsWith("/api/")) return sendJson(res, 404, { erreur: "inconnu" });
