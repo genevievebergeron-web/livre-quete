@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.26.0";
+const APP_VERSION = "1.27.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -134,6 +134,16 @@ const weeklyRewards = (n=8) => {
   arr.sort((a,b)=>a.k-b.k);
   return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
 };
+
+// ─── RARETÉS (incite à collectionner) ────────────────────────
+const RARITIES = [
+  { min:0,  name:"Commun",     color:"#9AA0A6" },
+  { min:20, name:"Rare",       color:"#4FA3FF" },
+  { min:30, name:"Ultra Rare", color:"#B06BFF" },
+  { min:45, name:"Légendaire", color:"#FFB02E" },
+  { min:60, name:"Unique",     color:"#FF5BAE" },
+];
+const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cost||0)>=x.min) r=x; return r; };
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -968,6 +978,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.27.0", date:"2026-06-13", features:[
+    "💎 Raretés des items! Commun, Rare, Ultra Rare, Légendaire, Unique — bordures et lueurs colorées pour les plus rares",
+  ]},
   { version:"1.26.0", date:"2026-06-13", features:[
     "🧭 Fix Safari (page blanche) — on retire le cache hors-ligne qui restait bloqué + compatibilité Safari plus ancien",
   ]},
@@ -2551,12 +2564,14 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
             {allOwned.map(item=>{
               const isEq = item.slot && eq[item.slot]===item.id;
+              const rar = rarityOf(item.cost);
               return (
                 <div key={item.id} onClick={()=>{ if(item.slot){onEquip(item);SFX.click();} }}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"8px 4px",
-                    background:isEq?`${pt.accent}20`:"rgba(0,0,0,0.45)",
-                    border:`3px solid ${isEq?(pt.accent||"#2ECC40"):"#444"}`,borderRadius:5,cursor:item.slot?"pointer":"default",
-                    boxShadow:isEq?`0 0 10px ${pt.glow||"#FFD700"}60`:"none"}}>
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px 5px",
+                    background:isEq?`${pt.accent}20`:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,
+                    border:`2px solid ${isEq?(pt.accent||"#2ECC40"):rar.color}`,borderRadius:6,cursor:item.slot?"pointer":"default",
+                    boxShadow:isEq?`0 0 10px ${pt.glow||"#FFD700"}60`:(rar.min>=45?`0 0 8px ${rar.color}55`:"none")}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   <span style={{fontSize:24}}>{item.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc",textAlign:"center",lineHeight:1.2}}>{item.name||item.label}</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#2ECC40":"#888"}}>
@@ -3060,10 +3075,12 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               const owned=pState.owned?.includes(item.id);
               const equipped=eq[item.slot]===item.id;
               const canAfford=pState.coins>=item.cost;
+              const rar=rarityOf(item.cost);
               return (
                 <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
-                  style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${equipped?"#2ECC40":owned?"#888":canAfford?"#555":"#333"}`,borderRadius:4,padding:"7px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.4:1}}>
-                  <span style={{fontSize:20,display:"block",marginBottom:2}}>{item.emoji}</span>
+                  style={{background:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,border:`2px solid ${equipped?"#2ECC40":rar.color}`,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,boxShadow:rar.min>=45?`0 0 10px ${rar.color}55`:"none",position:"relative"}}>
+                  <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
+                  <span style={{fontSize:20,display:"block",margin:"8px 0 2px"}}>{item.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#2ECC40":owned?"#888":"#FFD700"}}>{equipped?"✅ ON":owned?"Équiper":item.cost+" 🪙"}</span>
                 </div>
