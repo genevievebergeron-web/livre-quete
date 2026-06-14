@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.41.0";
+const APP_VERSION = "1.42.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -92,6 +92,32 @@ const minsToEnergy = (gs, target) => {
   const cur = currentEnergy(gs);
   if (cur >= target) return 0;
   return Math.ceil((target - cur) / ENERGY_REGEN_PER_MIN);
+};
+// ─── COMBAT DE BOSS FAMILIAL ──────────────────────────────────
+// Faire des quêtes = gagner des JETONS d'attaque. On les dépense (petite/grosse attaque)
+// pour enlever des PV au boss. Le boss riposte si la famille ralentit (PV de famille baissent).
+const BOSS_DIFF = { facile:{label:"Facile",hp:40}, moyen:{label:"Moyen",hp:80}, costaud:{label:"Costaud",hp:140} };
+const ATTACKS = {
+  petite:{ label:"Petite attaque", cost:1, dmg:1, emoji:"🗡️" },
+  grosse:{ label:"Grosse attaque", cost:3, dmg:4, emoji:"💥" }, // 3 jetons → 4 dégâts (bonus à viser gros)
+};
+const FAMILY_HP_MAX = 100;
+const BOSS_DRAIN_PER_H = FAMILY_HP_MAX / 36; // PV famille vidés en ~36 h sans attaque (recharge en attaquant)
+// PV de famille restants = baisse selon le temps écoulé depuis la dernière attaque
+const familyHp = (boss) => {
+  if (!boss || boss.defeatedAt || !boss.lastHitTs) return FAMILY_HP_MAX;
+  const h = (Date.now() - new Date(boss.lastHitTs).getTime()) / 3600000;
+  return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * BOSS_DRAIN_PER_H)));
+};
+const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
+const bossDamageTotal = (gameStates, bossId) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0);
+const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
+const mergeBossBattle = (a, b) => {
+  a = a || {}; b = b || {};
+  if (!a.bossId) return b.bossId ? b : { bossId:null, earned:0, spent:0, dmg:0 };
+  if (!b.bossId) return a;
+  if (a.bossId === b.bossId) return { bossId:a.bossId, earned:Math.max(a.earned||0,b.earned||0), spent:Math.max(a.spent||0,b.spent||0), dmg:Math.max(a.dmg||0,b.dmg||0) };
+  return (new Date(b.bossId) > new Date(a.bossId)) ? b : a; // boss le plus récent
 };
 // Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
 const streakOf = (activeDays) => {
@@ -204,6 +230,8 @@ const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cos
 const PRICE_MULT = 2;
 const baseCost = (it) => (it?.cost ?? it?.coins ?? 0); // items: .cost — récompenses: .coins
 const priceOf  = (it) => Math.round(baseCost(it) * PRICE_MULT);
+// Récompense d'une tâche selon la difficulté choisie par l'enfant
+const DIFF_PRESETS = { easy:{xp:10,coins:5}, medium:{xp:20,coins:10}, hard:{xp:40,coins:20} };
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -1050,6 +1078,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.42.0", date:"2026-06-14", features:[
+    "⚔️ COMBAT DE BOSS! Quand un boss est lancé, un onglet rouge ⚔️ BOSS apparaît. Chaque quête validée te donne un jeton d'attaque : choisis une petite (1 jeton) ou une grosse (3 jetons) attaque pour enlever des PV au boss. Battez-le en famille!",
+    "❤️ Le boss riposte : si la famille ralentit, les PV de la famille baissent (vite, attaquez!). Vaincre le boss donne +40 🪙 à tout le monde.",
+    "🎚️ Le parent choisit la difficulté du boss (Facile / Moyen / Costaud).",
+    "🟢🟡🔴 Quand tu crées ta propre tâche, tu choisis sa difficulté — plus c'est dur, plus ça donne d'XP et de pièces!",
+  ]},
   { version:"1.41.0", date:"2026-06-14", features:[
     "🐣 Familier VIVANT! Nourris-le chaque jour (🍖) pour qu'il reste en forme — c'est seulement nourri qu'il gagne de l'XP avec tes quêtes.",
     "⚡ Jauge d'énergie : jouer avec ton familier et ouvrir des coffres dépensent de l'énergie. Quand elle est basse, il fait une 💤 sieste et se recharge tout seul (reviens plus tard!). Tes quêtes, elles, sont toujours faisables.",
@@ -1389,6 +1423,8 @@ const mergeGS = (a, b, preferIncoming) => {
     energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
+    bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
+
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1533,6 +1569,7 @@ const migrateGameState = (gs) => {
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
     activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
+    bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -2620,8 +2657,9 @@ function ChestSprite({ open, size=96, style={} }){
 // ─── CHOIX D'EMOJI + CRÉATION DE TÂCHE (picker au lieu de taper) ──────────────
 const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
 function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
-  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐");
+  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium");
   const acc=th?.accent||"#FFD700";
+  const DIFFS=[["easy","🟢 Facile","+10 XP · 5 🪙"],["medium","🟡 Moyen","+20 XP · 10 🪙"],["hard","🔴 Difficile","+40 XP · 20 🪙"]];
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -2638,9 +2676,18 @@ function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCre
             style={{fontSize:20,padding:"6px 0",background:emoji===em?`${acc}33`:"#1a1a1a",border:`2px solid ${emoji===em?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{em}</button>
         ))}
       </div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>C'est difficile à quel point? (plus c'est dur, plus ça rapporte!)</div>
+      <div style={{display:"flex",gap:6,marginBottom:14}}>
+        {DIFFS.map(([k,l,sub])=>(
+          <button key={k} onClick={()=>{SFX.click();setDiff(k);}}
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 4px",lineHeight:1.5,background:diff===k?acc:"#1a1a1a",color:diff===k?"#000":"#999",border:`2px solid ${diff===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+            {l}<br/><span style={{fontFamily:"'VT323',monospace",fontSize:11}}>{sub}</span>
+          </button>
+        ))}
+      </div>
       <div style={{display:"flex",gap:8}}>
         <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
-        <button disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji}); } }}
+        <button disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff}); } }}
           style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #000"}}>
           ✅ {confirmLabel}
         </button>
@@ -2835,7 +2882,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3588,17 +3635,58 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       </div>
       </>)}
 
+      {/* ── ONGLET BOSS : combat familial (jetons d'attaque gagnés en faisant des quêtes) ── */}
+      {homeTab==="boss" && config.boss && (()=>{
+        const boss=config.boss; const bid=boss.startedAt; const hpMax=boss.hpMax||80;
+        const total=bossDamageTotal(allStates||[], bid); const hpLeft=Math.max(0,hpMax-total); const hpPct=Math.round(hpLeft/hpMax*100);
+        const fhp=familyHp(boss); const won=!!boss.defeatedAt; const myJetons=bossJetons(pState,bid);
+        const atkBtn=(type,label,sub,enabled)=>(
+          <button disabled={!enabled} onClick={()=>{ if(enabled){SFX.click();onBossAttack&&onBossAttack(type);} }}
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 6px",lineHeight:1.5,background:enabled?(boss.color||"#FF5555"):"#1a1a1a",color:enabled?"#000":"#555",border:"2px solid #000",borderRadius:6,cursor:enabled?"pointer":"not-allowed",opacity:enabled?1:0.5,boxShadow:enabled?"2px 2px 0 #000":"none"}}>
+            {label}<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{sub}</span>
+          </button>
+        );
+        return (
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:"#FF5555"}}>⚔️ COMBAT DE BOSS</div>
+            <div style={{background:"rgba(50,18,35,0.55)",border:`3px solid ${boss.color||"#FF5555"}`,borderRadius:12,padding:16,textAlign:"center"}}>
+              <BossSprite boss={boss} size={104} style={{filter:won?"grayscale(0.7) opacity(0.7)":"none"}}/>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:boss.color||"#FF5555",marginTop:8}}>{boss.emoji} {boss.name}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"8px 0 2px"}}>PV DU BOSS</div>
+              <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#FF4444,#FFD700)",transition:"width 0.5s"}}/></div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
+            </div>
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#FF4444":"#2ECC40"}}>{fhp}%</span></div>
+              <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden",marginTop:2}}><div style={{height:"100%",width:fhp+"%",background:fhp<30?"#FF4444":"#2ECC40",transition:"width 0.5s"}}/></div>
+              {!won && fhp<40 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#FF8888",marginTop:5,lineHeight:1.3}}>⚠️ Le boss reprend des forces! Faites des quêtes et attaquez vite pour défendre la famille!</div>}
+            </div>
+            {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#2ECC40",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#FFD700",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
+              <div style={{display:"flex",gap:8}}>
+                {atkBtn("petite","🗡️ Petite","1 jeton · −1 PV", myJetons>=1)}
+                {atkBtn("grosse","💥 Grosse","3 jetons · −4 PV", myJetons>=3)}
+              </div>
+              {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
+            </>)}
+          </div>
+        );
+      })()}
+
       {/* ── BARRE D'ONGLETS EN BAS (désencombre l'accueil) ── */}
       <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)"}}>
-        {[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],["sem","📅","Semaine"],["shop","🛒","Boutique"]].map(([k,ic,lb])=>{ const on=homeTab===k;
-          return (
-            <button key={k} onClick={()=>{setHomeTab(k);SFX.click();}}
-              style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${(pt.accent||player.color)}22`:"transparent",border:"none",borderTop:on?`3px solid ${pt.accent||player.color}`:"3px solid transparent",cursor:"pointer"}}>
-              <span style={{fontSize:20,filter:on?"none":"grayscale(0.4) opacity(0.7)"}}>{ic}</span>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?(pt.accent||player.color):"#888"}}>{lb}</span>
-            </button>
-          );
-        })}
+        {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
+          const tabs=[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],...(bossActive?[["boss","⚔️","BOSS"]]:[]),["sem","📅","Semaine"],["shop","🛒","Boutique"]];
+          return tabs.map(([k,ic,lb])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
+            return (
+              <button key={k} onClick={()=>{setHomeTab(k);SFX.click();}}
+                style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer"}}>
+                <span style={{fontSize:20,filter:on?"none":"grayscale(0.3) opacity(0.8)",animation:isBoss?"pulse 1.4s infinite":"none"}}>{ic}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"#888")}}>{lb}</span>
+              </button>
+            );
+          });
+        })()}
       </div>
 
     {/* Avatar popup */}
@@ -3752,23 +3840,22 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
 
-      {/* ⚔️ Boss de famille — objectif d'XP collectif */}
+      {/* ⚔️ Boss de famille — PV du boss (attaqué via les jetons gagnés en quêtes) */}
       {config.boss && (()=>{
-        const b=config.boss;
-        const total=gameStates.reduce((s,g)=>s+(g.xp||0),0);
-        const prog=Math.max(0,total-(b.startXpTotal||0));
-        const pct=Math.min(100,Math.round(prog/(b.goalXp||1)*100));
-        const won=!!b.defeatedAt;
+        const b=config.boss; const hpMax=b.hpMax||80;
+        const total=bossDamageTotal(gameStates, b.startedAt); const hpLeft=Math.max(0,hpMax-total);
+        const pct=Math.min(100,Math.round(hpLeft/hpMax*100));
+        const won=!!b.defeatedAt; const fhp=familyHp(b);
         return (
           <div style={{background:won?"rgba(20,55,25,0.5)":"rgba(50,18,35,0.5)",border:`2px solid ${won?"#2ECC40":b.color}`,borderRadius:10,padding:12,display:"flex",gap:12,alignItems:"center"}}>
             <BossSprite boss={b} size={84} style={{flexShrink:0,filter:won?"grayscale(0.6) opacity(0.7)":"none"}}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:won?"#2ECC40":b.color}}>{won?`🏆 ${b.name} vaincu!`:`${b.emoji} ${b.name}`}</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",margin:"3px 0"}}>{won?"Bravo la famille! Vous l'avez battu ensemble! 🎉":"Gagnez de l'XP en faisant vos quêtes — ensemble vous le vaincrez!"}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",margin:"3px 0"}}>{won?"Bravo la famille! Vous l'avez battu ensemble! 🎉":"Faites des quêtes → attaquez le boss dans l'onglet ⚔️ BOSS!"}</div>
               <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden"}}>
-                <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${b.color},#FFD700)`,transition:"width 0.6s ease"}}/>
+                <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,#FF4444,#FFD700)`,transition:"width 0.6s ease"}}/>
               </div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{prog} / {b.goalXp} XP{won?" ✓":` (${pct}%)`}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV{won?" ✓":` · ❤️ Famille ${fhp}%`}</div>
             </div>
           </div>
         );
@@ -4133,10 +4220,14 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
           {/* Boss de famille surprise */}
           <div style={{background:"rgba(50,18,35,0.4)",border:"2px solid #7B3FF2",borderRadius:6,padding:"10px",marginBottom:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#C9B3F7",marginBottom:5}}>🐉 BOSS DE FAMILLE</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#999",marginBottom:8}}>Lance un boss surprise : toute la famille doit gagner de l'XP ensemble pour le vaincre (récompense pour tout le monde!).</div>
-            <PBtn onClick={()=>{ if(!bossActive){ onLaunchBoss&&onLaunchBoss(); } }} color={bossActive?"#333":"#7B3FF2"} textColor="#fff" style={{width:"100%",opacity:bossActive?0.6:1}}>
-              {bossActive?"⚔️ Un boss est déjà en cours…":"🐉 Lancer un boss surprise!"}
-            </PBtn>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#999",marginBottom:8}}>Lance un boss : chaque quête faite donne un jeton d'attaque. La famille l'attaque dans l'onglet ⚔️ BOSS. Choisis sa difficulté (ses PV).</div>
+            {bossActive
+              ? <PBtn onClick={()=>{}} color="#333" textColor="#fff" style={{width:"100%",opacity:0.6}}>⚔️ Un boss est déjà en cours…</PBtn>
+              : <div style={{display:"flex",gap:6}}>
+                  {[["facile","Facile"],["moyen","Moyen"],["costaud","Costaud"]].map(([k,l])=>(
+                    <PBtn key={k} onClick={()=>{ onLaunchBoss&&onLaunchBoss(k); }} color="#7B3FF2" textColor="#fff" style={{flex:1}}>{l}</PBtn>
+                  ))}
+                </div>}
           </div>
           <Row>
             {undoStack.length>0
@@ -5656,16 +5747,12 @@ export default function App() {
       for(const bid of newBadgeIds){ const b=BADGES.find(x=>x.id===bid); if(b) fents.unshift({ id:"f_"+uid(), ts:now+2, likes:[], type:"badge", playerId:player.id, text:`${displayName(player)} a gagné le badge « ${b.name} »`, emoji:b.emoji||"🏅" }); }
       let feedAcc=[...fents, ...((config.feed)||[])];
       let bossNow=config.boss;
-      // Victoire de boss : l'XP collectif depuis le lancement atteint l'objectif
+      // Combat de boss : chaque quête accomplie donne 1 JETON d'attaque (dépensé dans l'onglet BOSS)
       if(bossNow && !bossNow.defeatedAt){
-        const total=n.reduce((s,g)=>s+(g.xp||0),0);
-        if(total - (bossNow.startXpTotal||0) >= (bossNow.goalXp||999999)){
-          bossNow={...bossNow, defeatedAt:new Date().toISOString()};
-          // récompense d'équipe : +15 pièces à chaque joueur
-          for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+15}; }
-          feedAcc=[{id:"f_"+uid(),ts:Date.now()+3,likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a vaincu le ${bossNow.name}! +15 🪙 pour tout le monde!`},...feedAcc];
-          setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu en famille! +15 🪙 chacun`,"#FFD700",5000); },200);
-        }
+        const bid=bossNow.startedAt;
+        const cur=(updatedPs.bossBattle&&updatedPs.bossBattle.bossId===bid)?updatedPs.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
+        updatedPs.bossBattle={...cur, earned:(cur.earned||0)+1};
+        n[playerIdx]=updatedPs;
       }
       // La célébration (popup + jeu de niveau) est DIFFÉRÉE vers l'appareil de l'enfant,
       // jouée à SA prochaine connexion — pas sur l'écran du parent qui valide.
@@ -5824,18 +5911,43 @@ export default function App() {
     showToast("➕ Tâche ajoutée!","#2ECC40");
   },[config,gameStates,persist,logAction,showToast]);
 
-  // Lance un boss de famille surprise (objectif d'XP collectif)
-  const handleLaunchBoss = useCallback(()=>{
-    const startXpTotal = gameStates.reduce((s,g)=>s+(g.xp||0),0);
+  // Lance un boss de famille — le parent choisit la difficulté (PV du boss)
+  const handleLaunchBoss = useCallback((difficulty="moyen")=>{
     const nPlayers = Math.max(1,(config.players||[]).length);
     const base = BOSSES[Math.floor(Math.random()*BOSSES.length)];
-    // Objectif collectif sur PLUSIEURS jours (les enfants gagnent ~100 XP/jour chacun) → vrai défi d'équipe
-    const boss = {...base, startXpTotal, goalXp: 200*nPlayers, startedAt:new Date().toISOString(), defeatedAt:null};
-    const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:boss.emoji,text:`⚔️ Un ${boss.name} apparaît! Gagnez ${boss.goalXp} XP en famille pour le vaincre ensemble!`};
+    const diff = BOSS_DIFF[difficulty] || BOSS_DIFF.moyen;
+    const now = new Date().toISOString();
+    // PV adaptés au nombre d'enfants (1 jeton par quête ≈ ~5 quêtes/enfant/jour)
+    const hpMax = Math.round(diff.hp * (0.6 + 0.4*nPlayers));
+    const boss = {...base, hpMax, lastHitTs:now, difficulty, startedAt:now, defeatedAt:null};
+    const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:boss.emoji,text:`⚔️ Un ${boss.name} (${diff.label}, ${hpMax} PV) apparaît! Faites des quêtes pour l'attaquer dans l'onglet BOSS!`};
     const newCfg={...config, boss, feed:[fe,...(config.feed||[])].slice(0,60)};
     setConfig(newCfg); persist(newCfg, gameStates);
     showToast(`${boss.emoji} ${boss.name} apparaît! Battez-le en famille!`,"#FF6B6B",4500);
   },[config,gameStates,persist,showToast]);
+
+  // Attaque du boss : dépense des jetons (gagnés en faisant des quêtes) → enlève des PV
+  const handleBossAttack = useCallback((playerIdx, type)=>{
+    const atk = ATTACKS[type]; const boss = cfgRef.current?.boss;
+    if(!atk || !boss || boss.defeatedAt) return;
+    const bid = boss.startedAt;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      const bb=(p.bossBattle&&p.bossBattle.bossId===bid)?p.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
+      if((bb.earned-bb.spent) < atk.cost) return gs; // pas assez de jetons
+      const newBB={...bb, spent:bb.spent+atk.cost, dmg:bb.dmg+atk.dmg};
+      n[playerIdx]={...p, bossBattle:newBB};
+      const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let nb = {...boss, lastHitTs:new Date().toISOString()};
+      const defeated = totalDmg >= (boss.hpMax||80);
+      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40}; } }
+      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 pour tout le monde!`} : null;
+      const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
+      setConfig(ncfg); persist(ncfg, n);
+      if(defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 chacun!`,"#FFD700",5000); },150); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(`${atk.emoji} −${atk.dmg} PV au boss!`,"#FF6B6B",2200); },60); }
+      return n;
+    });
+  },[persist,showToast]);
 
   // Le parent crée/assigne une routine à un enfant (atterrit dans gs[idx].routines)
   const handleAssignRoutine = useCallback((playerIdx, routine)=>{
@@ -5867,7 +5979,8 @@ export default function App() {
   const handleChildAddTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
     const taskId="cust_"+uid();
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:15,coins:8,diff:"easy",cat:"custom"};
+    const _dp=DIFF_PRESETS[data.diff]||DIFF_PRESETS.medium;
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom"};
     // La quête doit apparaître dans la vue ACTUELLE de l'enfant : si mode Semaine → aujourd'hui; si Routine → tâche de routine
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
@@ -5883,7 +5996,8 @@ export default function App() {
   const handleChildAddRoutineTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return null;
     const taskId="cust_"+uid();
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:15,coins:8,diff:"easy",cat:"custom"};
+    const _dp=DIFF_PRESETS[data.diff]||DIFF_PRESETS.medium;
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom"};
     const instanceId=uid();
     const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel
     const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
@@ -6322,6 +6436,8 @@ export default function App() {
             onRespondOffer={handleRespondOffer}
             onFeedPet={()=>handleFeedPet(view)}
             onPlayPet={()=>handlePlayPet(view)}
+            onBossAttack={(type)=>handleBossAttack(view,type)}
+            allStates={gameStates}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
