@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.42.0";
+const APP_VERSION = "1.43.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1078,6 +1078,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.43.0", date:"2026-06-14", features:[
+    "🐛 GROS FIX : une quête validée ne « revient » plus quelques secondes après (la synchro fusionne maintenant au lieu d'écraser).",
+    "🏃 Fix du jeu « Cours et saute » : appuie n'importe où sur l'écran pour sauter (ça marche enfin!).",
+    "📱 Fix : la fenêtre du code parent ne dépasse plus de l'écran sur téléphone.",
+    "🔓 Le bouton « PARENT » rouvre toujours le menu (plus besoin de se reconnecter).",
+  ]},
   { version:"1.42.0", date:"2026-06-14", features:[
     "⚔️ COMBAT DE BOSS! Quand un boss est lancé, un onglet rouge ⚔️ BOSS apparaît. Chaque quête validée te donne un jeton d'attaque : choisis une petite (1 jeton) ou une grosse (3 jetons) attaque pour enlever des PV au boss. Battez-le en famille!",
     "❤️ Le boss riposte : si la famille ralentit, les PV de la famille baissent (vite, attaquez!). Vaincre le boss donne +40 🪙 à tout le monde.",
@@ -1329,15 +1335,29 @@ const remotePush = (data) => {
   _pushTimer = setTimeout(async () => {
     try {
       if (await apiAvailable()) {
+        // ⚠️ FUSION AVANT ÉCRITURE : on relit le cloud et on fusionne, sinon un push « brut »
+        // écrase les changements faits sur un autre appareil (ex: une validation qui « revient »).
+        let toWrite = data;
+        try {
+          const r0 = await fetch(`/api/famille?id=${encodeURIComponent(FAMILY_ID)}`, { cache: "no-store" });
+          if (r0.ok) { const cloud = (await r0.json())?.data; if (cloud && cloud.config) toWrite = mergeFamily(cloud, data); }
+        } catch {}
         await fetch("/api/famille", { method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: FAMILY_ID, data }) });
+          body: JSON.stringify({ id: FAMILY_ID, data: toWrite }) });
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(toWrite)); LAST_SAVED_AT = toWrite.savedAt || LAST_SAVED_AT; } catch {}
         markSynced();
       } else if (supaEnabled()) {
+        let toWrite = data;
+        try {
+          const r0 = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: supaHeaders() });
+          if (r0.ok) { const cloud = (await r0.json())?.[0]?.data; if (cloud && cloud.config) toWrite = mergeFamily(cloud, data); }
+        } catch {}
         await fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
           method: "POST",
           headers: { ...supaHeaders(), Prefer: "resolution=merge-duplicates" },
-          body: JSON.stringify({ id: FAMILY_ID, data, saved_at: data.savedAt || new Date().toISOString() }),
+          body: JSON.stringify({ id: FAMILY_ID, data: toWrite, saved_at: toWrite.savedAt || new Date().toISOString() }),
         });
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(toWrite)); LAST_SAVED_AT = toWrite.savedAt || LAST_SAVED_AT; } catch {}
         markSynced();
       }
     } catch (e) { console.warn("Sync: push échoué (mode local conservé)", e); }
@@ -1847,9 +1867,9 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   }, [press]);
   const T = th || THEMES.minecraft;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:`linear-gradient(135deg,${T.bg},#1a1a2e)`,border:`6px solid ${T.accent}`,borderRadius:10,padding:"28px 34px",textAlign:"center",maxWidth:360,width:"90%",boxShadow:`0 0 50px ${T.accent}60`,animation:"bounceIn 0.35s ease"}}>
-        <div style={{fontSize:44,marginBottom:8}}>👩‍💻</div>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+      <div style={{background:`linear-gradient(135deg,${T.bg},#1a1a2e)`,border:`5px solid ${T.accent}`,borderRadius:10,padding:"20px 24px",textAlign:"center",maxWidth:360,width:"100%",maxHeight:"calc(100vh - 32px)",overflowY:"auto",boxSizing:"border-box",boxShadow:`0 0 50px ${T.accent}60`,animation:"bounceIn 0.35s ease"}}>
+        <div style={{fontSize:36,marginBottom:6}}>👩‍💻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:6}}>VALIDATION PARENT</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",marginBottom:14,lineHeight:1.3}}>{label}</div>
         <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:14}}>
@@ -4449,9 +4469,11 @@ function MiniGameRunner({ pt, level, onFinish }) {
 
     const jump = () => { if (st.onGround) { st.vy = JUMP_VY; st.onGround = false; SFX.click(); } };
     const onKey = e => { if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); } };
-    const onTap = () => jump();
+    // « Appuie n'importe où pour sauter » → on écoute sur TOUTE la fenêtre (pas juste le canvas)
+    const onTap = (e) => { if(e&&e.cancelable) e.preventDefault(); jump(); };
     window.addEventListener("keydown", onKey);
-    canvas.addEventListener("pointerdown", onTap);
+    window.addEventListener("pointerdown", onTap);
+    window.addEventListener("touchstart", onTap, { passive:false });
 
     const loop = (now) => {
       if (phaseRef.current !== "play") return;
@@ -4558,7 +4580,8 @@ function MiniGameRunner({ pt, level, onFinish }) {
     return () => {
       cancelAnimationFrame(st.rafId);
       window.removeEventListener("keydown", onKey);
-      canvas.removeEventListener("pointerdown", onTap);
+      window.removeEventListener("pointerdown", onTap);
+      window.removeEventListener("touchstart", onTap);
     };
   }, [phase]);
 
@@ -6310,7 +6333,7 @@ export default function App() {
             style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#2ECC40":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
         {/* Parent controls */}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={()=>{SFX.click();if(parentMode){setParentPanel(p=>!p);}else{setParentPinOpen(true);}}}
+          <button onClick={()=>{SFX.click();if(parentMode){setParentPanel(true);}else{setParentPinOpen(true);}}}
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",
               background:parentMode?"#FF8C00":"#222",color:parentMode?"#000":"#888",
               border:`2px solid ${parentMode?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer",
