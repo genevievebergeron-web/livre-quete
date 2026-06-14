@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.36.0";
+const APP_VERSION = "1.37.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -36,21 +36,39 @@ const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
 const DAYS_SHORT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 const COLORS = ["#4A90D9","#C060D0","#2ECC40","#FF6B35","#FFD700","#FF4444","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
 
+// Courbe plus exigeante + 10 niveaux (les enfants trouvaient ça trop facile).
+// Les paliers 1→4 restent proches pour ne RÉTROGRADER personne; ça devient dur après.
 const LEVELS = [
-  { level:1, xpNeeded:0,   title:"Débutant",   titleF:"Débutante"   },
-  { level:2, xpNeeded:60,  title:"Aventurier", titleF:"Aventurière" },
-  { level:3, xpNeeded:150, title:"Héros",      titleF:"Héroïne"     },
-  { level:4, xpNeeded:280, title:"Champion",   titleF:"Championne"  },
-  { level:5, xpNeeded:450, title:"LÉGENDE",    titleF:"LÉGENDE"     },
+  { level:1,  xpNeeded:0,    title:"Débutant",   titleF:"Débutante"   },
+  { level:2,  xpNeeded:70,   title:"Aventurier", titleF:"Aventurière" },
+  { level:3,  xpNeeded:150,  title:"Héros",      titleF:"Héroïne"     },
+  { level:4,  xpNeeded:300,  title:"Champion",   titleF:"Championne"  },
+  { level:5,  xpNeeded:500,  title:"LÉGENDE",    titleF:"LÉGENDE"     },
+  { level:6,  xpNeeded:760,  title:"MYTHIQUE",   titleF:"MYTHIQUE"    },
+  { level:7,  xpNeeded:1080, title:"MYTHIQUE",   titleF:"MYTHIQUE"    },
+  { level:8,  xpNeeded:1480, title:"DIVIN",      titleF:"DIVIN"       },
+  { level:9,  xpNeeded:1980, title:"DIVIN",      titleF:"DIVIN"       },
+  { level:10, xpNeeded:2600, title:"SUPRÊME",    titleF:"SUPRÊME"     },
 ];
 const getLevel = xp => { let c = LEVELS[0]; for (const l of LEVELS) if (xp >= l.xpNeeded) c = l; return c; };
 const getLevelTitle = (xp, themeId) => {
   const lv = getLevel(xp);
   const pt = getPlayerTheme(themeId);
-  const idx = Math.min(lv.level - 1, 4);
-  return { level: lv.level, title: pt.levels[idx] || pt.levels[0] };
+  // Niv. 1–5 : titre du thème. Niv. 6+ (prestige) : titre générique MYTHIQUE/DIVIN/SUPRÊME.
+  const title = lv.level <= 5 ? (pt.levels[Math.min(lv.level - 1, 4)] || pt.levels[0]) : lv.title;
+  return { level: lv.level, title };
 };
 const xpBar = xp => { for (let i=0;i<LEVELS.length-1;i++) if (xp<LEVELS[i+1].xpNeeded) return { cur: xp-LEVELS[i].xpNeeded, needed: LEVELS[i+1].xpNeeded-LEVELS[i].xpNeeded }; return {cur:1,needed:1}; };
+
+// ─── FAMILIERS qui ÉVOLUENT ───────────────────────────────────
+// Chaque familier a sa propre XP (gameState.petXp[petId]), conservée même déséquipé.
+// Le familier équipé gagne de l'XP quand l'enfant accomplit une quête.
+const PET_LEVELS = [0, 30, 80, 160, 280, 450];                       // XP requis pour niv 1..6
+const PET_STAGES = ["Bébé", "Jeune", "Apprenti", "Adulte", "Costaud", "Légendaire"];
+const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++) if ((xp||0) >= PET_LEVELS[i]) lv=i+1; return lv; };
+const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
+const petBar   = (xp) => { const lv=petLevel(xp); if (lv >= PET_LEVELS.length) return {cur:1,needed:1,max:true}; const base=PET_LEVELS[lv-1], next=PET_LEVELS[lv]; return { cur:(xp||0)-base, needed:next-base, max:false }; };
+const mergePetXp = (a, b) => { const out={...(a||{})}; for (const k in (b||{})) out[k]=Math.max(out[k]||0, b[k]||0); return out; };
 
 // ─── TASK CATALOG ────────────────────────────────────────────
 const TASK_CATALOG = [
@@ -985,6 +1003,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.37.0", date:"2026-06-14", features:[
+    "🐾 Familiers qui ÉVOLUENT! Ton familier équipé gagne de l'XP à chaque quête et monte de niveau (Bébé → Légendaire). Il garde sa progression même si tu l'enlèves.",
+    "🎒 Fenêtre du perso refaite : nouvel onglet « Familier » pour voir ton compagnon grandir.",
+    "📈 Niveaux plus difficiles et 10 niveaux à atteindre (Mythique, Divin, Suprême!) — vous trouviez ça trop facile 😉",
+    "📣 Le fil regroupe les quêtes : « X a accompli 5 quêtes » au lieu de 5 lignes.",
+  ]},
   { version:"1.36.0", date:"2026-06-14", features:[
     "🐛 GROS FIX : l'argent dépensé ne revient plus à la prochaine connexion (fini les achats infinis!)",
     "🏅 Fix : un badge ne se fête plus en double",
@@ -1297,6 +1321,7 @@ const mergeGS = (a, b, preferIncoming) => {
     dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
     pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
+    petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1424,6 +1449,7 @@ const migrateGameState = (gs) => {
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
     pendingCelebrations: gs.pendingCelebrations || [], // v1.31.0 — fêtes (popup/jeu) différées vers l'appareil de l'enfant
+    petXp: gs.petXp || {}, // v1.37.0 — XP par familier (conservée même déséquipé)
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -2583,7 +2609,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
 
         {/* Main tabs */}
         <div style={{display:"flex",gap:6}}>
-          {[["creator","✏️ Créer"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
+          {[["creator","✏️ Créer"],["pet","🐾 Familier"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
             <button key={k} onClick={()=>{setTab(k);SFX.click();}}
               style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px",background:tab===k?(pt.accent||"#FFD700"):"#222",color:tab===k?"#000":"#888",border:`2px solid ${tab===k?(pt.accent||"#FFD700"):"#444"}`,borderRadius:4,cursor:"pointer"}}>
               {l}
@@ -2671,6 +2697,55 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
             })}
           </div>
         </>}
+
+        {/* FAMILIER TAB — chaque familier évolue avec sa propre XP */}
+        {tab==="pet" && (()=>{
+          const petXp = pState.petXp || {};
+          const ownedPets = allShopItems.filter(i => i.slot==="pet" && pState.owned?.includes(i.id));
+          const acc = pt.accent||"#FFD700";
+          const eqPet = ownedPets.find(p=>p.id===eq.pet);
+          return (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {ownedPets.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:18,lineHeight:1.4}}>Tu n'as pas encore de familier! 🐾<br/>Achètes-en un dans la boutique 🛒, puis il grandira chaque fois que tu accomplis une quête.</div>}
+              {/* Vedette : le familier équipé, en grand, avec sa progression */}
+              {eqPet && (()=>{ const xp=petXp[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
+                const sz=64+lv*8; // il grossit en évoluant
+                return (
+                  <div style={{background:`radial-gradient(circle at 50% 30%, ${acc}22, rgba(0,0,0,0.5))`,border:`3px solid ${acc}`,borderRadius:12,padding:16,textAlign:"center"}}>
+                    <div style={{fontSize:sz,lineHeight:1,filter:`drop-shadow(0 0 ${4+lv*2}px ${pt.glow||acc})`,transition:"font-size 0.4s"}}>{eqPet.emoji}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{eqPet.name} — Niv.{lv}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",marginTop:2}}>Stade : {petStage(xp)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
+                    <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
+                      <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#5DECF5)`,transition:"width 0.8s ease"}}/>
+                    </div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{bar.max?`${xp} XP — évolution complète!`:`${bar.cur}/${bar.needed} XP vers Niv.${lv+1}`}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#7aa",marginTop:6}}>Ton familier gagne de l'XP à chaque quête validée 🌟</div>
+                  </div>
+                );
+              })()}
+              {/* Tous mes familiers — touche pour équiper (chacun garde son niveau) */}
+              {ownedPets.length>0 && <>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>MES FAMILIERS</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                  {ownedPets.map(p=>{ const xp=petXp[p.id]||0; const lv=petLevel(xp); const isEq=eq.pet===p.id; const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
+                    return (
+                      <div key={p.id} onClick={()=>{onEquip(p);SFX.click();}}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",background:isEq?`${acc}20`:"rgba(0,0,0,0.4)",border:`2px solid ${isEq?acc:"#333"}`,borderRadius:6,cursor:"pointer",boxShadow:isEq?`0 0 10px ${pt.glow||acc}60`:"none"}}>
+                        <span style={{fontSize:26}}>{p.emoji}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{p.name}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:acc}}>Niv.{lv} · {petStage(xp)}</span>
+                        <div style={{height:6,width:"90%",background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:pctp+"%",background:acc}}/>
+                        </div>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#2ECC40":"#777"}}>{isEq?"✅ ÉQUIPÉ":"Équiper"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>}
+            </div>
+          );
+        })()}
         <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:6,background:pt.accent||"#FFD700",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>← Retour</button>
       </div>
     </div>
@@ -3570,7 +3645,18 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
         </div>
         {(config.feed||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Rien encore. Les accomplissements de chacun s'afficheront ici! 🌟</div>}
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"40vh",overflowY:"auto"}}>
-          {(config.feed||[]).map(f=>{
+          {(()=>{ // Regroupe les quêtes consécutives d'un même enfant pour éviter le flood
+            const src=config.feed||[]; const grouped=[];
+            for(let i=0;i<src.length;){ const f=src[i];
+              if(f.type==="task"){ let j=i, likes=[...(f.likes||[])];
+                while(j+1<src.length && src[j+1].type==="task" && src[j+1].playerId===f.playerId){ j++; likes.push(...(src[j].likes||[])); }
+                const count=j-i+1;
+                grouped.push(count>1 ? {...f, likes:_uniq(likes), emoji:"🔥", text:`${feedName(f.playerId)} a accompli ${count} quêtes!`} : f);
+                i=j+1;
+              } else { grouped.push(f); i++; }
+            }
+            return grouped;
+          })().map(f=>{
             const liked=(f.likes||[]).includes(meId);
             return (
               <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`1px solid ${f.type==="chat"?(feedColor(f.playerId)+"55"):"#2a2a2a"}`,borderRadius:6}}>
@@ -5335,6 +5421,9 @@ export default function App() {
       const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount);
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
+      // Le familier ÉQUIPÉ gagne de l'XP (conservée par familier, même s'il est déséquipé plus tard)
+      const eqPet=p.equipped?.pet;
+      if(eqPet){ updatedPs.petXp={...(p.petXp||{}), [eqPet]:((p.petXp?.[eqPet])||0)+(task.xp||0)}; }
       const n=[...gs]; n[playerIdx]=updatedPs;
       // Fil de famille : on enregistre l'accomplissement (+ niveau / badges) dans le MÊME save
       const now=Date.now(); const fents=[{ id:"f_"+uid(), ts:now, likes:[], type:"task", playerId:player.id, text:`${displayName(player)} a accompli « ${task.label} »`, emoji:task.emoji||"✅" }];
