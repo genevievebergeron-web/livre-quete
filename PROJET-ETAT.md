@@ -1,5 +1,23 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-13 — v1.15.0_
+_Mis à jour: 2026-06-13 — v1.29.0_
+
+> **Résumé v1.16 → v1.29** (détails complets dans la constante `CHANGELOG` de `src/App.jsx`) :
+> - **v1.16** panneau « Mes réglages » par enfant (son, mode calme/anti-flash, décompte calme, humour, focus une tâche) + `prefers-reduced-motion`.
+> - **v1.17** stats « Progrès de la semaine » (XP/jour par membre, calculé depuis les clés `completed` datées → merge-safe) + classement.
+> - **v1.18** confidentialité (`sessionPlayer` : un enfant connecté ne voit que son onglet) + design allégé + avatars qui clignent (`AvatarCanvas` blink) + familier dans la fenêtre perso.
+> - **v1.19** fil de famille (`config.feed`, ❤️ + chat, merge union par id) + parent assigne un rituel à un enfant.
+> - **v1.20** boss de famille (`config.boss`, objectif XP collectif, sprite `BossSprite` pixel, victoire = +15🪙 chacun, lancé par parent).
+> - **v1.21** fix « Modifier le livre » (édite la config existante, `editingBook`) + récompenses renouvelées + **rotation hebdo aléatoire** (`weeklyRewards`) + enfant ajoute une quête + **picker emoji** (`CustomTaskModal`/`EMOJI_CHOICES`) + annuler récompense + badges plus durs + boutons Retour haut/bas.
+> - **v1.22** badges en **pixel-art** (`BadgeIcon`/`renderBadgeToCtx`, médaillon + symbole).
+> - **v1.23** **fix Safari** (rendu avant SW) + récompense « J'ai changé d'idée »/« Cacher » (`hiddenRewards`) + **Routine→Rituel** (libellés).
+> - **v1.24** calendrier au portail parent (`handleAddCalendarEvent`, récurrent/daté, `recur`/`upcomingOccurrences`) + onglet **Calendriers** (`view==="calendars"`) + onglet **Minuterie** (`TimerView`, chrono rituel + encouragements + feed/XP, `handleRitualTimerDone`).
+> - **v1.25** mini-jeux auto-start (retire le « OK » en trop) + rythme ralenti.
+> - **v1.26** **fix Safari déf.** : `VitePWA selfDestroying:true` (le SW se désinscrit et vide le cache bloqué) + `build.target` es2019/safari13.
+> - **v1.27** **raretés** des items (`RARITIES`/`rarityOf`, Commun→Unique, bordures/lueurs).
+> - **v1.28** **objectifs du jour** (`dailyClaimed`, défis quotidiens à réclamer).
+> - **v1.29** **coffres mystères** (`CHESTS`/`pickFromChest`/`ChestSprite`, tirage pondéré par rareté, doublon→pièces).
+>
+> **RESTE À FAIRE (gros lot art, demandé) :** pixel-art « illustré coloré comme les réfs » pour les **récompenses, items et familiers** (remplacer les emoji), et **nouveaux slots d'avatar** (ailes, armes tenues, souliers, accessoires de tête). À faire avec aperçu visuel pour itérer le look. Infra déjà prête : moteur de sprites canvas (cf. `BossSprite`, `BadgeIcon`, `ChestSprite`, `renderAvatarToCtx`).
 
 ---
 
