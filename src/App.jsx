@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.37.0";
+const APP_VERSION = "1.38.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1003,6 +1003,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.38.0", date:"2026-06-14", features:[
+    "🧹 Accueil désencombré! Une barre d'onglets en bas : 🏠 Accueil · ✅ Aujourd'hui · 📅 Semaine · 🛒 Boutique.",
+    "🏠 Accueil = ton profil + ton familier + tes badges. ✅ Aujourd'hui = tout ce qu'il y a à faire aujourd'hui. 📅 Semaine = calendrier et tâches à venir.",
+  ]},
   { version:"1.37.0", date:"2026-06-14", features:[
     "🐾 Familiers qui ÉVOLUENT! Ton familier équipé gagne de l'XP à chaque quête et monte de niveau (Bébé → Légendaire). Il garde sa progression même si tu l'enlèves.",
     "🎒 Fenêtre du perso refaite : nouvel onglet « Familier » pour voir ton compagnon grandir.",
@@ -2755,6 +2759,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
 function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
+  const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
   const [pseudoDraft, setPseudoDraft] = useState(""); // l'enfant change son pseudo
   const [pinDraft, setPinDraft] = useState(""); const [pinDraft2, setPinDraft2] = useState(""); // l'enfant change son code
   const [profileMsg, setProfileMsg] = useState("");
@@ -2817,7 +2822,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   ];
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px"}}>
+    <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
+      {homeTab==="accueil" && (<>
       {/* Player header card */}
       <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         {/* Avatar — clickable → opens creator/inventory */}
@@ -2858,6 +2864,28 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           ⚙️
         </button>
       </div>
+
+      {/* Aperçu du familier sur l'accueil */}
+      {(()=>{ const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet);
+        return (
+          <div onClick={()=>{setAvatarOpen(true);SFX.click();}} style={{cursor:"pointer",background:"rgba(0,0,0,0.4)",border:`2px solid ${(pt.accent||player.color)}55`,borderRadius:8,padding:12,display:"flex",alignItems:"center",gap:12}}>
+            {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
+              return (<>
+                <div style={{fontSize:46,lineHeight:1,filter:`drop-shadow(0 0 6px ${pt.glow||player.color})`}}>{eqPet.emoji}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||player.color}}>{eqPet.name} — Niv.{lv}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#bbb",margin:"2px 0"}}>🐾 {petStage(xp)}</div>
+                  <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctp+"%",background:pt.accent||player.color}}/></div>
+                </div>
+                <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Voir ›</span>
+              </>); })() : (<>
+                <div style={{fontSize:40,opacity:0.5}}>🐾</div>
+                <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒 et il évoluera avec toi!</div>
+              </>)}
+          </div>
+        );
+      })()}
+      </>)}
 
       {/* Panneau « Mes réglages » (accessibilité par enfant) */}
       {settingsOpen && (
@@ -2962,6 +2990,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         );
       })()}
 
+      {homeTab==="sem" && (<>
       {/* Calendar reminders */}
       {(()=>{
         const today = new Date().toISOString().split("T")[0];
@@ -2988,6 +3017,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         });
       })()}
 
+      </>)}
+      {homeTab==="jour" && (<>
       {/* 🎯 Objectifs du jour — bonus à réclamer */}
       {(()=>{
         const stamp="#"+todayStamp();
@@ -3073,6 +3104,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         );
       })()}
 
+      </>)}
       {/* Créateur de routine (enfant autonome) */}
       {routineBuilder && (
         <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
@@ -3138,6 +3170,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       )}
 
+      {homeTab==="jour" && (<>
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
@@ -3192,6 +3225,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         onClose={()=>setAddTaskOpen(false)}
         onCreate={(data)=>{ onChildAddTask&&onChildAddTask(data); setAddTaskOpen(false); }}/>}
 
+      </>)}
+      {homeTab==="sem" && (<>
       {/* Plus tard cette semaine (vue Semaine seulement) — aperçu grisé */}
       {pMode==="week" && laterWeek.length>0 && (
         <div style={{marginTop:6,opacity:0.7}}>
@@ -3210,6 +3245,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       )}
 
+      </>)}
+      {homeTab==="jour" && (<>
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
         <button onClick={()=>{
@@ -3232,6 +3269,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       )}
 
+      </>)}
+      {homeTab==="sem" && (<>
       {/* Calendar CRUD */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5DECF5",marginTop:10,paddingBottom:3,borderBottom:"2px solid #5DECF540"}}>📅 MON CALENDRIER</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:4}}>Note tes devoirs et examens — un rappel avec du XP bonus apparaîtra avant la date!</div>
@@ -3287,6 +3326,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </div>
       )}
 
+      </>)}
+      {homeTab==="shop" && (<>
       {/* Shop */}
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
@@ -3383,6 +3424,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           </div>
         )}
       </div>
+      </>)}
+      {homeTab==="accueil" && (<>
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:4}}>🏅 BADGES</div>
@@ -3418,6 +3461,21 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         })()}
         {(pState.badges||[]).length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginTop:6}}>Complète des quêtes pour débloquer des badges!</div>}
       </div>
+      </>)}
+
+      {/* ── BARRE D'ONGLETS EN BAS (désencombre l'accueil) ── */}
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)"}}>
+        {[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],["sem","📅","Semaine"],["shop","🛒","Boutique"]].map(([k,ic,lb])=>{ const on=homeTab===k;
+          return (
+            <button key={k} onClick={()=>{setHomeTab(k);SFX.click();}}
+              style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${(pt.accent||player.color)}22`:"transparent",border:"none",borderTop:on?`3px solid ${pt.accent||player.color}`:"3px solid transparent",cursor:"pointer"}}>
+              <span style={{fontSize:20,filter:on?"none":"grayscale(0.4) opacity(0.7)"}}>{ic}</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?(pt.accent||player.color):"#888"}}>{lb}</span>
+            </button>
+          );
+        })}
+      </div>
+
     {/* Avatar popup */}
     {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
       onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
