@@ -3,11 +3,16 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Cible de build compatible avec des Safari plus anciens (transpile ?? et ?. au besoin)
+  build: { target: ['es2019', 'safari13', 'chrome87', 'firefox78'] },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: null, // on enregistre nous-mêmes dans main.jsx (avec vérification périodique)
+      // On RETIRE le service worker : il restait bloqué sur une vieille version (page blanche sur Safari).
+      // Ce SW « autodestructeur » se désinscrit et vide les caches au prochain chargement → page fraîche partout.
+      selfDestroying: true,
+      injectRegister: null, // on enregistre nous-mêmes dans main.jsx
       manifest: {
         name: 'Livre de Quêtes',
         short_name: 'Quêtes',
