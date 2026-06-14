@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.43.0";
+const APP_VERSION = "1.44.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1078,6 +1078,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.44.0", date:"2026-06-14", features:[
+    "⏳ Minuterie : nouveau mode COMPTE À REBOURS (choisis tes minutes), avec « 🎉 J'ai réussi » ou « 😅 Oups, prochaine fois » — pas de récompense si pas réussi. Tu peux aussi nommer ce que tu chronomètres.",
+    "📋 Portail parent : les demandes « À valider » sont regroupées par enfant (avec « ✅ Tout valider »).",
+    "🎮 Mini-jeux : explications plus claires des touches (doigt, espace, flèches).",
+  ]},
   { version:"1.43.0", date:"2026-06-14", features:[
     "🐛 GROS FIX : une quête validée ne « revient » plus quelques secondes après (la synchro fusionne maintenant au lieu d'écraser).",
     "🏃 Fix du jeu « Cours et saute » : appuie n'importe où sur l'écran pour sauter (ça marche enfin!).",
@@ -4105,18 +4110,27 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
               items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins});
             });
           });
+          // Regrouper les demandes PAR ENFANT
+          const byChild=[]; players.forEach((pl,i)=>{ const its=items.filter(x=>x.playerIdx===i); if(its.length) byChild.push({pl,i,its}); });
           return (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>DEMANDES DES ENFANTS</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>DEMANDES DES ENFANTS{items.length>0?` (${items.length})`:""}</div>
               {items.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
-              {items.map(it=>(
+              {byChild.map(({pl,i,its})=>(
+                <div key={pl.id} style={{marginBottom:14}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,paddingBottom:4,borderBottom:`2px solid ${pl.color}55`}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pl.color}}>{displayName(pl)}</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>{its.length} à valider</span>
+                    <button onClick={()=>its.forEach(it=>onApprovePending(it.playerIdx,it.doneKey))}
+                      style={{marginLeft:"auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:"#1a3a1a",color:"#2ECC40",border:"1px solid #2ECC4055",borderRadius:3,cursor:"pointer"}}>✅ Tout valider</button>
+                  </div>
+                  {its.map(it=>(
                 <div key={it.doneKey} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${it.pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                     <span style={{fontSize:18}}>{it.emoji}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{it.label}</div>
                       <div style={{display:"flex",gap:8,marginTop:2}}>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:it.pl?.color||"#888"}}>{displayName(it.pl)}</span>
                         {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{it.xp}</span>}
                         {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙{it.coins}</span>}
                       </div>
@@ -4126,6 +4140,8 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                     <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#2ECC40" style={{flex:1}}>✅ Valider</PBtn>
                     <PBtn onClick={()=>onRefusePending(it.playerIdx,it.doneKey)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Refuser</PBtn>
                   </div>
+                </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -4966,9 +4982,9 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
   const [phase, setPhase] = useState("intro"); // intro | countdown | play
   const [count, setCount] = useState(3);
   const INFO = {
-    whack:  { icon:"🔨", name:"Tape vite!",   how:"Des cibles vont apparaître un peu partout. Tape dessus le plus vite possible avant qu'elles disparaissent!" },
-    runner: { icon:"🏃", name:"Cours et saute!", how:"Appuie n'importe où sur l'écran pour SAUTER par-dessus les obstacles. Ramasse les pièces au passage!" },
-    pacman: { icon:"😋", name:"Mange tout!",  how:"Glisse ton doigt (ou les flèches) pour te déplacer. Mange toutes les pastilles en évitant les fantômes!" },
+    whack:  { icon:"🔨", name:"Tape vite!",   how:"👆 Touche les cibles avec ton doigt (ou clique avec la souris) le plus vite possible avant qu'elles disparaissent!" },
+    runner: { icon:"🏃", name:"Cours et saute!", how:"👆 Appuie N'IMPORTE OÙ sur l'écran — ou la barre d'espace ⎵ / flèche du haut ⬆️ — pour SAUTER par-dessus les obstacles. Ramasse les pièces!" },
+    pacman: { icon:"😋", name:"Mange tout!",  how:"👆 Glisse ton doigt dans une direction — ou utilise les flèches du clavier ⬆️⬇️⬅️➡️ — pour te déplacer. Mange toutes les pastilles en évitant les fantômes!" },
   }[type];
 
   useEffect(() => {
@@ -5074,44 +5090,86 @@ const computeCalendarReminders = (calendar, today) => {
 const TIMER_ENCOURAGE=["Continue, tu es capable! 💪","Super rythme! ⚡","Tu gères ça comme un·e champion·ne! 🔥","Presque là, lâche pas! 🌟","Wow, quelle belle énergie! 🚀","Tu fais ça super bien! 👏"];
 function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete }){
   const [childIdx,setChildIdx]=useState(sessionPlayer!=null?sessionPlayer:0);
+  const [mode,setMode]=useState("down"); // down = compte à rebours · up = chrono
   const [ritualId,setRitualId]=useState(null);
+  const [taskLabel,setTaskLabel]=useState("");
+  const [targetMin,setTargetMin]=useState(5);
   const [startTs,setStartTs]=useState(null);
+  const [timeUp,setTimeUp]=useState(false);
   const [now,setNow]=useState(Date.now());
-  useEffect(()=>{ if(!startTs)return; const i=setInterval(()=>setNow(Date.now()),500); return()=>clearInterval(i); },[startTs]);
+  useEffect(()=>{ if(!startTs)return; const i=setInterval(()=>setNow(Date.now()),250); return()=>clearInterval(i); },[startTs]);
   const lockChild = sessionPlayer!=null && !parentMode;
   const cidx = lockChild?sessionPlayer:childIdx;
   const child=config.players[cidx]; const routines=(gameStates[cidx]?.routines)||[];
   const ritual=routines.find(r=>r.id===ritualId);
-  const ms=startTs?now-startTs:0; const mm=Math.floor(ms/60000), ss=Math.floor((ms%60000)/1000);
   const acc=th.accent||(child?.color)||"#FFD700";
+  const elapsed=startTs?now-startTs:0;
+  const remaining=mode==="down"?Math.max(0,targetMin*60000-elapsed):elapsed;
+  useEffect(()=>{ if(mode==="down"&&startTs&&!timeUp&&elapsed>=targetMin*60000){ setTimeUp(true); try{if(!CALM)spawnParticles("⏰");SFX.epic&&SFX.epic();}catch{} } },[now]); // temps écoulé
+  const mm=Math.floor(remaining/60000), ss=Math.floor((remaining%60000)/1000);
+  const lowTime = mode==="down" && remaining<=10000 && !timeUp;
+  const reset=()=>{ setStartTs(null); setTimeUp(false); setRitualId(null); };
+  const taskName=()=> ritual? ritual.name : (taskLabel.trim()||"Défi minuté");
+  const succeed=()=>{ const mins=mode==="down"?targetMin:Math.max(1,Math.round(elapsed/60000)); onComplete&&onComplete(cidx, ritual||{name:taskName(),emoji:"⏳"}, mins); reset(); };
+  const fail=()=>{ SFX.click&&SFX.click(); reset(); }; // pas d'XP en cas d'échec
+  const start=()=>{ SFX.epic&&SFX.epic(); setTimeUp(false); setStartTs(Date.now()); setNow(Date.now()); };
   return (
     <div style={{padding:"12px 10px",display:"flex",flexDirection:"column",gap:12}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:acc}}>⏱ MINUTERIE</div>
       {!lockChild && <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-        {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#000":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
+        {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);setTimeUp(false);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#000":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
       </div>}
+
       {!startTs && (<>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Chronomètre un rituel… ou pars un chrono libre, sans rituel!</div>
-        {/* Chrono libre — toujours disponible, même sans rituel */}
-        <button onClick={()=>{SFX.epic&&SFX.epic();setRitualId(null);setStartTs(Date.now());setNow(Date.now());}}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"15px",background:acc,color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
-          ▶️ Chrono libre (sans rituel)
-        </button>
-        {routines.length>0 && <>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginTop:4}}>…ou choisis un de tes rituels :</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px 12px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#999",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
+        {/* Choix du mode */}
+        <div style={{display:"flex",gap:8}}>
+          {[["down","⏳ Compte à rebours"],["up","⏱ Chrono libre"]].map(([k,l])=>(
+            <button key={k} onClick={()=>{setMode(k);SFX.click();}}
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"11px 6px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#000":"#999",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{l}</button>
+          ))}
+        </div>
+        {/* Quelle tâche on chronomètre (libre) */}
+        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Qu'est-ce que tu chronomètres?</div>
+        <input value={taskLabel} onChange={e=>{setTaskLabel(e.target.value.slice(0,40));setRitualId(null);}} placeholder="ex: Ranger ma chambre, brosser mes dents…"
+          style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"9px 11px",background:"#111",color:"#fff",border:`2px solid ${ritualId?"#333":acc}`,borderRadius:6,outline:"none"}}/>
+        {routines.length>0 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",alignSelf:"center"}}>ou un rituel :</span>
+          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
+        </div>}
+        {/* Durée (compte à rebours) */}
+        {mode==="down" && <>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginTop:2}}>Combien de minutes? <b style={{color:acc}}>{targetMin} min</b></div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            {[1,2,5,10,15,20].map(v=>(
+              <button key={v} onClick={()=>{setTargetMin(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:targetMin===v?acc:"#1a1a1a",color:targetMin===v?"#000":acc,border:`2px solid ${acc}`,borderRadius:5,cursor:"pointer"}}>{v}</button>
+            ))}
+            <input type="number" min="1" max="120" value={targetMin} onChange={e=>setTargetMin(Math.max(1,Math.min(120,parseInt(e.target.value)||1)))}
+              style={{width:60,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none",textAlign:"center"}}/>
           </div>
-          {ritual && <button onClick={()=>{SFX.epic&&SFX.epic();setStartTs(Date.now());setNow(Date.now());}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶️ Démarrer « {ritual.name} »!</button>}
         </>}
+        <button onClick={start}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
+          ▶️ {mode==="down"?`Partir (${targetMin} min)`:"Partir le chrono"}
+        </button>
       </>)}
-      {startTs && (<>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?`${ritual.emoji||"⏰"} ${ritual.name}`:"⏱ Chrono libre"}</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:"#fff",textAlign:"center",letterSpacing:2}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(ms/20000)%TIMER_ENCOURAGE.length]}</div>
-        <button onClick={()=>{ const minutes=Math.max(1,Math.round(ms/60000)); onComplete&&onComplete(cidx, ritual, minutes); setStartTs(null); setRitualId(null); }}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>✅ J'ai fini mon rituel!</button>
-        <button onClick={()=>{SFX.click();setStartTs(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Annuler</button>
+
+      {startTs && !timeUp && (<>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?`${ritual.emoji||"⏰"} ${ritual.name}`:`⏳ ${taskName()}`}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:lowTime?"#FF6B6B":"#fff",textAlign:"center",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
+        {mode==="down" && <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:Math.round(remaining/(targetMin*60000)*100)+"%",background:lowTime?"#FF6B6B":acc,transition:"width 0.25s linear"}}/></div>}
+        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(elapsed/20000)%TIMER_ENCOURAGE.length]}</div>
+        <button onClick={succeed}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🎉 J'ai réussi!</button>
+        <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
+      </>)}
+
+      {startTs && timeUp && (<>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,16px)",color:acc,textAlign:"center"}}>⏰ Temps écoulé!</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#ddd",textAlign:"center",lineHeight:1.3}}>As-tu réussi « {taskName()} »?</div>
+        <button onClick={succeed}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🎉 Oui, réussi!</button>
+        <button onClick={fail}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",background:"#1a1a1a",color:"#FFA94D",border:"2px solid #FFA94D55",borderRadius:8,cursor:"pointer"}}>😅 Oups, prochaine fois (pas de récompense)</button>
       </>)}
     </div>
   );
