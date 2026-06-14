@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.28.0";
+const APP_VERSION = "1.29.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.29.0", date:"2026-06-13", features:[
+    "🎁 Coffres mystères! Ouvre un coffre (Commun/Rare/Légendaire) pour un item surprise — plus le coffre est rare, plus la chance d'un item Légendaire ou Unique!",
+    "💰 Doublon = des pièces remboursées",
+  ]},
   { version:"1.28.0", date:"2026-06-13", features:[
     "🎯 Objectifs du jour — réussis des défis quotidiens (3 quêtes, 6 quêtes, 60 XP) pour des bonus à réclamer!",
   ]},
@@ -2424,6 +2428,41 @@ function BadgeIcon({ badge, earned, size=44, style={} }){
   return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
 
+// ─── COFFRES MYSTÈRES (loot boxes) ────────────────────────────
+const CHESTS = [
+  { id:"common", name:"Coffre Commun",     cost:40,  color:"#9AA0A6", bands:["Commun","Rare"],                    w:[70,30] },
+  { id:"rare",   name:"Coffre Rare",        cost:80,  color:"#4FA3FF", bands:["Rare","Ultra Rare","Légendaire"],  w:[55,35,10] },
+  { id:"epic",   name:"Coffre Légendaire",  cost:140, color:"#FFB02E", bands:["Ultra Rare","Légendaire","Unique"],w:[55,33,12] },
+];
+const pickFromChest = (pool, chest) => {
+  // tire une bande selon les poids, puis un item de cette bande (repli: tout le pool)
+  let r=Math.random()*chest.w.reduce((a,b)=>a+b,0), band=chest.bands[0];
+  for(let i=0;i<chest.bands.length;i++){ if(r<chest.w[i]){band=chest.bands[i];break;} r-=chest.w[i]; }
+  let cand=pool.filter(it=>rarityOf(it.cost).name===band);
+  if(!cand.length) cand=pool;
+  return cand[Math.floor(Math.random()*cand.length)];
+};
+function renderChestToCtx(ctx, open, W=96){
+  const sc=W/24, s=v=>Math.round(v*sc); ctx.clearRect(0,0,W,W);
+  // base
+  ctx.fillStyle="#7a4a1e"; ctx.fillRect(s(3),s(11),s(18),s(10));
+  ctx.fillStyle="#5c3514"; ctx.fillRect(s(3),s(18),s(18),s(3));
+  // lid
+  ctx.fillStyle="#9a6428"; if(open){ ctx.fillRect(s(3),s(5),s(18),s(3)); } else { ctx.fillRect(s(3),s(7),s(18),s(5)); }
+  // gold trim
+  ctx.fillStyle="#FFD24D"; ctx.fillRect(s(3),open?s(8):s(11),s(18),s(2)); ctx.fillRect(s(11),s(11),s(2),s(8));
+  // lock
+  ctx.fillStyle="#FFD24D"; ctx.fillRect(s(10),s(13),s(4),s(4)); ctx.fillStyle="#5c3514"; ctx.fillRect(s(11),s(14),s(2),s(2));
+  // glow if open
+  if(open){ ctx.fillStyle="rgba(255,240,150,0.5)"; ctx.fillRect(s(5),s(6),s(14),s(4)); }
+  ctx.strokeStyle="#3a2410"; ctx.lineWidth=Math.max(1,s(0.4));
+}
+function ChestSprite({ open, size=96, style={} }){
+  const ref=useRef(null);
+  useEffect(()=>{ const c=ref.current; if(c) renderChestToCtx(c.getContext("2d"), open, size); },[open,size]);
+  return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
 // ─── CHOIX D'EMOJI + CRÉATION DE TÂCHE (picker au lieu de taper) ──────────────
 const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
 function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
@@ -2593,10 +2632,11 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onClaimDaily, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
@@ -3073,6 +3113,42 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
+
+      {/* 🎁 Coffres mystères */}
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        {CHESTS.map(ch=>{ const can=pState.coins>=ch.cost; return (
+          <button key={ch.id} disabled={!can} onClick={()=>{
+              if(pState.coins<ch.cost)return;
+              const pool=allShopItemsFlat.filter(it=>it.slot);
+              const item=pickFromChest(pool, ch); if(!item)return;
+              const dup=pState.owned?.includes(item.id); const refund=Math.round((item.cost||10)/2);
+              onOpenChest&&onOpenChest({cost:ch.cost,itemId:item.id,dup,refund});
+              setChestReveal({item,dup,chest:ch,refund});
+              SFX.epic&&SFX.epic(); if(!CALM) spawnParticles("🎉");
+            }}
+            style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",background:`linear-gradient(180deg,${ch.color}1A,rgba(0,0,0,0.5))`,border:`2px solid ${ch.color}`,borderRadius:8,cursor:can?"pointer":"not-allowed",opacity:can?1:0.45,boxShadow:can?`0 0 8px ${ch.color}40`:"none"}}>
+            <ChestSprite open={false} size={48}/>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:ch.color,textAlign:"center"}}>{ch.name.replace("Coffre ","")}</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>{ch.cost} 🪙</span>
+          </button>
+        ); })}
+      </div>
+
+      {chestReveal && (()=>{ const it=chestReveal.item, rar=rarityOf(it.cost);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,textAlign:"center"}}>
+            <ChestSprite open={true} size={110}/>
+            <div style={{fontSize:48}}>{it.emoji}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff"}}>{it.name}</div>
+            {chestReveal.dup
+              ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>Tu l'avais déjà! Doublon → +{chestReveal.refund} 🪙</div>
+              : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40"}}>Nouvel item débloqué! 🎉</div>}
+            <button onClick={()=>{SFX.click();setChestReveal(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"14px 28px",background:rar.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>Super!</button>
+          </div>
+        );
+      })()}
+
       <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #FFD700",borderRadius:5,padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>(
@@ -5363,6 +5439,14 @@ export default function App() {
     showToast(`🎯 Objectif réussi! +${obj.xp} XP${obj.coins?` +${obj.coins} 🪙`:""}`,"#2ECC40",3500);
   },[config,persist,showToast]);
 
+  // Ouvrir un coffre : déduit le coût, ajoute l'item (ou rembourse un doublon)
+  const handleOpenChest = useCallback((playerId, payload)=>{
+    const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; if((p.coins||0)<payload.cost)return gs;
+      n[idx]={...p, coins:(p.coins||0)-payload.cost+(payload.dup?(payload.refund||0):0), owned:payload.dup?(p.owned||[]):[...new Set([...(p.owned||[]),payload.itemId])]};
+      persist(config,n); return n; });
+  },[config,persist]);
+
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
   const handleHideReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -5635,6 +5719,7 @@ export default function App() {
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
+            onOpenChest={(payload)=>handleOpenChest(config.players[view]?.id, payload)}
             parentMode={parentMode}
             playerMode={gameStates[view]?.mode || config.mode || "routine"}
             todayDayIdx={todayDayIdx}
