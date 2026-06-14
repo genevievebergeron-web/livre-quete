@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.30.0";
+const APP_VERSION = "1.31.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.31.0", date:"2026-06-14", features:[
+    "🎉 Quand un parent valide une quête sur un autre appareil, c'est l'ENFANT qui aura sa fête (popup + jeu de niveau) à sa prochaine connexion — fini les félicitations qui s'affichent sur l'écran du parent!",
+  ]},
   { version:"1.30.0", date:"2026-06-14", features:[
     "🐛 Fix : l'avatar est de nouveau modifiable (les morceaux se sauvegardent)",
     "✉️ Fix : le bouton « bug » copie l'adresse courriel et la montre (plus de cul-de-sac)",
@@ -1236,7 +1239,7 @@ const _mergeCalendar = (a, b) => {
   return out;
 };
 // Fusion d'un état de joueur — non régressive (max XP/pièces, union des listes)
-const mergeGS = (a, b) => {
+const mergeGS = (a, b, preferIncoming) => {
   a = a || {}; b = b || {};
   const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
@@ -1259,6 +1262,8 @@ const mergeGS = (a, b) => {
     hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
     dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
+    // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
+    pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1279,10 +1284,11 @@ const mergeFamily = (base, incoming) => {
   const bC = base.config || {}, iC = incoming.config || {};
   const bP = bC.players || [], iP = iC.players || [];
   const bG = base.gameStates || [], iG = incoming.gameStates || [];
+  const preferIncoming = isNewer(incoming.savedAt, base.savedAt);
   const byId = new Map();
   bP.forEach((p, i) => byId.set(p.id, { player: { ...p }, gs: bG[i] }));
   iP.forEach((p, i) => {
-    if (byId.has(p.id)) { const e = byId.get(p.id); e.player = _mergePlayer(e.player, p); e.gs = mergeGS(e.gs, iG[i]); }
+    if (byId.has(p.id)) { const e = byId.get(p.id); e.player = _mergePlayer(e.player, p); e.gs = mergeGS(e.gs, iG[i], preferIncoming); }
     else byId.set(p.id, { player: { ...p }, gs: iG[i] });
   });
   const players = [...byId.values()].map((e) => e.player);
@@ -1383,6 +1389,7 @@ const migrateGameState = (gs) => {
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
+    pendingCelebrations: gs.pendingCelebrations || [], // v1.31.0 — fêtes (popup/jeu) différées vers l'appareil de l'enfant
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -5215,21 +5222,16 @@ export default function App() {
           setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu en famille! +15 🪙 chacun`,"#FFD700",5000); },200);
         }
       }
+      // La célébration (popup + jeu de niveau) est DIFFÉRÉE vers l'appareil de l'enfant,
+      // jouée à SA prochaine connexion — pas sur l'écran du parent qui valide.
+      const celeb={ id:"c_"+uid(), level: prevLv<newLv?newLv:null, taskEmoji:task.emoji||"✅", taskLabel:task.label||"", xp:task.xp||0, coins:task.coins||0, themeId:player.themeId||"none",
+        badges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).map(b=>({id:b.id,emoji:b.emoji,name:b.name})) };
+      n[playerIdx]={...n[playerIdx], pendingCelebrations:[...(n[playerIdx].pendingCelebrations||[]), celeb]};
       const newCfg={...config, boss:bossNow, feed:feedAcc.slice(0,60)};
       setConfig(newCfg);
       persist(newCfg,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
-      const pendingRwd={task,player,newBadges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean)};
-      setTimeout(()=>{
-        spawnParticles(task.emoji);
-        if(task.xp>=35){SFX.epic();}else{SFX.task();}
-        if(p?.settings?.humor!==false) setTimeout(()=>showToast(FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)],"#555",2800),1400);
-        if(prevLv<newLv){
-          setMiniGame({player,playerIdx,level:newLv,playerThemeId:player.themeId||"none",pendingReward:pendingRwd});
-        } else {
-          setRewardPopup(pendingRwd);
-        }
-      },100);
+      showToast(`✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#2ECC40",4000);
       return n;
     });
     logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#2ECC40");
@@ -5260,6 +5262,30 @@ export default function App() {
     }
     setRewardPopup(pendingReward);
   },[miniGame,config,persist,showToast]);
+
+  // À la connexion de l'enfant : jouer les fêtes différées (validées par le parent sur un autre appareil)
+  // puis vider la file pour qu'elles ne rejouent pas.
+  const consumeCelebrations = useCallback((idx)=>{
+    const ps=gameStates[idx]; if(!ps) return;
+    const queue=ps.pendingCelebrations||[]; if(!queue.length) return;
+    const player=config.players[idx]; if(!player) return;
+    // On regroupe la file en UNE fête (cumul XP/pièces, tous les badges, le plus haut niveau atteint)
+    const totXp=queue.reduce((s,c)=>s+(c.xp||0),0);
+    const totCoins=queue.reduce((s,c)=>s+(c.coins||0),0);
+    const allBadges=queue.flatMap(c=>c.badges||[]);
+    const levels=queue.map(c=>c.level).filter(l=>l!=null);
+    const topLevel=levels.length?Math.max(...levels):null;
+    const label=queue.length===1?(queue[0].taskLabel||"Quête validée!"):`${queue.length} quêtes validées pendant ton absence!`;
+    const emoji=queue.length===1?(queue[0].taskEmoji||"✅"):"🎉";
+    const pendingRwd={ task:{emoji,label,xp:totXp,coins:totCoins}, player, newBadges:allBadges };
+    // On vide la file tout de suite (persist avec savedAt récent → reste vide après fusion cloud)
+    setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],pendingCelebrations:[]}; persist(config,n); return n; });
+    setTimeout(()=>{
+      spawnParticles(emoji);
+      if(topLevel!=null){ SFX.epic(); setMiniGame({player,playerIdx:idx,level:topLevel,playerThemeId:player.themeId||"none",pendingReward:pendingRwd}); }
+      else { SFX.task(); setRewardPopup(pendingRwd); }
+    },500);
+  },[gameStates,config,persist,spawnParticles]);
 
   // Buy / equip
   const handleBuy = useCallback((item,playerId)=>{
@@ -5557,6 +5583,8 @@ export default function App() {
       // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine)
       setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],mode:"week",activeRoutineId:null}; persist(config,n); return n; });
       setSessionPlayer(idx); setParentMode(false); setView(idx); setScreen("game"); SFX.click();
+      // Jouer les fêtes différées (quêtes validées par le parent sur un autre appareil)
+      consumeCelebrations(idx);
     }}
     onParentLogin={()=>{ setParentMode(true); setSessionPlayer(null); setView("family"); setScreen("game"); SFX.click(); }}
     onNewSetup={()=>{ setEditingBook(false); setScreen("setup"); }}
