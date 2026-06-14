@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.32.0";
+const APP_VERSION = "1.33.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -978,6 +978,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.33.0", date:"2026-06-14", features:[
+    "➕ Un enfant peut maintenant créer ses PROPRES tâches directement dans un rituel (plus besoin d'attendre qu'un parent en ajoute) — il est autonome!",
+    "🔑 Le code (PIN) d'un enfant peut être changé depuis un autre appareil et se synchronise partout",
+  ]},
   { version:"1.32.0", date:"2026-06-14", features:[
     "🎁 Un parent peut offrir un mini-jeu surprise (ex: Pac-Man) à un enfant : il apparaît à sa prochaine connexion!",
   ]},
@@ -1258,7 +1262,8 @@ const mergeGS = (a, b, preferIncoming) => {
     equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),
     avatar: avatarConfigured,
-    pin: a.pin ?? b.pin ?? null,
+    // PIN : dernière écriture gagne (permet de changer le code d'un enfant depuis un autre appareil)
+    pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
     routines: (() => { const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
@@ -2646,8 +2651,9 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
+  const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
@@ -2940,7 +2946,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>👇 Touche les tâches que tu VEUX faire dans ce rituel.</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Une tâche choisie devient verte avec un ✅. Touche encore pour l'enlever.</div>
           <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
-            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555"}}>Aucune tâche de rituel assignée. Demande à un parent d'en ajouter (type ⏰ Rituel).</div>}
+            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888"}}>Tu n'as pas encore de tâche de rituel. Touche « ➕ Créer ma propre tâche » plus bas pour en ajouter une! 👇</div>}
             {routineMine.map(a=>{
               const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null;
               const sel=routineBuilder.taskIds.includes(a.instanceId);
@@ -2954,6 +2960,14 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               );
             })}
           </div>
+          {/* L'enfant est autonome : il peut créer sa propre tâche et l'ajouter direct au rituel */}
+          <button onClick={()=>{SFX.click();setRoutineTaskModal(true);}}
+            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"10px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${th.accent||player.color}`,color:(th.accent||player.color),borderRadius:5,cursor:"pointer"}}>
+            ➕ Créer ma propre tâche
+          </button>
+          {routineTaskModal && <CustomTaskModal title="➕ Ma tâche de rituel" confirmLabel="Ajouter au rituel" th={th}
+            onClose={()=>setRoutineTaskModal(false)}
+            onCreate={(data)=>{ const newId = onChildAddRoutineTask && onChildAddRoutineTask(data); if(newId) setRoutineBuilder(b=>({...b, taskIds:[...b.taskIds, newId]})); setRoutineTaskModal(false); }}/>}
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{SFX.click();setRoutineBuilder(null);}}
               style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>Annuler</button>
@@ -5434,6 +5448,20 @@ export default function App() {
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
   },[config,gameStates,persist,showToast]);
 
+  // L'enfant crée sa propre tâche de RITUEL (days:[] = type rituel) et on retourne l'instanceId
+  // pour l'ajouter immédiatement au rituel qu'il est en train de bâtir.
+  const handleChildAddRoutineTask = useCallback((playerIdx, data)=>{
+    const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return null;
+    const taskId="cust_"+uid();
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:15,coins:8,diff:"easy",cat:"custom"};
+    const instanceId=uid();
+    const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel
+    const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("➕ Tâche ajoutée à ton rituel!","#2ECC40");
+    return instanceId;
+  },[config,gameStates,persist,showToast]);
+
   // Annuler une récompense réclamée (remet les pièces) — accessible enfant ET parent
   const handleUnclaimReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -5758,6 +5786,7 @@ export default function App() {
               setGameStates(gs=>{ const n=[...gs]; n[i]={...n[i],avatar:av}; persist(config,n); return n; });
             }}
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
+            onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
