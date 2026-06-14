@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.40.0";
+const APP_VERSION = "1.41.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -69,6 +69,41 @@ const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++) if ((
 const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
 const petBar   = (xp) => { const lv=petLevel(xp); if (lv >= PET_LEVELS.length) return {cur:1,needed:1,max:true}; const base=PET_LEVELS[lv-1], next=PET_LEVELS[lv]; return { cur:(xp||0)-base, needed:next-base, max:false }; };
 const mergePetXp = (a, b) => { const out={...(a||{})}; for (const k in (b||{})) out[k]=Math.max(out[k]||0, b[k]||0); return out; };
+
+// ─── ÉNERGIE / SIESTE (frein sain : on ne passe pas la journée dessus) ──────
+// L'énergie se RECHARGE toute seule avec le temps réel (pleine en ~3 h).
+// Les extras « plaisir » (coffres, jouer) la consomment. Basse → le familier fait une sieste.
+// Les quêtes ne sont JAMAIS bloquées (on veut que les corvées se fassent).
+const ENERGY_MAX = 100;
+const ENERGY_REGEN_PER_MIN = ENERGY_MAX / 180; // pleine en 3 heures
+const CHEST_ENERGY = 30;   // ouvrir un coffre coûte de l'énergie
+const PLAY_ENERGY  = 20;   // jouer avec le familier
+const FEED_ENERGY  = 45;   // nourrir le familier (1×/jour) en redonne
+// Énergie courante = valeur stockée + ce qui s'est rechargé depuis energyTs
+const currentEnergy = (gs) => {
+  if (!gs) return ENERGY_MAX;
+  const base = gs.energy == null ? ENERGY_MAX : gs.energy;
+  const ts = gs.energyTs ? new Date(gs.energyTs).getTime() : 0;
+  const mins = ts ? Math.max(0, (Date.now() - ts) / 60000) : 0;
+  return Math.max(0, Math.min(ENERGY_MAX, Math.round(base + mins * ENERGY_REGEN_PER_MIN)));
+};
+// Minutes avant que l'énergie atteigne `target`
+const minsToEnergy = (gs, target) => {
+  const cur = currentEnergy(gs);
+  if (cur >= target) return 0;
+  return Math.ceil((target - cur) / ENERGY_REGEN_PER_MIN);
+};
+// Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
+const streakOf = (activeDays) => {
+  const set = new Set(activeDays || []);
+  if (!set.size) return 0;
+  const d = new Date(); d.setHours(12,0,0,0);
+  const key = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  if (!set.has(key(d))) { d.setDate(d.getDate()-1); if (!set.has(key(d))) return 0; } // ni aujourd'hui ni hier → série rompue
+  let n = 0;
+  while (set.has(key(d))) { n++; d.setDate(d.getDate()-1); }
+  return n;
+};
 
 // ─── TASK CATALOG ────────────────────────────────────────────
 const TASK_CATALOG = [
@@ -1015,6 +1050,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.41.0", date:"2026-06-14", features:[
+    "🐣 Familier VIVANT! Nourris-le chaque jour (🍖) pour qu'il reste en forme — c'est seulement nourri qu'il gagne de l'XP avec tes quêtes.",
+    "⚡ Jauge d'énergie : jouer avec ton familier et ouvrir des coffres dépensent de l'énergie. Quand elle est basse, il fait une 💤 sieste et se recharge tout seul (reviens plus tard!). Tes quêtes, elles, sont toujours faisables.",
+    "🔥 Série : le nombre de jours d'affilée où tu fais au moins une quête s'affiche sur ton Accueil.",
+  ]},
   { version:"1.40.0", date:"2026-06-14", features:[
     "🤝 Échange de pièces : en plus de DONNER, tu peux maintenant DEMANDER des pièces à un frère depuis son profil. Il reçoit ta demande sur son Accueil (📬) et peut accepter ou refuser. (idée de D1TEXXY)",
   ]},
@@ -1344,6 +1384,11 @@ const mergeGS = (a, b, preferIncoming) => {
     // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
     pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
+    // Énergie : consommable → dernière écriture gagne (la paire valeur+horodatage voyage ensemble)
+    energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
+    energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
+    lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
+    activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
@@ -1484,6 +1529,10 @@ const migrateGameState = (gs) => {
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
     pendingCelebrations: gs.pendingCelebrations || [], // v1.31.0 — fêtes (popup/jeu) différées vers l'appareil de l'enfant
     petXp: gs.petXp || {}, // v1.37.0 — XP par familier (conservée même déséquipé)
+    energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
+    energyTs: gs.energyTs || null,
+    lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
+    activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
@@ -2786,7 +2835,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -2891,23 +2940,50 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         </button>
       </div>
 
-      {/* Aperçu du familier sur l'accueil */}
-      {(()=>{ const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet);
+      {/* 🔥 Série + 🐾 Familier vivant (énergie / sieste / nourrir / jouer) */}
+      {(()=>{
+        const acc=pt.accent||player.color;
+        const streak=streakOf(pState.activeDays);
+        const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet);
+        const cur=currentEnergy(pState);
+        const fedToday=pState.lastFedDay===todayStamp();
+        const eColor=cur>=60?"#2ECC40":cur>=30?"#FFD700":"#FF6B6B";
+        const napping=cur<PLAY_ENERGY;
         return (
-          <div onClick={()=>{setAvatarOpen(true);SFX.click();}} style={{cursor:"pointer",background:"rgba(0,0,0,0.4)",border:`2px solid ${(pt.accent||player.color)}55`,borderRadius:8,padding:12,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:10}}>
+            {/* Série */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#FF8C00":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
+            </div>
             {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
               return (<>
-                <div style={{fontSize:46,lineHeight:1,filter:`drop-shadow(0 0 6px ${pt.glow||player.color})`}}>{eqPet.emoji}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||player.color}}>{eqPet.name} — Niv.{lv}</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#bbb",margin:"2px 0"}}>🐾 {petStage(xp)}</div>
-                  <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctp+"%",background:pt.accent||player.color}}/></div>
+                <div style={{display:"flex",alignItems:"center",gap:12}} onClick={()=>{setAvatarOpen(true);SFX.click();}} >
+                  <div style={{fontSize:48,lineHeight:1,cursor:"pointer",filter:`drop-shadow(0 0 6px ${pt.glow||acc})`,opacity:napping?0.6:1}}>{napping?"😴":eqPet.emoji}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:acc}}>{eqPet.name} — Niv.{lv}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#bbb",margin:"1px 0 3px"}}>🐾 {petStage(xp)} {napping?"· 💤 fait la sieste":""}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>XP familier</div>
+                    <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",margin:"1px 0 4px"}}><div style={{height:"100%",width:pctp+"%",background:acc}}/></div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⚡ Énergie {cur}%</div>
+                    <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",marginTop:1}}><div style={{height:"100%",width:cur+"%",background:eColor,transition:"width 0.6s"}}/></div>
+                  </div>
                 </div>
-                <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Voir ›</span>
-              </>); })() : (<>
-                <div style={{fontSize:40,opacity:0.5}}>🐾</div>
-                <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒 et il évoluera avec toi!</div>
-              </>)}
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:fedToday?"#2ECC40":"#FFD700",lineHeight:1.3}}>
+                  {fedToday?"✅ Nourri aujourd'hui — il gagne de l'XP avec tes quêtes!":"🍖 Nourris-le aujourd'hui pour qu'il gagne de l'XP avec tes quêtes!"}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={(e)=>{e.stopPropagation();onFeedPet&&onFeedPet();}} disabled={fedToday}
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#2ECC40",color:fedToday?"#555":"#000",border:"2px solid #000",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
+                  <button onClick={(e)=>{e.stopPropagation();onPlayPet&&onPlayPet();}}
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:napping?"#1a1a1a":acc,color:napping?"#777":"#000",border:"2px solid #000",borderRadius:5,cursor:"pointer"}}>{napping?"💤 Sieste":"🎾 Jouer"}</button>
+                </div>
+              </>); })() : (
+                <div onClick={()=>{setAvatarOpen(true);SFX.click();}} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{fontSize:40,opacity:0.5}}>🐾</div>
+                  <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒, nourris-le chaque jour et il évoluera avec tes quêtes!</div>
+                </div>
+              )}
           </div>
         );
       })()}
@@ -3380,10 +3456,13 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
 
       {/* 🎁 Coffres mystères */}
+      {(()=>{ const cur=currentEnergy(pState); if(cur>=CHEST_ENERGY) return null; const m=minsToEnergy(pState,CHEST_ENERGY);
+        return <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #5DECF555",borderRadius:6,padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:14,color:"#9fd",lineHeight:1.3}}>💤 Ton familier est fatigué et fait une sieste — les coffres reviennent dans ~{m} min. En attendant, va faire tes quêtes! 🌟</div>;
+      })()}
       <div style={{display:"flex",gap:8,marginBottom:10}}>
-        {CHESTS.map(ch=>{ const can=pState.coins>=ch.cost; return (
+        {CHESTS.map(ch=>{ const can=pState.coins>=ch.cost && currentEnergy(pState)>=CHEST_ENERGY; return (
           <button key={ch.id} disabled={!can} onClick={()=>{
-              if(pState.coins<ch.cost)return;
+              if(pState.coins<ch.cost || currentEnergy(pState)<CHEST_ENERGY)return;
               const pool=allShopItemsFlat.filter(it=>it.slot);
               const item=pickFromChest(pool, ch); if(!item)return;
               const dup=pState.owned?.includes(item.id); const refund=Math.max(3,Math.round(baseCost(item)/3));
@@ -5563,9 +5642,13 @@ export default function App() {
       const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount);
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
-      // Le familier ÉQUIPÉ gagne de l'XP (conservée par familier, même s'il est déséquipé plus tard)
+      // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).
+      // C'est la boucle Tamagotchi : nourris-le chaque jour pour qu'il grandisse avec tes quêtes.
       const eqPet=p.equipped?.pet;
-      if(eqPet){ updatedPs.petXp={...(p.petXp||{}), [eqPet]:((p.petXp?.[eqPet])||0)+(task.xp||0)}; }
+      const petFedToday=p.lastFedDay===todayStamp();
+      if(eqPet && petFedToday){ updatedPs.petXp={...(p.petXp||{}), [eqPet]:((p.petXp?.[eqPet])||0)+(task.xp||0)}; }
+      // Série 🔥 : marquer aujourd'hui comme jour actif (quête accomplie)
+      updatedPs.activeDays=_uniq([...(p.activeDays||[]), todayStamp()]);
       const n=[...gs]; n[playerIdx]=updatedPs;
       // Fil de famille : on enregistre l'accomplissement (+ niveau / badges) dans le MÊME save
       const now=Date.now(); const fents=[{ id:"f_"+uid(), ts:now, likes:[], type:"task", playerId:player.id, text:`${displayName(player)} a accompli « ${task.label} »`, emoji:task.emoji||"✅" }];
@@ -5746,7 +5829,8 @@ export default function App() {
     const startXpTotal = gameStates.reduce((s,g)=>s+(g.xp||0),0);
     const nPlayers = Math.max(1,(config.players||[]).length);
     const base = BOSSES[Math.floor(Math.random()*BOSSES.length)];
-    const boss = {...base, startXpTotal, goalXp: 40*nPlayers, startedAt:new Date().toISOString(), defeatedAt:null};
+    // Objectif collectif sur PLUSIEURS jours (les enfants gagnent ~100 XP/jour chacun) → vrai défi d'équipe
+    const boss = {...base, startXpTotal, goalXp: 200*nPlayers, startedAt:new Date().toISOString(), defeatedAt:null};
     const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:boss.emoji,text:`⚔️ Un ${boss.name} apparaît! Gagnez ${boss.goalXp} XP en famille pour le vaincre ensemble!`};
     const newCfg={...config, boss, feed:[fe,...(config.feed||[])].slice(0,60)};
     setConfig(newCfg); persist(newCfg, gameStates);
@@ -5922,9 +6006,39 @@ export default function App() {
   const handleOpenChest = useCallback((playerId, payload)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
     setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; if((p.coins||0)<payload.cost)return gs;
-      n[idx]={...p, coins:(p.coins||0)-payload.cost+(payload.dup?(payload.refund||0):0), owned:payload.dup?(p.owned||[]):[...new Set([...(p.owned||[]),payload.itemId])]};
+      // Ouvrir un coffre dépense aussi de l'ÉNERGIE (frein sain)
+      n[idx]={...p, coins:(p.coins||0)-payload.cost+(payload.dup?(payload.refund||0):0), owned:payload.dup?(p.owned||[]):[...new Set([...(p.owned||[]),payload.itemId])],
+        energy:Math.max(0, currentEnergy(p)-CHEST_ENERGY), energyTs:new Date().toISOString()};
       persist(config,n); return n; });
   },[config,persist]);
+
+  // 🍖 Nourrir le familier (1×/jour) → recharge l'énergie + rend le familier content (+XP)
+  const handleFeedPet = useCallback((playerIdx)=>{
+    const p=gameStates[playerIdx]; if(!p) return;
+    const today=todayStamp();
+    if(p.lastFedDay===today){ showToast("Ton familier a déjà mangé aujourd'hui 🐾 Reviens demain!","#FF8C00",3000); return; }
+    const eqPet=p.equipped?.pet;
+    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx];
+      n[playerIdx]={...q, lastFedDay:today, energy:Math.min(ENERGY_MAX, currentEnergy(q)+FEED_ENERGY), energyTs:new Date().toISOString(),
+        petXp: eqPet ? {...(q.petXp||{}), [eqPet]:((q.petXp?.[eqPet])||0)+12} : (q.petXp||{}) };
+      persist(config,n); return n; });
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("🍖"); SFX.coin&&SFX.coin(); }catch{} },80);
+    showToast("🍖 Miam! Ton familier est rassasié et plein d'énergie!","#2ECC40",3000);
+  },[gameStates,config,persist,showToast]);
+
+  // 🎾 Jouer avec le familier → coûte de l'énergie, donne de l'XP au familier
+  const handlePlayPet = useCallback((playerIdx)=>{
+    const p=gameStates[playerIdx]; if(!p) return;
+    const eqPet=p.equipped?.pet;
+    if(!eqPet){ showToast("Équipe d'abord un familier 🐾","#FF8C00",2500); return; }
+    if(currentEnergy(p)<PLAY_ENERGY){ const m=minsToEnergy(p,PLAY_ENERGY); showToast(`💤 Ton familier fait une sieste… reviens dans ~${m} min!`,"#5DECF5",3500); return; }
+    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx];
+      n[playerIdx]={...q, energy:Math.max(0, currentEnergy(q)-PLAY_ENERGY), energyTs:new Date().toISOString(),
+        petXp:{...(q.petXp||{}), [eqPet]:((q.petXp?.[eqPet])||0)+10} };
+      persist(config,n); return n; });
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎾"); SFX.click&&SFX.click(); }catch{} },80);
+    showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#FFD700",2800);
+  },[gameStates,config,persist,showToast]);
 
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
   const handleHideReward = useCallback((playerId, reward)=>{
@@ -6206,6 +6320,8 @@ export default function App() {
             onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
             onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
             onRespondOffer={handleRespondOffer}
+            onFeedPet={()=>handleFeedPet(view)}
+            onPlayPet={()=>handlePlayPet(view)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
