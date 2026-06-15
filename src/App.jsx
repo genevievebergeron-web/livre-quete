@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.64.0";
+const APP_VERSION = "1.65.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.65.0", date:"2026-06-15", features:[
+    "🐛 Correctif : le formulaire « J'ai trouvé un bug » se rend maintenant de façon fiable dans ton portail parent (onglet Logs) — les rapports ne se perdaient plus à la synchro.",
+    "🕐 Horodateur ajouté sur les tâches (création + complétion) pour mieux analyser ce qui se passe.",
+  ]},
   { version:"1.64.0", date:"2026-06-15", features:[
     "🛠️ Bug réglé : une tâche refusée par le parent ne revient plus toute seule dans le portail (la synchro la ré-injectait).",
     "😹 Quand une quête est refusée, l'enfant voit un petit message rigolo + un bouton « Archiver » pour le faire disparaître.",
@@ -1760,6 +1764,7 @@ const mergeFamily = (base, incoming) => {
       const cutoff = Date.now() - 2 * 864e5;
       return [...m.values()].filter(o => o.status === "pending" || (o.ts || 0) > cutoff).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 40);
     })(),
+    bugs: (() => { const m = new Map(); for (const x of [...(bC.bugs || []), ...(iC.bugs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60); })(), // v1.65.0 — bugs signalés : union par id (ne se perdent plus à la synchro)
     boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
       const a = bC.boss, b = iC.boss;
       if (!a) return b || null; if (!b) return a;
@@ -6548,7 +6553,7 @@ export default function App() {
     if(!taskId||!playerIds?.length)return;
     // assType: "week" → tâche de semaine (jours Lun–Ven par défaut); sinon → routine (sans jour)
     const days = assType==="week" ? [0,1,2,3,4] : [];
-    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:""}));
+    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:"",createdAt:Date.now()}));
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
@@ -6680,7 +6685,7 @@ export default function App() {
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp()}; // à usage unique (nettoyée après aujourd'hui)
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now()}; // à usage unique (nettoyée après aujourd'hui)
     const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
     const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
@@ -6701,7 +6706,7 @@ export default function App() {
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp()};
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now()};
     const newCfg={...config, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
