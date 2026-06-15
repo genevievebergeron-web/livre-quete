@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.51.0";
+const APP_VERSION = "1.52.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -63,12 +63,38 @@ const xpBar = xp => { for (let i=0;i<LEVELS.length-1;i++) if (xp<LEVELS[i+1].xpN
 // ─── FAMILIERS qui ÉVOLUENT ───────────────────────────────────
 // Chaque familier a sa propre XP (gameState.petXp[petId]), conservée même déséquipé.
 // Le familier équipé gagne de l'XP quand l'enfant accomplit une quête.
-const PET_LEVELS = [0, 30, 80, 160, 280, 450];                       // XP requis pour niv 1..6
-const PET_STAGES = ["Bébé", "Jeune", "Apprenti", "Adulte", "Costaud", "Légendaire"];
+const PET_LEVELS = [0, 80, 220, 440, 760, 1200, 1800, 2600];          // v1.52.0 — XP niv 1..8, courbe lente : Légendaire = objectif long terme (semaines de soins, pas une journée)
+const PET_STAGES = ["Bébé", "Jeune", "Apprenti", "Adulte", "Vétéran", "Champion", "Mythique", "Légendaire"];
+const PET_DAILY_CAP = 50;                                             // v1.52.0 — XP max gagné PAR JOUR par le familier (anti-grind : il grandit en prenant soin de lui chaque jour, pas en farmant d'un coup)
 const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++) if ((xp||0) >= PET_LEVELS[i]) lv=i+1; return lv; };
 const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
 const petBar   = (xp) => { const lv=petLevel(xp); if (lv >= PET_LEVELS.length) return {cur:1,needed:1,max:true}; const base=PET_LEVELS[lv-1], next=PET_LEVELS[lv]; return { cur:(xp||0)-base, needed:next-base, max:false }; };
 const mergePetXp = (a, b) => { const out={...(a||{})}; for (const k in (b||{})) out[k]=Math.max(out[k]||0, b[k]||0); return out; };
+// v1.52.0 — migration anti-rétrogradation : avec la nouvelle courbe (plus dure), on remonte
+// l'XP des familiers existants pour qu'aucun enfant ne perde son stade. Mappe l'ancien niveau
+// (courbe 6 paliers) vers le nouveau (8 paliers) et remonte au plancher du palier obtenu.
+const PET_LEVELS_OLD = [0, 30, 80, 160, 280, 450];
+const migratePetXpV2 = (petXp) => {
+  const out = { ...(petXp || {}) };
+  for (const k in out) {
+    const xp = out[k] || 0;
+    let oldLv = 1; for (let i = 0; i < PET_LEVELS_OLD.length; i++) if (xp >= PET_LEVELS_OLD[i]) oldLv = i + 1;
+    const newLv = Math.max(1, Math.min(PET_LEVELS.length, Math.round(oldLv / PET_LEVELS_OLD.length * PET_LEVELS.length)));
+    const floor = PET_LEVELS[newLv - 1] || 0;
+    if (xp < floor) out[k] = floor;
+  }
+  return out;
+};
+// v1.52.0 — ajoute de l'XP au familier équipé en respectant le plafond quotidien. Retourne {petXp, petDay}.
+const gainPet = (p, petId, amount) => {
+  const cur = p.petXp || {}; const today = todayStamp();
+  const pd0 = (p.petDay && p.petDay.day === today) ? p.petDay : { day: today, xp: 0 };
+  if (!petId || !(amount > 0)) return { petXp: cur, petDay: pd0 };
+  const room = Math.max(0, PET_DAILY_CAP - (pd0.xp || 0));
+  const add = Math.min(amount, room);
+  if (add <= 0) return { petXp: cur, petDay: pd0 };
+  return { petXp: { ...cur, [petId]: (cur[petId] || 0) + add }, petDay: { day: today, xp: (pd0.xp || 0) + add } };
+};
 
 // ─── ÉNERGIE / SIESTE (frein sain : on ne passe pas la journée dessus) ──────
 // L'énergie se RECHARGE toute seule avec le temps réel (pleine en ~3 h).
@@ -1080,6 +1106,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.52.0", date:"2026-06-15", features:[
+    "🐾 Familiers plus difficiles à faire évoluer : 8 stades (Bébé → Légendaire) avec une courbe beaucoup plus longue. Devenir Légendaire est maintenant un vrai objectif de plusieurs semaines, pas d'une journée!",
+    "🌙 Ton familier grandit en prenant soin de lui CHAQUE JOUR : il gagne au max un peu d'XP par jour (plus de gros « farm » d'un coup). Nourris-le et fais tes quêtes tous les jours pour qu'il évolue.",
+    "✅ Personne ne perd son stade : les familiers déjà avancés gardent (ou améliorent) leur niveau avec la nouvelle courbe.",
+  ]},
   { version:"1.51.0", date:"2026-06-15", features:[
     "⏱️ Minuterie de rituel : depuis un rituel, touche « Partir le minuteur de ce rituel » — il charge ton heure de fin et te donne de l'XP quand tu le réussis dans les temps.",
     "🛠️ La minuterie libre (sans rituel) est maintenant juste un OUTIL : elle ne donne plus d'XP « pour rien ». Pour gagner de l'XP, choisis un rituel dans la minuterie.",
@@ -1471,6 +1502,7 @@ const mergeGS = (a, b, preferIncoming) => {
     // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
     pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
+    petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
     // Énergie : consommable → dernière écriture gagne (la paire valeur+horodatage voyage ensemble)
     energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
     energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
@@ -1620,7 +1652,9 @@ const migrateGameState = (gs) => {
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
     pendingCelebrations: gs.pendingCelebrations || [], // v1.31.0 — fêtes (popup/jeu) différées vers l'appareil de l'enfant
-    petXp: gs.petXp || {}, // v1.37.0 — XP par familier (conservée même déséquipé)
+    petXp: gs.petMigV2 ? (gs.petXp || {}) : migratePetXpV2(gs.petXp), // v1.52.0 — migration anti-rétrogradation (une seule fois)
+    petMigV2: true, // v1.52.0 — drapeau : migration de courbe des familiers appliquée
+    petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
@@ -6023,7 +6057,7 @@ export default function App() {
       // C'est la boucle Tamagotchi : nourris-le chaque jour pour qu'il grandisse avec tes quêtes.
       const eqPet=p.equipped?.pet;
       const petFedToday=p.lastFedDay===todayStamp();
-      if(eqPet && petFedToday){ updatedPs.petXp={...(p.petXp||{}), [eqPet]:((p.petXp?.[eqPet])||0)+(task.xp||0)}; }
+      if(eqPet && petFedToday){ const _g=gainPet(p,eqPet,task.xp||0); updatedPs.petXp=_g.petXp; updatedPs.petDay=_g.petDay; }
       // Série 🔥 : marquer aujourd'hui comme jour actif (quête accomplie)
       updatedPs.activeDays=_uniq([...(p.activeDays||[]), todayStamp()]);
       const n=[...gs]; n[playerIdx]=updatedPs;
@@ -6457,9 +6491,9 @@ export default function App() {
     const today=todayStamp();
     if(p.lastFedDay===today){ showToast("Ton familier a déjà mangé aujourd'hui 🐾 Reviens demain!","#FF8C00",3000); return; }
     const eqPet=p.equipped?.pet;
-    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx];
+    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]; const _g=gainPet(q,eqPet,12);
       n[playerIdx]={...q, lastFedDay:today, energy:Math.min(ENERGY_MAX, currentEnergy(q)+FEED_ENERGY), energyTs:new Date().toISOString(),
-        petXp: eqPet ? {...(q.petXp||{}), [eqPet]:((q.petXp?.[eqPet])||0)+12} : (q.petXp||{}) };
+        petXp:_g.petXp, petDay:_g.petDay };
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🍖"); SFX.coin&&SFX.coin(); }catch{} },80);
     showToast("🍖 Miam! Ton familier est rassasié et plein d'énergie!","#2ECC40",3000);
@@ -6471,9 +6505,9 @@ export default function App() {
     const eqPet=p.equipped?.pet;
     if(!eqPet){ showToast("Équipe d'abord un familier 🐾","#FF8C00",2500); return; }
     if(currentEnergy(p)<PLAY_ENERGY){ const m=minsToEnergy(p,PLAY_ENERGY); showToast(`💤 Ton familier fait une sieste… reviens dans ~${m} min!`,"#5DECF5",3500); return; }
-    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx];
+    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]; const _g=gainPet(q,eqPet,10);
       n[playerIdx]={...q, energy:Math.max(0, currentEnergy(q)-PLAY_ENERGY), energyTs:new Date().toISOString(),
-        petXp:{...(q.petXp||{}), [eqPet]:((q.petXp?.[eqPet])||0)+10} };
+        petXp:_g.petXp, petDay:_g.petDay };
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎾"); SFX.click&&SFX.click(); }catch{} },80);
     showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#FFD700",2800);
