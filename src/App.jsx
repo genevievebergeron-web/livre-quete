@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.55.0";
+const APP_VERSION = "1.56.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -70,6 +70,48 @@ const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++) if ((
 const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
 const petBar   = (xp) => { const lv=petLevel(xp); if (lv >= PET_LEVELS.length) return {cur:1,needed:1,max:true}; const base=PET_LEVELS[lv-1], next=PET_LEVELS[lv]; return { cur:(xp||0)-base, needed:next-base, max:false }; };
 const mergePetXp = (a, b) => { const out={...(a||{})}; for (const k in (b||{})) out[k]=Math.max(out[k]||0, b[k]||0); return out; };
+
+// ─── SPRITES PIXEL-ART DES FAMILIERS (v1.56.0) ───────────────
+// Chaque familier = grille 16×16 (chaîne par ligne) + palette de base. Le caractère mappe une couleur.
+// '.' = transparent. Recoloré par élément à l'évolution (voir PET_ELEMENTS).
+const PET_SPRITES = {
+  cat:{rows:["....o....o......","...oao..oao.....","...obo..obo.....","...obboooobo....","...obbbbbbbo....","...obeobbeobo...","...obbbwwbbbo...","...obbbbbbbbo...","....obbbbbbo....","....obbbbbbo..o.","....obbbbbbo.oao",".....obbbbbooao.",".....obbbbbbbao.",".....oobaabaooo.","......oooooo...."],
+    pal:{o:"#5A3A1E",b:"#C9A06A",a:"#F0DCC0",e:"#2B2B2B",w:"#FF8FA3"}},
+  dog:{rows:["...obboooobbo...","..oabbbbbbbbao..",".oaabbbbbbbbaao.",".oaabeobboebaao.",".oabbbbwwbbbbao.",".oabbbbbbbbbbao.","..obbbbbbbbbbo..","..obbbbbbbbbbo..","...obbbbbbbbo...","...obbbbbbbbo.o.","...obbbbbbbboao.","...oobaabaaooo..","....oooooooo...."],
+    pal:{o:"#4A3220",b:"#D9A066",a:"#A6692F",e:"#2B2B2B",w:"#3A2A1A"}},
+  wolf:{rows:["..............o.","..d..........oao",".dao........obbo",".daaoooooooobbbn",".daaaaaaaaabbben",".daaaaaaaaabbbbn",".obaaaaaaaabbbbo","..obbbbbbbbbbbo.","..o..oo..oo..o..","..o..oo..oo..o..","..ooo.oo..oo.oo."],
+    pal:{o:"#2E3440",b:"#8A93A0",a:"#9AA3B0",d:"#D8DEE9",e:"#FFD24D",n:"#1A1A1A"}},
+  fox:{rows:["..o........o....",".oao......oao...",".obbo....obbo...",".obbboooobbbo...",".obbbbbbbbbbbo..",".obeobbbbbbeobo.",".obbcccccccbbo..","..occcnnnccco...","..obcccccccbo...","..obbbbbbbbbo...","...obbbbbo..ddd.","...obbbbbo.dcccd","...obbbbbo.ddddo","...oobaabaooo...","....ooooooo....."],
+    pal:{o:"#7A2E00",b:"#E8742E",a:"#FFF6EC",c:"#FFFFFF",e:"#2B2B2B",n:"#1A1A1A",d:"#FFFFFF"}},
+  dragon:{rows:["...d......d.....","..dod....dod....","...obboooobbo...","w..obbbbbbbbo..w","ww.obeobbeobo.ww","wwwobbbnnbbbowww","wwwobbbbbbbbowww",".w.obbbbbbbbo.w.","...obbbbbbbbo..d","...obbbbbbbbo.dd","...oobaabbaoboo.","....oooooooooo.."],
+    pal:{o:"#1E5E2A",b:"#4FB05A",a:"#BFF0A0",e:"#FFD24D",n:"#2B2B2B",d:"#FFD24D",w:"#2E8B40"}},
+  parrot:{rows:["....obbo........","...obbbbo.......","...obbbbo.......","...obeobboooo...","...obbbobkk.....","...obbbobkk.....","..owbbbbbo......",".owwbbbbbbo.....",".owwbbbbbbo.....",".owwbbbbbbo.....","..owbbbbbbo.....","...obbbbbbo.....","...obtttbbo.....","...otttttto.....","....ot..to......"],
+    pal:{o:"#145A24",b:"#2ECC55",w:"#1E8B3A",e:"#2B2B2B",k:"#FFB02E",t:"#FF3B3B"}},
+  owl:{rows:["....o......o....","...obo....obo...","..oobboooobboo..",".obbbbbbbbbbbbo.",".obbbbbbbbbbbbo.",".obeeebbbbeeebo.",".obepebbbbepebo.",".obeeebkkbeeebo.",".obbbbbkkbbbbbo.",".obwbbbbbbbbwbo.",".obwbbbbbbbbwbo.","..obbbbbbbbbbo..","..obbbbbbbbbbo..","...obbttttbbo...","....oobbbboo....",".....obbbbo....."],
+    pal:{o:"#4A2E12",b:"#A9763E",w:"#7E5424",e:"#FFFFFF",p:"#2B2B2B",k:"#FFB02E",t:"#FFB02E"}},
+  duck:{rows:["................","....oooo........","...obbbbo.......","...obeobo.......","...obbboKK......","..obbbbboK......",".obbbbbbbo......",".obbbbbbbbo.....",".obbbbbbbbo.....",".obbbbbbbbo.....","..obbbbbbo......","...oooooo.......","....t..t........"],
+    pal:{o:"#B8860B",b:"#FFD21E",e:"#2B2B2B",K:"#FF8C1A",t:"#FF8C1A"}},
+  worm:{rows:["................",".....ooooo......","....obbbbbo.....","....obeobeo.....","....ossssso.....",".....obbbo......","....obbbbbo.....","...obbsssbbo....","..obbbbbbbbbo...","..obsssbsssbo...",".obbbbbbbbbbbo..","..obsssbsssbo...","...obbbbbbbo....","....ooooooo....."],
+    pal:{o:"#A85A6A",b:"#F2A8B2",s:"#C97888",e:"#2B2B2B"}},
+  capybara:{rows:["................","...oo.......oo..","..obboooooobbo..",".obbbbbbbbbbbbo.",".obbbbbbbbbbbbo.",".obebbbbbbbbebo.",".obbbbbbbbbbbbo.",".obbbbbbbbbbbbo.",".obbbbnnnnbbbbo.",".obbbbbbbbbbbbo.",".obbbbbbbbbbbbo.","..ooo.oo.oo.ooo.","..o.....o....o.."],
+    pal:{o:"#5A3A1E",b:"#9A6B3A",e:"#2B2B2B",n:"#6A4A28"}},
+  bee:{rows:["...d......d.....","....o....o......","...ooooooooo....","..obeobbbeobo...",".woooooooooooow.","wwoyyyyyyyyyyoww",".woobbbbbbbboow.","wwoyyyyyyyyyyoww",".wooobbbbbbooww.","...oyyyyyyyyo...","....obbbbbbo....",".....oyyyyo.....","......osso......",".......oo......."],
+    pal:{o:"#3A2A00",y:"#FFD21E",b:"#2B2B2B",w:"#CFE8FF",d:"#2B2B2B",s:"#2B2B2B",e:"#FFFFFF"}},
+  spider:{rows:["l.l........l.l..",".ll........ll...","..ll......ll....","...loooooool....","..llobbbbboll...",".l.obeoobeobo.l.","..lobbbbbbbol...","...obbbbbbbo....","..llobbbbboll...",".l..looooool..l.","..ll......ll....",".ll........ll...","l.l........l.l.."],
+    pal:{o:"#0F0F18",b:"#4A4A5A",l:"#2A2A3A",e:"#FF3B3B"}},
+};
+// Quel sprite pour un id d'item familier (sinon null → repli emoji)
+const PET_SPRITE_KEY = { p1:"cat", p2:"dog", p3:"wolf", p4:"fox", p5:"dragon", p6:"parrot", hp4:"owl", dk1:"duck", dk5:"duck", pet_worm:"worm", pet_capy:"capybara", pet_bee:"bee", pet_spider:"spider", pet_duck:"duck" };
+const petSpriteKey = (itemId) => PET_SPRITE_KEY[itemId] || null;
+// Dessine un familier pixel sur un canvas (key = clé PET_SPRITES, ou null)
+const renderPetToCtx = (ctx, key, size=64, palOverride=null) => {
+  const sp = PET_SPRITES[key]; if (!ctx) return;
+  ctx.clearRect(0,0,size,size);
+  if (!sp) return;
+  const pal = palOverride ? { ...sp.pal, ...palOverride } : sp.pal;
+  const S = size/16;
+  for (let y=0; y<16; y++){ const row=(sp.rows[y]||"")+"................"; for (let x=0; x<16; x++){ const c=row[x]; const col=pal[c]; if(col){ ctx.fillStyle=col; ctx.fillRect(Math.round(x*S),Math.round(y*S),Math.ceil(S),Math.ceil(S)); } } }
+};
 // v1.52.0 — migration anti-rétrogradation : avec la nouvelle courbe (plus dure), on remonte
 // l'XP des familiers existants pour qu'aucun enfant ne perde son stade. Mappe l'ancien niveau
 // (courbe 6 paliers) vers le nouveau (8 paliers) et remonte au plancher du palier obtenu.
@@ -1070,7 +1112,7 @@ const getPlayerTheme = (id) => PLAYER_THEMES[id] || PLAYER_THEMES.none;
 const BASE_SHOP_ITEMS = {
   hats:[{id:"h1",emoji:"🎩",name:"Chapeau magique",cost:20,slot:"hat"},{id:"h2",emoji:"👑",name:"Couronne",cost:40,slot:"hat"},{id:"h3",emoji:"⛑",name:"Casque héros",cost:25,slot:"hat"},{id:"h4",emoji:"🪖",name:"Casque diamant",cost:35,slot:"hat"},{id:"h5",emoji:"🎓",name:"Chapeau savant",cost:30,slot:"hat"},{id:"h6",emoji:"🧢",name:"Cap champion",cost:15,slot:"hat"}],
   armors:[{id:"a1",emoji:"🛡️",name:"Bouclier",cost:15,slot:"armor"},{id:"a2",emoji:"⚔️",name:"Épée",cost:20,slot:"armor"},{id:"a3",emoji:"🏹",name:"Arc en or",cost:35,slot:"armor"},{id:"a4",emoji:"💎",name:"Armure diamant",cost:50,slot:"armor"},{id:"a5",emoji:"🪄",name:"Bâton magique",cost:30,slot:"armor"}],
-  pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"}],
+  pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"},{id:"pet_duck",emoji:"🦆",name:"Canard jaune",cost:20,slot:"pet"},{id:"pet_worm",emoji:"🪱",name:"Ver de terre",cost:15,slot:"pet"},{id:"pet_capy",emoji:"🦫",name:"Capybara",cost:40,slot:"pet"},{id:"pet_bee",emoji:"🐝",name:"Abeille",cost:25,slot:"pet"},{id:"pet_spider",emoji:"🕷️",name:"Araignée",cost:30,slot:"pet"}],
 };
 const ALL_SHOP_ITEMS = [
   ...BASE_SHOP_ITEMS.hats, ...BASE_SHOP_ITEMS.armors, ...BASE_SHOP_ITEMS.pets,
@@ -1117,6 +1159,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.56.0", date:"2026-06-15", features:[
+    "🐾 Les familiers ont maintenant un look PIXEL ART! Ton familier équipé s'affiche en grand dans « Mon perso » et grossit quand il monte de niveau.",
+    "🆕 Nouveaux familiers dans la boutique : 🦆 Canard jaune, 🪱 Ver de terre, 🦫 Capybara, 🐝 Abeille, 🕷️ Araignée!",
+  ]},
   { version:"1.55.0", date:"2026-06-15", features:[
     "🧹 Grand ménage : les vieilles tâches « orphelines » (anciens doublons qui ne servaient plus) sont retirées pour de bon, et elles ne reviennent plus à la prochaine synchro. La liste de tâches reste propre.",
   ]},
@@ -2650,6 +2696,15 @@ function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true })
     style={{imageRendering:"pixelated",borderRadius:4,...style}}/>;
 }
 
+// v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
+function PetSprite({ petKey, itemId, size=64, palOverride=null, style={} }) {
+  const canvasRef = useRef(null);
+  const key = petKey || petSpriteKey(itemId);
+  useEffect(()=>{ const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride); },[key,size,palOverride]);
+  if(!key) return null;
+  return <canvas ref={canvasRef} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
 // ─── BOSS DE FAMILLE — sprites pixel-art ORIGINAUX (dessinés sur canvas) ──────
 const BOSSES = [
   { id:"dragon", name:"Dragon du Chaos",     color:"#7B3FF2", belly:"#C9B3F7", eye:"#FFE14D", emoji:"🐉" },
@@ -2996,7 +3051,9 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
                 const sz=64+lv*8; // il grossit en évoluant
                 return (
                   <div style={{background:`radial-gradient(circle at 50% 30%, ${acc}22, rgba(0,0,0,0.5))`,border:`3px solid ${acc}`,borderRadius:12,padding:16,textAlign:"center"}}>
-                    <div style={{fontSize:sz,lineHeight:1,filter:`drop-shadow(0 0 ${4+lv*2}px ${pt.glow||acc})`,transition:"font-size 0.4s"}}>{eqPet.emoji}</div>
+                    <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:sz,filter:`drop-shadow(0 0 ${4+lv*2}px ${pt.glow||acc})`,transition:"all 0.4s"}}>
+                      {petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={sz}/> : <span style={{fontSize:sz,lineHeight:1}}>{eqPet.emoji}</span>}
+                    </div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{eqPet.name} — Niv.{lv}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",marginTop:2}}>Stade : {petStage(xp)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
                     <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
