@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.50.0";
+const APP_VERSION = "1.51.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1080,6 +1080,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.51.0", date:"2026-06-15", features:[
+    "⏱️ Minuterie de rituel : depuis un rituel, touche « Partir le minuteur de ce rituel » — il charge ton heure de fin et te donne de l'XP quand tu le réussis dans les temps.",
+    "🛠️ La minuterie libre (sans rituel) est maintenant juste un OUTIL : elle ne donne plus d'XP « pour rien ». Pour gagner de l'XP, choisis un rituel dans la minuterie.",
+  ]},
   { version:"1.50.0", date:"2026-06-15", features:[
     "🗂️ L'onglet « Tout » des rituels est rangé! Tes tâches sont maintenant regroupées par rituel (Matin, Soir…), repliées par défaut. Touche un rituel pour l'ouvrir — fini la liste sans fin qui scrolle à l'infini.",
   ]},
@@ -3561,6 +3565,13 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       </>)}
       {homeTab==="jour" && (<>
+      {/* Partir le minuteur de ce rituel (heure de fin → XP à la complétion) */}
+      {activeRoutine && onGoTimer && (
+        <button onClick={()=>{SFX.click();onGoTimer(activeRoutine.id);}}
+          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:th.accent||player.color,border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
+          ⏱️ Partir le minuteur de ce rituel{activeRoutine.endTime?` (jusqu'à ${activeRoutine.endTime.replace(":","h")})`:""}
+        </button>
+      )}
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
         <button onClick={()=>{
@@ -5246,10 +5257,10 @@ const computeCalendarReminders = (calendar, today) => {
 
 // ─── MINUTERIE (chrono + rituel + encouragements) ────────────
 const TIMER_ENCOURAGE=["Continue, tu es capable! 💪","Super rythme! ⚡","Tu gères ça comme un·e champion·ne! 🔥","Presque là, lâche pas! 🌟","Wow, quelle belle énergie! 🚀","Tu fais ça super bien! 👏"];
-function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete }){
+function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete, initialRitualId }){
   const [childIdx,setChildIdx]=useState(sessionPlayer!=null?sessionPlayer:0);
   const [mode,setMode]=useState("deadline"); // deadline = heure de fin · down = minutes · up = chrono
-  const [ritualId,setRitualId]=useState(null);
+  const [ritualId,setRitualId]=useState(initialRitualId||null);
   const [taskLabel,setTaskLabel]=useState("");
   const [targetMin,setTargetMin]=useState(5);
   const [endTime,setEndTime]=useState("07:30"); // heure de fin (départ des gars)
@@ -5257,6 +5268,8 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
   const [timeUp,setTimeUp]=useState(false);
   const [now,setNow]=useState(Date.now());
   useEffect(()=>{ if(!startTs)return; const i=setInterval(()=>setNow(Date.now()),250); return()=>clearInterval(i); },[startTs]);
+  // Rituel présélectionné (ouvert depuis la vue rituel) → charge son heure de fin
+  useEffect(()=>{ if(!initialRitualId)return; const idx=sessionPlayer!=null?sessionPlayer:childIdx; const r=(gameStates[idx]?.routines||[]).find(x=>x.id===initialRitualId); if(r){ setRitualId(r.id); if(r.endTime){ setMode("deadline"); setEndTime(r.endTime); } } },[initialRitualId]);
   const lockChild = sessionPlayer!=null && !parentMode;
   const cidx = lockChild?sessionPlayer:childIdx;
   const child=config.players[cidx]; const routines=(gameStates[cidx]?.routines)||[];
@@ -5295,9 +5308,13 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         <input value={taskLabel} onChange={e=>{setTaskLabel(e.target.value.slice(0,40));setRitualId(null);}} placeholder="ex: Ranger ma chambre, brosser mes dents…"
           style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"9px 11px",background:"#111",color:"#fff",border:`2px solid ${ritualId?"#333":acc}`,borderRadius:6,outline:"none"}}/>
         {routines.length>0 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",alignSelf:"center"}}>ou un rituel :</span>
-          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}</button>))}
+          <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",alignSelf:"center"}}>ou un rituel (donne de l'XP 🎁) :</span>
+          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");if(r.endTime){setMode("deadline");setEndTime(r.endTime);}SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}{r.endTime?` · ${r.endTime.replace(":","h")}`:""}</button>))}
         </div>}
+        {/* Rappel clair : outil vs rituel */}
+        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:ritual?"#2ECC40":"#888",lineHeight:1.3,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"6px 9px"}}>
+          {ritual ? `🎁 Rituel « ${ritual.name} » : le réussir dans les temps donne de l'XP!` : "🛠️ Minuterie libre : c'est juste un outil pour t'aider — pas de récompense. Choisis un rituel ci-dessus pour gagner de l'XP."}
+        </div>
         {/* Durée (compte à rebours) */}
         {mode==="down" && <>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginTop:2}}>Combien de minutes? <b style={{color:acc}}>{targetMin} min</b></div>
@@ -5818,6 +5835,7 @@ export default function App() {
   const [editingBook, setEditingBook] = useState(false); // true = "Modifier le livre" (édite la config existante)
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
   const [hamOpen, setHamOpen] = useState(false); // menu ☰ enfant (piloté depuis le header)
+  const [timerRitual, setTimerRitual] = useState(null); // rituel pré-sélectionné en ouvrant la minuterie
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
   const [pinChangeMode, setPinChangeMode] = useState(false);
@@ -6385,9 +6403,15 @@ export default function App() {
   // Minuterie : l'enfant a complété un rituel chronométré → bonus XP + entrée au fil
   const handleRitualTimerDone = useCallback((playerIdx, ritual, minutes)=>{
     const player=config.players[playerIdx]; if(!player)return;
+    // XP SEULEMENT si c'est un vrai rituel enregistré (avec id). La minuterie libre = outil, pas de récompense.
+    const isRealRoutine = !!(ritual && ritual.id);
+    if(!isRealRoutine){
+      showToast(`⏱ Minuterie terminée! C'est un outil — pas de récompense. 🙂`,"#888",4000);
+      return;
+    }
     const bonus=Math.min(40, 5*Math.max(1,(ritual?.taskIds?.length||1)));
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus};
-      const txt=ritual ? `${displayName(player)} a complété son rituel « ${ritual.name} » en ${minutes} min! (+${bonus} XP)` : `${displayName(player)} s'est concentré ${minutes} min au chrono! (+${bonus} XP)`;
+      const txt=`${displayName(player)} a complété son rituel « ${ritual.name} » en ${minutes} min! (+${bonus} XP)`;
       const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:txt};
       const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};
       setConfig(newCfg); persist(newCfg,n); return n; });
@@ -6711,7 +6735,7 @@ export default function App() {
           );
         })()}
         {view==="timer"&&(
-          <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone}/>
+          <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone} initialRitualId={timerRitual}/>
         )}
         {view==="family"&&(
           <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===i} th={th}
@@ -6751,7 +6775,7 @@ export default function App() {
             hamOpen={hamOpen} onCloseHam={()=>setHamOpen(false)}
             onGoFamily={()=>{setView("family");SFX.click();}}
             onGoCalendars={()=>{setView("calendars");SFX.click();}}
-            onGoTimer={()=>{setView("timer");SFX.click();}}
+            onGoTimer={(ritualId)=>{setTimerRitual(ritualId&&typeof ritualId==="string"?ritualId:null);setView("timer");SFX.click();}}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
