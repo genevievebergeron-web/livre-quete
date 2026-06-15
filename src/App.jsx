@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.58.0";
+const APP_VERSION = "1.59.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -395,16 +395,37 @@ const BADGES = [
   { id:"bt_sci1",    emoji:"🔬", name:"Chercheur·se en Chef", desc:"5 quêtes en mode Science",           type:"microscopique",check:(ps)=>(ps.completed?.length||0)>=5 },
   { id:"bt_dis1",    emoji:"✨", name:"Bienvenue dans le Rêve",desc:"Première quête Disney",             type:"disney",      check:(ps)=>(ps.completed?.length||0)>=1 },
   { id:"bt_pix1",    emoji:"💡", name:"Lampe de Chevet",      desc:"3 quêtes en mode Pixar",             type:"pixar",       check:(ps)=>(ps.completed?.length||0)>=3 },
+  // ── PAR ÉTIQUETTE (catégorie de tâche) — objectifs plus difficiles ──
+  { id:"b_cat_menage10",  emoji:"🧹", name:"As du Ménage",        desc:"Fais 10 tâches de Ménage",  type:"general", check:(ps,c,cc)=>(cc?.menage||0)>=10 },
+  { id:"b_cat_menage30",  emoji:"🧼", name:"Maître du Ménage",    desc:"Fais 30 tâches de Ménage",  type:"general", check:(ps,c,cc)=>(cc?.menage||0)>=30 },
+  { id:"b_cat_cuisine10", emoji:"🍳", name:"Marmiton",            desc:"Fais 10 tâches de Cuisine", type:"general", check:(ps,c,cc)=>(cc?.cuisine||0)>=10 },
+  { id:"b_cat_cuisine30", emoji:"👨‍🍳", name:"Chef de la Maison",   desc:"Fais 30 tâches de Cuisine", type:"general", check:(ps,c,cc)=>(cc?.cuisine||0)>=30 },
+  { id:"b_cat_routine20", emoji:"⏰", name:"Roi des Routines",     desc:"Fais 20 tâches de Routine", type:"general", check:(ps,c,cc)=>(cc?.routine||0)>=20 },
+  { id:"b_cat_defi10",    emoji:"🎯", name:"Casse-Cou",           desc:"Réussis 10 Défis",          type:"general", check:(ps,c,cc)=>(cc?.defi||0)>=10 },
+  { id:"b_cat_outdoor10", emoji:"🌳", name:"Aventurier du Dehors",desc:"Fais 10 tâches Dehors",     type:"general", check:(ps,c,cc)=>(cc?.outdoor||0)>=10 },
+  // ── PLUS DURS (longue haleine) ──
+  { id:"b_100tasks", emoji:"💯", name:"Centurion",            desc:"Complète 100 quêtes",        type:"general", check:(ps)=>(ps.completed?.length||0)>=100 },
+  { id:"b_300tasks", emoji:"🛡️", name:"Vétéran des Corvées",   desc:"Complète 300 quêtes",        type:"general", check:(ps)=>(ps.completed?.length||0)>=300 },
+  { id:"b_xp2500",   emoji:"☄️", name:"Comète",               desc:"Accumule 2500 XP",           type:"general", check:(ps)=>(ps.xp||0)>=2500 },
+  { id:"b_day10",    emoji:"🌟", name:"Journée Marathon",     desc:"10 quêtes dans la même journée", type:"general", check:(ps,c)=>c>=10 },
 ];
 
+// v1.59.0 — compte les complétions par étiquette (catégorie de tâche) pour les badges par catégorie
+const completionCatCounts = (ps, config) => {
+  const tasks=[...TASK_CATALOG, ...((config&&config.customTasks)||[])];
+  const catByInst={}; ((config&&config.assignments)||[]).forEach(a=>{ const t=tasks.find(x=>x.id===a.taskId); if(t) catByInst[a.instanceId]=t.cat; });
+  const counts={};
+  (ps.completed||[]).forEach(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const cat=catByInst[inst]; if(cat) counts[cat]=(counts[cat]||0)+1; });
+  return counts;
+};
 // Returns array of newly earned badge IDs
-const checkBadges = (pState, player, dailyCount) => {
+const checkBadges = (pState, player, dailyCount, catCounts={}) => {
   const themeId = player?.themeId || "none";
   const alreadyEarned = new Set(pState.badges || []);
   return BADGES
     .filter(b => !alreadyEarned.has(b.id))
     .filter(b => b.type === "general" || b.type === themeId)
-    .filter(b => { try { return b.check(pState, dailyCount); } catch { return false; } })
+    .filter(b => { try { return b.check(pState, dailyCount, catCounts); } catch { return false; } })
     .map(b => b.id);
 };
 
@@ -1201,6 +1222,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.59.0", date:"2026-06-15", features:[
+    "🏅 Plein de nouveaux badges, dont des plus DURS à mériter! Des badges par type de tâche : As du Ménage (10), Marmiton (cuisine), Roi des Routines, Casse-Cou (défis), Aventurier du Dehors…",
+    "💯 Des défis de longue haleine : 100 et 300 quêtes, 2500 XP, et « Journée Marathon » (10 quêtes en une seule journée)!",
+  ]},
   { version:"1.58.0", date:"2026-06-15", features:[
     "⚔️ Le combat de boss devient stratégique! Chaque jour, un MODIFICATEUR change la meilleure tactique (jour des grosses, carapace, frénésie, jour du familier…). Sous 30% de PV, le boss ENRAGE et devient plus dangereux.",
     "🐾 Ton FAMILIER peut attaquer le boss! S'il est nourri et évolué (niv. 4+), lance-le au combat (3 jetons) — un familier Légendaire 👑 frappe beaucoup plus fort.",
@@ -6284,7 +6309,7 @@ export default function App() {
       const today="#"+todayStamp();
       const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
       const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
-      const newBadgeIds=checkBadges(updatedPs,player,todayCount);
+      const newBadgeIds=checkBadges(updatedPs,player,todayCount, completionCatCounts(updatedPs, cfgRef.current||config));
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).
       // C'est la boucle Tamagotchi : nourris-le chaque jour pour qu'il grandisse avec tes quêtes.
