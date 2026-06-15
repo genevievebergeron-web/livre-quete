@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.54.0";
+const APP_VERSION = "1.55.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1117,6 +1117,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.55.0", date:"2026-06-15", features:[
+    "🧹 Grand ménage : les vieilles tâches « orphelines » (anciens doublons qui ne servaient plus) sont retirées pour de bon, et elles ne reviennent plus à la prochaine synchro. La liste de tâches reste propre.",
+  ]},
   { version:"1.54.0", date:"2026-06-15", features:[
     "🛒 La boutique se renouvelle CHAQUE JOUR : de nouvelles récompenses à découvrir tous les matins (avant c'était chaque semaine).",
     "🪟 Correctif : le popup de félicitations / récompense ne déborde plus hors de l'écran — il s'adapte et défile sur les petits écrans (téléphones).",
@@ -1564,10 +1567,12 @@ const mergeFamily = (base, incoming) => {
   const assignMap = new Map();
   (bC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId)) assignMap.set(a.instanceId, a); });
   (iC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId) && !assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
-  // Tâches perso : union par id
+  // Tâches perso : union par id, MOINS les supprimées (tombstones durables, comme les assignations)
+  const removedCustomTasks = _uniq([...(bC.removedCustomTasks || []), ...(iC.removedCustomTasks || [])]).slice(-1000);
+  const _rmCT = new Set(removedCustomTasks);
   const taskMap = new Map();
-  (bC.customTasks || []).forEach((t) => taskMap.set(t.id, t));
-  (iC.customTasks || []).forEach((t) => { if (!taskMap.has(t.id)) taskMap.set(t.id, t); });
+  (bC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id)) taskMap.set(t.id, t); });
+  (iC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
   const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
   const newerC = newer.config || {};
   const config = {
@@ -1576,6 +1581,7 @@ const mergeFamily = (base, incoming) => {
     assignments: [...assignMap.values()],
     removedAssignments,
     customTasks: [...taskMap.values()],
+    removedCustomTasks,
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
       const m = new Map();
@@ -5958,6 +5964,17 @@ export default function App() {
           data.config={...data.config,
             assignments:(data.config.assignments||[]).filter(a=>!rm.has(a.instanceId)),
             removedAssignments:_uniq([...(data.config.removedAssignments||[]), ...expired]).slice(-800)};
+        }
+        // 🧹 v1.55.0 — ménage des tâches perso ORPHELINES (plus aucune assignation) → tombstone durable
+        {
+          const usedTaskIds=new Set((data.config.assignments||[]).map(a=>a.taskId));
+          const orphans=(data.config.customTasks||[]).filter(t=>t&&t.id&&!usedTaskIds.has(t.id)).map(t=>t.id);
+          if(orphans.length){
+            const orphSet=new Set(orphans);
+            data.config={...data.config,
+              customTasks:(data.config.customTasks||[]).filter(t=>!orphSet.has(t.id)),
+              removedCustomTasks:_uniq([...(data.config.removedCustomTasks||[]), ...orphans]).slice(-1000)};
+          }
         }
         setConfig(data.config);
         setGameStates(data.gameStates);
