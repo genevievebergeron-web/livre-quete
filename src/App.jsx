@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.59.0";
+const APP_VERSION = "1.60.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1222,6 +1222,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.60.0", date:"2026-06-15", features:[
+    "🏷️ Chaque quête affiche son étiquette de couleur (Ménage, Cuisine, Routine, Dehors, Défi…) — facile de s'y retrouver d'un coup d'œil.",
+    "📊 Nouvelle carte « Stats de la famille » dans l'onglet Famille : voyez combien de quêtes vous avez accomplies ENSEMBLE, par catégorie!",
+  ]},
   { version:"1.59.0", date:"2026-06-15", features:[
     "🏅 Plein de nouveaux badges, dont des plus DURS à mériter! Des badges par type de tâche : As du Ménage (10), Marmiton (cuisine), Roi des Routines, Casse-Cou (défis), Aventurier du Dehors…",
     "💯 Des défis de longue haleine : 100 et 300 quêtes, 2500 XP, et « Journée Marathon » (10 quêtes en une seule journée)!",
@@ -3742,6 +3746,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
+              {task.cat && (()=>{ const m=catMeta(task.cat); return <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:m.color,background:`${m.color}1A`,border:`1px solid ${m.color}55`,padding:"1px 4px"}}>{m.label}</span>; })()}
             </div>
             {!done&&!pending&&<button onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
               style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
@@ -7083,6 +7088,29 @@ export default function App() {
         {view==="timer"&&(
           <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone} initialRitualId={timerRitual}/>
         )}
+        {view==="family"&&(()=>{
+          // v1.60.0 — stats familiales : quêtes accomplies par étiquette, agrégées sur tous les enfants
+          const catByInst={}; (config.assignments||[]).forEach(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(t) catByInst[a.instanceId]=t.cat; });
+          const counts={}; let total=0;
+          (gameStates||[]).forEach(gs=>{ (gs.completed||[]).forEach(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const cat=catByInst[inst]; if(cat){ counts[cat]=(counts[cat]||0)+1; total++; } }); });
+          if(total===0) return null;
+          const cats=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+          const maxN=Math.max(...cats.map(c=>counts[c]));
+          return (
+            <div style={{background:th.card||"rgba(0,0,0,0.5)",border:`2px solid ${(th.accent||"#FFD700")}55`,borderRadius:10,padding:14,margin:"4px 0 12px"}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||"#FFD700",marginBottom:4}}>📊 Stats de la famille</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",marginBottom:10}}>{total} quêtes accomplies ensemble! 🎉</div>
+              <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                {cats.map(c=>{ const m=catMeta(c); const w=Math.round(counts[c]/maxN*100); return (
+                  <div key={c}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}><span style={{color:m.color}}>{m.label}</span><span>{counts[c]}</span></div>
+                    <div style={{height:10,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:w+"%",background:m.color,transition:"width 0.6s"}}/></div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          );
+        })()}
         {view==="family"&&(
           <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===i} th={th}
             onGiveCoins={handleGiveCoins}
