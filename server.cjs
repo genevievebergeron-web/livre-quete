@@ -84,6 +84,8 @@ const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
 const mergeGS = (a, b, preferIncoming) => {
   a = a || {}; b = b || {};
   const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]);
+  const refusedKeys = _uniq([...(a.refusedKeys||[]), ...(b.refusedKeys||[])]).slice(-400); // v1.64.0 — tombstone des refus
+  const _refusedSet = new Set(refusedKeys);
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
   return {
     ...a, ...b,
@@ -91,7 +93,9 @@ const mergeGS = (a, b, preferIncoming) => {
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
-    pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k)),
+    pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées
+    refusedKeys,
+    refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins) : le « j'ai changé d'idée » TIENT
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),

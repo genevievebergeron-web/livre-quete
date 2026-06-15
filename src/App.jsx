@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.63.0";
+const APP_VERSION = "1.64.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -355,6 +355,15 @@ const CAT_META = {
 };
 const catMeta = (c) => CAT_META[c] || { label:"Autre", color:"#9AA0A6" };
 const normLabel = (s) => (s||"").toLowerCase().trim().replace(/\s+/g," ");
+// v1.64.0 — messages drôles de refus (déterministe par clé pour rester stable)
+const REFUS_MSGS = [
+  "😹 Bien tenté! Cette quête part au recyclage…",
+  "🙃 Pas tout à fait — on réessaiera une autre fois!",
+  "🐙 Ton parent a dit « pas celle-là pour l'instant »!",
+  "🎈 Cette quête s'envole… reviens-y plus tard!",
+  "🛟 Refusée pour cette fois — pas grave, t'es capable!",
+];
+const refusMsg = (key) => { let h=0; const s=String(key||""); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return REFUS_MSGS[h%REFUS_MSGS.length]; };
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -1222,6 +1231,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.64.0", date:"2026-06-15", features:[
+    "🛠️ Bug réglé : une tâche refusée par le parent ne revient plus toute seule dans le portail (la synchro la ré-injectait).",
+    "😹 Quand une quête est refusée, l'enfant voit un petit message rigolo + un bouton « Archiver » pour le faire disparaître.",
+  ]},
   { version:"1.63.0", date:"2026-06-15", features:[
     "🛠️ VRAI correctif du bug des pièces infinies : « j'ai changé d'idée » tient maintenant pour de bon (avant, la synchro ramenait la récompense → on pouvait rembourser sans fin).",
     "📅 Les tâches prévues pour d'autres jours sont rangées dans un accordéon « Tâches planifiées » (replié) — ta liste du jour reste propre.",
@@ -1634,6 +1647,8 @@ const _mergeCalendar = (a, b) => {
 const mergeGS = (a, b, preferIncoming) => {
   a = a || {}; b = b || {};
   const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
+  const refusedKeys = _uniq([...(a.refusedKeys || []), ...(b.refusedKeys || [])]).slice(-400); // v1.64.0 — tombstone des demandes refusées
+  const _refusedSet = new Set(refusedKeys);
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
   return {
     ...a, ...b,
@@ -1643,7 +1658,9 @@ const mergeGS = (a, b, preferIncoming) => {
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
-    pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k)),
+    pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées (sinon l'union les ré-ajoutait au portail parent)
+    refusedKeys,
+    refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins) : un « j'ai changé d'idée » TIENT (l'union ré-ajoutait → remboursement infini)
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
@@ -1820,6 +1837,8 @@ const migrateGameState = (gs) => {
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
     petEvo: gs.petEvo || {}, // v1.57.0 — voies d'évolution par familier {petId:{1,2,3}}
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
+    refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
+    refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
@@ -3213,7 +3232,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3291,6 +3310,14 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         <EvolutionModal petId={_eqPetId} tier={_petPendingTier} evo={_eqPetEvo} th={th}
           onChoose={(el)=>{ onChoosePetEvo && onChoosePetEvo(_eqPetId, _petPendingTier, el); }}/>
       )}
+      {/* v1.64.0 — message drôle quand une quête a été refusée par le parent */}
+      {!parentMode && (pState.refusals||[]).map(r=>(
+        <div key={r.key} style={{display:"flex",alignItems:"center",gap:10,background:"#3a2410",border:"2px solid #FF8C00",borderRadius:8,padding:"9px 11px"}}>
+          <span style={{fontSize:20}}>{r.emoji}</span>
+          <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD7A0",lineHeight:1.3}}><b>{r.label}</b> — {r.msg}</span>
+          <button onClick={()=>{ if(SFX.click)SFX.click(); onDismissRefusal&&onDismissRefusal(r.key); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 9px",background:"#FF8C00",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}}>Archiver</button>
+        </div>
+      ))}
       {/* ☰ Menu (déclenché depuis le header) — méta : réglages, archives, bug, validation parent, quitter */}
       {hamOpen && (
         <div onClick={()=>onCloseHam&&onCloseHam()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2600,display:"flex",justifyContent:"flex-end"}}>
@@ -6376,11 +6403,22 @@ export default function App() {
     logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#2ECC40");
   },[config,persist,resolvePendingTask,logAction,showToast]);
 
+  // v1.64.0 — l'enfant « archive » (efface) un message de refus
+  const handleDismissRefusal = useCallback((playerIdx, key)=>{
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]; n[playerIdx]={...p, refusals:(p.refusals||[]).filter(r=>r.key!==key)}; persist(config,n); return n; });
+  },[config,persist]);
+
   // Refus parent : retire la demande sans XP
   const refusePending = useCallback((playerIdx, doneKey)=>{
     const task=resolvePendingTask(playerIdx,doneKey);
     const player=config.players[playerIdx];
-    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      const refusal={ key:doneKey, label:task?.label||"Quête", emoji:task?.emoji||"✗", msg:refusMsg(doneKey), ts:Date.now() };
+      n[playerIdx]={...p,
+        pending:(p.pending||[]).filter(k=>k!==doneKey),
+        refusedKeys:[...new Set([...(p.refusedKeys||[]), doneKey])].slice(-400), // tombstone → ne revient plus au portail parent
+        refusals:[...(p.refusals||[]).filter(r=>r.key!==doneKey), refusal].slice(-10) }; // message drôle pour l'enfant
+      persist(config,n); return n; });
     logAction(`✗ Refusé: ${displayName(player)} — ${task?.label||doneKey}`,"#FF8C00");
     showToast(`✗ Demande refusée`,"#FF8C00");
   },[config,persist,resolvePendingTask,logAction,showToast]);
@@ -7167,6 +7205,7 @@ export default function App() {
             onFeedPet={()=>handleFeedPet(view)}
             onPlayPet={()=>handlePlayPet(view)}
             onChoosePetEvo={(petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el)}
+            onDismissRefusal={(key)=>handleDismissRefusal(view,key)}
             onBossAttack={(type)=>handleBossAttack(view,type)}
             onBossPetAttack={()=>handleBossPetAttack(view)}
             allStates={gameStates}
