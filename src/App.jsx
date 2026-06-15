@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.44.0";
+const APP_VERSION = "1.45.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1078,6 +1078,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.45.0", date:"2026-06-14", features:[
+    "☰ Nouveau menu : un seul bouton « Menu » regroupe tes réglages, les Archives, et « J'ai trouvé un bug ».",
+    "🗄️ Archives : retrouve tes quêtes complétées aujourd'hui.",
+    "🐛 J'ai trouvé un bug → s'envoie directement à ton parent (il le voit dans son portail).",
+  ]},
   { version:"1.44.0", date:"2026-06-14", features:[
     "⏳ Minuterie : nouveau mode COMPTE À REBOURS (choisis tes minutes), avec « 🎉 J'ai réussi » ou « 😅 Oups, prochaine fois » — pas de récompense si pas réussi. Tu peux aussi nommer ce que tu chronomètres.",
     "📋 Portail parent : les demandes « À valider » sont regroupées par enfant (avec « ✅ Tout valider »).",
@@ -2907,10 +2912,13 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
+  const [hamOpen, setHamOpen] = useState(false);       // menu hamburger ☰ (méta)
+  const [archivesOpen, setArchivesOpen] = useState(false);
+  const [bugOpen, setBugOpen] = useState(false); const [bugText, setBugText] = useState("");
   const [pseudoDraft, setPseudoDraft] = useState(""); // l'enfant change son pseudo
   const [pinDraft, setPinDraft] = useState(""); const [pinDraft2, setPinDraft2] = useState(""); // l'enfant change son code
   const [profileMsg, setProfileMsg] = useState("");
@@ -2970,6 +2978,63 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
+      {/* ☰ Menu (méta : quitter, réglages, validation parent, archives, bug) */}
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <button onClick={()=>{SFX.click();setHamOpen(true);}} title="Menu"
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",background:"rgba(0,0,0,0.4)",color:pt.accent||player.color,border:`2px solid ${(pt.accent||player.color)}55`,borderRadius:6,cursor:"pointer"}}>☰ Menu</button>
+      </div>
+      {hamOpen && (
+        <div onClick={()=>setHamOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2600,display:"flex",justifyContent:"flex-end"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:pt.bg||"#1a1a2e",borderLeft:`3px solid ${pt.accent||player.color}`,width:"min(280px,82vw)",height:"100%",padding:16,display:"flex",flexDirection:"column",gap:10,overflowY:"auto",boxShadow:"-6px 0 24px rgba(0,0,0,0.5)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:pt.accent||player.color}}>☰ Menu</div>
+              <button onClick={()=>setHamOpen(false)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+            </div>
+            {[
+              ["⚙️ Mes réglages", ()=>{setHamOpen(false);setSettingsOpen(true);}],
+              ["🗄️ Archives", ()=>{setHamOpen(false);setArchivesOpen(true);}],
+              ["🐛 J'ai trouvé un bug", ()=>{setHamOpen(false);setBugOpen(true);}],
+              ["🔓 Validation parent", ()=>{setHamOpen(false);onOpenParentPin&&onOpenParentPin();}],
+              ["🚪 Quitter / changer d'enfant", ()=>{setHamOpen(false);onLogout&&onLogout();}],
+            ].map(([lbl,fn])=>(
+              <button key={lbl} onClick={fn}
+                style={{textAlign:"left",fontFamily:"'VT323',monospace",fontSize:17,padding:"12px 14px",background:"rgba(0,0,0,0.4)",color:"#ddd",border:`2px solid ${(pt.accent||player.color)}33`,borderRadius:8,cursor:"pointer"}}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* 🗄️ Archives — quêtes complétées (aujourd'hui) */}
+      {archivesOpen && (()=>{
+        const stamp="#"+todayStamp();
+        const done=(pState.completed||[]).filter(k=>k.endsWith(stamp));
+        const rows=done.map(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const ass=(config.assignments||[]).find(a=>a.instanceId===inst); const t=ass?allTasks.find(x=>x.id===ass.taskId):null; return { emoji:t?.emoji||"✅", label:t?.label||(inst.startsWith("cal_")?"Devoir/examen":"Quête") }; });
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||player.color}}>🗄️ Archives — aujourd'hui</div>
+              <button onClick={()=>setArchivesOpen(false)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:8}}>Tes quêtes complétées aujourd'hui ({rows.length}) :</div>
+            {rows.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:18}}>Rien encore aujourd'hui. Fais une quête! 💪</div>}
+            {rows.map((r,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40",flex:1}}>{r.label}</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span></div>))}
+            <button onClick={()=>setArchivesOpen(false)} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer"}}>← Retour</button>
+          </div>
+        );
+      })()}
+      {/* 🐛 Signaler un bug → envoyé au parent */}
+      {bugOpen && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#FF8C00"}}>🐛 J'ai trouvé un bug</div>
+            <button onClick={()=>{setBugOpen(false);setBugText("");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+          </div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:6}}>Explique ce qui ne marche pas — ton parent va le recevoir :</div>
+          <textarea value={bugText} onChange={e=>setBugText(e.target.value.slice(0,300))} autoFocus placeholder="ex: quand je clique sur..., il se passe..."
+            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"10px 12px",background:"#111",color:"#fff",border:"2px solid #FF8C00",borderRadius:6,outline:"none",minHeight:120,resize:"vertical"}}/>
+          <button disabled={!bugText.trim()} onClick={()=>{ if(bugText.trim()&&onReportBug){ const ok=onReportBug(bugText.trim()); if(ok){setBugOpen(false);setBugText("");} } }}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",padding:"15px",marginTop:10,background:bugText.trim()?"#FF8C00":"#333",color:"#000",border:"3px solid #000",borderRadius:8,cursor:bugText.trim()?"pointer":"not-allowed",opacity:bugText.trim()?1:0.5,boxShadow:"2px 2px 0 #000"}}>📨 Envoyer au parent</button>
+        </div>
+      )}
       {homeTab==="accueil" && (<>
       {/* Player header card */}
       <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
@@ -4354,6 +4419,18 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
         })()}
 
         {tab==="log" && <>
+          {/* 🐛 Bugs signalés par les enfants */}
+          {(config.bugs||[]).length>0 && (
+            <div style={{background:"rgba(255,140,0,0.08)",border:"2px solid #FF8C0055",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:8}}>🐛 BUGS SIGNALÉS ({(config.bugs||[]).length})</div>
+              {(config.bugs||[]).map(b=>(
+                <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #FF8C0022"}}>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.3}}>{b.text}</div>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888",marginTop:3}}>— {b.who} · {new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
           {/* Changelog de mise à jour */}
           {(config.updateFeedEntries||[]).map((entry,i)=>(
@@ -6107,6 +6184,17 @@ export default function App() {
     return ok;
   },[config,persist,showToast,pushFeed]);
 
+  // 🐛 Signalement de bug → stocké dans config.bugs, visible dans le portail parent
+  const handleReportBug = useCallback((text, who)=>{
+    const t=(text||"").trim(); if(!t) return false;
+    const cfg=cfgRef.current||{};
+    const bug={ id:"bug_"+uid(), ts:Date.now(), who:who||"?", text:t.slice(0,300) };
+    const n={...cfg, bugs:[bug, ...(cfg.bugs||[])].slice(0,50)};
+    setConfig(n); persist(n, gsRef.current);
+    showToast("🐛 Merci! Le bug a été envoyé au parent.","#2ECC40",3500);
+    return true;
+  },[persist,showToast]);
+
   // OFFRE : un enfant DEMANDE des pièces à un frère (fromId=demandeur, toId=détenteur qui paie)
   const handleCreateOffer = useCallback((fromId, toId, amount)=>{
     const amt=Math.max(1, Math.round(amount||0));
@@ -6519,6 +6607,9 @@ export default function App() {
             onPlayPet={()=>handlePlayPet(view)}
             onBossAttack={(type)=>handleBossAttack(view,type)}
             allStates={gameStates}
+            onLogout={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
+            onOpenParentPin={()=>{SFX.click();setParentPinOpen(true);}}
+            onReportBug={(text)=>handleReportBug(text, displayName(config.players[view]))}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
