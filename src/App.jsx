@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.52.0";
+const APP_VERSION = "1.53.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -260,6 +260,17 @@ const priceOf  = (it) => Math.round(baseCost(it) * PRICE_MULT);
 const DIFF_PRESETS = { easy:{xp:10,coins:5}, medium:{xp:20,coins:10}, hard:{xp:40,coins:20} };
 // Plafond ANTI-FARM pour les tâches qu'un ENFANT se crée (valeurs réduites)
 const CHILD_DIFF_PRESETS = { easy:{xp:5,coins:2}, medium:{xp:8,coins:4}, hard:{xp:12,coins:6} };
+// v1.53.0 — étiquettes de catégorie (couleur + libellé) pour le sélecteur de tâches en grille
+const CAT_META = {
+  routine:{label:"Routine",color:"#9B5DE5"},
+  cuisine:{label:"Cuisine",color:"#FF8C42"},
+  menage:{label:"Ménage",color:"#4A90D9"},
+  outdoor:{label:"Dehors",color:"#2ECC40"},
+  defi:{label:"Défi",color:"#FF2D6F"},
+  custom:{label:"Mes tâches",color:"#FFD24D"},
+};
+const catMeta = (c) => CAT_META[c] || { label:"Autre", color:"#9AA0A6" };
+const normLabel = (s) => (s||"").toLowerCase().trim().replace(/\s+/g," ");
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -1106,6 +1117,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.53.0", date:"2026-06-15", features:[
+    "➕ Ajouter une quête, version facile : tu CHOISIS maintenant dans une grille colorée par catégorie (Routine, Cuisine, Ménage, Dehors, Défi…) au lieu de tout réécrire. Plus rapide à trouver, et fini les doublons!",
+    "✏️ Tu peux encore créer ta propre tâche si tu ne la trouves pas — et si elle existe déjà, le jeu la réutilise au lieu d'en faire une copie.",
+  ]},
   { version:"1.52.0", date:"2026-06-15", features:[
     "🐾 Familiers plus difficiles à faire évoluer : 8 stades (Bébé → Légendaire) avec une courbe beaucoup plus longue. Devenir Légendaire est maintenant un vrai objectif de plusieurs semaines, pas d'une journée!",
     "🌙 Ton familier grandit en prenant soin de lui CHAQUE JOUR : il gagne au max un peu d'XP par jour (plus de gros « farm » d'un coup). Nourris-le et fais tes quêtes tous les jours pour qu'il évolue.",
@@ -2746,6 +2761,45 @@ function ChestSprite({ open, size=96, style={} }){
 
 // ─── CHOIX D'EMOJI + CRÉATION DE TÂCHE (picker au lieu de taper) ──────────────
 const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
+// v1.53.0 — Sélecteur de tâches en GRILLE groupée + code couleur par étiquette.
+// L'enfant CHOISIT une tâche existante (réutilise son taskId → zéro doublon). Repli: créer la sienne.
+function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
+  const acc=th?.accent||"#FFD700";
+  const tasks=(allTasks||[]).filter(t=>t && t.label && !t.child); // tâches curées (catalogue + parent), pas le bric-à-brac
+  const order=["routine","cuisine","menage","outdoor","defi","custom"];
+  const groups={}; tasks.forEach(t=>{ const c=t.cat||"custom"; (groups[c]=groups[c]||[]).push(t); });
+  const cats=Object.keys(groups).sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.93)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc}}>➕ Choisis une quête</div>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+      </div>
+      {cats.map(c=>{ const m=catMeta(c); return (
+        <div key={c} style={{marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+            <span style={{width:12,height:12,background:m.color,borderRadius:3,display:"inline-block"}}/>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:m.color}}>{m.label}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+            {groups[c].map(t=>(
+              <button key={t.id} onClick={()=>{SFX.click&&SFX.click();onPick(t.id);}}
+                style={{display:"flex",alignItems:"center",gap:8,textAlign:"left",padding:"9px 10px",background:"rgba(0,0,0,0.45)",border:`2px solid ${m.color}55`,borderLeft:`5px solid ${m.color}`,borderRadius:8,cursor:"pointer"}}>
+                <span style={{fontSize:20}}>{t.emoji||"⭐"}</span>
+                <span style={{display:"flex",flexDirection:"column",minWidth:0}}>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#fff",lineHeight:1.1}}>{t.label}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:m.color}}>+{t.xp||0} XP · {t.coins||0} 🪙</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );})}
+      <button onClick={onCreateOwn} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"12px",marginTop:4,background:"rgba(0,0,0,0.4)",border:`2px dashed ${acc}`,color:acc,borderRadius:6,cursor:"pointer"}}>✏️ Je ne trouve pas — créer ma propre tâche</button>
+    </div>
+  );
+}
+
 function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
   const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium");
   const acc=th?.accent||"#FFD700";
@@ -2972,7 +3026,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -2984,6 +3038,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [profileMsg, setProfileMsg] = useState("");
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
@@ -3568,11 +3623,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         return list.map(renderCard);
       })()}
 
-      {/* Enfant : ajouter une quête à sa journée à la volée */}
-      <button onClick={()=>{SFX.click();setAddTaskOpen(true);}}
+      {/* Enfant : ajouter une quête — CHOISIR dans la grille (anti-doublons), repli = créer la sienne */}
+      <button onClick={()=>{SFX.click();setChooserOpen(true);}}
         style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"10px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${player.color}`,color:player.color,borderRadius:5,cursor:"pointer",marginTop:2}}>
         ➕ Ajouter une quête à ma journée
       </button>
+      {chooserOpen && <TaskChooser allTasks={allTasks} th={th}
+        onClose={()=>setChooserOpen(false)}
+        onPick={(taskId)=>{ onChildPickTask&&onChildPickTask(taskId); setChooserOpen(false); }}
+        onCreateOwn={()=>{ setChooserOpen(false); setAddTaskOpen(true); }}/>}
       {addTaskOpen && <CustomTaskModal title="➕ Ma nouvelle quête" confirmLabel="Ajouter à ma journée" th={th}
         onClose={()=>setAddTaskOpen(false)}
         onCreate={(data)=>{ onChildAddTask&&onChildAddTask(data); setAddTaskOpen(false); }}/>}
@@ -6315,15 +6374,31 @@ export default function App() {
   // Enfant : ajoute une quête à SA journée (type routine, aujourd'hui). Le parent valide à la fin.
   const handleChildAddTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
-    const taskId="cust_"+uid();
+    const label=data.label.trim();
+    // v1.53.0 anti-doublon : si une tâche au MÊME libellé existe déjà, on la réutilise au lieu d'en recréer une
+    const existing=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(label));
     const _dp=CHILD_DIFF_PRESETS[data.diff]||CHILD_DIFF_PRESETS.medium; // plafond anti-farm
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
+    const taskId=existing?existing.id:("cust_"+uid());
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label,xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
     // La quête doit apparaître dans la vue ACTUELLE de l'enfant : si mode Semaine → aujourd'hui; si Routine → tâche de routine
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
     const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp()}; // à usage unique (nettoyée après aujourd'hui)
-    const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
+    const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
+    const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
+  },[config,gameStates,persist,showToast]);
+
+  // v1.53.0 — l'enfant CHOISIT une tâche existante (grille) : on réutilise le taskId → aucun doublon créé
+  const handleChildPickTask = useCallback((playerIdx, taskId)=>{
+    const pid=config.players[playerIdx]?.id; if(!pid||!taskId)return;
+    const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
+    const todayIdx=(new Date().getDay()+6)%7;
+    const days=pmode==="week" ? [todayIdx] : [];
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp()};
+    const newCfg={...config, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
   },[config,gameStates,persist,showToast]);
@@ -6796,6 +6871,7 @@ export default function App() {
               setGameStates(gs=>{ const n=[...gs]; n[i]={...n[i],avatar:av}; persist(config,n); return n; });
             }}
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
+            onChildPickTask={(taskId)=>handleChildPickTask(view,taskId)}
             onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
             onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
             onRespondOffer={handleRespondOffer}
