@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.60.0";
+const APP_VERSION = "1.61.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1222,6 +1222,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.61.0", date:"2026-06-15", features:[
+    "📋 Grand ménage des quêtes : une quête validée QUITTE ta liste du jour (fini les tâches barrées qui traînent) et se range dans 🗄️ Archives — maintenant avec l'HEURE de complétion et l'étiquette.",
+    "🎉 Quand tout est fait, un beau message « Tout est fait pour aujourd'hui! » remplace la liste.",
+  ]},
   { version:"1.60.0", date:"2026-06-15", features:[
     "🏷️ Chaque quête affiche son étiquette de couleur (Ménage, Cuisine, Routine, Dehors, Défi…) — facile de s'y retrouver d'un coup d'œil.",
     "📊 Nouvelle carte « Stats de la famille » dans l'onglet Famille : voyez combien de quêtes vous avez accomplies ENSEMBLE, par catégorie!",
@@ -1631,6 +1635,7 @@ const mergeGS = (a, b, preferIncoming) => {
     // → dernière écriture gagne (l'appareil qui a changé le solde le plus récemment gagne).
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     completed,
+    completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k)),
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
     boughtRewards: _uniq([...(a.boughtRewards || []), ...(b.boughtRewards || [])]),
@@ -1807,6 +1812,7 @@ const migrateGameState = (gs) => {
     petMigV2: true, // v1.52.0 — drapeau : migration de courbe des familiers appliquée
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
     petEvo: gs.petEvo || {}, // v1.57.0 — voies d'évolution par familier {petId:{1,2,3}}
+    completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
@@ -3299,7 +3305,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {archivesOpen && (()=>{
         const stamp="#"+todayStamp();
         const done=(pState.completed||[]).filter(k=>k.endsWith(stamp));
-        const rows=done.map(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const ass=(config.assignments||[]).find(a=>a.instanceId===inst); const t=ass?allTasks.find(x=>x.id===ass.taskId):null; return { emoji:t?.emoji||"✅", label:t?.label||(inst.startsWith("cal_")?"Devoir/examen":"Quête") }; });
+        const rows=done.map(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const ass=(config.assignments||[]).find(a=>a.instanceId===inst); const t=ass?allTasks.find(x=>x.id===ass.taskId):null; const ts=(pState.completedAt||{})[k]; const time=ts?new Date(ts).toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"}):""; const cat=t?.cat; return { emoji:t?.emoji||"✅", label:t?.label||(inst.startsWith("cal_")?"Devoir/examen":"Quête"), time, cat }; }).sort((a,b)=>(b.time||"").localeCompare(a.time||""));
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -3308,7 +3314,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             </div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:8}}>Tes quêtes complétées aujourd'hui ({rows.length}) :</div>
             {rows.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:18}}>Rien encore aujourd'hui. Fais une quête! 💪</div>}
-            {rows.map((r,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40",flex:1}}>{r.label}</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span></div>))}
+            {rows.map((r,i)=>{ const m=r.cat?catMeta(r.cat):null; return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40",flex:1}}>{r.label}{m?<span style={{color:m.color,fontSize:13}}> · {m.label}</span>:""}</span>{r.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{r.time}</span>}<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span></div>); })}
             <button onClick={()=>setArchivesOpen(false)} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer"}}>← Retour</button>
           </div>
         );
@@ -3801,7 +3807,9 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             );
           });
         }
-        const list = settings.focus ? myAssignments.filter(a=>!pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).slice(0,1) : myAssignments;
+        const _done=a=>pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp());
+        const list = settings.focus ? myAssignments.filter(a=>!_done(a)).slice(0,1) : myAssignments.filter(a=>!_done(a)); // v1.60.0 — les quêtes validées quittent la liste → Archives
+        if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
         return list.map(renderCard);
       })()}
 
@@ -6313,7 +6321,7 @@ export default function App() {
       // Count tasks done today for streak badge (clés du jour: ..._player#YYYY-MM-DD)
       const today="#"+todayStamp();
       const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
-      const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey)};
+      const updatedPs={...p,xp:newXp,coins:newCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()}};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount, completionCatCounts(updatedPs, cfgRef.current||config));
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).

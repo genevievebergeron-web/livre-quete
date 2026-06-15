@@ -90,6 +90,7 @@ const mergeGS = (a, b, preferIncoming) => {
     xp: Math.max(a.xp||0, b.xp||0),
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     completed,
+    completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k)),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
     boughtRewards: _uniq([...(a.boughtRewards||[]), ...(b.boughtRewards||[])]),
