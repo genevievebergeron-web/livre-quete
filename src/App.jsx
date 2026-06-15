@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.56.0";
+const APP_VERSION = "1.57.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -63,8 +63,8 @@ const xpBar = xp => { for (let i=0;i<LEVELS.length-1;i++) if (xp<LEVELS[i+1].xpN
 // ─── FAMILIERS qui ÉVOLUENT ───────────────────────────────────
 // Chaque familier a sa propre XP (gameState.petXp[petId]), conservée même déséquipé.
 // Le familier équipé gagne de l'XP quand l'enfant accomplit une quête.
-const PET_LEVELS = [0, 80, 220, 440, 760, 1200, 1800, 2600];          // v1.52.0 — XP niv 1..8, courbe lente : Légendaire = objectif long terme (semaines de soins, pas une journée)
-const PET_STAGES = ["Bébé", "Jeune", "Apprenti", "Adulte", "Vétéran", "Champion", "Mythique", "Légendaire"];
+const PET_LEVELS = [0, 50, 130, 250, 410, 610, 860, 1160, 1520, 1940, 2240, 2600]; // v1.57.0 — 12 niveaux; évolutions aux niveaux 4 / 8 / 12 (Légendaire)
+const PET_STAGES = ["Bébé","Bébé","Petit","Jeune","Jeune","Ado","Ado","Adulte","Adulte","Vétéran","Champion","Légendaire"];
 const PET_DAILY_CAP = 50;                                             // v1.52.0 — XP max gagné PAR JOUR par le familier (anti-grind : il grandit en prenant soin de lui chaque jour, pas en farmant d'un coup)
 const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++) if ((xp||0) >= PET_LEVELS[i]) lv=i+1; return lv; };
 const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
@@ -104,13 +104,42 @@ const PET_SPRITES = {
 const PET_SPRITE_KEY = { p1:"cat", p2:"dog", p3:"wolf", p4:"fox", p5:"dragon", p6:"parrot", hp4:"owl", dk1:"duck", dk5:"duck", pet_worm:"worm", pet_capy:"capybara", pet_bee:"bee", pet_spider:"spider", pet_duck:"duck" };
 const petSpriteKey = (itemId) => PET_SPRITE_KEY[itemId] || null;
 // Dessine un familier pixel sur un canvas (key = clé PET_SPRITES, ou null)
-const renderPetToCtx = (ctx, key, size=64, palOverride=null) => {
+const renderPetToCtx = (ctx, key, size=64, palOverride=null, halo=false) => {
   const sp = PET_SPRITES[key]; if (!ctx) return;
   ctx.clearRect(0,0,size,size);
   if (!sp) return;
+  if (halo){ // halo doré du Légendaire
+    ctx.strokeStyle="#FFD45A"; ctx.lineWidth=Math.max(2,size*0.035);
+    ctx.beginPath(); ctx.ellipse(size*0.5, size*0.10, size*0.27, size*0.075, 0, 0, Math.PI*2); ctx.stroke();
+  }
   const pal = palOverride ? { ...sp.pal, ...palOverride } : sp.pal;
   const S = size/16;
   for (let y=0; y<16; y++){ const row=(sp.rows[y]||"")+"................"; for (let x=0; x<16; x++){ const c=row[x]; const col=pal[c]; if(col){ ctx.fillStyle=col; ctx.fillRect(Math.round(x*S),Math.round(y*S),Math.ceil(S),Math.ceil(S)); } } }
+};
+// ─── ÉLÉMENTS D'ÉVOLUTION (v1.57.0) — recolorent le sprite ────
+const PET_ELEMENTS = {
+  feu:{label:"Feu", pal:{o:"#7A1E00",b:"#FF5A1E",a:"#FFD89A",w:"#B23400"}},
+  glace:{label:"Glace", pal:{o:"#1E5C86",b:"#8FD8F0",a:"#E6FAFF",w:"#5FB6DC"}},
+  nature:{label:"Nature", pal:{o:"#245E26",b:"#5FC24B",a:"#BFF09A",w:"#3E8B30"}},
+  eau:{label:"Eau", pal:{o:"#134E8C",b:"#36A6F0",a:"#B6E6FF",w:"#1E6FB0"}},
+  ouragan:{label:"Ouragan", pal:{o:"#4C6075",b:"#AEC2D6",a:"#E2EEF8",w:"#7E94A8"}},
+  ombre:{label:"Ombre", pal:{o:"#140A24",b:"#5A4A7A",a:"#9B7AD0",w:"#3A2A5A"}},
+  foudre:{label:"Foudre", pal:{o:"#7A5A00",b:"#FFD21E",a:"#FFF3A0",w:"#C79A00"}},
+  lave:{label:"Lave", pal:{o:"#5A0E00",b:"#FF3B1E",a:"#FFB02E",w:"#9E2200"}},
+};
+const PET_ELEMENT_KEYS = Object.keys(PET_ELEMENTS);
+const petTierForLevel = (lv) => (lv>=12?3:lv>=8?2:lv>=4?1:0);            // tier débloqué selon le niveau
+const petActiveElement = (evo) => evo ? (evo[3]||evo[2]||evo[1]||null) : null;
+const petIsLegendary = (evo, lv) => lv>=12 && !!(evo&&evo[3]);
+const petFormLabel = (evo, lv) => { const el=petActiveElement(evo); if(petIsLegendary(evo,lv)) return `Légendaire${el?` · ${PET_ELEMENTS[el].label}`:""}`; return el?PET_ELEMENTS[el].label:"Bébé"; };
+const petPalOverride = (evo) => { const el=petActiveElement(evo); return el?PET_ELEMENTS[el].pal:null; };
+const petPendingTier = (evo, lv) => { const t=petTierForLevel(lv); for(let i=1;i<=t;i++){ if(!(evo&&evo[i])) return i; } return 0; };
+// 2 options élémentaires tirées de façon DÉTERMINISTE (par petId+tier → mêmes options sur tous les appareils), hors déjà choisis
+const petEvoOptions = (petId, tier, evo) => {
+  const taken=new Set([evo&&evo[1],evo&&evo[2],evo&&evo[3]].filter(Boolean));
+  const avail=PET_ELEMENT_KEYS.filter(k=>!taken.has(k));
+  let seed=0; const s=(petId||"x")+"#"+tier; for(let i=0;i<s.length;i++) seed=(seed*31+s.charCodeAt(i))>>>0;
+  return avail.map((k,i)=>({k,r:((seed+i*2654435761)>>>0)})).sort((a,b)=>a.r-b.r).slice(0,2).map(x=>x.k);
 };
 // v1.52.0 — migration anti-rétrogradation : avec la nouvelle courbe (plus dure), on remonte
 // l'XP des familiers existants pour qu'aucun enfant ne perde son stade. Mappe l'ancien niveau
@@ -1159,6 +1188,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.57.0", date:"2026-06-15", features:[
+    "✨ ÉVOLUTION DES FAMILIERS! Aux niveaux 4, 8 et 12, ton familier évolue — tu CHOISIS sa voie élémentaire (Feu, Glace, Nature, Ombre, Foudre…) parmi 2 options tirées au hasard. Son apparence change selon la voie!",
+    "👑 Niveau 12 = forme LÉGENDAIRE avec couronne et halo doré. Un vrai objectif de longue haleine (la nouvelle courbe va jusqu'au niveau 12).",
+  ]},
   { version:"1.56.0", date:"2026-06-15", features:[
     "🐾 Les familiers ont maintenant un look PIXEL ART! Ton familier équipé s'affiche en grand dans « Mon perso » et grossit quand il monte de niveau.",
     "🆕 Nouveaux familiers dans la boutique : 🦆 Canard jaune, 🪱 Ver de terre, 🦫 Capybara, 🐝 Abeille, 🕷️ Araignée!",
@@ -1571,6 +1604,7 @@ const mergeGS = (a, b, preferIncoming) => {
     pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
+    petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
     // Énergie : consommable → dernière écriture gagne (la paire valeur+horodatage voyage ensemble)
     energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
     energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
@@ -1726,6 +1760,7 @@ const migrateGameState = (gs) => {
     petXp: gs.petMigV2 ? (gs.petXp || {}) : migratePetXpV2(gs.petXp), // v1.52.0 — migration anti-rétrogradation (une seule fois)
     petMigV2: true, // v1.52.0 — drapeau : migration de courbe des familiers appliquée
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
+    petEvo: gs.petEvo || {}, // v1.57.0 — voies d'évolution par familier {petId:{1,2,3}}
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
@@ -2697,12 +2732,35 @@ function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true })
 }
 
 // v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
-function PetSprite({ petKey, itemId, size=64, palOverride=null, style={} }) {
+function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary=false, style={} }) {
   const canvasRef = useRef(null);
   const key = petKey || petSpriteKey(itemId);
-  useEffect(()=>{ const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride); },[key,size,palOverride]);
+  useEffect(()=>{ const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride, legendary); },[key,size,palOverride,legendary]);
   if(!key) return null;
   return <canvas ref={canvasRef} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
+// v1.57.0 — Choix d'évolution : 2 éléments tirés au hasard, l'enfant choisit la voie de son familier
+function EvolutionModal({ petId, tier, evo, onChoose, th }) {
+  const opts = petEvoOptions(petId, tier, evo);
+  const acc = th?.accent || "#FFD700";
+  const spriteKey = petSpriteKey(petId);
+  const legend = tier===3;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto",textAlign:"center"}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,1.9vw,16px)",color:acc,marginBottom:6}}>✨ ÉVOLUTION! ✨</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff",marginBottom:18,maxWidth:360,lineHeight:1.35}}>{legend?"Ton familier atteint sa forme finale! Choisis sa voie Légendaire :":"Ton familier veut évoluer. Choisis sa voie élémentaire :"}</div>
+      <div style={{display:"flex",gap:18,flexWrap:"wrap",justifyContent:"center"}}>
+        {opts.map(el=>{ const E=PET_ELEMENTS[el]; return (
+          <button key={el} onClick={()=>{ if(SFX.click)SFX.click(); onChoose(el); }}
+            style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,background:"rgba(0,0,0,0.5)",border:`3px solid ${E.pal.b}`,borderRadius:14,padding:"16px 20px",cursor:"pointer"}}>
+            <PetSprite petKey={spriteKey} size={100} palOverride={E.pal} legendary={legend}/>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:E.pal.b}}>{E.label}</span>
+          </button>
+        );})}
+      </div>
+    </div>
+  );
 }
 
 // ─── BOSS DE FAMILLE — sprites pixel-art ORIGINAUX (dessinés sur canvas) ──────
@@ -3048,14 +3106,14 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
               {ownedPets.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:18,lineHeight:1.4}}>Tu n'as pas encore de familier! 🐾<br/>Achètes-en un dans la boutique 🛒, puis il grandira chaque fois que tu accomplis une quête.</div>}
               {/* Vedette : le familier équipé, en grand, avec sa progression */}
               {eqPet && (()=>{ const xp=petXp[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
-                const sz=64+lv*8; // il grossit en évoluant
+                const sz=64+lv*6; const _evo=(pState.petEvo||{})[eqPet.id]; const _leg=petIsLegendary(_evo,lv); // il grossit en évoluant
                 return (
-                  <div style={{background:`radial-gradient(circle at 50% 30%, ${acc}22, rgba(0,0,0,0.5))`,border:`3px solid ${acc}`,borderRadius:12,padding:16,textAlign:"center"}}>
-                    <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:sz,filter:`drop-shadow(0 0 ${4+lv*2}px ${pt.glow||acc})`,transition:"all 0.4s"}}>
-                      {petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={sz}/> : <span style={{fontSize:sz,lineHeight:1}}>{eqPet.emoji}</span>}
+                  <div style={{background:`radial-gradient(circle at 50% 30%, ${acc}22, rgba(0,0,0,0.5))`,border:`3px solid ${_leg?"#FFD45A":acc}`,borderRadius:12,padding:16,textAlign:"center"}}>
+                    <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:sz,filter:`drop-shadow(0 0 ${4+lv*2}px ${_leg?"#FFD45A":(pt.glow||acc)})`,transition:"all 0.4s"}}>
+                      {petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={sz} palOverride={petPalOverride(_evo)} legendary={_leg}/> : <span style={{fontSize:sz,lineHeight:1}}>{eqPet.emoji}</span>}
                     </div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{eqPet.name} — Niv.{lv}</div>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",marginTop:2}}>Stade : {petStage(xp)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:_leg?"#FFD45A":"#fff",marginTop:2}}>Stade : {petFormLabel(_evo,lv)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
                     <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
                       <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#5DECF5)`,transition:"width 0.8s ease"}}/>
                     </div>
@@ -3093,7 +3151,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3106,6 +3164,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  // v1.57.0 — évolution du familier équipé en attente d'un choix?
+  const _eqPetId = pState.equipped?.pet;
+  const _eqPetLv = petLevel((pState.petXp||{})[_eqPetId]||0);
+  const _eqPetEvo = (pState.petEvo||{})[_eqPetId];
+  const _petPendingTier = _eqPetId ? petPendingTier(_eqPetEvo, _eqPetLv) : 0;
   const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
@@ -3160,6 +3223,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
+      {/* ✨ Évolution du familier — choix d'une voie élémentaire (niveaux 4/8/12) */}
+      {!parentMode && _petPendingTier>0 && _eqPetId && (
+        <EvolutionModal petId={_eqPetId} tier={_petPendingTier} evo={_eqPetEvo} th={th}
+          onChoose={(el)=>{ onChoosePetEvo && onChoosePetEvo(_eqPetId, _petPendingTier, el); }}/>
+      )}
       {/* ☰ Menu (déclenché depuis le header) — méta : réglages, archives, bug, validation parent, quitter */}
       {hamOpen && (
         <div onClick={()=>onCloseHam&&onCloseHam()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2600,display:"flex",justifyContent:"flex-end"}}>
@@ -6469,6 +6537,14 @@ export default function App() {
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
   },[config,gameStates,persist,showToast]);
 
+  // v1.57.0 — l'enfant choisit la voie d'évolution de son familier (tier 1/2/3 → élément)
+  const handleChoosePetEvo = useCallback((playerIdx, petId, tier, element)=>{
+    if(playerIdx==null||!petId||!tier||!element)return;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; const pe={...(p.petEvo||{})}; pe[petId]={...(pe[petId]||{}), [tier]:element}; n[playerIdx]={...p, petEvo:pe}; persist(config,n); return n; });
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("✨"); SFX.epic&&SFX.epic(); }catch{} },120);
+    showToast("✨ Ton familier a évolué!","#FFD700",3500);
+  },[config,persist,showToast]);
+
   // v1.53.0 — l'enfant CHOISIT une tâche existante (grille) : on réutilise le taskId → aucun doublon créé
   const handleChildPickTask = useCallback((playerIdx, taskId)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!taskId)return;
@@ -6955,6 +7031,7 @@ export default function App() {
             onRespondOffer={handleRespondOffer}
             onFeedPet={()=>handleFeedPet(view)}
             onPlayPet={()=>handlePlayPet(view)}
+            onChoosePetEvo={(petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el)}
             onBossAttack={(type)=>handleBossAttack(view,type)}
             allStates={gameStates}
             onLogout={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
