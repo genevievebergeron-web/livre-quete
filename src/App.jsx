@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.57.0";
+const APP_VERSION = "1.58.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -201,14 +201,27 @@ const ATTACKS = {
 const FAMILY_HP_MAX = 100;
 const BOSS_DRAIN_PER_H = FAMILY_HP_MAX / 36; // PV famille vidés en ~36 h sans attaque (recharge en attaquant)
 // PV de famille restants = baisse selon le temps écoulé depuis la dernière attaque
-const familyHp = (boss) => {
+const familyHp = (boss, enraged=false) => {
   if (!boss || boss.defeatedAt || !boss.lastHitTs) return FAMILY_HP_MAX;
+  const drain = BOSS_DRAIN_PER_H * (enraged ? 2 : 1); // v1.58.0 — le boss enragé vide les PV 2× plus vite
   const h = (Date.now() - new Date(boss.lastHitTs).getTime()) / 3600000;
-  return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * BOSS_DRAIN_PER_H)));
+  return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * drain)));
 };
 const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
 const bossDamageTotal = (gameStates, bossId) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0);
 const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
+// v1.58.0 — modificateur du JOUR (surprise + stratégie), déterministe par date+boss → identique sur tous les appareils
+const BOSS_MODIFIERS = [
+  { id:"grosse",   emoji:"💥", label:"Jour des grosses", desc:"Les grosses attaques font +2 dégâts!" },
+  { id:"petite",   emoji:"🗡️", label:"Pluie de coups",   desc:"Les petites attaques font +1 dégât!" },
+  { id:"carapace", emoji:"🛡️", label:"Carapace",         desc:"Les petites rebondissent — vise les grosses!" },
+  { id:"frenesie", emoji:"⚡", label:"Frénésie",          desc:"Toutes les attaques font +1!" },
+  { id:"familier", emoji:"🐾", label:"Jour du familier",  desc:"L'attaque du familier fait DOUBLE!" },
+];
+const bossModifierOfDay = (bossId) => { const s=todayStamp()+"#"+(bossId||""); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return BOSS_MODIFIERS[h%BOSS_MODIFIERS.length]; };
+const bossAtkDamage = (type, mod) => { let d=ATTACKS[type]?.dmg||0; if(mod){ if(mod.id==="grosse"&&type==="grosse") d+=2; if(mod.id==="petite"&&type==="petite") d+=1; if(mod.id==="carapace"&&type==="petite") d=0; if(mod.id==="frenesie") d+=1; } return Math.max(0,d); };
+const PET_ATTACK_COST = 3; // jetons pour lancer l'attaque du familier
+const petAttackDamage = (petLv, legendary, mod) => { let d = 3 + Math.floor((petLv||1)/2) + Math.floor(Math.random()*3) + (legendary?3:0); if(mod&&mod.id==="familier") d*=2; return d; };
 const mergeBossBattle = (a, b) => {
   a = a || {}; b = b || {};
   if (!a.bossId) return b.bossId ? b : { bossId:null, earned:0, spent:0, dmg:0 };
@@ -1188,6 +1201,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.58.0", date:"2026-06-15", features:[
+    "⚔️ Le combat de boss devient stratégique! Chaque jour, un MODIFICATEUR change la meilleure tactique (jour des grosses, carapace, frénésie, jour du familier…). Sous 30% de PV, le boss ENRAGE et devient plus dangereux.",
+    "🐾 Ton FAMILIER peut attaquer le boss! S'il est nourri et évolué (niv. 4+), lance-le au combat (3 jetons) — un familier Légendaire 👑 frappe beaucoup plus fort.",
+  ]},
   { version:"1.57.0", date:"2026-06-15", features:[
     "✨ ÉVOLUTION DES FAMILIERS! Aux niveaux 4, 8 et 12, ton familier évolue — tu CHOISIS sa voie élémentaire (Feu, Glace, Nature, Ombre, Foudre…) parmi 2 options tirées au hasard. Son apparence change selon la voie!",
     "👑 Niveau 12 = forme LÉGENDAIRE avec couronne et halo doré. Un vrai objectif de longue haleine (la nouvelle courbe va jusqu'au niveau 12).",
@@ -3151,7 +3168,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -4036,7 +4053,9 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {homeTab==="boss" && config.boss && (()=>{
         const boss=config.boss; const bid=boss.startedAt; const hpMax=boss.hpMax||80;
         const total=bossDamageTotal(allStates||[], bid); const hpLeft=Math.max(0,hpMax-total); const hpPct=Math.round(hpLeft/hpMax*100);
-        const fhp=familyHp(boss); const won=!!boss.defeatedAt; const myJetons=bossJetons(pState,bid);
+        const won=!!boss.defeatedAt; const enraged=!won && hpPct<=30; const fhp=familyHp(boss, enraged); const myJetons=bossJetons(pState,bid);
+        const mod=bossModifierOfDay(bid);
+        const _petId=pState.equipped?.pet; const _petLv=petLevel((pState.petXp||{})[_petId]||0); const _petReady=!!_petId && pState.lastFedDay===todayStamp() && _petLv>=4;
         const atkBtn=(type,label,sub,enabled)=>(
           <button disabled={!enabled} onClick={()=>{ if(enabled){SFX.click();onBossAttack&&onBossAttack(type);} }}
             style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 6px",lineHeight:1.5,background:enabled?(boss.color||"#FF5555"):"#1a1a1a",color:enabled?"#000":"#555",border:"2px solid #000",borderRadius:6,cursor:enabled?"pointer":"not-allowed",opacity:enabled?1:0.5,boxShadow:enabled?"2px 2px 0 #000":"none"}}>
@@ -4053,6 +4072,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#FF4444,#FFD700)",transition:"width 0.5s"}}/></div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
+            {!won && <div style={{background:`${boss.color||"#FF5555"}22`,border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"7px 10px",textAlign:"center"}}>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>{mod.emoji} {mod.label} (aujourd'hui)</span>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#eee"}}>{mod.desc}</div>
+            </div>}
+            {enraged && <div style={{background:"#3a0e0e",border:"2px solid #FF4444",borderRadius:8,padding:"7px 10px",textAlign:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#FF8888"}}>🔥 Le boss ENRAGE! Il vide les PV de la famille 2× plus vite — achevez-le!</div>}
             <div>
               <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#FF4444":"#2ECC40"}}>{fhp}%</span></div>
               <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden",marginTop:2}}><div style={{height:"100%",width:fhp+"%",background:fhp<30?"#FF4444":"#2ECC40",transition:"width 0.5s"}}/></div>
@@ -4061,9 +4085,13 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#2ECC40",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
               <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#FFD700",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
               <div style={{display:"flex",gap:8}}>
-                {atkBtn("petite","🗡️ Petite","1 jeton · −1 PV", myJetons>=1)}
-                {atkBtn("grosse","💥 Grosse","3 jetons · −4 PV", myJetons>=3)}
+                {atkBtn("petite","🗡️ Petite",`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
+                {atkBtn("grosse","💥 Grosse",`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
               </div>
+              <button onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
+                style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#FFD700":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#000":"#999",border:"2px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                🐾 Attaque du familier<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{PET_ATTACK_COST} jetons · dégâts selon ton familier{_petReady?"":" — nourris-le, niv.4+"}</span>
+              </button>
               {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
             </>)}
           </div>
@@ -6459,7 +6487,8 @@ export default function App() {
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
       const bb=(p.bossBattle&&p.bossBattle.bossId===bid)?p.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
       if((bb.earned-bb.spent) < atk.cost) return gs; // pas assez de jetons
-      const newBB={...bb, spent:bb.spent+atk.cost, dmg:bb.dmg+atk.dmg};
+      const mod = bossModifierOfDay(bid); const dmg = bossAtkDamage(type, mod); // v1.58.0 — modificateur du jour
+      const newBB={...bb, spent:bb.spent+atk.cost, dmg:bb.dmg+dmg};
       n[playerIdx]={...p, bossBattle:newBB};
       const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
       let nb = {...boss, lastHitTs:new Date().toISOString()};
@@ -6469,10 +6498,39 @@ export default function App() {
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
       if(defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 chacun!`,"#FFD700",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(`${atk.emoji} −${atk.dmg} PV au boss!`,"#FF6B6B",2200); },60); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`,"#FF6B6B",2200); },60); }
       return n;
     });
   },[persist,showToast]);
+
+  // v1.58.0 — attaque du FAMILIER : il frappe le boss s'il est en forme (nourri) et assez évolué (niv ≥4). Légendaire = bonus de dégâts.
+  const handleBossPetAttack = useCallback((playerIdx)=>{
+    const boss = cfgRef.current?.boss; if(!boss || boss.defeatedAt) return;
+    const p0 = gameStates[playerIdx]; const petId = p0?.equipped?.pet;
+    if(!petId){ showToast("Équipe un familier pour qu'il attaque! 🐾","#FF8C00",2800); return; }
+    if(p0.lastFedDay!==todayStamp()){ showToast("Ton familier a faim — nourris-le pour qu'il se batte! 🍖","#FF8C00",3000); return; }
+    const petLv = petLevel((p0.petXp||{})[petId]||0);
+    if(petLv<4){ showToast("Ton familier est trop jeune pour se battre (niv. 4) 🐣","#FF8C00",3000); return; }
+    const bid = boss.startedAt;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      const bb=(p.bossBattle&&p.bossBattle.bossId===bid)?p.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
+      if((bb.earned-bb.spent) < PET_ATTACK_COST){ setTimeout(()=>showToast(`Il faut ${PET_ATTACK_COST} jetons (fais des quêtes) pour lancer ton familier!`,"#FF8C00",3000),0); return gs; }
+      const mod = bossModifierOfDay(bid); const legend = petIsLegendary((p.petEvo||{})[petId], petLv);
+      const dmg = petAttackDamage(petLv, legend, mod);
+      const newBB={...bb, spent:bb.spent+PET_ATTACK_COST, dmg:bb.dmg+dmg};
+      n[playerIdx]={...p, bossBattle:newBB};
+      const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let nb = {...boss, lastHitTs:new Date().toISOString()};
+      const defeated = totalDmg >= (boss.hpMax||80);
+      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40}; } }
+      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 pour tout le monde!`} : null;
+      const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
+      setConfig(ncfg); persist(ncfg, n);
+      if(defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 chacun!`,"#FFD700",5000); },150); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles("🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#FFD700",2800); },60); }
+      return n;
+    });
+  },[gameStates,persist,showToast]);
 
   // Le parent crée/assigne une routine à un enfant (atterrit dans gs[idx].routines)
   const handleAssignRoutine = useCallback((playerIdx, routine)=>{
@@ -7033,6 +7091,7 @@ export default function App() {
             onPlayPet={()=>handlePlayPet(view)}
             onChoosePetEvo={(petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el)}
             onBossAttack={(type)=>handleBossAttack(view,type)}
+            onBossPetAttack={()=>handleBossPetAttack(view)}
             allStates={gameStates}
             onLogout={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
             onOpenParentPin={()=>{SFX.click();setParentPinOpen(true);}}
