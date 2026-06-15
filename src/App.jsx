@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.49.0";
+const APP_VERSION = "1.50.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1080,6 +1080,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.50.0", date:"2026-06-15", features:[
+    "🗂️ L'onglet « Tout » des rituels est rangé! Tes tâches sont maintenant regroupées par rituel (Matin, Soir…), repliées par défaut. Touche un rituel pour l'ouvrir — fini la liste sans fin qui scrolle à l'infini.",
+  ]},
   { version:"1.49.0", date:"2026-06-15", features:[
     "🧭 Navigation simplifiée : sur ta page d'accueil, des gros boutons mènent à 👨‍👩‍👧‍👦 Famille, 📅 Calendrier et ⏱️ Minuterie. Plus de barre d'onglets en double en haut — un bouton 🏠 Accueil te ramène toujours chez toi.",
     "🛠️ Glitch corrigé : « j'ai changé d'idée » ne rembourse plus qu'une seule fois par récompense (fini les pièces infinies!).",
@@ -2935,6 +2938,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
+  const [openRoutineGroups, setOpenRoutineGroups] = useState({}); // mode "Tout" : quels rituels sont dépliés
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [bugOpen, setBugOpen] = useState(false); const [bugText, setBugText] = useState("");
   const [pseudoDraft, setPseudoDraft] = useState(""); // l'enfant change son pseudo
@@ -3452,7 +3456,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
         return null;
       })()}
-      {(settings.focus ? myAssignments.filter(a=>!pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).slice(0,1) : myAssignments).map(ass=>{
+      {(()=>{
+        const renderCard=(ass)=>{
         const task=allTasks.find(t=>t.id===ass.taskId);
         if(!task)return null;
         const doneKey=ass.instanceId+"_"+player.id+"#"+todayStamp(); // clé du jour → se remet à zéro chaque jour
@@ -3487,7 +3492,43 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {pending&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",textAlign:"center",marginTop:4}}>⏳ En attente de parent…</div>}
           </div>
         );
-      })}
+        };
+        // Mode « Tout » (rituels, sans rituel ciblé) : regrouper par rituel, replié par défaut → fini le scroll infini
+        const isTout = pMode==="routine" && !activeRoutine && !settings.focus;
+        if(isTout){
+          const dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp();
+          const used=new Set();
+          const groups=myRoutines.map(r=>{
+            const items=routineMine.filter(a=>r.taskIds?.includes(a.instanceId) && !used.has(a.instanceId));
+            items.forEach(a=>used.add(a.instanceId));
+            return {id:r.id, label:`${r.emoji||"⏰"} ${r.name}`, items};
+          }).filter(g=>g.items.length>0);
+          const orphans=routineMine.filter(a=>!used.has(a.instanceId));
+          if(orphans.length) groups.push({id:"__autres", label:"🗂️ Autres tâches", items:orphans});
+          if(groups.length===0) return null;
+          const acc=th.accent||player.color;
+          return groups.map(g=>{
+            const open=!!openRoutineGroups[g.id];
+            const doneN=g.items.filter(a=>pState.completed?.includes(dk(a))).length;
+            const allDone=doneN===g.items.length;
+            return (
+              <div key={g.id} style={{display:"flex",flexDirection:"column"}}>
+                <button onClick={()=>{SFX.click();setOpenRoutineGroups(s=>({...s,[g.id]:!s[g.id]}));}}
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",
+                    fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",lineHeight:1.4,textAlign:"left",
+                    padding:"11px 12px",background:open?`${acc}22`:"rgba(0,0,0,0.45)",
+                    color:allDone?"#2ECC40":"#fff",border:`2px solid ${open?acc:"#333"}`,borderRadius:8,cursor:"pointer"}}>
+                  <span>{open?"▼":"▶"} {g.label}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:allDone?"#2ECC40":"#888"}}>{allDone?"✅ ":""}{doneN}/{g.items.length}</span>
+                </button>
+                {open && <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,marginBottom:4}}>{g.items.map(renderCard)}</div>}
+              </div>
+            );
+          });
+        }
+        const list = settings.focus ? myAssignments.filter(a=>!pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).slice(0,1) : myAssignments;
+        return list.map(renderCard);
+      })()}
 
       {/* Enfant : ajouter une quête à sa journée à la volée */}
       <button onClick={()=>{SFX.click();setAddTaskOpen(true);}}
