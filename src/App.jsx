@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.45.0";
+const APP_VERSION = "1.46.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1078,6 +1078,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.46.0", date:"2026-06-14", features:[
+    "☰ Le menu est maintenant dans le header (en haut à droite) — il remplace le cadenas et la porte (qui sont dedans : Validation parent, Quitter).",
+  ]},
   { version:"1.45.0", date:"2026-06-14", features:[
     "☰ Nouveau menu : un seul bouton « Menu » regroupe tes réglages, les Archives, et « J'ai trouvé un bug ».",
     "🗄️ Archives : retrouve tes quêtes complétées aujourd'hui.",
@@ -2912,11 +2915,10 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
-  const [hamOpen, setHamOpen] = useState(false);       // menu hamburger ☰ (méta)
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [bugOpen, setBugOpen] = useState(false); const [bugText, setBugText] = useState("");
   const [pseudoDraft, setPseudoDraft] = useState(""); // l'enfant change son pseudo
@@ -2978,24 +2980,20 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
-      {/* ☰ Menu (méta : quitter, réglages, validation parent, archives, bug) */}
-      <div style={{display:"flex",justifyContent:"flex-end"}}>
-        <button onClick={()=>{SFX.click();setHamOpen(true);}} title="Menu"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",background:"rgba(0,0,0,0.4)",color:pt.accent||player.color,border:`2px solid ${(pt.accent||player.color)}55`,borderRadius:6,cursor:"pointer"}}>☰ Menu</button>
-      </div>
+      {/* ☰ Menu (déclenché depuis le header) — méta : réglages, archives, bug, validation parent, quitter */}
       {hamOpen && (
-        <div onClick={()=>setHamOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2600,display:"flex",justifyContent:"flex-end"}}>
+        <div onClick={()=>onCloseHam&&onCloseHam()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2600,display:"flex",justifyContent:"flex-end"}}>
           <div onClick={e=>e.stopPropagation()} style={{background:pt.bg||"#1a1a2e",borderLeft:`3px solid ${pt.accent||player.color}`,width:"min(280px,82vw)",height:"100%",padding:16,display:"flex",flexDirection:"column",gap:10,overflowY:"auto",boxShadow:"-6px 0 24px rgba(0,0,0,0.5)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:pt.accent||player.color}}>☰ Menu</div>
-              <button onClick={()=>setHamOpen(false)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>onCloseHam&&onCloseHam()} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
             </div>
             {[
-              ["⚙️ Mes réglages", ()=>{setHamOpen(false);setSettingsOpen(true);}],
-              ["🗄️ Archives", ()=>{setHamOpen(false);setArchivesOpen(true);}],
-              ["🐛 J'ai trouvé un bug", ()=>{setHamOpen(false);setBugOpen(true);}],
-              ["🔓 Validation parent", ()=>{setHamOpen(false);onOpenParentPin&&onOpenParentPin();}],
-              ["🚪 Quitter / changer d'enfant", ()=>{setHamOpen(false);onLogout&&onLogout();}],
+              ["⚙️ Mes réglages", ()=>{onCloseHam&&onCloseHam();setSettingsOpen(true);}],
+              ["🗄️ Archives", ()=>{onCloseHam&&onCloseHam();setArchivesOpen(true);}],
+              ["🐛 J'ai trouvé un bug", ()=>{onCloseHam&&onCloseHam();setBugOpen(true);}],
+              ["🔓 Validation parent", ()=>{onCloseHam&&onCloseHam();onOpenParentPin&&onOpenParentPin();}],
+              ["🚪 Quitter / changer d'enfant", ()=>{onCloseHam&&onCloseHam();onLogout&&onLogout();}],
             ].map(([lbl,fn])=>(
               <button key={lbl} onClick={fn}
                 style={{textAlign:"left",fontFamily:"'VT323',monospace",fontSize:17,padding:"12px 14px",background:"rgba(0,0,0,0.4)",color:"#ddd",border:`2px solid ${(pt.accent||player.color)}33`,borderRadius:8,cursor:"pointer"}}>{lbl}</button>
@@ -5717,6 +5715,7 @@ export default function App() {
   const [sessionPlayer, setSessionPlayer] = useState(null); // enfant connecté (idx) — null = parent/aucun
   const [editingBook, setEditingBook] = useState(false); // true = "Modifier le livre" (édite la config existante)
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
+  const [hamOpen, setHamOpen] = useState(false); // menu ☰ enfant (piloté depuis le header)
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
   const [pinChangeMode, setPinChangeMode] = useState(false);
@@ -6477,27 +6476,25 @@ export default function App() {
         {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
           return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
             style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#2ECC40":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
-        {/* Parent controls */}
+        {/* Contrôles header */}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={()=>{SFX.click();if(parentMode){setParentPanel(true);}else{setParentPinOpen(true);}}}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",
-              background:parentMode?"#FF8C00":"#222",color:parentMode?"#000":"#888",
-              border:`2px solid ${parentMode?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer",
-              boxShadow:parentMode?"0 0 10px #FF8C0060":"none",position:"relative"}}>
-            {parentMode?"🔓 PARENT ▸":"🔐"}
-            {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
-              return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#FF4444",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #000"}}>{nb}</span>:null; })()}
-          </button>
-          {/* Quitter le mode parent */}
-          {parentMode&&<button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#FF8C00",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">
-            🔒
-          </button>}
-          {/* Déconnexion / changer d'enfant */}
-          <button onClick={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Changer d'enfant / déconnexion">
-            🚪
-          </button>
+          {parentMode ? (<>
+            <button onClick={()=>{SFX.click();setParentPanel(true);}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",background:"#FF8C00",color:"#000",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer",boxShadow:"0 0 10px #FF8C0060",position:"relative"}}>
+              🔓 PARENT ▸
+              {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
+                return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#FF4444",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #000"}}>{nb}</span>:null; })()}
+            </button>
+            <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#FF8C00",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">🔒</button>
+          </>) : sessionPlayer!=null ? (
+            // ☰ Menu enfant (contient réglages, archives, bug, validation parent, quitter)
+            <button onClick={()=>{SFX.click(); if(typeof view!=="number") setView(sessionPlayer); setHamOpen(true);}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 14px",background:"#222",color:th.accent,border:`2px solid ${th.accent}66`,borderRadius:3,cursor:"pointer"}} title="Menu">☰ Menu</button>
+          ) : (
+            <button onClick={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Déconnexion">🚪</button>
+          )}
         </div>
       </div>
 
@@ -6610,6 +6607,7 @@ export default function App() {
             onLogout={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
             onOpenParentPin={()=>{SFX.click();setParentPinOpen(true);}}
             onReportBug={(text)=>handleReportBug(text, displayName(config.players[view]))}
+            hamOpen={hamOpen} onCloseHam={()=>setHamOpen(false)}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
