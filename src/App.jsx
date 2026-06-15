@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.62.0";
+const APP_VERSION = "1.63.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1222,6 +1222,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.63.0", date:"2026-06-15", features:[
+    "🛠️ VRAI correctif du bug des pièces infinies : « j'ai changé d'idée » tient maintenant pour de bon (avant, la synchro ramenait la récompense → on pouvait rembourser sans fin).",
+    "📅 Les tâches prévues pour d'autres jours sont rangées dans un accordéon « Tâches planifiées » (replié) — ta liste du jour reste propre.",
+  ]},
   { version:"1.62.0", date:"2026-06-15", features:[
     "🎽 Tes items équipés s'affichent maintenant PORTÉS sur ton perso : chapeau sur la tête, accessoire de visage, armure sur le torse — et ton familier en pixel art juste à côté de toi! Équipe des items dans 🎒 pour personnaliser ton avatar.",
   ]},
@@ -1641,7 +1645,7 @@ const mergeGS = (a, b, preferIncoming) => {
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k)),
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
-    boughtRewards: _uniq([...(a.boughtRewards || []), ...(b.boughtRewards || [])]),
+    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins) : un « j'ai changé d'idée » TIENT (l'union ré-ajoutait → remboursement infini)
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
     equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),
@@ -3222,6 +3226,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [themePicker, setThemePicker] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [laterOpen, setLaterOpen] = useState(false); // v1.63.0 — accordéon « tâches planifiées » (replié par défaut)
   // v1.57.0 — évolution du familier équipé en attente d'un choix?
   const _eqPetId = pState.equipped?.pet;
   const _eqPetLv = petLevel((pState.petXp||{})[_eqPetId]||0);
@@ -3835,11 +3840,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       </>)}
       {homeTab==="sem" && (<>
-      {/* Plus tard cette semaine (vue Semaine seulement) — aperçu grisé */}
+      {/* Tâches planifiées (pas aujourd'hui) — accordéon replié par défaut (vue Semaine) */}
       {pMode==="week" && laterWeek.length>0 && (
-        <div style={{marginTop:6,opacity:0.7}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666",borderBottom:"1px solid #2a2a2a",paddingBottom:3,marginBottom:5}}>📅 PLUS TARD CETTE SEMAINE</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{marginTop:6}}>
+          <button onClick={()=>{ if(SFX.click)SFX.click(); setLaterOpen(o=>!o); }}
+            style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
+            <span>{laterOpen?"▼":"▶"} 📅 Tâches planifiées</span>
+            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>{laterWeek.length}</span>
+          </button>
+          {laterOpen && <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:5,opacity:0.85}}>
             {laterWeek.map(ass=>{ const t=allTasks.find(x=>x.id===ass.taskId); if(!t)return null;
               return (
                 <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:4}}>
@@ -3849,7 +3858,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 </div>
               );
             })}
-          </div>
+          </div>}
         </div>
       )}
 

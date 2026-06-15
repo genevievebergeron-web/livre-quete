@@ -93,7 +93,7 @@ const mergeGS = (a, b, preferIncoming) => {
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k)),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
-    boughtRewards: _uniq([...(a.boughtRewards||[]), ...(b.boughtRewards||[])]),
+    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins) : le « j'ai changé d'idée » TIENT
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),
