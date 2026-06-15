@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.61.0";
+const APP_VERSION = "1.62.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1222,6 +1222,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.62.0", date:"2026-06-15", features:[
+    "🎽 Tes items équipés s'affichent maintenant PORTÉS sur ton perso : chapeau sur la tête, accessoire de visage, armure sur le torse — et ton familier en pixel art juste à côté de toi! Équipe des items dans 🎒 pour personnaliser ton avatar.",
+  ]},
   { version:"1.61.0", date:"2026-06-15", features:[
     "📋 Grand ménage des quêtes : une quête validée QUITTE ta liste du jour (fini les tâches barrées qui traînent) et se range dans 🗄️ Archives — maintenant avec l'HEURE de complétion et l'étiquette.",
     "🎉 Quand tout est fait, un beau message « Tout est fait pour aujourd'hui! » remplace la liste.",
@@ -3043,9 +3046,12 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
           <div style={{position:"relative"}}>
             <AvatarCanvas avatarDef={avatarDef} bodyColor={pt.charBodyColor||player.color} size={120}
               style={{border:`4px solid ${pt.accent||"#FFD700"}`,boxShadow:`0 0 20px ${pt.glow||"#FFD700"}50`}}/>
-            {eq.hat   && <span style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",fontSize:32,filter:"drop-shadow(0 2px 0 #000)"}}>{allShopItems.find(i=>i.id===eq.hat)?.emoji}</span>}
-            {eq.armor  && <span style={{position:"absolute",bottom:-14,right:-14,fontSize:26}}>{allShopItems.find(i=>i.id===eq.armor)?.emoji}</span>}
-            {eq.pet    && <span style={{position:"absolute",bottom:-14,left:-14,fontSize:26}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>}
+            {/* v1.62.0 — items équipés PORTÉS sur l'avatar (chapeau sur la tête, visage, armure sur le torse), familier en pixel à côté */}
+            {eq.hat   && <span style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",fontSize:46,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.hat)?.emoji}</span>}
+            {eq.face  && <span style={{position:"absolute",top:36,left:"50%",transform:"translateX(-50%)",fontSize:28,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.face)?.emoji}</span>}
+            {eq.armor && <span style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",fontSize:36,filter:"drop-shadow(0 1px 0 #000)",pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.armor)?.emoji}</span>}
+            {eq.themed && <span style={{position:"absolute",bottom:6,right:2,fontSize:26,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.themed)?.emoji}</span>}
+            {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-10,left:-14,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={48}/></div> : <span style={{position:"absolute",bottom:-12,left:-12,fontSize:28,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>)}
           </div>
           <div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:player.color,marginBottom:6}}>{displayName(player)}</div>
@@ -3340,9 +3346,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setAvatarOpen(true);SFX.click();}} title="Personnaliser mon perso">
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
             style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
-          {eq.hat   && <span style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:22,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.hat)?.emoji}</span>}
-          {eq.armor && <span style={{position:"absolute",bottom:-10,right:-8,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.armor)?.emoji}</span>}
-          {eq.pet   && <span style={{position:"absolute",bottom:-10,left:-8,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>}
+          {eq.hat   && <span style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",fontSize:28,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.hat)?.emoji}</span>}
+          {eq.face  && <span style={{position:"absolute",top:22,left:"50%",transform:"translateX(-50%)",fontSize:17,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.face)?.emoji}</span>}
+          {eq.armor && <span style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",fontSize:22,filter:"drop-shadow(0 1px 0 #000)",pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.armor)?.emoji}</span>}
+          {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-8,left:-10,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={30}/></div> : <span style={{position:"absolute",bottom:-8,left:-6,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>)}
           <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",whiteSpace:"nowrap"}}>✏️ Modifier</div>
         </div>
         <div style={{flex:1,minWidth:0}}>
