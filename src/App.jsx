@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.48.0";
+const APP_VERSION = "1.49.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1080,6 +1080,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.49.0", date:"2026-06-15", features:[
+    "🧭 Navigation simplifiée : sur ta page d'accueil, des gros boutons mènent à 👨‍👩‍👧‍👦 Famille, 📅 Calendrier et ⏱️ Minuterie. Plus de barre d'onglets en double en haut — un bouton 🏠 Accueil te ramène toujours chez toi.",
+    "🛠️ Glitch corrigé : « j'ai changé d'idée » ne rembourse plus qu'une seule fois par récompense (fini les pièces infinies!).",
+  ]},
   { version:"1.48.0", date:"2026-06-15", features:[
     "🧹 Les tâches qu'un enfant s'invente valent moins (anti-farm), ne s'ajoutent plus au catalogue des autres, et celles « ajoutées à ma journée » s'effacent toutes seules après la journée.",
     "🗑️ Parent : bouton pour supprimer d'un coup les tâches perso d'un enfant (onglet 📋 Tâches) — et les suppressions « tiennent » maintenant (ne reviennent plus).",
@@ -2927,7 +2931,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onBossAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3698,6 +3702,19 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       </div>
       </>)}
       {homeTab==="accueil" && (<>
+      {/* ── MENU : accès aux autres écrans (remplace les onglets du haut) ── */}
+      {(onGoFamily||onGoCalendars||onGoTimer) && (
+      <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+        {onGoFamily && (
+          <button onClick={onGoFamily} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+            <span style={{fontSize:22}}>👨‍👩‍👧‍👦</span>Famille</button>)}
+        {onGoCalendars && (
+          <button onClick={onGoCalendars} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+            <span style={{fontSize:22}}>📅</span>Calendrier</button>)}
+        {onGoTimer && (
+          <button onClick={onGoTimer} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+            <span style={{fontSize:22}}>⏱️</span>Minuterie</button>)}
+      </div>)}
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:4}}>🏅 BADGES</div>
@@ -6315,8 +6332,13 @@ export default function App() {
   // Annuler une récompense réclamée (remet les pièces) — accessible enfant ET parent
   const handleUnclaimReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
-    setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), coins:(p.coins||0)+(reward.coins||0)}; persist(config,n); return n; });
-    showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
+    // Anti-glitch : on ne rembourse QUE si la récompense est encore possédée (évite les remboursements infinis)
+    let did=false;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[idx];
+      if(!(p.boughtRewards||[]).includes(reward.id)) return gs; // déjà remboursée → rien
+      did=true;
+      n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), coins:(p.coins||0)+(reward.coins||0)}; persist(config,n); return n; });
+    if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
   },[config,persist,showToast]);
 
   // Minuterie : l'enfant a complété un rituel chronométré → bonus XP + entrée au fil
@@ -6588,7 +6610,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── PLAYER NAV ── */}
+      {/* ── PLAYER NAV ── (cachée en session enfant : la nav passe par l'accueil-menu + footer) */}
+      {!(sessionPlayer!=null && !parentMode) &&
       <div style={{display:"flex",gap:0,background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
         <button onClick={()=>{setView("family");SFX.click();}} className="nav-btn"
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
@@ -6609,7 +6632,14 @@ export default function App() {
             {displayName(pl)}
           </button>
         ))}
-      </div>
+      </div>}
+
+      {/* ── FOOTER COLLANT enfant : retour à l'accueil depuis Famille/Calendrier/Minuterie ── */}
+      {(sessionPlayer!=null && !parentMode && (view==="family"||view==="calendars"||view==="timer")) && (
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(0,0,0,0.92)",borderTop:"2px solid #333",display:"flex",justifyContent:"center",padding:"8px 10px"}}>
+          <button onClick={()=>{setView(sessionPlayer);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:th.accent,border:"none",borderRadius:10,padding:"12px 26px",cursor:"pointer"}}>🏠 Accueil</button>
+        </div>
+      )}
 
       {/* ── CONTENT ── */}
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
@@ -6678,6 +6708,9 @@ export default function App() {
             onOpenParentPin={()=>{SFX.click();setParentPinOpen(true);}}
             onReportBug={(text)=>handleReportBug(text, displayName(config.players[view]))}
             hamOpen={hamOpen} onCloseHam={()=>setHamOpen(false)}
+            onGoFamily={()=>{setView("family");SFX.click();}}
+            onGoCalendars={()=>{setView("calendars");SFX.click();}}
+            onGoTimer={()=>{setView("timer");SFX.click();}}
             onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
             onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
             onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
