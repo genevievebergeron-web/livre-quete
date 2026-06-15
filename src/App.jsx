@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.47.0";
+const APP_VERSION = "1.48.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -230,8 +230,10 @@ const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cos
 const PRICE_MULT = 2;
 const baseCost = (it) => (it?.cost ?? it?.coins ?? 0); // items: .cost — récompenses: .coins
 const priceOf  = (it) => Math.round(baseCost(it) * PRICE_MULT);
-// Récompense d'une tâche selon la difficulté choisie par l'enfant
+// Récompense d'une tâche selon la difficulté choisie
 const DIFF_PRESETS = { easy:{xp:10,coins:5}, medium:{xp:20,coins:10}, hard:{xp:40,coins:20} };
+// Plafond ANTI-FARM pour les tâches qu'un ENFANT se crée (valeurs réduites)
+const CHILD_DIFF_PRESETS = { easy:{xp:5,coins:2}, medium:{xp:8,coins:4}, hard:{xp:12,coins:6} };
 
 // ─── BADGE CATALOG ───────────────────────────────────────────
 // type: "general" | themeId
@@ -1078,6 +1080,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.48.0", date:"2026-06-15", features:[
+    "🧹 Les tâches qu'un enfant s'invente valent moins (anti-farm), ne s'ajoutent plus au catalogue des autres, et celles « ajoutées à ma journée » s'effacent toutes seules après la journée.",
+    "🗑️ Parent : bouton pour supprimer d'un coup les tâches perso d'un enfant (onglet 📋 Tâches) — et les suppressions « tiennent » maintenant (ne reviennent plus).",
+  ]},
   { version:"1.47.0", date:"2026-06-15", features:[
     "🕐 Minuterie « Heure de fin » : choisis l'heure où tu dois être prêt (7h, 7h30, 8h ou autre). Le minuteur affiche « il reste X min » et lance un « 🚀 Let's go! » à 5 minutes. Parfait pour la routine du matin!",
   ]},
@@ -1490,10 +1496,12 @@ const mergeFamily = (base, incoming) => {
   });
   const players = [...byId.values()].map((e) => e.player);
   const gameStates = [...byId.values()].map((e) => e.gs);
-  // Assignations : union par instanceId
+  // Assignations : union par instanceId, MOINS les supprimées (tombstones, union des deux côtés)
+  const removedAssignments = _uniq([...(bC.removedAssignments || []), ...(iC.removedAssignments || [])]).slice(-800);
+  const _rmSet = new Set(removedAssignments);
   const assignMap = new Map();
-  (bC.assignments || []).forEach((a) => assignMap.set(a.instanceId, a));
-  (iC.assignments || []).forEach((a) => { if (!assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
+  (bC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId)) assignMap.set(a.instanceId, a); });
+  (iC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId) && !assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
   // Tâches perso : union par id
   const taskMap = new Map();
   (bC.customTasks || []).forEach((t) => taskMap.set(t.id, t));
@@ -1504,6 +1512,7 @@ const mergeFamily = (base, incoming) => {
     ...bC, ...iC,
     players,
     assignments: [...assignMap.values()],
+    removedAssignments,
     customTasks: [...taskMap.values()],
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
@@ -4085,7 +4094,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onClearChildTasks, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -4221,7 +4230,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
             <select value={addTaskId} onChange={e=>setAddTaskId(e.target.value)}
               style={{width:"100%",background:"#111",border:"2px solid #FF8C00",color:"#fff",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8}}>
               <option value="">— Choisir dans le catalogue —</option>
-              {allTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.label} (⚡{t.xp} 🪙{t.coins})</option>)}
+              {allTasks.filter(t=>!t.child).map(t=><option key={t.id} value={t.id}>{t.emoji} {t.label} (⚡{t.xp} 🪙{t.coins})</option>)}
             </select>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
               {players.map(pl=>{
@@ -4277,6 +4286,19 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:8,lineHeight:1.4}}>
               Pour les horaires et les jours de la semaine, passe par ⚙️ Modifier le livre (onglet Actions).
             </div>
+            {/* 🧹 Ménage : supprimer les tâches qu'un enfant s'est créées */}
+            {(config.customTasks||[]).some(t=>t.child) && (
+              <div style={{marginTop:14,paddingTop:12,borderTop:"2px solid #333"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:6}}>🧹 MÉNAGE — TÂCHES PERSO DES ENFANTS</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:8}}>Supprime d'un coup les tâches qu'un enfant s'est inventées (les vraies tâches du catalogue ne sont pas touchées).</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {players.map((pl,i)=>{ const childTaskIds=new Set((config.customTasks||[]).filter(t=>t.child).map(t=>t.id)); const n=(config.assignments||[]).filter(a=>a.playerIds?.includes(pl.id)&&childTaskIds.has(a.taskId)).length; if(!n) return null;
+                    return <button key={pl.id} onClick={()=>{ if(window.confirm(`Supprimer les ${n} tâche(s) perso de ${displayName(pl)}?`)){ onClearChildTasks&&onClearChildTasks(i); } }}
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"7px 9px",background:"#3a1a1a",color:"#FF6464",border:"2px solid #FF646455",borderRadius:4,cursor:"pointer"}}>🗑️ {displayName(pl)} ({n})</button>;
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Assigner une routine à un enfant ───────────────── */}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UN RITUEL</div>
@@ -5755,6 +5777,15 @@ export default function App() {
     load().then(raw=>{
       const data = migrateSavedData(raw);
       if(data?.config&&data?.gameStates){
+        // 🧹 Nettoyage des tâches « à usage unique » d'un jour passé (anti-accumulation)
+        const today=todayStamp();
+        const expired=(data.config.assignments||[]).filter(a=>a.oneDay && a.oneDay!==today).map(a=>a.instanceId);
+        if(expired.length){
+          const rm=new Set(expired);
+          data.config={...data.config,
+            assignments:(data.config.assignments||[]).filter(a=>!rm.has(a.instanceId)),
+            removedAssignments:_uniq([...(data.config.removedAssignments||[]), ...expired]).slice(-800)};
+        }
         setConfig(data.config);
         setGameStates(data.gameStates);
         // Toujours persister les données migrées (pin par défaut, seenVersions, etc.)
@@ -6139,11 +6170,28 @@ export default function App() {
   const handleRemoveAssignment = useCallback((instanceId)=>{
     const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
     const task=ass?[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId):null;
-    const newCfg={...config,assignments:(config.assignments||[]).filter(a=>a.instanceId!==instanceId)};
+    // Tombstone : la fusion ré-ajouterait l'assignation sinon → on mémorise les supprimées
+    const newCfg={...config,
+      assignments:(config.assignments||[]).filter(a=>a.instanceId!==instanceId),
+      removedAssignments:_uniq([...(config.removedAssignments||[]), instanceId]).slice(-800)};
     setConfig(newCfg); persist(newCfg,gameStates);
     logAction(`🗑️ Tâche retirée: ${task?.label||instanceId}`,"#FF8C00");
     showToast("🗑️ Tâche retirée","#FF8C00");
   },[config,gameStates,persist,logAction,showToast]);
+
+  // Ménage : supprimer TOUTES les tâches qu'un enfant s'est créées (child:true)
+  const handleClearChildTasks = useCallback((playerIdx)=>{
+    const pid=config.players[playerIdx]?.id; if(!pid) return;
+    const childTaskIds=new Set((config.customTasks||[]).filter(t=>t.child).map(t=>t.id));
+    const toRemove=(config.assignments||[]).filter(a=>a.playerIds?.includes(pid) && childTaskIds.has(a.taskId)).map(a=>a.instanceId);
+    if(!toRemove.length){ showToast("Aucune tâche perso à supprimer 👍","#888"); return; }
+    const removedSet=new Set(toRemove);
+    const newCfg={...config,
+      assignments:(config.assignments||[]).filter(a=>!removedSet.has(a.instanceId)),
+      removedAssignments:_uniq([...(config.removedAssignments||[]), ...toRemove]).slice(-800)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast(`🗑️ ${toRemove.length} tâche(s) perso supprimée(s)`,"#FF8C00");
+  },[config,gameStates,persist,showToast]);
 
   const handleAddCustomTask = useCallback((data)=>{
     if(!data?.label?.trim())return null;
@@ -6158,13 +6206,13 @@ export default function App() {
   const handleChildAddTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
     const taskId="cust_"+uid();
-    const _dp=DIFF_PRESETS[data.diff]||DIFF_PRESETS.medium;
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom"};
+    const _dp=CHILD_DIFF_PRESETS[data.diff]||CHILD_DIFF_PRESETS.medium; // plafond anti-farm
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
     // La quête doit apparaître dans la vue ACTUELLE de l'enfant : si mode Semaine → aujourd'hui; si Routine → tâche de routine
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:""};
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp()}; // à usage unique (nettoyée après aujourd'hui)
     const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
@@ -6175,10 +6223,10 @@ export default function App() {
   const handleChildAddRoutineTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return null;
     const taskId="cust_"+uid();
-    const _dp=DIFF_PRESETS[data.diff]||DIFF_PRESETS.medium;
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom"};
+    const _dp=CHILD_DIFF_PRESETS[data.diff]||CHILD_DIFF_PRESETS.medium; // plafond anti-farm
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
     const instanceId=uid();
-    const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel
+    const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel (persiste dans SON rituel)
     const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Tâche ajoutée à ton rituel!","#2ECC40");
@@ -6681,6 +6729,7 @@ export default function App() {
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onAddCalendarEvent={handleAddCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
+          onClearChildTasks={handleClearChildTasks}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
           onExitParent={()=>{setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
