@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.66.0";
+const APP_VERSION = "1.67.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.67.0", date:"2026-06-16", features:[
+    "🎮 Correctif : ton jeu de niveau se lance maintenant même si tu es DÉJÀ dans l'app quand un parent valide ta quête (avant, il fallait se déconnecter/reconnecter — tu voyais la notif mais le jeu ne partait pas).",
+  ]},
   { version:"1.66.0", date:"2026-06-16", features:[
     "🙂 Correctif : quand tu changes ton pseudo (ou ton thème), ça reste — fini le retour à l'ancien après la synchro.",
     "💰 Les items et les familiers coûtent un peu plus cher : ils deviennent de vrais objectifs à viser. Prends ton temps, ça vaut la peine!",
@@ -6483,6 +6486,18 @@ export default function App() {
       else if(pendingRwd){ SFX.task(); setRewardPopup(pendingRwd); }
     },500);
   },[gameStates,config,persist,spawnParticles]);
+
+  // v1.67.0 (fix B1) — Avant, le mini-jeu/fête de niveau ne se jouait QU'à la connexion
+  // (consumeCelebrations dans onSelectPlayer). Si le parent validait pendant que l'enfant
+  // était DÉJÀ connecté, la file pendingCelebrations grandissait via la sync mais rien ne
+  // se déclenchait → l'enfant voyait la notif au fil mais « le jeu ne partait jamais ».
+  // Cet effet consomme la file AUSSI en cours de session (sans couper une fête en cours).
+  useEffect(()=>{
+    if(sessionPlayer==null || parentMode) return;
+    if(miniGame || rewardPopup) return;            // ne pas interrompre une fête déjà à l'écran
+    const q=gameStates[sessionPlayer]?.pendingCelebrations;
+    if(q && q.length) consumeCelebrations(sessionPlayer);
+  },[sessionPlayer,parentMode,gameStates,miniGame,rewardPopup,consumeCelebrations]);
 
   // Buy / equip
   const handleBuy = useCallback((item,playerId)=>{
