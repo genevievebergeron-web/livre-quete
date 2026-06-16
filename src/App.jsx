@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.65.0";
+const APP_VERSION = "1.66.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -337,7 +337,7 @@ const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cos
 // ─── ÉCONOMIE (équilibrage « game master ») ───────────────────
 // Prix de base montés d'un cran pour que les pièces aient de la valeur et qu'un
 // item légendaire se MÉRITE. rarityOf reste sur le coût de BASE (la rareté ne bouge pas).
-const PRICE_MULT = 2;
+const PRICE_MULT = 3; // v1.66.0 — items/familiers plus chers (Gen : « que ça dure longtemps »). Était 2.
 const baseCost = (it) => (it?.cost ?? it?.coins ?? 0); // items: .cost — récompenses: .coins
 const priceOf  = (it) => Math.round(baseCost(it) * PRICE_MULT);
 // Récompense d'une tâche selon la difficulté choisie
@@ -1231,6 +1231,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.66.0", date:"2026-06-16", features:[
+    "🙂 Correctif : quand tu changes ton pseudo (ou ton thème), ça reste — fini le retour à l'ancien après la synchro.",
+    "💰 Les items et les familiers coûtent un peu plus cher : ils deviennent de vrais objectifs à viser. Prends ton temps, ça vaut la peine!",
+  ]},
   { version:"1.65.0", date:"2026-06-15", features:[
     "🐛 Correctif : le formulaire « J'ai trouvé un bug » se rend maintenant de façon fiable dans ton portail parent (onglet Logs) — les rapports ne se perdaient plus à la synchro.",
     "🕐 Horodateur ajouté sur les tâches (création + complétion) pour mieux analyser ce qui se passe.",
@@ -1694,16 +1698,24 @@ const mergeGS = (a, b, preferIncoming) => {
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
   };
 };
-// Fusion d'un joueur (config) — garde UN seul thème par enfant
-const _mergePlayer = (a, b) => ({
-  ...a, ...b,
-  name: a.name || b.name,
-  pseudo: a.pseudo || b.pseudo,
-  color: a.color || b.color,
-  themeId: (a.themeId && a.themeId !== "none") ? a.themeId : (b.themeId || a.themeId || "none"),
-  starterThemes: _uniq([...(a.starterThemes || []), ...(b.starterThemes || [])]).slice(0, 4),
-  themeChosenAt: a.themeChosenAt || b.themeChosenAt,
-});
+// Fusion d'un joueur (config) — garde UN seul thème par enfant.
+// v1.66.0 (fix B2) : pseudo / themeId / themeChosenAt en DERNIÈRE-ÉCRITURE-GAGNE
+// (preferIncoming = la copie entrante est plus récente). Avant, la base gagnait
+// toujours → le pseudo changé par l'enfant « revenait » à sa prochaine sync.
+const _mergePlayer = (a, b, preferIncoming = false) => {
+  const w = preferIncoming ? b : a, o = preferIncoming ? a : b; // w = écriture la plus récente
+  return {
+    ...a, ...b,
+    name: a.name || b.name,
+    color: a.color || b.color,
+    pseudo: w.pseudo || o.pseudo,
+    themeId: (w.themeId && w.themeId !== "none") ? w.themeId
+           : (o.themeId && o.themeId !== "none") ? o.themeId
+           : (w.themeId || o.themeId || "none"),
+    themeChosenAt: w.themeChosenAt || o.themeChosenAt,
+    starterThemes: _uniq([...(a.starterThemes || []), ...(b.starterThemes || [])]).slice(0, 4),
+  };
+};
 // Fusion complète de deux instantanés famille { config, gameStates, savedAt }
 const mergeFamily = (base, incoming) => {
   if (!base) return incoming;
@@ -1715,7 +1727,7 @@ const mergeFamily = (base, incoming) => {
   const byId = new Map();
   bP.forEach((p, i) => byId.set(p.id, { player: { ...p }, gs: bG[i] }));
   iP.forEach((p, i) => {
-    if (byId.has(p.id)) { const e = byId.get(p.id); e.player = _mergePlayer(e.player, p); e.gs = mergeGS(e.gs, iG[i], preferIncoming); }
+    if (byId.has(p.id)) { const e = byId.get(p.id); e.player = _mergePlayer(e.player, p, preferIncoming); e.gs = mergeGS(e.gs, iG[i], preferIncoming); }
     else byId.set(p.id, { player: { ...p }, gs: iG[i] });
   });
   const players = [...byId.values()].map((e) => e.player);

@@ -121,9 +121,15 @@ const mergeGS = (a, b, preferIncoming) => {
     settings: { ...(a.settings||{}), ...(b.settings||{}) },
   };
 };
-const _mergePlayer = (a, b) => ({ ...a, ...b, name:a.name||b.name, pseudo:a.pseudo||b.pseudo, color:a.color||b.color,
-  themeId:(a.themeId && a.themeId!=="none") ? a.themeId : (b.themeId||a.themeId||"none"),
-  starterThemes:_uniq([...(a.starterThemes||[]), ...(b.starterThemes||[])]).slice(0,4), themeChosenAt:a.themeChosenAt||b.themeChosenAt });
+// v1.66.0 (fix B2) : pseudo / themeId / themeChosenAt en DERNIÈRE-ÉCRITURE-GAGNE (preferIncoming)
+const _mergePlayer = (a, b, preferIncoming = false) => {
+  const w = preferIncoming ? b : a, o = preferIncoming ? a : b;
+  return { ...a, ...b, name:a.name||b.name, color:a.color||b.color,
+    pseudo: w.pseudo || o.pseudo,
+    themeId:(w.themeId && w.themeId!=="none") ? w.themeId : (o.themeId && o.themeId!=="none") ? o.themeId : (w.themeId||o.themeId||"none"),
+    themeChosenAt: w.themeChosenAt || o.themeChosenAt,
+    starterThemes:_uniq([...(a.starterThemes||[]), ...(b.starterThemes||[])]).slice(0,4) };
+};
 const mergeFamily = (base, incoming) => {
   if (!base) return incoming; if (!incoming) return base;
   const bC = base.config||{}, iC = incoming.config||{};
@@ -131,7 +137,7 @@ const mergeFamily = (base, incoming) => {
   const preferIncoming = isNewer(incoming.savedAt, base.savedAt);
   const byId = new Map();
   bP.forEach((p, i) => byId.set(p.id, { player:{ ...p }, gs:bG[i] }));
-  iP.forEach((p, i) => { if (byId.has(p.id)) { const e=byId.get(p.id); e.player=_mergePlayer(e.player,p); e.gs=mergeGS(e.gs,iG[i],preferIncoming); } else byId.set(p.id, { player:{ ...p }, gs:iG[i] }); });
+  iP.forEach((p, i) => { if (byId.has(p.id)) { const e=byId.get(p.id); e.player=_mergePlayer(e.player,p,preferIncoming); e.gs=mergeGS(e.gs,iG[i],preferIncoming); } else byId.set(p.id, { player:{ ...p }, gs:iG[i] }); });
   const players = [...byId.values()].map(e => e.player);
   const gameStates = [...byId.values()].map(e => e.gs);
   const removedAssignments = _uniq([...(bC.removedAssignments||[]), ...(iC.removedAssignments||[])]).slice(-800);

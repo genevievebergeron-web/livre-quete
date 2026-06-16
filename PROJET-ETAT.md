@@ -1,5 +1,8 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-06-13 — v1.29.0_
+_Mis à jour: 2026-06-16 — v1.66.0_
+
+> **AUDIT 16 juin** (fonctionnalité + balance + fun/motivation) : `Documents/Claude/Projects/Livre de quêtes (1)/audit-fonctionnalite-balance.md`. Bugs root-causés (B1 mini-jeu de niveau jamais lancé en session active = `consumeCelebrations` au login seulement; B2 pseudo/thème qui revient = `_mergePlayer` base-gagne; B3 frein énergie ne bloque que coffres+jouer-familier; B4 timer rituel sans accès aux tâches; B5 fin de rituel sans célébration; B6 enfant ne peut pas supprimer une tâche; B7 ménage tâches + grille colonnes côté parent).
+> **v1.66.0 (16 juin) — FAIT :** (1) fix B2 — `_mergePlayer` (client App.jsx ~1698 ET server.cjs ~124) en DERNIÈRE-ÉCRITURE-GAGNE sur `pseudo`/`themeId`/`themeChosenAt` (reçoit `preferIncoming`) → pseudo/thème ne « revient » plus (testé node 6/6). (2) Balance : `PRICE_MULT` 2→3. Validé esbuild (2 warnings préexistants bénins). **RESTE (lots de l'audit) :** B1, B4, B5, frein énergie élargi, déblocage thèmes HEBDO (1 random/semaine au lieu de XP — dépend de B2), suppression tâche enfant→appro parent, ménage parent + colonnes, Phase F pixel art (sprites 8-bit items + équipement sur avatar : perso centré, familier proportionné/visible). `PET_DAILY_CAP` 50→35 possible pour ralentir les familiers.
 
 > **Résumé v1.16 → v1.29** (détails complets dans la constante `CHANGELOG` de `src/App.jsx`) :
 > - **v1.16** panneau « Mes réglages » par enfant (son, mode calme/anti-flash, décompte calme, humour, focus une tâche) + `prefers-reduced-motion`.
