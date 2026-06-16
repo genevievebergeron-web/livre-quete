@@ -97,7 +97,8 @@ const mergeGS = (a, b, preferIncoming) => {
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
-    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins) : le « j'ai changé d'idée » TIENT
+    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins)
+    refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),

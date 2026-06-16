@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.68.0";
+const APP_VERSION = "1.69.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.69.0", date:"2026-06-16", features:[
+    "🛠️ VRAI correctif des pièces infinies (pour de bon) : « j'ai changé d'idée » ne rembourse qu'une seule fois par récompense, même quand l'appareil d'un autre enfant resynchronise. Plus aucune boucle de remboursement.",
+  ]},
   { version:"1.68.0", date:"2026-06-16", features:[
     "📋 Quand tu pars le minuteur d'un rituel, tu vois maintenant TOUTES ses tâches juste en dessous — coche-les au fur et à mesure sans quitter le minuteur!",
     "🎉 Quand tu termines un rituel AU COMPLET, une belle fête apparaît pour célébrer ta job. Bravo!",
@@ -1677,7 +1680,8 @@ const mergeGS = (a, b, preferIncoming) => {
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
-    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins) : un « j'ai changé d'idée » TIENT (l'union ré-ajoutait → remboursement infini)
+    boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins)
+    refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé cette semaine » (union increvable → fin des pièces infinies)
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
     equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),
@@ -1848,6 +1852,7 @@ const migrateGameState = (gs) => {
     ...gs,
     badges: gs.badges || [],
     boughtRewards: gs.boughtRewards || [],
+    refundedRewards: gs.refundedRewards || [], // v1.69.0 — tombstone anti-remboursement-infini
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
@@ -6897,12 +6902,25 @@ export default function App() {
   // Annuler une récompense réclamée (remet les pièces) — accessible enfant ET parent
   const handleUnclaimReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
-    // Anti-glitch : on ne rembourse QUE si la récompense est encore possédée (évite les remboursements infinis)
+    // v1.69.0 — VRAI fix « pièces infinies » : le remboursement est IDEMPOTENT par semaine.
+    // Cause restante (post-v1.63) : coins/boughtRewards sont en dernière-écriture-gagne au niveau
+    // FAMILLE → l'appareil d'un AUTRE enfant qui pousse un instantané périmé ressuscitait la
+    // récompense remboursée (le bouton revenait) → re-remboursement sans fin. On pose un tombstone
+    // `refundedRewards` (id#semaine, fusionné en UNION = increvable) : on ne rembourse qu'UNE fois.
+    const key=reward.id+"#"+weekKey();
     let did=false;
     setGameStates(gs=>{ const n=[...gs]; const p=n[idx];
-      if(!(p.boughtRewards||[]).includes(reward.id)) return gs; // déjà remboursée → rien
+      if(!(p.boughtRewards||[]).includes(reward.id)) return gs; // pas réclamée → rien
+      if((p.refundedRewards||[]).includes(key)){
+        // déjà remboursée cette semaine (revenue via une synchro) → on retire juste le bouton, AUCUNE pièce
+        n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id)}; persist(config,n); return n;
+      }
       did=true;
-      n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), coins:(p.coins||0)+(reward.coins||0)}; persist(config,n); return n; });
+      n[idx]={...p,
+        boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id),
+        coins:(p.coins||0)+priceOf(reward),                         // rembourse ce qui a été payé (×PRICE_MULT)
+        refundedRewards:[...new Set([...(p.refundedRewards||[]), key])].slice(-200) };
+      persist(config,n); return n; });
     if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
   },[config,persist,showToast]);
 
