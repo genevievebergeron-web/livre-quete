@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.67.0";
+const APP_VERSION = "1.68.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.68.0", date:"2026-06-16", features:[
+    "📋 Quand tu pars le minuteur d'un rituel, tu vois maintenant TOUTES ses tâches juste en dessous — coche-les au fur et à mesure sans quitter le minuteur!",
+    "🎉 Quand tu termines un rituel AU COMPLET, une belle fête apparaît pour célébrer ta job. Bravo!",
+  ]},
   { version:"1.67.0", date:"2026-06-16", features:[
     "🎮 Correctif : ton jeu de niveau se lance maintenant même si tu es DÉJÀ dans l'app quand un parent valide ta quête (avant, il fallait se déconnecter/reconnecter — tu voyais la notif mais le jeu ne partait pas).",
   ]},
@@ -1686,6 +1690,7 @@ const mergeGS = (a, b, preferIncoming) => {
     hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
     dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
+    ritualCelebrated: (()=>{ const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.68.0 (B5) — garde « rituel déjà fêté aujourd'hui »
     // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
     pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
@@ -3299,6 +3304,27 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const weekMine = allMine.filter(isWeekAss);
   const myRoutines = pState.routines || [];
   const activeRoutine = pMode==="routine" && pState.activeRoutineId ? myRoutines.find(r=>r.id===pState.activeRoutineId) : null;
+  // v1.68.0 (B5) — Fête quand un rituel est complété AU COMPLET (toutes ses tâches faites/en attente
+  // aujourd'hui). Avant : finir un rituel ne donnait rien de spécial. 1× par rituel par jour (garde
+  // ritualCelebrated, merge-safe). Pas d'XP ici (l'XP vient des quêtes/du minuteur) → 0 risque d'éco.
+  const [ritualWin, setRitualWin] = useState(null); // {name, emoji}
+  useEffect(()=>{
+    if(parentMode) return;
+    const day=todayStamp();
+    const rc=(pState.ritualCelebrated && pState.ritualCelebrated.day===day) ? (pState.ritualCelebrated.ids||[]) : [];
+    const isDone=k=>(pState.completed?.includes(k))||(pState.pending?.includes(k));
+    const fresh=[];
+    for(const r of (pState.routines||[])){
+      const items=(routineMine||[]).filter(a=>r.taskIds?.includes(a.instanceId));
+      if(items.length>0 && !rc.includes(r.id) && items.every(a=>isDone(a.instanceId+"_"+player.id+"#"+day))) fresh.push(r);
+    }
+    if(fresh.length){
+      onPatchState&&onPatchState({ ritualCelebrated:{ day, ids:[...rc, ...fresh.map(r=>r.id)] } });
+      try{ if(!CALM) spawnParticles(fresh[0].emoji||"⏰"); SFX.epic&&SFX.epic(); }catch{}
+      setRitualWin({ name:fresh[0].name, emoji:fresh[0].emoji||"⏰", n:fresh.length });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[pState.completed, pState.pending]);
   // Vue Semaine : on met en avant les tâches d'AUJOURD'HUI; le reste de la semaine va dans une section grisée
   const todayWeek = weekMine.filter(a=>Array.isArray(a.days)&&a.days.includes(todayDayIdx));
   const laterWeek = weekMine.filter(a=>!(Array.isArray(a.days)&&a.days.includes(todayDayIdx)));
@@ -3325,6 +3351,18 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
+      {/* v1.68.0 (B5) — bannière de fin de rituel (toute une routine complétée) */}
+      {ritualWin && (
+        <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:24,cursor:"pointer"}}>
+          <div style={{maxWidth:360,textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#2ECC40"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
+            <div style={{fontSize:60,lineHeight:1}}>{ritualWin.emoji}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#2ECC40",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff",lineHeight:1.3}}>Bravo, tu as fini « {ritualWin.name} » au complet! 🎉</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9ad29a",marginTop:8}}>Quelle belle job. 👏</div>
+            <button onClick={(e)=>{e.stopPropagation();setRitualWin(null);}} style={{marginTop:16,fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 22px",background:th.accent||"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>YEAH!</button>
+          </div>
+        </div>
+      )}
       {/* ✨ Évolution du familier — choix d'une voie élémentaire (niveaux 4/8/12) */}
       {!parentMode && _petPendingTier>0 && _eqPetId && (
         <EvolutionModal petId={_eqPetId} tier={_petPendingTier} evo={_eqPetEvo} th={th}
@@ -5614,7 +5652,7 @@ const computeCalendarReminders = (calendar, today) => {
 
 // ─── MINUTERIE (chrono + rituel + encouragements) ────────────
 const TIMER_ENCOURAGE=["Continue, tu es capable! 💪","Super rythme! ⚡","Tu gères ça comme un·e champion·ne! 🔥","Presque là, lâche pas! 🌟","Wow, quelle belle énergie! 🚀","Tu fais ça super bien! 👏"];
-function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete, initialRitualId }){
+function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete, initialRitualId, onCompleteTask }){
   const [childIdx,setChildIdx]=useState(sessionPlayer!=null?sessionPlayer:0);
   const [mode,setMode]=useState("deadline"); // deadline = heure de fin · down = minutes · up = chrono
   const [ritualId,setRitualId]=useState(initialRitualId||null);
@@ -5632,6 +5670,25 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
   const child=config.players[cidx]; const routines=(gameStates[cidx]?.routines)||[];
   const ritual=routines.find(r=>r.id===ritualId);
   const acc=th.accent||(child?.color)||"#FFD700";
+  // v1.68.0 (B4) — les TÂCHES du rituel, pour les cocher pendant le minuteur (avant : on n'y avait pas accès)
+  const _allT=[...TASK_CATALOG, ...((config&&config.customTasks)||[])];
+  const _pid=child?.id;
+  const _cgs=gameStates[cidx]||{};
+  const ritualTasks = ritual ? (ritual.taskIds||[]).map(iid=>{ const ass=(config.assignments||[]).find(a=>a.instanceId===iid); if(!ass)return null; const t=_allT.find(x=>x.id===ass.taskId); return t?{iid,ass,t}:null; }).filter(Boolean) : [];
+  const _taskStatus=(iid)=>{ const k=iid+"_"+_pid+"#"+todayStamp(); return _cgs.completed?.includes(k)?"done":(_cgs.pending?.includes(k)?"pending":null); };
+  const ritualChecklistEl = (ritual && ritualTasks.length>0) ? (
+    <div style={{display:"flex",flexDirection:"column",gap:6,background:"rgba(0,0,0,0.32)",borderRadius:8,padding:"9px 11px"}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:acc}}>📋 Tâches de « {ritual.name} »</div>
+      {ritualTasks.map(({iid,ass,t})=>{ const st=_taskStatus(iid); return (
+        <div key={iid} style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>{t.emoji}</span>
+          <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,color:st==="done"?"#2ECC40":"#eee",textDecoration:st?"line-through":"none",opacity:st?0.65:1}}>{t.label}</span>
+          {st==="done" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span>
+           : st==="pending" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFC107"}}>⏳ attente</span>
+           : <button onClick={()=>{ SFX.click&&SFX.click(); onCompleteTask&&onCompleteTask(ass,_pid); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"7px 10px",background:"#2ECC40",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer"}}>Fait!</button>}
+        </div> ); })}
+    </div>
+  ) : null;
   const elapsed=startTs?now-startTs:0;
   // Heure de fin : on vise HH:MM aujourd'hui (calculé au démarrage)
   const deadlineMs=(()=>{ if(mode!=="deadline"||!startTs) return 0; const [h,m]=endTime.split(":").map(Number); const dt=new Date(startTs); dt.setHours(h,m,0,0); if(dt.getTime()<startTs) dt.setDate(dt.getDate()+1); return dt.getTime(); })();
@@ -5672,6 +5729,8 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:ritual?"#2ECC40":"#888",lineHeight:1.3,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"6px 9px"}}>
           {ritual ? `🎁 Rituel « ${ritual.name} » : le réussir dans les temps donne de l'XP!` : "🛠️ Minuterie libre : c'est juste un outil pour t'aider — pas de récompense. Choisis un rituel ci-dessus pour gagner de l'XP."}
         </div>
+        {/* v1.68.0 (B4) — les tâches du rituel, cochables ici même */}
+        {ritualChecklistEl}
         {/* Durée (compte à rebours) */}
         {mode==="down" && <>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginTop:2}}>Combien de minutes? <b style={{color:acc}}>{targetMin} min</b></div>
@@ -5709,6 +5768,8 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         {urgent5
           ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,15px)",color:"#FFA94D",textAlign:"center",animation:"pulse 0.7s infinite"}}>🚀 LET'S GO! Plus que {Math.ceil(remaining/60000)} min!</div>
           : <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(elapsed/20000)%TIMER_ENCOURAGE.length]}</div>}
+        {/* v1.68.0 (B4) — coche les tâches du rituel pendant que le minuteur tourne */}
+        {ritualChecklistEl}
         <button onClick={succeed}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🎉 J'ai réussi!</button>
         <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
@@ -7180,7 +7241,7 @@ export default function App() {
           );
         })()}
         {view==="timer"&&(
-          <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone} initialRitualId={timerRitual}/>
+          <TimerView config={config} gameStates={gameStates} sessionPlayer={sessionPlayer} parentMode={parentMode} th={th} onComplete={handleRitualTimerDone} initialRitualId={timerRitual} onCompleteTask={requestComplete}/>
         )}
         {view==="family"&&(()=>{
           // v1.60.0 — stats familiales : quêtes accomplies par étiquette, agrégées sur tous les enfants
