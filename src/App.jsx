@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.71.0";
+const APP_VERSION = "1.72.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -417,6 +417,7 @@ const BADGES = [
   { id:"b_300tasks", emoji:"🛡️", name:"Vétéran des Corvées",   desc:"Complète 300 quêtes",        type:"general", check:(ps)=>(ps.completed?.length||0)>=300 },
   { id:"b_xp2500",   emoji:"☄️", name:"Comète",               desc:"Accumule 2500 XP",           type:"general", check:(ps)=>(ps.xp||0)>=2500 },
   { id:"b_day10",    emoji:"🌟", name:"Journée Marathon",     desc:"10 quêtes dans la même journée", type:"general", check:(ps,c)=>c>=10 },
+  { id:"b_boss",     emoji:"🐲", name:"Tombeur de Boss",      desc:"Vaincs un boss de famille en équipe", type:"general", check:()=>false }, // v1.72.0 — décerné à la victoire (pas via checkBadges)
 ];
 
 // v1.59.0 — compte les complétions par étiquette (catégorie de tâche) pour les badges par catégorie
@@ -1231,6 +1232,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.72.0", date:"2026-06-17", features:[
+    "🏆 Vaincre le boss de semaine, c'est maintenant un VRAI moment : célébration plein écran + récompense bonifiée — +40 🪙, +50 ⚡, et le nouveau badge « Tombeur de Boss » 🐲 pour toute la famille!",
+  ]},
   { version:"1.71.0", date:"2026-06-17", features:[
     "📅 Assignation enrichie (portail parent) : quand tu planifies une tâche, tu choisis maintenant les JOURS — « Chaque jour », « Lun–Ven », « Fin de semaine », ou des jours précis (récurrence par jour de la semaine).",
   ]},
@@ -6288,6 +6292,7 @@ export default function App() {
   const [newPin, setNewPin] = useState("");
   const [toast, setToast] = useState(null);
   const [rewardPopup, setRewardPopup] = useState(null);
+  const [bossWin, setBossWin] = useState(null); // v1.72.0 — célébration de victoire de boss
   const [miniGame, setMiniGame] = useState(null); // {player,playerIdx,level,playerThemeId,pendingReward}
   const [syncedAt, setSyncedAt] = useState(0); // dernier instant de synchro cloud réussie
   const [now, setNow] = useState(new Date());
@@ -6706,11 +6711,11 @@ export default function App() {
       const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
       let nb = {...boss, lastHitTs:new Date().toISOString()};
       const defeated = totalDmg >= (boss.hpMax||80);
-      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40}; } }
-      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 pour tout le monde!`} : null;
+      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40, xp:(n[i].xp||0)+50, badges:[...new Set([...(n[i].badges||[]),"b_boss"])]}; } } // v1.72.0 — récompense de victoire : +40🪙 +50XP + badge
+      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 chacun!`,"#FFD700",5000); },150); }
+      if(defeated){ setBossWin({name:boss.name,emoji:boss.emoji,color:boss.color}); setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 +50 XP chacun!`,"#FFD700",5000); },150); }
       else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`,"#FF6B6B",2200); },60); }
       return n;
     });
@@ -6735,11 +6740,11 @@ export default function App() {
       const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
       let nb = {...boss, lastHitTs:new Date().toISOString()};
       const defeated = totalDmg >= (boss.hpMax||80);
-      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40}; } }
-      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 pour tout le monde!`} : null;
+      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ n[i]={...n[i], coins:(n[i].coins||0)+40, xp:(n[i].xp||0)+50, badges:[...new Set([...(n[i].badges||[]),"b_boss"])]}; } } // v1.72.0 — récompense de victoire : +40🪙 +50XP + badge
+      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎉"); SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 chacun!`,"#FFD700",5000); },150); }
+      if(defeated){ setBossWin({name:boss.name,emoji:boss.emoji,color:boss.color}); setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! +40 🪙 +50 XP chacun!`,"#FFD700",5000); },150); }
       else { setTimeout(()=>{ try{ if(!CALM) spawnParticles("🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#FFD700",2800); },60); }
       return n;
     });
@@ -7419,6 +7424,17 @@ export default function App() {
 
       {parentPinOpen&&(
         <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#FF8C00"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
+      )}
+      {bossWin&&(
+        <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",cursor:"pointer"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#1a2e1a,#0c220c)",border:`5px solid ${bossWin.color||"#FFD700"}`,borderRadius:16,padding:"28px 26px",maxWidth:380,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",boxShadow:`0 0 50px ${bossWin.color||"#FFD700"}70`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
+            <div style={{fontSize:64,lineHeight:1,marginBottom:6}}>{bossWin.emoji||"🐲"}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#FFD700",marginBottom:8}}>🏆 VICTOIRE!</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:19,color:"#fff",marginBottom:8,lineHeight:1.3}}>Vous avez vaincu<br/><b style={{color:bossWin.color||"#FFD700"}}>{bossWin.name}</b> en équipe! 💪</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#2ECC40",margin:"12px 0",lineHeight:1.6}}>+40 🪙 · +50 ⚡<br/>🐲 Badge « Tombeur de Boss »!</div>
+            <button onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>🎉 Bravo!</button>
+          </div>
+        </div>
       )}
       {rewardPopup&&(
         <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
