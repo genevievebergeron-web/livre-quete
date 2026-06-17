@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.70.0";
+const APP_VERSION = "1.71.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.71.0", date:"2026-06-17", features:[
+    "📅 Assignation enrichie (portail parent) : quand tu planifies une tâche, tu choisis maintenant les JOURS — « Chaque jour », « Lun–Ven », « Fin de semaine », ou des jours précis (récurrence par jour de la semaine).",
+  ]},
   { version:"1.70.0", date:"2026-06-17", features:[
     "🔓 Validation parent depuis une session enfant : entrer le code te ramène maintenant au portail parent (avec « À valider ») — avant, ça restait coincé dans la vue de l'enfant.",
     "🪟 Balayage des fenêtres : plus de débordement hors écran et défilement partout (popup quête/rituel terminé, formulaire bug, coffre, célébrations, mini-jeux, niveau, code parent).",
@@ -4578,6 +4581,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addTaskId, setAddTaskId] = useState("");
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
+  const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
@@ -4714,19 +4718,34 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                 </div>;
               })}
             </div>
-            {/* Type de tâche : routine (sans jour) ou semaine (Lun–Ven) */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>TYPE DE TÂCHE</div>
+            {/* v1.71.0 — Quand : rituel (chaque jour, sans planif) OU planifié (jours choisis = récurrence) */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>QUAND?</div>
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["routine","⏰ Rituel"],["week","📅 Semaine"]].map(([k,l])=>(
+              {[["routine","⏰ Rituel"],["week","📅 Planifié"]].map(([k,l])=>(
                 <button key={k} onClick={()=>{setAddType(k);SFX.click();}}
                   style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:addType===k?"#FF8C00":"#1a1a1a",color:addType===k?"#000":"#888",border:`2px solid ${addType===k?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
             </div>
-            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length){ onAddAssignment(addTaskId,addPlayerIds,addType); setAddTaskId(""); } }}
-              color={addTaskId&&addPlayerIds.length?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length?1:0.5,marginBottom:8}}>
-              ➕ Ajouter ({addType==="week"?"semaine":"routine"})
+            {addType==="week" && (()=>{ const eq=(dd)=>JSON.stringify([...addDays].sort((a,b)=>a-b))===JSON.stringify([...dd].sort((a,b)=>a-b)); return (
+              <div style={{marginBottom:8}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:5}}>RÉCURRENCE — QUELS JOURS?</div>
+                <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
+                  {[["Chaque jour",[0,1,2,3,4,5,6]],["Lun–Ven",[0,1,2,3,4]],["Fin de sem.",[5,6]]].map(([lbl,dd])=>(
+                    <button key={lbl} onClick={()=>{SFX.click();setAddDays(dd);}} style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 10px",background:eq(dd)?"#FF8C00":"#1a1a1a",color:eq(dd)?"#000":"#bbb",border:"2px solid #444",borderRadius:14,cursor:"pointer"}}>{lbl}</button>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:3}}>
+                  {DAYS_SHORT.map((d,i)=>{ const on=addDays.includes(i); return (
+                    <button key={i} onClick={()=>{SFX.click();setAddDays(a=>on?a.filter(x=>x!==i):[...a,i]);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px 0",background:on?"#FF8C00":"#1a1a1a",color:on?"#000":"#666",border:`2px solid ${on?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>{d[0]}</button>
+                  );})}
+                </div>
+              </div>
+            ); })()}
+            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)){ onAddAssignment(addTaskId,addPlayerIds,addType,addDays); setAddTaskId(""); } }}
+              color={addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?1:0.5,marginBottom:8}}>
+              ➕ Ajouter {addType==="week"?`(${addDays.length} jour${addDays.length>1?"s":""}/sem.)`:"(rituel)"}
             </PBtn>
             <button onClick={()=>{ SFX.click(); setCustomOpen(true); }}
               style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #FF8C0060",color:"#FF8C00",borderRadius:4,cursor:"pointer",marginBottom:14}}>
@@ -6646,10 +6665,10 @@ export default function App() {
 
   // ── Gestion des tâches depuis le portail parent ──────────
   // Ajoute une tâche pour chaque joueur coché (copies indépendantes, comme le wizard)
-  const handleAddAssignment = useCallback((taskId, playerIds, assType)=>{
+  const handleAddAssignment = useCallback((taskId, playerIds, assType, customDays)=>{
     if(!taskId||!playerIds?.length)return;
-    // assType: "week" → tâche de semaine (jours Lun–Ven par défaut); sinon → routine (sans jour)
-    const days = assType==="week" ? [0,1,2,3,4] : [];
+    // assType: "week" → tâche planifiée (jours choisis = récurrence hebდo par jour); sinon → routine (sans jour)
+    const days = assType==="week" ? ((Array.isArray(customDays)&&customDays.length)?[...customDays].sort((a,b)=>a-b):[0,1,2,3,4]) : [];
     const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:"",createdAt:Date.now()}));
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
