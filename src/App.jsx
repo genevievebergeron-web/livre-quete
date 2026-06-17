@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.74.0";
+const APP_VERSION = "1.75.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1235,6 +1235,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.75.0", date:"2026-06-17", features:[
+    "🖼️ Les familiers peuvent maintenant afficher de vraies illustrations pixel art (sprites PNG) — préparation pour les nouveaux dessins. Si une image existe, elle s'affiche; sinon, le familier dessiné actuel reste.",
+  ]},
   { version:"1.74.0", date:"2026-06-17", features:[
     "🏆 Victoire du boss, en mieux : les 4 enfants reçoivent la grande notification de victoire à leur PROCHAINE connexion (plus seulement celui qui porte le coup final), et chacun gagne un ITEM ULTRA LÉGENDAIRE aléatoire 🎁 — en plus des +40 🪙, +50 ⚡ et du badge 🐲.",
   ]},
@@ -2861,10 +2864,14 @@ function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true })
 
 // v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
 function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary=false, style={} }) {
-  const canvasRef = useRef(null);
   const key = petKey || petSpriteKey(itemId);
-  useEffect(()=>{ const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride, legendary); },[key,size,palOverride,legendary]);
+  const [imgFail, setImgFail] = useState(false); // v1.75.0 — repli sur le canvas si pas de PNG
+  const canvasRef = useRef(null);
+  // PNG seulement pour la forme de base (pas évoluée) : `public/sprites/pets/<key>.png`. Évolué/Légendaire = canvas recoloré.
+  const usePng = !imgFail && !palOverride && !legendary && !!key;
+  useEffect(()=>{ if(usePng) return; const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride, legendary); },[usePng,key,size,palOverride,legendary]);
   if(!key) return null;
+  if(usePng) return <img src={`/sprites/pets/${key}.png`} width={size} height={size} alt="" onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",objectFit:"contain",...style}}/>;
   return <canvas ref={canvasRef} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
 
