@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.72.0";
+const APP_VERSION = "1.73.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1232,6 +1232,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.73.0", date:"2026-06-17", features:[
+    "⏱️ Minuteur intégré dans ton rituel : juste sous tes tâches, choisis ⏳ Minuterie (compte à rebours), ⏰ Heure butoir (jusqu'à une heure précise) ou ⏱ Chrono — sans changer d'écran. (Le minuteur plein écran avec XP reste dispo en dessous.)",
+  ]},
   { version:"1.72.0", date:"2026-06-17", features:[
     "🏆 Vaincre le boss de semaine, c'est maintenant un VRAI moment : célébration plein écran + récompense bonifiée — +40 🪙, +50 ⚡, et le nouveau badge « Tombeur de Boss » 🐲 pour toute la famille!",
   ]},
@@ -3273,6 +3276,47 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   );
 }
 
+// v1.73.0 — minuteur compact INLINE pour la vue rituel (3 modes : minuterie / heure butoir / chrono)
+function InlineRitualTimer({ endTime, accent }){
+  const [mode,setMode]=useState("down"); const [running,setRunning]=useState(false);
+  const [secs,setSecs]=useState(0); const [mins,setMins]=useState(10); const [endT,setEndT]=useState(endTime||"08:00");
+  const ref=useRef(null);
+  useEffect(()=>{ if(!running){ if(ref.current)clearInterval(ref.current); return; }
+    ref.current=setInterval(()=>{ setSecs(s=>{ if(mode==="up") return s+1; if(s<=1){ try{ if(!CALM)spawnParticles("⏰"); SFX.epic&&SFX.epic(); }catch{} setRunning(false); return 0; } return s-1; }); },1000);
+    return ()=>clearInterval(ref.current);
+  },[running,mode]);
+  const acc=accent||"#FFD700";
+  const start=()=>{ let s=0; if(mode==="down") s=Math.max(1,mins)*60; else if(mode==="deadline"){ const [h,m]=(endT||"08:00").split(":").map(Number); const now=new Date(); const end=new Date(); end.setHours(h||0,m||0,0,0); if(end<now) end.setDate(end.getDate()+1); s=Math.max(0,Math.round((end-now)/1000)); } else s=0; setSecs(s); setRunning(true); };
+  const fmt=(s)=>{ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; return (h>0?h+":"+String(m).padStart(2,"0"):String(m))+":"+String(ss).padStart(2,"0"); };
+  const low=mode!=="up"&&running&&secs<=60;
+  return (
+    <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:10,padding:12,marginTop:6}}>
+      <div style={{display:"flex",gap:5,marginBottom:8}}>
+        {[["down","⏳ Minuterie"],["deadline","⏰ Heure butoir"],["up","⏱ Chrono"]].map(([k,l])=>(
+          <button key={k} onClick={()=>{ if(SFX.click)SFX.click(); setMode(k); setRunning(false); setSecs(0); }} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:6,lineHeight:1.4,padding:"7px 3px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#000":"#888",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {!running && mode==="down" && (
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8,justifyContent:"center"}}>
+          {[2,5,10,15,30].map(m=>(<button key={m} onClick={()=>{if(SFX.click)SFX.click();setMins(m);}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 11px",background:mins===m?acc:"#1a1a1a",color:mins===m?"#000":"#bbb",border:"2px solid #444",borderRadius:12,cursor:"pointer"}}>{m} min</button>))}
+        </div>
+      )}
+      {!running && mode==="deadline" && (
+        <div style={{textAlign:"center",marginBottom:8}}>
+          <input type="time" value={endT} onChange={e=>setEndT(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:18,padding:"6px 10px",background:"#111",color:"#fff",border:`2px solid ${acc}`,borderRadius:6}}/>
+        </div>
+      )}
+      <div style={{textAlign:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(20px,5vw,32px)",color:low?"#FF4444":acc,margin:"6px 0 10px"}}>{fmt(secs)}</div>
+      <div style={{display:"flex",gap:6}}>
+        {!running
+          ? <button onClick={()=>{if(SFX.click)SFX.click();start();}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶ Partir</button>
+          : <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#FF8C00",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>⏸ Pause</button>}
+        <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);setSecs(0);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"11px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:6,cursor:"pointer"}}>↺ Reset</button>
+      </div>
+    </div>
+  );
+}
+
 function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
@@ -3965,11 +4009,15 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       </>)}
       {homeTab==="jour" && (<>
-      {/* Partir le minuteur de ce rituel (heure de fin → XP à la complétion) */}
+      {/* v1.73.0 — minuteur INLINE dans la fenêtre du rituel (3 modes : minuterie / heure butoir / chrono) */}
+      {activeRoutine && (
+        <InlineRitualTimer endTime={activeRoutine.endTime} accent={th.accent||player.color}/>
+      )}
+      {/* Minuteur plein écran (heure de fin → XP à la complétion du rituel) */}
       {activeRoutine && onGoTimer && (
         <button onClick={()=>{SFX.click();onGoTimer(activeRoutine.id);}}
-          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:th.accent||player.color,border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
-          ⏱️ Partir le minuteur de ce rituel{activeRoutine.endTime?` (jusqu'à ${activeRoutine.endTime.replace(":","h")})`:""}
+          style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:th.accent||player.color,background:"transparent",border:`1px solid ${(th.accent||player.color)}55`,borderRadius:4,cursor:"pointer",marginTop:4}}>
+          ⛶ Minuteur plein écran (avec XP){activeRoutine.endTime?` · ${activeRoutine.endTime.replace(":","h")}`:""}
         </button>
       )}
       {/* Terminer la routine → retour au mode Semaine */}
