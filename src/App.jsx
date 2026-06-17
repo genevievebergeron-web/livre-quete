@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.69.0";
+const APP_VERSION = "1.70.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1231,6 +1231,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.70.0", date:"2026-06-17", features:[
+    "🔓 Validation parent depuis une session enfant : entrer le code te ramène maintenant au portail parent (avec « À valider ») — avant, ça restait coincé dans la vue de l'enfant.",
+    "🪟 Balayage des fenêtres : plus de débordement hors écran et défilement partout (popup quête/rituel terminé, formulaire bug, coffre, célébrations, mini-jeux, niveau, code parent).",
+  ]},
   { version:"1.69.0", date:"2026-06-16", features:[
     "🛠️ VRAI correctif des pièces infinies (pour de bon) : « j'ai changé d'idée » ne rembourse qu'une seule fois par récompense, même quand l'appareil d'un autre enfant resynchronise. Plus aucune boucle de remboursement.",
   ]},
@@ -2078,7 +2082,7 @@ const Platformer = ({ player, onClose }) => {
   },[]);
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:pt.accent,textShadow:`0 0 16px ${pt.glow}`}}>
         {pt.icon} LEVEL UP — Mini-Niveau! {pt.icon}
       </div>
@@ -2151,7 +2155,7 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   }, [press]);
   const T = th || THEMES.minecraft;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       <div style={{background:`linear-gradient(135deg,${T.bg},#1a1a2e)`,border:`5px solid ${T.accent}`,borderRadius:10,padding:"20px 24px",textAlign:"center",maxWidth:360,width:"100%",maxHeight:"calc(100vh - 32px)",overflowY:"auto",boxSizing:"border-box",boxShadow:`0 0 50px ${T.accent}60`,animation:"bounceIn 0.35s ease"}}>
         <div style={{fontSize:36,marginBottom:6}}>👩‍💻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:6}}>VALIDATION PARENT</div>
@@ -3358,8 +3362,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
       {/* v1.68.0 (B5) — bannière de fin de rituel (toute une routine complétée) */}
       {ritualWin && (
-        <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:24,cursor:"pointer"}}>
-          <div style={{maxWidth:360,textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#2ECC40"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
+        <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",cursor:"pointer"}}>
+          <div style={{maxWidth:360,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#2ECC40"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
             <div style={{fontSize:60,lineHeight:1}}>{ritualWin.emoji}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#2ECC40",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff",lineHeight:1.3}}>Bravo, tu as fini « {ritualWin.name} » au complet! 🎉</div>
@@ -3422,7 +3426,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       })()}
       {/* 🐛 Signaler un bug → envoyé au parent */}
       {bugOpen && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#FF8C00"}}>🐛 J'ai trouvé un bug</div>
             <button onClick={()=>{setBugOpen(false);setBugText("");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
@@ -4072,7 +4076,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       {chestReveal && (()=>{ const it=chestReveal.item, rar=rarityOf(it.cost);
         return (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,textAlign:"center"}}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,textAlign:"center",overflowY:"auto",boxSizing:"border-box"}}>
             <ChestSprite open={true} size={110}/>
             <div style={{fontSize:48}}>{it.emoji}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
@@ -5176,7 +5180,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
   const bonusCoins = BONUS_COINS[tier];
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>🏃</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5415,7 +5419,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
   const dpad = (dx, dy) => { if (stRef.current) stRef.current.pNextDir = {dx,dy}; };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:12}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:12,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>👻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5504,7 +5508,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
   const msg = score === 3 ? "PARFAIT! 🔥" : score >= 2 ? "Bien joué!" : score === 1 ? "Pas mal!" : "La prochaine fois!";
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:40}}>{TARGET}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent,textAlign:"center",textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5582,7 +5586,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
   }
   if (phase === "countdown") {
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
         <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#aaa"}}>{INFO.icon} {INFO.name}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#2ECC40",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
           {count>0 ? count : "GO!"}
@@ -7395,7 +7399,7 @@ export default function App() {
       )}
 
       {parentPinOpen&&(
-        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{setParentMode(p=>!p);setParentPinOpen(false);showToast(parentMode?"🔒 Mode parent désactivé":"🔓 Mode parent activé!","#FF8C00");}} onCancel={()=>setParentPinOpen(false)} th={th}/>
+        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#FF8C00"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
       )}
       {rewardPopup&&(
         <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
