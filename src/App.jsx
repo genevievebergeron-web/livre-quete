@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.75.0";
+const APP_VERSION = "1.76.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -301,6 +301,22 @@ const familyHp = (boss, enraged=false) => {
 const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
 const bossDamageTotal = (gameStates, bossId) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0);
 const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
+// v1.76.0 — l'Hydre ne peut être ACHEVÉE que si toutes les corvées du jour (cust_hydre_) sont complétées par les enfants assignés
+const bossQuestsAllDone = (config, states) => {
+  try {
+    const todayIdx=(new Date().getDay()+6)%7, stamp=todayStamp();
+    const corv=(config?.assignments||[]).filter(a=>typeof a.taskId==="string" && a.taskId.startsWith("cust_hydre_") && Array.isArray(a.days) && a.days.includes(todayIdx));
+    if(!corv.length) return true; // aucune corvée d'Hydre aujourd'hui → pas de verrou
+    for(const a of corv){
+      for(const pid of (a.playerIds||[])){
+        const idx=(config.players||[]).findIndex(p=>p.id===pid);
+        if(idx<0) continue;
+        if(!((states[idx]?.completed||[]).includes(a.instanceId+"_"+pid+"#"+stamp))) return false;
+      }
+    }
+    return true;
+  } catch(e){ return true; }
+};
 // v1.58.0 — modificateur du JOUR (surprise + stratégie), déterministe par date+boss → identique sur tous les appareils
 const BOSS_MODIFIERS = [
   { id:"grosse",   emoji:"💥", label:"Jour des grosses", desc:"Les grosses attaques font +2 dégâts!" },
@@ -1326,6 +1342,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.76.0", date:"2026-07-01", features:[
+    "🐉 L'Hydre à deux têtes a maintenant son propre look : un vrai monstre à deux têtes (une jaune, une bleue) au lieu du dragon habituel!",
+    "🔒 L'Hydre ne peut être ACHEVÉE que si TOUTES les corvées du jour sont faites — vous pouvez l'affaiblir, mais le coup final n'entre que quand tout le monde a terminé ses quêtes. Travail d'équipe! 💪",
+  ]},
   { version:"1.75.0", date:"2026-06-17", features:[
     "🖼️ Les familiers peuvent maintenant afficher de vraies illustrations pixel art (sprites PNG) — préparation pour les nouveaux dessins. Si une image existe, elle s'affiche; sinon, le familier dessiné actuel reste.",
   ]},
@@ -3010,10 +3030,32 @@ const BOSSES = [
   { id:"kraken", name:"Kraken des Corvées",  color:"#2E6FD6", belly:"#A9C9F4", eye:"#FFD93B", emoji:"🐙" },
 ];
 // Dessine un monstre pixel original (corps, ventre, cornes, yeux, dents, taches)
+function renderHydraToCtx(ctx, boss, W, H, s){
+  // v1.76.0 — sprite HYDRE À DEUX TÊTES (tête gauche = boss.eye, tête droite = boss.belly)
+  const body=boss?.color||"#2FA37A", cA=boss?.eye||"#FFD23F", cB=boss?.belly||"#3FA9FF", dk="rgba(0,0,0,0.20)";
+  const head=(hx,hy,c)=>{
+    ctx.fillStyle="#efe3c0"; ctx.fillRect(hx+s(0),hy-s(1),s(1),s(2)); ctx.fillRect(hx+s(4),hy-s(1),s(1),s(2)); // cornes
+    ctx.fillStyle=c; ctx.fillRect(hx,hy,s(6),s(5)); ctx.fillRect(hx+s(1),hy+s(4),s(5),s(2));                // crâne + museau
+    ctx.fillStyle=dk; ctx.fillRect(hx+s(1),hy+s(1),s(4),s(1));                                              // écaille front
+    ctx.fillStyle="#fff"; ctx.fillRect(hx+s(1),hy+s(2),s(2),s(2)); ctx.fillRect(hx+s(3),hy+s(2),s(2),s(2)); // yeux
+    ctx.fillStyle="#111"; ctx.fillRect(hx+s(1),hy+s(2),s(1),s(2)); ctx.fillRect(hx+s(4),hy+s(2),s(1),s(2)); // pupilles fâchées
+    ctx.fillStyle="#3a0d0d"; ctx.fillRect(hx+s(2),hy+s(5),s(2),s(1));                                        // gueule
+  };
+  // corps
+  ctx.fillStyle=body; ctx.fillRect(s(6),s(15),s(12),s(7)); ctx.fillRect(s(5),s(17),s(14),s(4));
+  ctx.fillStyle=dk; ctx.fillRect(s(9),s(18),s(6),s(3));
+  // deux cous (S vers chaque tête)
+  ctx.fillStyle=body; ctx.fillRect(s(7),s(9),s(3),s(8)); ctx.fillRect(s(14),s(9),s(3),s(8));
+  ctx.fillStyle=dk; ctx.fillRect(s(7),s(11),s(3),s(1)); ctx.fillRect(s(14),s(13),s(3),s(1)); // écailles
+  // deux têtes
+  head(s(3),s(3),cA);   // gauche = jaune
+  head(s(15),s(3),cB);  // droite = bleue
+}
 function renderBossToCtx(ctx, boss, W=120, H=120){
   const sc=W/24, s=v=>Math.round(v*sc);
   ctx.clearRect(0,0,W,H);
   const col=boss?.color||"#7B3FF2", belly=boss?.belly||"#C9B3F7", eye=boss?.eye||"#FFE14D";
+  if(boss?.sprite==="hydra" || /hydre|hydra/i.test(boss?.name||"")){ renderHydraToCtx(ctx, boss, W, H, s); ctx.strokeStyle="#000"; ctx.lineWidth=Math.max(1,s(0.4)); return; }
   // Cornes
   ctx.fillStyle="#2a2230";
   ctx.fillRect(s(4),s(1),s(3),s(4)); ctx.fillRect(s(17),s(1),s(3),s(4));
@@ -6877,15 +6919,18 @@ export default function App() {
       const mod = bossModifierOfDay(bid); const dmg = bossAtkDamage(type, mod); // v1.58.0 — modificateur du jour
       const newBB={...bb, spent:bb.spent+atk.cost, dmg:bb.dmg+dmg};
       n[playerIdx]={...p, bossBattle:newBB};
-      const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
       let nb = {...boss, lastHitTs:new Date().toISOString()};
-      const defeated = totalDmg >= (boss.hpMax||80);
+      const HPMAX=(boss.hpMax||80), questsDone=bossQuestsAllDone(cfgRef.current, n);
+      if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
+      const locked = !questsDone && totalDmg >= HPMAX-1;
+      const defeated = questsDone && totalDmg >= HPMAX;
       if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
       if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#FFD700",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`,"#FF6B6B",2200); },60); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#FF6B6B",locked?3600:2200); },60); }
       return n;
     });
   },[persist,showToast]);
@@ -6906,15 +6951,18 @@ export default function App() {
       const dmg = petAttackDamage(petLv, legend, mod);
       const newBB={...bb, spent:bb.spent+PET_ATTACK_COST, dmg:bb.dmg+dmg};
       n[playerIdx]={...p, bossBattle:newBB};
-      const totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
       let nb = {...boss, lastHitTs:new Date().toISOString()};
-      const defeated = totalDmg >= (boss.hpMax||80);
+      const HPMAX=(boss.hpMax||80), questsDone=bossQuestsAllDone(cfgRef.current, n);
+      if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
+      const locked = !questsDone && totalDmg >= HPMAX-1;
+      const defeated = questsDone && totalDmg >= HPMAX;
       if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
       if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#FFD700",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles("🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#FFD700",2800); },60); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#FFD700",locked?3600:2800); },60); }
       return n;
     });
   },[gameStates,persist,showToast]);
