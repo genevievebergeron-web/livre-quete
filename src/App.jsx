@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.76.0";
+const APP_VERSION = "1.77.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.77.0", date:"2026-07-01", features:[
+    "🎮 COMBAT FINAL! Dans l'onglet ⚔️ BOSS, un nouveau bouton « 🐉 Combat final » lance un vrai mini-jeu plateforme : tu affrontes ta tête d'Hydre avec TON avatar et TON familier, tu tires des flèches et tu sautes par-dessus le feu (3 vies). Jouable au doigt sur cellulaire et tablette!",
+  ]},
   { version:"1.76.0", date:"2026-07-01", features:[
     "🐉 L'Hydre à deux têtes a maintenant son propre look : un vrai monstre à deux têtes (une jaune, une bleue) au lieu du dragon habituel!",
     "🔒 L'Hydre ne peut être ACHEVÉE que si TOUTES les corvées du jour sont faites — vous pouvez l'affaiblir, mais le coup final n'entre que quand tout le monde a terminé ses quêtes. Travail d'équipe! 💪",
@@ -3083,6 +3086,39 @@ function BossSprite({ boss, size=120, style={} }){
   return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
 
+// v1.77.0 — COMBAT FINAL : mini-jeu plateforme (fichier statique /combat-hydre.html) en iframe isolée,
+// avec le VRAI avatar (renderAvatarToCtx) et le VRAI familier (renderPetToCtx) de l'enfant.
+function HydraFinalGame({ player, pState, color, onClose }){
+  const iframeRef = useRef(null);
+  const data = useMemo(()=>{
+    const dk=(h)=>{ try{ let c=(h||"#FFD23F").replace("#",""); if(c.length===3)c=c.split("").map(x=>x+x).join(""); const f=v=>Math.max(0,Math.round(parseInt(v,16)*0.6)).toString(16).padStart(2,"0"); return "#"+f(c.slice(0,2))+f(c.slice(2,4))+f(c.slice(4,6)); }catch(e){ return "#7a5a12"; } };
+    let hero="", pet="";
+    try{ const hc=document.createElement("canvas"); hc.width=hc.height=96;
+      renderAvatarToCtx(hc.getContext("2d"), pState.avatar||DEFAULT_AVATAR, getPlayerTheme(player.themeId).charBodyColor||player.color, 96,96,false);
+      hero=hc.toDataURL("image/png"); }catch(e){}
+    try{ const pid=pState.equipped&&pState.equipped.pet; const key=petSpriteKey(pid);
+      if(key){ const pc=document.createElement("canvas"); pc.width=pc.height=96;
+        const evo=(pState.petEvo||{})[pid]; const lv=petLevel((pState.petXp||{})[pid]||0);
+        renderPetToCtx(pc.getContext("2d"), key, 96, petPalOverride(evo), petIsLegendary(evo,lv)); pet=pc.toDataURL("image/png"); } }catch(e){}
+    const col=color||player.color||"#FFD23F";
+    return { type:"hg-init", name:displayName(player), color:col, dark:dk(col), hero, pet };
+  },[player,pState,color]);
+  useEffect(()=>{
+    const onMsg=(e)=>{ if(e && e.data && e.data.type==="hg-close") onClose && onClose(); };
+    window.addEventListener("message", onMsg);
+    return ()=>window.removeEventListener("message", onMsg);
+  },[onClose]);
+  const send=()=>{ try{ iframeRef.current && iframeRef.current.contentWindow.postMessage(data,"*"); }catch(e){} };
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:4000,background:"#000"}}>
+      <iframe ref={iframeRef} src="/combat-hydre.html" onLoad={()=>{ send(); setTimeout(send,250); }} title="Combat final de l'Hydre"
+        style={{width:"100%",height:"100%",border:"none",display:"block"}}/>
+      <button onClick={onClose} aria-label="Fermer"
+        style={{position:"absolute",top:10,right:10,zIndex:4001,width:40,height:40,borderRadius:20,border:"2px solid #fff",background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:20,lineHeight:"36px",cursor:"pointer"}}>✕</button>
+    </div>
+  );
+}
+
 // ─── BADGES PIXEL-ART (médaillon + symbole représentatif, sans emoji) ─────────
 // Symbole déduit du badge (représentatif du défi)
 const badgeSymbol = (b)=>{
@@ -3503,6 +3539,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [themeRevealed, setThemeRevealed] = useState(false);
   const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
+  const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
   const [calOpen, setCalOpen] = useState(false);
   const [calForm, setCalForm] = useState({type:"devoir", label:"", date:""});
   const T = th;
@@ -4436,6 +4473,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#FF4444,#FFD700)",transition:"width 0.5s"}}/></div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
+            <button onClick={()=>{ if(SFX.click)SFX.click(); setFinalBattle(true); }}
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1.5,padding:"13px 8px",background:"linear-gradient(90deg,#7B2FF2,#FF5555)",color:"#fff",border:"2px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 3px 0 #000"}}>
+              🐉 COMBAT FINAL<br/><span style={{fontFamily:"'VT323',monospace",fontSize:13}}>Affronte ta tête d'Hydre en mini-jeu!</span>
+            </button>
             {!won && <div style={{background:`${boss.color||"#FF5555"}22`,border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"7px 10px",textAlign:"center"}}>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>{mod.emoji} {mod.label} (aujourd'hui)</span>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#eee"}}>{mod.desc}</div>
@@ -4482,6 +4523,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
     {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
       onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
       allShopItems={allShopItemsFlat} th={th}/>}
+    {finalBattle && <HydraFinalGame player={player} pState={pState} color={player.color} onClose={()=>setFinalBattle(false)}/>}
     </div>
   );
 }
