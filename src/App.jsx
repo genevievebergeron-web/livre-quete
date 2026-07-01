@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.77.0";
+const APP_VERSION = "1.78.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.78.0", date:"2026-07-01", features:[
+    "🪟 Correctif d'affichage : les fenêtres de félicitations et écrans de mini-jeu (niveau atteint, boss vaincu, récompense) ne peuvent plus être coupés en haut de l'écran sur les petits écrans — elles se centrent quand ça rentre et défilent quand c'est trop grand.",
+  ]},
   { version:"1.77.0", date:"2026-07-01", features:[
     "🎮 COMBAT FINAL! Dans l'onglet ⚔️ BOSS, un nouveau bouton « 🐉 Combat final » lance un vrai mini-jeu plateforme : tu affrontes ta tête d'Hydre avec TON avatar et TON familier, tu tires des flèches et tu sautes par-dessus le feu (3 vies). Jouable au doigt sur cellulaire et tablette!",
   ]},
@@ -2215,7 +2218,7 @@ const Platformer = ({ player, onClose }) => {
   },[]);
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:pt.accent,textShadow:`0 0 16px ${pt.glow}`}}>
         {pt.icon} LEVEL UP — Mini-Niveau! {pt.icon}
       </div>
@@ -2288,7 +2291,7 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   }, [press]);
   const T = th || THEMES.minecraft;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       <div style={{background:`linear-gradient(135deg,${T.bg},#1a1a2e)`,border:`5px solid ${T.accent}`,borderRadius:10,padding:"20px 24px",textAlign:"center",maxWidth:360,width:"100%",maxHeight:"calc(100vh - 32px)",overflowY:"auto",boxSizing:"border-box",boxShadow:`0 0 50px ${T.accent}60`,animation:"bounceIn 0.35s ease"}}>
         <div style={{fontSize:36,marginBottom:6}}>👩‍💻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:6}}>VALIDATION PARENT</div>
@@ -2349,7 +2352,7 @@ function spawnParticles(emoji) {
 function RewardPopup({ task, player, newBadges, onClose, th }) {
   const T = th || THEMES.minecraft;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto"}}>
       <div style={{background:T.bg,border:`6px solid ${T.accent}`,borderRadius:10,padding:"clamp(18px,4vw,30px) clamp(20px,5vw,40px)",textAlign:"center",maxWidth:440,width:"90%",maxHeight:"90vh",overflowY:"auto",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
         <div style={{fontSize:60,marginBottom:10}}>{task.emoji}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:T.accent,marginBottom:8}}>⚡ QUÊTE {(getPlayerTheme(player?.themeId)?.taskVerb||"validée").toUpperCase()}!</div>
@@ -2736,7 +2739,7 @@ function SetupWizard({ existing, onDone }) {
                     <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:sel?"#fff":"#aaa"}}>{r.label}</div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙 {r.coins} pièces</div>
                   </div>
-                  <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
+                  <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"safe center",color:"#000",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
                 </div>
               );
             })}
@@ -2810,7 +2813,7 @@ function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx }) {
     <div style={{overflowX:"auto",paddingBottom:8}}>
       <div style={{display:"grid",gridTemplateColumns:`120px repeat(7,1fr)`,gap:2,minWidth:700}}>
         {/* Header */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555",display:"flex",alignItems:"center",justifyContent:"center"}}>TÂCHE</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555",display:"flex",alignItems:"center",justifyContent:"safe center"}}>TÂCHE</div>
         {DAYS_SHORT.map((d,i)=>(
           <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"#888",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
             {d}{i===todayDayIdx&&<div style={{fontSize:5,color:th.accent,marginTop:2}}>▲</div>}
@@ -3009,7 +3012,7 @@ function EvolutionModal({ petId, tier, evo, onChoose, th }) {
   const spriteKey = petSpriteKey(petId);
   const legend = tier===3;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto",textAlign:"center"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",padding:20,overflowY:"auto",textAlign:"center"}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,1.9vw,16px)",color:acc,marginBottom:6}}>✨ ÉVOLUTION! ✨</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff",marginBottom:18,maxWidth:360,lineHeight:1.35}}>{legend?"Ton familier atteint sa forme finale! Choisis sa voie Légendaire :":"Ton familier veut évoluer. Choisis sa voie élémentaire :"}</div>
       <div style={{display:"flex",gap:18,flexWrap:"wrap",justifyContent:"center"}}>
@@ -3295,7 +3298,7 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
   const update = (part, id) => { SFX.click(); onUpdateAvatar({...avatarDef,[part]:id}); };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"safe center",padding:12}}>
       <div style={{background:pt.bg||"#1a1a2e",border:`2px solid ${pt.accent||"#FFD700"}88`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -3609,7 +3612,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
     <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
       {/* v1.68.0 (B5) — bannière de fin de rituel (toute une routine complétée) */}
       {ritualWin && (
-        <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",cursor:"pointer"}}>
+        <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
           <div style={{maxWidth:360,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#2ECC40"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
             <div style={{fontSize:60,lineHeight:1}}>{ritualWin.emoji}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#2ECC40",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
@@ -3911,7 +3914,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           const done = pState.completed?.includes(doneKey);
           return (
             <div key={rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":"#5DECF5"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
-              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
               <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#5DECF5",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
               <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
@@ -4098,7 +4101,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         const pending=pState.pending?.includes(doneKey);
         return (
           <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":pending?"#FFD700":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
-            {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+            {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
@@ -4327,7 +4330,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       {chestReveal && (()=>{ const it=chestReveal.item, rar=rarityOf(it.cost);
         return (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,textAlign:"center",overflowY:"auto",boxSizing:"border-box"}}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:20,textAlign:"center",overflowY:"auto",boxSizing:"border-box"}}>
             <ChestSprite open={true} size={110}/>
             <div style={{fontSize:48}}>{it.emoji}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
@@ -4545,7 +4548,7 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
   const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
   const maxXp = Math.max(...siblings.map(s=>s.xp),1);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16}} onClick={onClose}>
       <div style={{background:"#111",border:`4px solid ${player.color}`,borderRadius:12,padding:20,maxWidth:380,width:"100%",boxShadow:`0 0 40px ${player.color}60`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
           <AvatarCanvas avatarDef={gs.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(player.themeId).charBodyColor||player.color} size={64} style={{border:`4px solid ${player.color}`,borderRadius:8}}/>
@@ -4591,7 +4594,7 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
                   const petLvl = it.slot==="pet" ? petLevel((gs.petXp||{})[it.id]||0) : null;
                   return (
                     <div key={it.id} title={(it.name||"")+(isEq?" — équipé":"")+(petLvl?` — familier Niv.${petLvl}`:"")}
-                      style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",width:46,height:46,background:isEq?`${rar.color}22`:"rgba(0,0,0,0.4)",border:`2px solid ${isEq?player.color:rar.color+"66"}`,borderRadius:6}}>
+                      style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",width:46,height:46,background:isEq?`${rar.color}22`:"rgba(0,0,0,0.4)",border:`2px solid ${isEq?player.color:rar.color+"66"}`,borderRadius:6}}>
                       <span style={{fontSize:22}}>{it.emoji}</span>
                       {isEq && <span style={{position:"absolute",top:-5,right:-5,fontSize:11}}>✅</span>}
                       {petLvl && <span style={{position:"absolute",bottom:-2,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>N{petLvl}</span>}
@@ -5454,7 +5457,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
   const bonusCoins = BONUS_COINS[tier];
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>🏃</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5693,7 +5696,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
   const dpad = (dx, dy) => { if (stRef.current) stRef.current.pNextDir = {dx,dy}; };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:12,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:8,padding:12,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>👻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5782,7 +5785,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
   const msg = score === 3 ? "PARFAIT! 🔥" : score >= 2 ? "Bien joué!" : score === 1 ? "Pas mal!" : "La prochaine fois!";
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:20,overflowY:"auto",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:20,overflowY:"auto",boxSizing:"border-box"}}>
       {phase === "intro" && (<>
         <div style={{fontSize:40}}>{TARGET}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent,textAlign:"center",textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
@@ -5844,7 +5847,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
 
   if (phase === "intro") {
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24,textAlign:"center",overflowY:"auto"}}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:18,padding:24,textAlign:"center",overflowY:"auto"}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
         <div style={{fontSize:64,lineHeight:1}}>{INFO.icon}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:pt.accent,textShadow:`0 0 14px ${pt.glow}80`}}>{INFO.name}</div>
@@ -5860,7 +5863,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
   }
   if (phase === "countdown") {
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
         <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#aaa"}}>{INFO.icon} {INFO.name}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#2ECC40",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
           {count>0 ? count : "GO!"}
@@ -6213,7 +6216,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
   );
 
   return (
-    <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
+    <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#5DECF520 0%,transparent 60%)",pointerEvents:"none"}}/>
 
@@ -6322,7 +6325,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
               );
             })}
             <button onClick={()=>{SFX.click();onNewSetup?.();}}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px 16px",background:"rgba(0,0,0,0.5)",color:"#4ade80",border:"3px dashed #4ade8066",borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s"}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px 16px",background:"rgba(0,0,0,0.5)",color:"#4ade80",border:"3px dashed #4ade8066",borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"safe center",gap:10,transition:"all 0.15s"}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ade80";e.currentTarget.style.boxShadow="0 0 16px #4ade8033";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor="#4ade8066";e.currentTarget.style.boxShadow="none";}}>
               📖 Nouveau livre de quêtes
@@ -7388,7 +7391,7 @@ export default function App() {
     return 0;
   },[config,now,todayDayIdx,effectiveMode]);
 
-  if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
+  if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
@@ -7685,7 +7688,7 @@ export default function App() {
         <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#FF8C00"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
       )}
       {bossWin&&(
-        <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto",cursor:"pointer"}}>
+        <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
           <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#1a2e1a,#0c220c)",border:`5px solid ${bossWin.color||"#FFD700"}`,borderRadius:16,padding:"28px 26px",maxWidth:380,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",boxShadow:`0 0 50px ${bossWin.color||"#FFD700"}70`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
             <div style={{fontSize:64,lineHeight:1,marginBottom:6}}>{bossWin.emoji||"🐲"}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#FFD700",marginBottom:8}}>🏆 VICTOIRE!</div>
@@ -7710,7 +7713,7 @@ export default function App() {
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
       {/* ── VERSION FOOTER ── */}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"5px 12px",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:50,borderTop:"1px solid #222"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"safe center",gap:10,padding:"5px 12px",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:50,borderTop:"1px solid #222"}}>
         <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#444"}}>Livre de Quêtes v{APP_VERSION}</span>
         <button
           onClick={()=>{
