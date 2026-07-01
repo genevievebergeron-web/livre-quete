@@ -1,0 +1,7 @@
+[
+  { "out": "public/sprites/items/sc1.png", "id": "77cce7ee-b86c-4308-8f00-e20cc8369a02", "description": "legendary science microscope" },
+  { "out": "public/sprites/items/a4.png", "description": "shiny blue diamond gem crystal, game item icon", "view": "side" },
+  { "out": "public/sprites/items/h2.png", "description": "golden royal crown with red jewels, game item icon", "view": "side" },
+  { "out": "public/sprites/items/di1.png", "description": "tiny fairytale castle, game item icon", "view": "side" },
+  { "out": "public/sprites/items/mc5.png", "description": "minecraft diamond ore block, cube, game item icon", "view": "side" }
+]
