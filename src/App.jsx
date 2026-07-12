@@ -6703,7 +6703,7 @@ export default function App() {
     const fe = {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`};
     const ncfg = {...cfgRef.current, boss:nb, feed:[fe,...(cfgRef.current.feed||[])].slice(0,60)};
     setConfig(ncfg); setGameStates(n); persist(ncfg, n);
-  },[gameStates, config.boss]);
+  },[gameStates, config?.boss]);
 
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
   const logAction = useCallback((msg,color="#FF8C00")=>{
