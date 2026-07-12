@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.78.0";
+const APP_VERSION = "1.79.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.79.0", date:"2026-07-12", features:[
+    "🐛 Fix boss « jamais vaincu » : la victoire est maintenant recalculée automatiquement dès que les dégâts cumulés dépassent les PV du boss, même sans nouveau clic d'attaque (ne peut plus rester bloqué pour toujours).",
+    "🏕️ Boss de camping unique avec ses propres couleurs et des arbres autour de lui!",
+  ]},
   { version:"1.78.0", date:"2026-07-01", features:[
     "🪟 Correctif d'affichage : les fenêtres de félicitations et écrans de mini-jeu (niveau atteint, boss vaincu, récompense) ne peuvent plus être coupés en haut de l'écran sur les petits écrans — elles se centrent quand ça rentre et défilent quand c'est trop grand.",
   ]},
@@ -4470,7 +4474,9 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:"#FF5555"}}>⚔️ COMBAT DE BOSS</div>
             <div style={{background:"rgba(50,18,35,0.55)",border:`3px solid ${boss.color||"#FF5555"}`,borderRadius:12,padding:16,textAlign:"center"}}>
+              {boss.forest && <div style={{fontSize:26,letterSpacing:6,marginBottom:-4}}>🌲🌳🌲🌳🌲</div>}
               <BossSprite boss={boss} size={104} style={{filter:won?"grayscale(0.7) opacity(0.7)":"none"}}/>
+              {boss.forest && <div style={{fontSize:20,letterSpacing:8,marginTop:2,opacity:0.85}}>🌲🌳🌲</div>}
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:boss.color||"#FF5555",marginTop:8}}>{boss.emoji} {boss.name}</div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"8px 0 2px"}}>PV DU BOSS</div>
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#FF4444,#FFD700)",transition:"width 0.5s"}}/></div>
@@ -4493,8 +4499,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#2ECC40",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
               <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#FFD700",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
               <div style={{display:"flex",gap:8}}>
-                {atkBtn("petite","🗡️ Petite",`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
-                {atkBtn("grosse","💥 Grosse",`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
+                {atkBtn("petite",`${boss.atkEmoji?.petite||"🗡️"} Petite`,`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
+                {atkBtn("grosse",`${boss.atkEmoji?.grosse||"💥"} Grosse`,`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
               </div>
               <button onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
                 style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#FFD700":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#000":"#999",border:"2px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
@@ -4683,6 +4689,7 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
         return (
           <div style={{background:won?"rgba(20,55,25,0.5)":"rgba(50,18,35,0.5)",border:`2px solid ${won?"#2ECC40":b.color}`,borderRadius:10,padding:12,display:"flex",gap:12,alignItems:"center"}}>
             <BossSprite boss={b} size={84} style={{flexShrink:0,filter:won?"grayscale(0.6) opacity(0.7)":"none"}}/>
+            {b.forest && <span style={{fontSize:22,flexShrink:0}}>🌲{won?"":"🔥"}🌲</span>}
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:won?"#2ECC40":b.color}}>{won?`🏆 ${b.name} vaincu!`:`${b.emoji} ${b.name}`}</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",margin:"3px 0"}}>{won?"Bravo la famille! Vous l'avez battu ensemble! 🎉":"Faites des quêtes → attaquez le boss dans l'onglet ⚔️ BOSS!"}</div>
@@ -6668,6 +6675,35 @@ export default function App() {
     window.addEventListener("lq-synced",onSync);
     return ()=>window.removeEventListener("lq-synced",onSync);
   },[]);
+
+  // v1.79.0 — FILET DE SÉCURITÉ victoire du boss (fix "boss jamais vaincu")
+  // Avant : la victoire n'était calculée QUE dans handleBossAttack/handleBossPetAttack, au moment d'un clic.
+  // Si les dégâts cumulés dépassaient déjà les PV (ex: dégâts arrivés par synchro d'un autre appareil APRÈS
+  // le dernier clic, ou tous les jetons de la famille dépensés avant que le total franchisse le seuil),
+  // plus personne ne pouvait re-déclencher le calcul de victoire → boss bloqué pour toujours, sans le jeu
+  // de fin ni les récompenses (vécu avec l'Hydre à deux têtes du 1er juillet, jamais vaincue malgré des
+  // dégâts cumulés très supérieurs à ses PV). Ce filet réévalue la victoire à CHAQUE changement d'état
+  // (sync, validation de quête…), pas seulement au clic — donc impossible de rester bloqué.
+  useEffect(()=>{
+    const boss = cfgRef.current?.boss;
+    if(!boss || boss.defeatedAt) return;
+    const HPMAX = boss.hpMax||80;
+    const totalDmg = bossDamageTotal(gameStates, boss.startedAt);
+    if(totalDmg < HPMAX) return;
+    if(!bossQuestsAllDone(cfgRef.current, gameStates)) return;
+    const now = new Date().toISOString();
+    const n = gameStates.map(g=>{
+      const _it = pickUltraLegendary();
+      return {...g, coins:(g.coins||0)+40, xp:(g.xp||0)+50,
+        owned:[...new Set([...(g.owned||[]), _it.id])],
+        badges:[...new Set([...(g.badges||[]),"b_boss"])],
+        pendingCelebrations:[...(g.pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]};
+    });
+    const nb = {...boss, defeatedAt:now};
+    const fe = {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`};
+    const ncfg = {...cfgRef.current, boss:nb, feed:[fe,...(cfgRef.current.feed||[])].slice(0,60)};
+    setConfig(ncfg); setGameStates(n); persist(ncfg, n);
+  },[gameStates, config.boss]);
 
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
   const logAction = useCallback((msg,color="#FF8C00")=>{
