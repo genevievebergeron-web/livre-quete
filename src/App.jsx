@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.79.1";
+const APP_VERSION = "1.80.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.80.0", date:"2026-07-18", features:[
+    "📶 Combat final plus fiable : si le jeu ne charge pas (signal faible), un message clair et un bouton « Réessayer » apparaissent au lieu d'un écran noir muet.",
+  ]},
   { version:"1.79.0", date:"2026-07-12", features:[
     "🐛 Fix boss « jamais vaincu » : la victoire est maintenant recalculée automatiquement dès que les dégâts cumulés dépassent les PV du boss, même sans nouveau clic d'attaque (ne peut plus rester bloqué pour toujours).",
     "🏕️ Boss de camping unique avec ses propres couleurs et des arbres autour de lui!",
@@ -3097,6 +3100,18 @@ function BossSprite({ boss, size=120, style={} }){
 // avec le VRAI avatar (renderAvatarToCtx) et le VRAI familier (renderPetToCtx) de l'enfant.
 function HydraFinalGame({ player, pState, color, onClose }){
   const iframeRef = useRef(null);
+  // v1.80.0 — filet réseau : un seul enfant (sur 4, en camping avec signal faible) arrivait à charger
+  // le jeu — les 3 autres restaient sur un écran noir muet sans savoir si ça chargeait ou avait échoué.
+  // Le fichier /combat-hydre.html lui-même est correct et se sert bien (vérifié) : la cause probable
+  // est un chargement réseau qui traîne/échoue silencieusement (aucun état d'erreur avant ce fix).
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(()=>{
+    setLoaded(false); setFailed(false);
+    const t = setTimeout(()=>{ setLoaded(l=>{ if(!l) setFailed(true); return l; }); }, 7000);
+    return ()=>clearTimeout(t);
+  },[reloadKey]);
   const data = useMemo(()=>{
     const dk=(h)=>{ try{ let c=(h||"#FFD23F").replace("#",""); if(c.length===3)c=c.split("").map(x=>x+x).join(""); const f=v=>Math.max(0,Math.round(parseInt(v,16)*0.6)).toString(16).padStart(2,"0"); return "#"+f(c.slice(0,2))+f(c.slice(2,4))+f(c.slice(4,6)); }catch(e){ return "#7a5a12"; } };
     let hero="", pet="";
@@ -3116,10 +3131,24 @@ function HydraFinalGame({ player, pState, color, onClose }){
     return ()=>window.removeEventListener("message", onMsg);
   },[onClose]);
   const send=()=>{ try{ iframeRef.current && iframeRef.current.contentWindow.postMessage(data,"*"); }catch(e){} };
+  const handleLoad=()=>{ setLoaded(true); setFailed(false); send(); setTimeout(send,250); };
   return (
     <div style={{position:"fixed",inset:0,zIndex:4000,background:"#000"}}>
-      <iframe ref={iframeRef} src="/combat-hydre.html" onLoad={()=>{ send(); setTimeout(send,250); }} title="Combat final de l'Hydre"
+      <iframe key={reloadKey} ref={iframeRef} src="/combat-hydre.html" onLoad={handleLoad} title="Combat final de l'Hydre"
         style={{width:"100%",height:"100%",border:"none",display:"block"}}/>
+      {!loaded && !failed && (
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,background:"#140d2b",color:"#fff",fontFamily:"'VT323',monospace",fontSize:20}}>
+          <div>⏳ Chargement du combat...</div>
+        </div>
+      )}
+      {failed && (
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,background:"#140d2b",color:"#fff",fontFamily:"'VT323',monospace",fontSize:18,textAlign:"center",padding:24}}>
+          <div style={{fontSize:40}}>📶</div>
+          <div>Ça n'a pas pu charger — souvent un signal faible.</div>
+          <button onClick={()=>setReloadKey(k=>k+1)}
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,lineHeight:1.5,padding:"12px 20px",background:"linear-gradient(#ffe27a,#ffb02e)",color:"#251400",border:"none",borderRadius:12,cursor:"pointer",boxShadow:"0 6px 0 #a86a00"}}>🔁 Réessayer</button>
+        </div>
+      )}
       <button onClick={onClose} aria-label="Fermer"
         style={{position:"absolute",top:10,right:10,zIndex:4001,width:40,height:40,borderRadius:20,border:"2px solid #fff",background:"rgba(0,0,0,0.55)",color:"#fff",fontSize:20,lineHeight:"36px",cursor:"pointer"}}>✕</button>
     </div>
