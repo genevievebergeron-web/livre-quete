@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.80.0";
+const APP_VERSION = "1.81.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.81.0", date:"2026-07-20", features:[
+    "🎨 Nouveaux dessins pixel art faits par un des garçons : bouclier, épée, arc, bâton magique et armure, 6 chapeaux/casques/couronnes, et 11 familiers (chat, chien, loup, renard, dragon, araignée, canard, abeille, ver, colibri-perroquet, capybara)!",
+    "🧙 Ton perso PORTE vraiment son équipement maintenant : le chapeau est sur la tête, l'armure sur le torse, et les armes (bouclier/épée/arc/bâton) sont tenues en main — fini les items qui flottaient à côté du perso.",
+  ]},
   { version:"1.80.0", date:"2026-07-18", features:[
     "📶 Combat final plus fiable : si le jeu ne charge pas (signal faible), un message clair et un bouton « Réessayer » apparaissent au lieu d'un écran noir muet.",
   ]},
@@ -3012,6 +3016,46 @@ function ItemSprite({ itemId, emoji, size=48, style={} }) {
   return <span style={{fontSize:Math.round(size*0.78),lineHeight:1,display:"block",...style}}>{emoji}</span>;
 }
 
+// v1.81.0 — Ancrage anatomique des items équipés. AVANT : hat/face/armor étaient centrés sur le CANVAS
+// (72 unités, left:"50%") — mais le personnage dessiné par renderAvatarToCtx (bras compris, x:-2..38) est
+// décalé à gauche dedans, son vrai centre est x=18, pas 36. Résultat : les items flottaient à côté du corps
+// au lieu de sembler portés. Les ancres ci-dessous utilisent le même repère 72 unités que renderAvatarToCtx,
+// donc l'alignement reste correct à N'IMPORTE QUELLE taille d'avatar (cx/cy en unités natives ÷72×size).
+// a1/a2/a3/a5 (bouclier/épée/arc/bâton) sont en fait des ARMES tenues en main, pas de l'armure de torse —
+// a4 (armure diamant) reste seule à utiliser l'ancre "armor" (centrée sur le torse).
+const HELD_WEAPON_IDS = new Set(["a1","a2","a3","a5"]);
+const AVATAR_EQUIP_ANCHORS = {
+  hat:    { cx:18, cy:1,  wRatio:0.40, shadow:true },              // sommet de la tête (tête native x3-33 y2-24, centre x18)
+  face:   { cx:18, cy:13, wRatio:0.235 },                          // niveau des yeux
+  armor:  { cx:18, cy:39, wRatio:0.34, shadow:true },               // centré sur le torse (corps natif x2-34 y26-50, centre x18 y38)
+  weapon: { cx:37, cy:32, wRatio:0.36, rotate:22, shadow:true },    // tenue dans la main droite (bras natif x32-38 y28-42), légère inclinaison
+  themed: { cx:29, cy:53, wRatio:0.22 },                           // accessoire secondaire, à la ceinture/jambe
+};
+function equipAnchorStyle(key, size) {
+  const A = AVATAR_EQUIP_ANCHORS[key];
+  const w = Math.round(size*A.wRatio);
+  return {
+    position:"absolute", left:Math.round(A.cx/72*size), top:Math.round(A.cy/72*size),
+    width:w, height:w,
+    transform:`translate(-50%,-50%)${A.rotate?` rotate(${A.rotate}deg)`:""}`,
+    filter:A.shadow?"drop-shadow(0 2px 0 #000)":undefined,
+    pointerEvents:"none",
+  };
+}
+// Rendu commun des items équipés "portés" sur l'avatar (chapeau/visage/arme-ou-armure au bon endroit anatomique).
+// Le familier (eq.pet) reste géré séparément à chaque site d'appel (il est À CÔTÉ du perso, pas porté dessus).
+function EquippedGear({ eq, items, size }) {
+  if (!eq) return null;
+  const find = id => items.find(i=>i.id===id);
+  const armorAnchor = eq.armor && HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor";
+  return (<>
+    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size).width}         style={equipAnchorStyle("hat",size)}/>}
+    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size).width}        style={equipAnchorStyle("face",size)}/>}
+    {eq.armor  && <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size).width}   style={equipAnchorStyle(armorAnchor,size)}/>}
+    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size).width}      style={equipAnchorStyle("themed",size)}/>}
+  </>);
+}
+
 // v1.57.0 — Choix d'évolution : 2 éléments tirés au hasard, l'enfant choisit la voie de son familier
 function EvolutionModal({ petId, tier, evo, onChoose, th }) {
   const opts = petEvoOptions(petId, tier, evo);
@@ -3344,11 +3388,8 @@ function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShop
           <div style={{position:"relative"}}>
             <AvatarCanvas avatarDef={avatarDef} bodyColor={pt.charBodyColor||player.color} size={120}
               style={{border:`4px solid ${pt.accent||"#FFD700"}`,boxShadow:`0 0 20px ${pt.glow||"#FFD700"}50`}}/>
-            {/* v1.62.0 — items équipés PORTÉS sur l'avatar (chapeau sur la tête, visage, armure sur le torse), familier en pixel à côté */}
-            {eq.hat   && <ItemSprite itemId={eq.hat} emoji={allShopItems.find(i=>i.id===eq.hat)?.emoji} size={46} style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",fontSize:46,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}/>}
-            {eq.face  && <ItemSprite itemId={eq.face} emoji={allShopItems.find(i=>i.id===eq.face)?.emoji} size={28} style={{position:"absolute",top:36,left:"50%",transform:"translateX(-50%)",fontSize:28,pointerEvents:"none"}}/>}
-            {eq.armor && <ItemSprite itemId={eq.armor} emoji={allShopItems.find(i=>i.id===eq.armor)?.emoji} size={36} style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",fontSize:36,filter:"drop-shadow(0 1px 0 #000)",pointerEvents:"none"}}/>}
-            {eq.themed && <ItemSprite itemId={eq.themed} emoji={allShopItems.find(i=>i.id===eq.themed)?.emoji} size={26} style={{position:"absolute",bottom:6,right:2,fontSize:26,pointerEvents:"none"}}/>}
+            {/* v1.81.0 — items équipés PORTÉS sur l'avatar, ancrés sur la vraie géométrie du corps (EquippedGear) */}
+            <EquippedGear eq={eq} items={allShopItems} size={120}/>
             {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-10,left:-14,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={48}/></div> : <span style={{position:"absolute",bottom:-12,left:-12,fontSize:28,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>)}
           </div>
           <div>
@@ -3728,9 +3769,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setAvatarOpen(true);SFX.click();}} title="Personnaliser mon perso">
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
             style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
-          {eq.hat   && <ItemSprite itemId={eq.hat} emoji={allShopItemsFlat.find(i=>i.id===eq.hat)?.emoji} size={28} style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",fontSize:28,filter:"drop-shadow(0 2px 0 #000)",pointerEvents:"none"}}/>}
-          {eq.face  && <ItemSprite itemId={eq.face} emoji={allShopItemsFlat.find(i=>i.id===eq.face)?.emoji} size={17} style={{position:"absolute",top:22,left:"50%",transform:"translateX(-50%)",fontSize:17,pointerEvents:"none"}}/>}
-          {eq.armor && <ItemSprite itemId={eq.armor} emoji={allShopItemsFlat.find(i=>i.id===eq.armor)?.emoji} size={22} style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",fontSize:22,filter:"drop-shadow(0 1px 0 #000)",pointerEvents:"none"}}/>}
+          {/* v1.81.0 — ancré sur la vraie géométrie du corps (EquippedGear), voir plus haut */}
+          <EquippedGear eq={eq} items={allShopItemsFlat} size={72}/>
           {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-8,left:-10,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={30}/></div> : <span style={{position:"absolute",bottom:-8,left:-6,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>)}
           <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",whiteSpace:"nowrap"}}>✏️ Modifier</div>
         </div>
