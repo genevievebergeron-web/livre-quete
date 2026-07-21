@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-20 — v1.84.0_
+_Mis à jour: 2026-07-20 — v1.85.0_
+
+> **v1.85.0 (20 juillet, poussé) — Lot 2 de l'audit 2.0 partiel.** Fait : l'onglet "✅ Aujourd'hui" montre aussi les rappels calendrier du jour; chip "🏠 Semaine"→"📋 Mes tâches" (fix collision d'icône avec l'onglet Accueil); états vides orientants (Semaine↔Rituels); 4 nouvelles catégories calendrier (Santé/Sport/Intervenant/Camp) + fix pour qu'elles ne soient pas gamifiées comme des devoirs. **Pas fait** (reste du Lot 2) : unifier le sélecteur de rituel de l'onglet Minuterie avec celui du dashboard (#6); fusion complète Semaine+Rituel dans une seule vue au-delà d'aujourd'hui (#10). Découverte utile en creusant : l'app avait déjà un onglet "✅ Aujourd'hui" pensé comme hub central — le vrai trou était qu'il manquait les rappels calendrier, pas qu'il fallait tout reconstruire.
 
 > **v1.84.0 (20 juillet, poussé) — Lot 1 de l'audit 2.0 TERMINÉ.** Les 4 items du Lot 1 (voir plan) sont livrés et en ligne : (v1.82.0) sélecteur parent en grille + catalogue de tâches perso qui ne grossit plus à l'infini + retrait du toggle humour mort; (v1.83.0) l'enfant peut demander à retirer une tâche (approbation parent); (v1.84.0) frein énergie élargi à la boutique + avatar, avec message "sieste" visible dans la fiche perso. **Prochain lot recommandé : Lot 2 (navigation)** — le vrai irritant nommé par Gen ("on sait jamais où chercher"), pas encore commencé. Plan complet : `~/.claude/plans/le-design-de-mon-mighty-mountain.md`.
 
