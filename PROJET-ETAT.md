@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-20 — v1.88.0_
+_Mis à jour: 2026-07-21 — v1.89.0_
+
+> **v1.89.0 (21 juillet, poussé) — Flex mobile/desktop**, demandé par Gen hors-plan : `game-root` n'avait aucune largeur max, donc l'app s'étirait pleine largeur sur un ordinateur. Le contenu principal avait déjà `maxWidth:900`, mais pas l'en-tête/compte-à-rebours/barre du jour/nav/barre d'onglets du bas — appliqué le même plafond partout, cohérent, testé visuellement en Chrome (~1568px) et sur mobile via seed. Aucune régression possible sous 900px par construction (maxWidth ne peut que restreindre). **Ronde de tests v1.82.0-v1.88.0 aussi complétée cette session** : relecture complète du diff + tests unitaires Node + vérification visuelle en Chrome réelle (disque de minuterie confirmé fonctionnel, bouton retrait de tâche, état vide orientant, chip renommé, D'abord→Ensuite — tous vus en direct).
 
 > **v1.88.0 (20 juillet, poussé) — Lot 3 de l'audit 2.0 COMPLET** (sauf #17, déprioritisé — impact réel quasi nul). Ajouté sur v1.87.0 : disque de minuterie visuel qui rétrécit (TimerView, ⚠️ **pas vérifié visuellement en navigateur cette session** — seulement relu attentivement, à tester en priorité avec les enfants); "👉 Ensuite: …" en mode une-tâche-à-la-fois; message "tu y es presque!" à 1-2 tâches restantes; confettis réduits sur une tâche ordinaire (pleine fête conservée pour level-up/victoire de boss). **Lots 1, 2, 3 tous complétés** (avec quelques items délibérément déprioritisés/reportés, documentés dans le plan). **Prochaine étape suggérée : Lot 4 (autonomie/gamification) ou Lot 5 (fluidité/performance).**
 
