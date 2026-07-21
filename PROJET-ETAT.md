@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-20 — v1.87.0_
+_Mis à jour: 2026-07-20 — v1.88.0_
+
+> **v1.88.0 (20 juillet, poussé) — Lot 3 de l'audit 2.0 COMPLET** (sauf #17, déprioritisé — impact réel quasi nul). Ajouté sur v1.87.0 : disque de minuterie visuel qui rétrécit (TimerView, ⚠️ **pas vérifié visuellement en navigateur cette session** — seulement relu attentivement, à tester en priorité avec les enfants); "👉 Ensuite: …" en mode une-tâche-à-la-fois; message "tu y es presque!" à 1-2 tâches restantes; confettis réduits sur une tâche ordinaire (pleine fête conservée pour level-up/victoire de boss). **Lots 1, 2, 3 tous complétés** (avec quelques items délibérément déprioritisés/reportés, documentés dans le plan). **Prochaine étape suggérée : Lot 4 (autonomie/gamification) ou Lot 5 (fluidité/performance).**
 
 > **v1.87.0 (20 juillet, poussé) — Lot 3 de l'audit 2.0 partiel.** Fait, vérifié visuellement en navigateur avant push : réglages "Taille du texte" (Normal/Grand/Très grand) et "Police plus lisible" (Nunito) dans Mes réglages; message "🌅 Nouvelle journée!" au premier retour d'un jour différent. **Pas fait** : réduction de la densité confetti/SFX/glow par défaut (#11, demande un vrai jugement de tuning), minuterie visuelle Time Timer (#13), visuel "D'abord → Ensuite" (#14), avertissements de transition (#15). Item #17 (hoist GLOBAL_CSS) **déprioritisé** : en creusant, son impact réel sur la fluidité est quasi nul (les 4 sites ne montent jamais simultanément).
 
