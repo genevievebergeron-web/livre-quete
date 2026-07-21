@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.84.0";
+const APP_VERSION = "1.85.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -470,6 +470,23 @@ const CAT_META = {
 };
 const catMeta = (c) => CAT_META[c] || { label:"Autre", color:"#9AA0A6" };
 const normLabel = (s) => (s||"").toLowerCase().trim().replace(/\s+/g," ");
+
+// v1.85.0 (Lot 2 #9) — catégories de calendrier au-delà de Événement/Devoir/Examen : tout ce qui
+// n'est pas scolaire (camp de jour, match/entraînement, vaccin, intervenant à la maison…) avait
+// jusqu'ici la même icône générique 📅. `type`/`recur`/`date` restent les mêmes champs — extension
+// du tableau de types, pas une nouvelle mécanique.
+const CAL_TYPES = {
+  sante:       { label:"🏥 Santé/rendez-vous", icon:"🏥" },
+  sport:       { label:"⚽ Sport/activité",     icon:"⚽" },
+  intervenant: { label:"🧑‍⚕️ Intervenant à la maison", icon:"🧑‍⚕️" },
+  camp:        { label:"🏕️ Camp/sortie",        icon:"🏕️" },
+};
+const calEventIcon = (e) => {
+  if (e.type==="examen") return "📝";
+  if (e.type==="devoir") return "📚";
+  if (CAL_TYPES[e.type]) return CAL_TYPES[e.type].icon; // nouvelles catégories : icône dédiée même récurrent
+  return e.recur ? "🔁" : "📅"; // "evenement" générique — comportement historique inchangé
+};
 // v1.64.0 — messages drôles de refus (déterministe par clé pour rester stable)
 const REFUS_MSGS = [
   "😹 Bien tenté! Cette quête part au recyclage…",
@@ -1350,6 +1367,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.85.0", date:"2026-07-20", features:[
+    "✅ L'onglet « Aujourd'hui » montre maintenant aussi tes devoirs/examens du jour, pas juste tes quêtes — un seul endroit pour voir tout ce qu'il y a à faire.",
+    "📋 Le bouton « Semaine » est renommé « Mes tâches » pour ne plus se confondre avec l'onglet Accueil.",
+    "💡 Si tu n'as rien dans un mode (Mes tâches / Rituels), l'app te dit maintenant si tu as des trucs dans l'autre.",
+    "📅 Le calendrier a 4 nouvelles catégories : 🏥 Santé, ⚽ Sport, 🧑‍⚕️ Intervenant, 🏕️ Camp/sortie (en plus de Devoir/Examen/Événement).",
+  ]},
   { version:"1.84.0", date:"2026-07-20", features:[
     "😴 L'énergie de ton héros s'applique maintenant aussi à la boutique et à ton perso (pas juste ton familier) — les corvées, elles, restent TOUJOURS gratuites.",
     "😴 Un petit message « ton héros se repose » apparaît maintenant dans ta fiche perso dès que l'énergie est basse, pas juste sur la carte familier.",
@@ -4044,6 +4067,33 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
 
       </>)}
       {homeTab==="jour" && (<>
+      {/* v1.85.0 (Lot 2 #5/#10) — rappels calendrier (devoirs/examens) du jour AUSSI ici,
+          pas seulement dans l'onglet "📅 Semaine" séparé : "Aujourd'hui" doit vraiment
+          montrer tout ce qu'il y a à faire aujourd'hui en un seul endroit. */}
+      {(()=>{
+        const today = new Date().toISOString().split("T")[0];
+        const reminders = computeCalendarReminders(pState.calendar||[], today).filter(r=>r._daysLeft===0);
+        if (!reminders.length) return null;
+        return reminders.map(rem=>{
+          const doneKey = rem.instanceId+"_"+player.id;
+          const done = pState.completed?.includes(doneKey);
+          return (
+            <div key={"jour_"+rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":"#5DECF5"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
+              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#5DECF5",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
+              <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",padding:"1px 4px"}}>📅 AUJOURD'HUI</span>
+              </div>
+              {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
+                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                ✔ J'AI ÉTUDIÉ!
+              </button>}
+            </div>
+          );
+        });
+      })()}
       {/* 🎯 Objectifs du jour — bonus à réclamer */}
       {(()=>{
         const stamp="#"+todayStamp();
@@ -4096,7 +4146,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:2}}>
             {/* Niveau 1 : Semaine vs Rituels */}
             <div style={{display:"flex",gap:8}}>
-              {seg(pMode==="week","🏠 Semaine","ma page d'accueil",()=>{ if(pMode!=="week"){SFX.click();onPatchState({mode:"week",activeRoutineId:null});} })}
+              {/* v1.85.0 (Lot 2 #8) — "📋 Mes tâches" au lieu de "🏠 Semaine" : évite la collision
+                  d'icône avec l'onglet du bas "🏠 Accueil" (deux 🏠 pour deux choses différentes)
+                  et le mot "Semaine" déjà pris par l'onglet du bas "📅 Semaine" (calendrier). */}
+              {seg(pMode==="week","📋 Mes tâches","planifiées cette semaine",()=>{ if(pMode!=="week"){SFX.click();onPatchState({mode:"week",activeRoutineId:null});} })}
               {seg(pMode==="routine","⏰ Rituels",myRoutines.length?`${myRoutines.length} rituel${myRoutines.length>1?"s":""}`:"à créer",()=>{
                 if(pMode!=="routine"){ SFX.click(); onPatchState({mode:"routine",activeRoutineId: myRoutines[0]?.id || null}); }
               })}
@@ -4199,7 +4252,17 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
-      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>{pMode==="week"?(weekMine.length?"Rien de prévu aujourd'hui! 🎉":"Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).") : (activeRoutine?"Ce rituel est vide. Modifie-le ou crée-en un nouveau.":"Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Rituel).")}</div>}
+      {/* v1.85.0 (Lot 2 #7) — état vide orientant : si l'AUTRE mode a des tâches, on le dit plutôt
+          que de laisser croire qu'il n'y a rien du tout ("on sait jamais où chercher") */}
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16,lineHeight:1.4}}>
+        {pMode==="week"
+          ? (weekMine.length ? "Rien de prévu aujourd'hui! 🎉"
+             : routineMine.length ? <>Pas de tâches planifiées, mais tu as des <b style={{color:"#aaa"}}>rituels ⏰</b> — touche « Rituels » ci-dessus!</>
+             : "Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).")
+          : (activeRoutine ? "Ce rituel est vide. Modifie-le ou crée-en un nouveau."
+             : weekMine.length ? <>Pas de rituels, mais tu as des <b style={{color:"#aaa"}}>tâches planifiées 📋</b> — touche « Mes tâches » ci-dessus!</>
+             : "Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Rituel).")}
+      </div>}
       {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
         if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
         return null;
@@ -4406,7 +4469,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
           {[...(pState.calendar||[])].sort((a,b)=>a.date.localeCompare(b.date)).map(entry=>(
             <div key={entry.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"rgba(0,0,0,0.4)",border:"1px solid #222",borderRadius:3}}>
-              <span style={{fontSize:14}}>{entry.type==="examen"?"📝":"📚"}</span>
+              <span style={{fontSize:14}}>{calEventIcon(entry)}</span>
               <div style={{flex:1}}>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{entry.label}</div>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666"}}>{entry.date}</div>
@@ -5313,7 +5376,8 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
               <input value={ceLabel} onChange={e=>setCeLabel(e.target.value.slice(0,50))} placeholder="Ex: Cours de natation, Rendez-vous dentiste…"
                 style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #5DECF5",borderRadius:4,marginBottom:8,outline:"none"}}/>
               <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
-                {[["evenement","📅 Événement"],["devoir","📚 Devoir"],["examen","📝 Examen"]].map(([v,l])=>(
+                {[["evenement","📅 Événement"],["devoir","📚 Devoir"],["examen","📝 Examen"],
+                  ["sante",CAL_TYPES.sante.label],["sport",CAL_TYPES.sport.label],["intervenant",CAL_TYPES.intervenant.label],["camp",CAL_TYPES.camp.label]].map(([v,l])=>(
                   <button key={v} onClick={()=>{setCeType(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceType===v?"#5DECF5":"#1a1a1a",color:ceType===v?"#000":"#888",border:`2px solid ${ceType===v?"#5DECF5":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
                 ))}
               </div>
@@ -5337,7 +5401,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
               {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun événement.</div>}
               {allEntries.map(e=>(
                 <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#FFD700":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
-                  <span style={{fontSize:16}}>{e.type==="examen"?"📝":e.type==="devoir"?"📚":e.recur?"🔁":"📅"}</span>
+                  <span style={{fontSize:16}}>{calEventIcon(e)}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
                     <div style={{display:"flex",gap:6,marginTop:2}}>
@@ -6077,6 +6141,11 @@ const computeCalendarReminders = (calendar, today) => {
   const t = new Date(today); t.setHours(0,0,0,0);
   return (calendar || []).flatMap(entry => {
     if (!entry.date || entry.recur) return []; // les événements récurrents/sans date ne génèrent pas de rappel d'étude
+    // v1.85.0 (Lot 2 #9) — seuls devoir/examen génèrent un rappel "à étudier" avec bonus XP; les
+    // nouvelles catégories (santé/sport/intervenant/camp) et "événement" restent de simples entrées
+    // de calendrier (visibles dans la liste), pas des tâches à XP — un rendez-vous chez le dentiste
+    // n'est pas un devoir à "étudier".
+    if (entry.type!=="examen" && entry.type!=="devoir") return [];
     const examDate = new Date(entry.date); examDate.setHours(0,0,0,0);
     if (t > examDate) return []; // dépassé
     const triggerDate = subWeekdays(entry.date, 3);
@@ -7765,7 +7834,7 @@ export default function App() {
                     {items.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
                     {items.map(({d,e},k)=>(
                       <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #222"}}>
-                        <span style={{fontSize:14}}>{e.type==="examen"?"📝":e.type==="devoir"?"📚":e.recur?"🔁":"📅"}</span>
+                        <span style={{fontSize:14}}>{calEventIcon(e)}</span>
                         <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",minWidth:46}}>{fmt(d)}</span>
                         <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
                       </div>
