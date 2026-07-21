@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-20 — v1.86.0_
+_Mis à jour: 2026-07-20 — v1.87.0_
+
+> **v1.87.0 (20 juillet, poussé) — Lot 3 de l'audit 2.0 partiel.** Fait, vérifié visuellement en navigateur avant push : réglages "Taille du texte" (Normal/Grand/Très grand) et "Police plus lisible" (Nunito) dans Mes réglages; message "🌅 Nouvelle journée!" au premier retour d'un jour différent. **Pas fait** : réduction de la densité confetti/SFX/glow par défaut (#11, demande un vrai jugement de tuning), minuterie visuelle Time Timer (#13), visuel "D'abord → Ensuite" (#14), avertissements de transition (#15). Item #17 (hoist GLOBAL_CSS) **déprioritisé** : en creusant, son impact réel sur la fluidité est quasi nul (les 4 sites ne montent jamais simultanément).
 
 > **v1.86.0 (20 juillet, poussé) — Lot 2 de l'audit 2.0 CLOS pour cette passe** (items restants réévalués, pas juste sautés). #6 fait en version réduite : le bouton Minuterie de l'Accueil respecte maintenant le rituel actif (au lieu d'ouvrir toujours vierge) — mais je n'ai PAS forcé `TimerView` à partager 100% son état avec le dashboard, car c'est un outil délibérément plus flexible (3 modes + minuterie libre + choix d'un autre rituel), pas une duplication à éliminer. #10 (fusion complète Semaine+Rituel en une vue simultanée) est resté **délibérément pas fait** : `pMode` pilote trop de choses (en-tête, section "plus tard cette semaine", bouton fin de rituel, minuteur) pour que ce soit un fix ciblé — c'est une vraie refonte qui mérite une maquette avant d'y toucher sur une app utilisée quotidiennement par 4 enfants. **Prochaine étape suggérée : Lot 3 (épuration sensorielle) ou une session de conception dédiée pour le #10.**
 
