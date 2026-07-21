@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.88.0";
+const APP_VERSION = "1.89.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1367,6 +1367,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.89.0", date:"2026-07-21", features:[
+    "🖥️ Sur un ordinateur (grand écran), l'app reste maintenant une colonne confortable et centrée au lieu de s'étirer d'un bord à l'autre — pareil sur téléphone, tablette et ordi.",
+  ]},
   { version:"1.88.0", date:"2026-07-20", features:[
     "⏱ Minuterie : nouveau disque visuel qui rétrécit avec le temps (en plus du chrono numérique).",
     "👉 Mode « une tâche à la fois » : affiche maintenant ce qui vient après (« Ensuite: … »).",
@@ -4791,7 +4794,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       })()}
 
       {/* ── BARRE D'ONGLETS EN BAS (désencombre l'accueil) ── */}
-      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)"}}>
+      {/* v1.89.0 (desktop/mobile flex) — la bande reste pleine largeur (continuité visuelle),
+          mais les boutons eux-mêmes restent groupés dans une colonne de largeur raisonnable
+          au lieu de s'étirer d'un bord à l'autre d'un écran d'ordinateur. */}
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",justifyContent:"center",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)"}}>
+        <div style={{display:"flex",width:"100%",maxWidth:900}}>
         {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
           const tabs=[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],...(bossActive?[["boss","⚔️","BOSS"]]:[]),["sem","📅","Semaine"],["shop","🛒","Boutique"]];
           return tabs.map(([k,ic,lb])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
@@ -4804,6 +4811,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             );
           });
         })()}
+        </div>
       </div>
 
     {/* Avatar popup */}
@@ -7835,7 +7843,10 @@ export default function App() {
       <div style={{position:"fixed",inset:0,background:`radial-gradient(ellipse at 30% 0%,${th.primary}0E 0%,transparent 55%)`,zIndex:0,pointerEvents:"none"}}/>
 
       {/* ── HEADER ── */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:`${th.bg}F2`,borderBottom:`2px solid ${th.accent}55`,padding:"9px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      {/* v1.89.0 (desktop/mobile flex) — largeur plafonnée + centrée (comme le contenu et la barre
+          d'onglets) pour que l'app reste une colonne confortable au lieu de s'étirer sur un écran
+          d'ordinateur — le fond dégradé de game-root reste visible de chaque côté. */}
+      <div style={{position:"sticky",top:0,zIndex:100,maxWidth:900,margin:"0 auto",background:`${th.bg}F2`,borderBottom:`2px solid ${th.accent}55`,padding:"9px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
@@ -7870,10 +7881,10 @@ export default function App() {
       </div>
 
       {/* ── ROUTINE COUNTDOWN (sticky below header) ── */}
-      {showCountdown&&<div style={{position:"sticky",top:72,zIndex:90,padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={countdownEnd} th={th} calm={curSettings.calmCountdown}/></div>}
+      {showCountdown&&<div style={{position:"sticky",top:72,zIndex:90,maxWidth:900,margin:"0 auto",padding:"6px 12px",background:`${th.bg}EE`,backdropFilter:"blur(6px)"}}><Countdown endTime={countdownEnd} th={th} calm={curSettings.calmCountdown}/></div>}
 
       {/* ── DAY PROGRESS ── */}
-      <div style={{padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
+      <div style={{maxWidth:900,margin:"0 auto",padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{effectiveMode==="routine"?"6h00":"Lun"}</span>
           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>
@@ -7891,7 +7902,7 @@ export default function App() {
 
       {/* ── PLAYER NAV ── (cachée en session enfant : la nav passe par l'accueil-menu + footer) */}
       {!(sessionPlayer!=null && !parentMode) &&
-      <div style={{display:"flex",gap:0,background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
+      <div style={{display:"flex",gap:0,maxWidth:900,margin:"0 auto",background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
         <button onClick={()=>{setView("family");SFX.click();}} className="nav-btn"
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
