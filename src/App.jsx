@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.87.0";
+const APP_VERSION = "1.88.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1367,6 +1367,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.88.0", date:"2026-07-20", features:[
+    "⏱ Minuterie : nouveau disque visuel qui rétrécit avec le temps (en plus du chrono numérique).",
+    "👉 Mode « une tâche à la fois » : affiche maintenant ce qui vient après (« Ensuite: … »).",
+    "🌟 Petit message encourageant quand il reste 1-2 tâches (« tu y es presque! »).",
+    "🎉 Les confettis d'une tâche ordinaire sont un peu plus discrets — les vrais jalons (level-up, victoire de boss) gardent toute la fête.",
+  ]},
   { version:"1.87.0", date:"2026-07-20", features:[
     "🔍 Nouveau réglage « Taille du texte » (Normal/Grand/Très grand) dans Mes réglages.",
     "🔤 Nouveau réglage « Police plus lisible » — remplace les lettres « jeu vidéo » par une police plus simple à lire, pour toute l'app.",
@@ -2403,16 +2409,22 @@ function Toast({ msg, color }) {
 }
 
 // ─── PARTICLES FX ────────────────────────────────────────────
-function spawnParticles(emoji) {
+// v1.88.0 (Lot 3 #11) — `big` (défaut true, rétrocompatible) contrôle l'intensité : les VRAIS
+// jalons (level-up, victoire de boss, coffre, etc.) gardent l'intensité complète (7 emoji + 18
+// confettis), mais une tâche ordinaire validée (le déclencheur le plus fréquent — des dizaines
+// de fois par jour) passe en version réduite (3 + 6) — moins de densité sur les actions courantes
+// sans retirer la fête pour les vrais accomplissements.
+function spawnParticles(emoji, big=true) {
   if (CALM) return; // mode calme : pas de particules/flash
   const emojis = [emoji,"⭐","✨","💫"];
-  for(let i=0;i<7;i++) setTimeout(()=>{
+  const nEmoji = big ? 7 : 3, nConfetti = big ? 18 : 6;
+  for(let i=0;i<nEmoji;i++) setTimeout(()=>{
     const p=document.createElement("div");
     p.style.cssText=`position:fixed;left:${Math.random()*70+15}vw;top:${Math.random()*50+25}vh;font-size:22px;pointer-events:none;z-index:2999;animation:floatUp 1.4s ease-out forwards;`;
     p.textContent=emojis[Math.floor(Math.random()*emojis.length)]; document.body.appendChild(p); setTimeout(()=>p.remove(),1500);
   },i*90);
   const cols=["#FFD700","#4A90D9","#C060D0","#2ECC40","#FF6464"];
-  for(let i=0;i<18;i++) setTimeout(()=>{
+  for(let i=0;i<nConfetti;i++) setTimeout(()=>{
     const c=document.createElement("div");
     c.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-10px;width:${Math.random()*8+4}px;height:${Math.random()*8+4}px;background:${cols[Math.floor(Math.random()*5)]};z-index:2998;border-radius:2px;animation:confettiFall ${Math.random()*1+1.5}s ease-in ${Math.random()*0.4}s forwards;`;
     document.body.appendChild(c); setTimeout(()=>c.remove(),2200);
@@ -2849,6 +2861,25 @@ function SetupWizard({ existing, onDone }) {
 // ═══════════════════════════════════════════════════════════════
 
 // ─── COUNTDOWN (Routine mode) ────────────────────────────────
+// v1.88.0 (Lot 3 #13) — minuterie visuelle style "Time Timer" : un disque dont la portion colorée
+// rétrécit avec le temps qui passe, en complément du chrono numérique (pas un remplacement) —
+// aide à "sentir" le temps sans lire de chiffres, utile pour la cécité temporelle (TDAH).
+// `progress` = fraction de temps RESTANT (1 = plein, 0 = écoulé). Pas de rouge par défaut
+// (cohérent avec le "décompte calme" déjà en place) — la couleur vient du thème/accent.
+function TimeTimerDisc({ progress, size=110, color="#5DECF5", urgentColor="#FF6B6B", urgent=false }) {
+  const r = size/2 - 8;
+  const c = 2*Math.PI*r;
+  const p = Math.max(0, Math.min(1, progress||0));
+  const offset = c * (1-p);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:"block",margin:"0 auto"}}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#222" strokeWidth="10"/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={urgent?urgentColor:color} strokeWidth="10"
+        strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`} style={{transition:"stroke-dashoffset 0.9s linear, stroke 0.3s"}}/>
+    </svg>
+  );
+}
 function Countdown({ endTime, th, calm }) {
   const [now, setNow] = useState(new Date());
   useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
@@ -4306,6 +4337,14 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       </div>}
       {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
         if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
+        // v1.88.0 (Lot 3 #15) — avertissement de transition : ton neutre/encourageant (pas d'urgence
+        // rouge, contrairement au décompte) quand il reste peu de tâches — les transitions sont
+        // difficiles pour TSA/TDAH, un signal clair "tu y es presque" aide à anticiper la fin.
+        if(!settings.focus && myAssignments.length>=3 && undone.length>0 && undone.length<=2){
+          return <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa",textAlign:"center",padding:"6px 4px"}}>
+            🌟 Encore {undone.length} tâche{undone.length>1?"s":""}, tu y es presque!
+          </div>;
+        }
         return null;
       })()}
       {(()=>{
@@ -4390,9 +4429,23 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
           });
         }
         const _done=a=>pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp());
-        const list = settings.focus ? myAssignments.filter(a=>!_done(a)).slice(0,1) : myAssignments.filter(a=>!_done(a)); // v1.60.0 — les quêtes validées quittent la liste → Archives
+        const undoneAll = myAssignments.filter(a=>!_done(a)); // v1.88.0 — nommé pour réutilisation (D'abord→Ensuite)
+        const list = settings.focus ? undoneAll.slice(0,1) : undoneAll; // v1.60.0 — les quêtes validées quittent la liste → Archives
         if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
-        return list.map(renderCard);
+        const cards = list.map(renderCard);
+        // v1.88.0 (Lot 3 #14) — "D'abord → Ensuite" : en mode focus (une tâche à la fois), montre
+        // ce qui vient après — prévisibilité utile pour TSA/TDAH (savoir à quoi s'attendre).
+        if(settings.focus && undoneAll.length>1){
+          const next=allTasks.find(t=>t.id===undoneAll[1].taskId);
+          cards.push(
+            <div key="first-then" style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px dashed #444",borderRadius:6,fontFamily:"'VT323',monospace",fontSize:14,color:"#777",flexWrap:"wrap"}}>
+              <span>👉 Ensuite:</span>
+              {next && <span style={{fontSize:16}}>{next.emoji}</span>}
+              <span style={{color:"#aaa"}}>{next?next.label:"?"}</span>
+            </div>
+          );
+        }
+        return cards;
       })()}
 
       {/* Enfant : ajouter une quête — CHOISIR dans la grille (anti-doublons), repli = créer la sienne */}
@@ -6322,6 +6375,10 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
       {startTs && !timeUp && (<>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?`${ritual.emoji||"⏰"} ${ritual.name}`:`⏳ ${taskName()}`}{mode==="deadline"?` — jusqu'à ${endTime.replace(":","h")}`:""}</div>
         {mode==="deadline" && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:urgent5?"#FF6B6B":"#bbb",textAlign:"center"}}>il reste <b>{Math.ceil(remaining/60000)}</b> min</div>}
+        {/* v1.88.0 (Lot 3 #13) — disque visuel, seulement quand on a une vraie durée totale (pas en chrono libre) */}
+        {(mode==="down"||mode==="deadline") && (()=>{ const totalMs = mode==="down" ? targetMin*60000 : Math.max(1,deadlineMs-(startTs||0)); return (
+          <TimeTimerDisc progress={remaining/totalMs} color={acc} urgent={lowTime}/>
+        ); })()}
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:lowTime?"#FF6B6B":urgent5?"#FFA94D":"#fff",textAlign:"center",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
         {mode==="down" && <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:Math.round(remaining/(targetMin*60000)*100)+"%",background:lowTime?"#FF6B6B":acc,transition:"width 0.25s linear"}}/></div>}
         {urgent5
@@ -7132,7 +7189,9 @@ export default function App() {
     // On vide la file tout de suite (persist avec savedAt récent → reste vide après fusion cloud)
     setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],pendingCelebrations:[]}; persist(config,n); return n; });
     setTimeout(()=>{
-      spawnParticles(emoji);
+      // v1.88.0 (Lot 3 #11) — intensité réduite pour une célébration de tâche(s) ordinaire(s);
+      // pleine intensité si un vrai jalon est dedans (level-up ou victoire de boss)
+      spawnParticles(emoji, topLevel!=null || !!_bw);
       if(_bw){ try{ if(!CALM)spawnParticles("🏆"); SFX.epic&&SFX.epic(); }catch{} setBossWin({..._bw.bossWin, items:_wonItems}); } // notif de victoire à la connexion
       if(topLevel!=null||forcedType){ SFX.epic(); setMiniGame({player,playerIdx:idx,level:topLevel||getLevel(ps.xp||0).level,playerThemeId:player.themeId||"none",pendingReward:pendingRwd,forcedType,isGift:topLevel==null}); }
       else if(pendingRwd){ SFX.task(); setRewardPopup(pendingRwd); }
