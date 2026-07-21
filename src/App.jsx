@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.81.0";
+const APP_VERSION = "1.82.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.82.0", date:"2026-07-20", features:[
+    "📋 Choisir une tâche à assigner se fait maintenant par grille (comme côté enfant) au lieu d'une longue liste déroulante.",
+    "🧹 Créer une tâche personnalisée qui existe déjà (même nom) réutilise l'ancienne au lieu d'en empiler une nouvelle — le catalogue de tâches ne grossit plus à l'infini.",
+    "🧹 Retiré le réglage « Messages rigolos » qui ne faisait rien (aucun message drôle n'existe encore dans le jeu) — reviendra une fois du vrai contenu écrit.",
+  ]},
   { version:"1.81.0", date:"2026-07-20", features:[
     "🎨 Nouveaux dessins pixel art faits par un des garçons : bouclier, épée, arc, bâton magique et armure, 6 chapeaux/casques/couronnes, et 11 familiers (chat, chien, loup, renard, dragon, araignée, canard, abeille, ver, colibri-perroquet, capybara)!",
     "🧙 Ton perso PORTE vraiment son équipement maintenant : le chapeau est sur la tête, l'armure sur le torse, et les armes (bouclier/épée/arc/bâton) sont tenues en main — fini les items qui flottaient à côté du perso.",
@@ -3910,10 +3915,11 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             ["sound","🔊 Son","Les petits sons quand tu touches et réussis"],
             ["calm","🎬 Mode calme","Moins d'animations et de clignotements (plus doux pour les yeux)"],
             ["calmCountdown","⏱ Décompte calme","Le minuteur sans rouge ni « dépêche-toi »"],
-            ["humor","😄 Messages rigolos","Les petits messages drôles après une quête"],
             ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
           ].map(([key,label,desc])=>{
-            const isOn = (key==="sound"||key==="humor") ? settings[key]!==false : !!settings[key];
+            // v1.82.0 (Lot 1 #4) — "humor" retiré : c'était un réglage sans effet (aucun texte
+            // humoristique n'existe dans le code), ça promettait une fonction inexistante à l'enfant.
+            const isOn = (key==="sound") ? settings[key]!==false : !!settings[key];
             return (
               <div key={key} onClick={()=>{SFX.click();setSetting(key, !isOn);}}
                 style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#2ECC40"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
@@ -4917,6 +4923,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
+  const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
@@ -5038,11 +5045,16 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
         {tab==="tasks" && (
           <div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>AJOUTER UNE TÂCHE</div>
-            <select value={addTaskId} onChange={e=>setAddTaskId(e.target.value)}
-              style={{width:"100%",background:"#111",border:"2px solid #FF8C00",color:"#fff",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8}}>
-              <option value="">— Choisir dans le catalogue —</option>
-              {allTasks.filter(t=>!t.child).map(t=><option key={t.id} value={t.id}>{t.emoji} {t.label} (⚡{t.xp} 🪙{t.coins})</option>)}
-            </select>
+            {/* v1.82.0 (Lot 1 #3/B7) — grille catégorisée (TaskChooser), même composant que côté enfant,
+                au lieu d'un <select> plat qui devenait long à parcourir à mesure que le catalogue grossit. */}
+            <button onClick={()=>{SFX.click();setChooserOpen(true);}}
+              style={{width:"100%",textAlign:"left",background:"#111",border:"2px solid #FF8C00",color:addTaskId?"#fff":"#888",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8,cursor:"pointer"}}>
+              {(()=>{ const t=allTasks.find(x=>x.id===addTaskId); return t ? `${t.emoji} ${t.label} (⚡${t.xp} 🪙${t.coins})` : "— Choisir une tâche —"; })()}
+            </button>
+            {chooserOpen && <TaskChooser allTasks={allTasks} th={{accent:"#FF8C00"}}
+              onPick={(id)=>{setAddTaskId(id);setChooserOpen(false);}}
+              onCreateOwn={()=>{setChooserOpen(false);setCustomOpen(true);}}
+              onClose={()=>setChooserOpen(false)}/>}
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
               {players.map(pl=>{
                 const sel=addPlayerIds.includes(pl.id);
@@ -7153,7 +7165,13 @@ export default function App() {
 
   const handleAddCustomTask = useCallback((data)=>{
     if(!data?.label?.trim())return null;
-    const newTask={id:"cust_"+uid(),emoji:data.emoji||"⭐",label:data.label.trim(),xp:20,coins:10,diff:"medium",cat:"custom"};
+    const label=data.label.trim();
+    // v1.82.0 (Lot 1 #3/B7) — anti-doublon côté parent, même règle que côté enfant (v1.53.0,
+    // handleChildAddTask) : un libellé déjà présent réutilise la tâche existante au lieu d'en
+    // empiler une nouvelle — évite que le catalogue/menu de choix grossisse à l'infini.
+    const existing=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(label));
+    if(existing){ showToast(`${existing.emoji} «${existing.label}» existe déjà — réutilisée!`,"#FFD700",4000); return existing.id; }
+    const newTask={id:"cust_"+uid(),emoji:data.emoji||"⭐",label,xp:20,coins:10,diff:"medium",cat:"custom"};
     const newCfg={...config,customTasks:[...(config.customTasks||[]),newTask]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast(`${newTask.emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#2ECC40",4000);
