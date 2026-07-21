@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.91.0";
+const APP_VERSION = "1.92.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -411,9 +411,12 @@ const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", bos
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
 // (emoji = placeholder temporaire — remplacé par du pixel-art dans le milestone art)
+// v1.92.0 (Lot 4 #19) — `cat` optionnel distingue les récompenses ÉCRAN des récompenses
+// CALME (temps calme/apaisant), pour que la boutique ne pousse pas que vers l'écran —
+// utile pour les enfants neuroatypiques qui bénéficient d'alternatives de régulation visibles.
 const REWARD_CATALOG = [
-  { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40 },
-  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35 },
+  { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40, cat:"ecran" },
+  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35, cat:"calme" },
   { id:"rw_dessert", emoji:"🍰", label:"Permission de 2e dessert",           coins:30 },
   { id:"rw_dejsoup", emoji:"🥞", label:"Permission de déjeuner au souper",   coins:35 },
   { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60 },
@@ -425,11 +428,12 @@ const REWARD_CATALOG = [
   { id:"rw_debarrasse",emoji:"🧽",label:"On débarrasse ton repas",           coins:25 },
   { id:"rw_servi",   emoji:"🍴", label:"Tu te fais servir au souper",        coins:30 },
   { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150 },
-  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45 },
-  { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25 },
+  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45, cat:"calme" },
+  { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25, cat:"calme" },
   { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90 },
-  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40 },
+  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme" },
 ];
+const REWARD_CAT_BADGE = { ecran:{label:"📱 Écran",color:"#FF8C6B"}, calme:{label:"🌙 Calme",color:"#7FD6E0"} };
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
   const wk = todayStamp();
@@ -1367,6 +1371,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.92.0", date:"2026-07-21", features:[
+    "🌙 Boutique : les récompenses « écran » et « calme » (bain moussant, déjeuner au lit, temps privé avec ton parent, musique) ont maintenant une petite étiquette de couleur — plus facile de choisir une récompense apaisante plutôt que toujours de l'écran.",
+  ]},
   { version:"1.91.0", date:"2026-07-21", features:[
     "🔧 Nouveau système de logs techniques (invisible pour les enfants) : capture automatique des erreurs pour aider Gen/Claude à diagnostiquer un pépin, visible dans le portail parent (onglet Journal).",
   ]},
@@ -4651,7 +4658,10 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                   style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${bought?"#2ECC40":canBuy?"#FFD700":"#333"}`,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
                   <span style={{fontSize:22}}>{r.emoji}</span>
                   <div style={{flex:1}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#2ECC40":"#ddd"}}>{r.label}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#2ECC40":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      {r.label}
+                      {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#000",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
+                    </div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#2ECC40":"#FFD700"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
                   </div>
                   {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
