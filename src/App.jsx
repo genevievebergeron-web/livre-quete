@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.86.0";
+const APP_VERSION = "1.87.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1367,6 +1367,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.87.0", date:"2026-07-20", features:[
+    "🔍 Nouveau réglage « Taille du texte » (Normal/Grand/Très grand) dans Mes réglages.",
+    "🔤 Nouveau réglage « Police plus lisible » — remplace les lettres « jeu vidéo » par une police plus simple à lire, pour toute l'app.",
+    "🌅 Message « Nouvelle journée! » à ta première visite du jour — explique pourquoi tes tâches sont redevenues à faire.",
+  ]},
   { version:"1.86.0", date:"2026-07-20", features:[
     "⏱ Le bouton Minuterie de l'accueil garde maintenant ton rituel actif présélectionné (avant : toujours vierge, même si tu étais en plein rituel).",
   ]},
@@ -2059,7 +2064,7 @@ const migrateGameState = (gs) => {
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
-    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant
+    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12)
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
@@ -2149,6 +2154,10 @@ const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Nunito:wght@700;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Nunito',sans-serif;-webkit-tap-highlight-color:transparent;}
+  /* v1.87.0 (Lot 3 #12) — "police plus lisible" : bascule les polices pixel-art (Press Start 2P /
+     VT323) vers Nunito (déjà chargée, poids 700/900) — !important pour l'emporter sur les centaines
+     de styles inline, seule façon réaliste de couvrir toute l'app sans réécrire chaque composant. */
+  .readable-font, .readable-font *{font-family:'Nunito',sans-serif!important;letter-spacing:0.01em!important;}
   ::-webkit-scrollbar{width:4px;height:4px;} ::-webkit-scrollbar-track{background:#111;} ::-webkit-scrollbar-thumb{background:#444;border-radius:2px;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
   @keyframes clkPulse{from{opacity:1}to{opacity:0.65}}
@@ -3661,7 +3670,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const _petPendingTier = _eqPetId ? petPendingTier(_eqPetEvo, _eqPetLv) : 0;
   const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
+  const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -3715,6 +3724,18 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pState.completed, pState.pending]);
+  // v1.87.0 (Lot 3 #16) — message "Nouvelle journée!" au premier retour dans l'app un jour différent :
+  // explique pourquoi les tâches sont "décochées" (reset quotidien par clé datée) au lieu de laisser
+  // l'enfant deviner. Une fois par ouverture (au montage), pas à chaque re-render.
+  useEffect(()=>{
+    if(parentMode) return;
+    const today=todayStamp();
+    if(pState.lastSeenDay && pState.lastSeenDay!==today){
+      showToast&&showToast("🌅 Nouvelle journée! Tes routines sont prêtes.","#5DECF5",4000);
+    }
+    if(pState.lastSeenDay!==today){ onPatchState&&onPatchState({lastSeenDay:today}); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   // Vue Semaine : on met en avant les tâches d'AUJOURD'HUI; le reste de la semaine va dans une section grisée
   const todayWeek = weekMine.filter(a=>Array.isArray(a.days)&&a.days.includes(todayDayIdx));
   const laterWeek = weekMine.filter(a=>!(Array.isArray(a.days)&&a.days.includes(todayDayIdx)));
@@ -3740,7 +3761,12 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   ];
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px"}}>
+    // v1.87.0 (Lot 3 #12) — accessibilité texte : `zoom` (pas `fontSize`/`rem`) car TOUT le style de
+    // l'app est en px/clamp() littéraux, pas en unités relatives — zoom est la seule façon de tout
+    // agrandir (texte ET boutons ET espacements) sans réécrire des centaines de styles inline.
+    // `readable-font` (classe CSS, voir GLOBAL_CSS) bascule la police pixel-art vers une police
+    // système lisible via un sélecteur global — même raison, pas de réécriture site-wide possible ici.
+    <div className={settings.readableFont?"readable-font":undefined} style={{display:"flex",flexDirection:"column",gap:10,padding:"10px 8px 92px",zoom:settings.fontScale||1}}>
       {/* v1.68.0 (B5) — bannière de fin de rituel (toute une routine complétée) */}
       {ritualWin && (
         <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
@@ -3975,6 +4001,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             ["calm","🎬 Mode calme","Moins d'animations et de clignotements (plus doux pour les yeux)"],
             ["calmCountdown","⏱ Décompte calme","Le minuteur sans rouge ni « dépêche-toi »"],
             ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
+            ["readableFont","🔤 Police plus lisible","Remplace les lettres « jeu vidéo » par une police plus simple à lire"], // v1.87.0 (Lot 3 #12)
           ].map(([key,label,desc])=>{
             // v1.82.0 (Lot 1 #4) — "humor" retiré : c'était un réglage sans effet (aucun texte
             // humoristique n'existe dans le code), ça promettait une fonction inexistante à l'enfant.
@@ -3990,6 +4017,17 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
               </div>
             );
           })}
+          {/* v1.87.0 (Lot 3 #12) — taille du texte : `zoom` sur le conteneur racine (voir plus haut),
+              pas un booléen donc en dehors de la liste ON/OFF ci-dessus */}
+          <div style={{padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:6,marginBottom:8}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#ccc",marginBottom:8}}>🔍 Taille du texte</div>
+            <div style={{display:"flex",gap:6}}>
+              {[["Normal",1],["Grand",1.15],["Très grand",1.3]].map(([lbl,val])=>{ const on=(settings.fontScale||1)===val; return (
+                <button key={val} onClick={()=>{SFX.click();setSetting("fontScale",val);}}
+                  style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 4px",background:on?(pt.accent||"#2ECC40"):"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?(pt.accent||"#2ECC40"):"#333"}`,borderRadius:4,cursor:"pointer"}}>{lbl}</button>
+              ); })}
+            </div>
+          </div>
           <button onClick={()=>{SFX.click();setSettingsOpen(false);}}
             style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
             ← Retour
@@ -7663,7 +7701,7 @@ export default function App() {
   // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille/parent = accueil Semaine (pas de gros chrono rouge).
   const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
   // Réglages d'accessibilité de l'enfant affiché → pilotent son/animations/décompte
-  const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false };
+  const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
   SFX_MUTED = curSettings.sound === false;
   CALM = !!curSettings.calm;
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
