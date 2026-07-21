@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.83.0";
+const APP_VERSION = "1.84.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -267,6 +267,14 @@ const ENERGY_REGEN_PER_MIN = ENERGY_MAX / 180; // pleine en 3 heures
 const CHEST_ENERGY = 30;   // ouvrir un coffre coûte de l'énergie
 const PLAY_ENERGY  = 20;   // jouer avec le familier
 const FEED_ENERGY  = 45;   // nourrir le familier (1×/jour) en redonne
+// v1.84.0 (Lot 1 #B3) — le frein énergie s'élargit à la boutique et à l'avatar (browsing "plaisir"
+// sans limite naturelle). Volontairement PAS étendu à : (1) le mini-jeu de niveau — récompense
+// méritée par un accomplissement (level-up), pas une activité répétée pour tuer le temps; (2) le
+// combat de boss — déjà gaté par les jetons (1 par quête complétée), donc déjà lié à l'effort réel;
+// l'audit du 16 juin avait explicitement jugé le boss "bien conçu... RAS", ajouter l'énergie par-dessus
+// serait redondant et rendrait une activité familiale plus frustrante sans bénéfice.
+const SHOP_ENERGY  = 15;   // acheter dans la boutique (magasiner)
+const AVATAR_ENERGY= 10;   // ouvrir le personnalisateur de perso
 // Énergie courante = valeur stockée + ce qui s'est rechargé depuis energyTs
 const currentEnergy = (gs) => {
   if (!gs) return ENERGY_MAX;
@@ -1342,6 +1350,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.84.0", date:"2026-07-20", features:[
+    "😴 L'énergie de ton héros s'applique maintenant aussi à la boutique et à ton perso (pas juste ton familier) — les corvées, elles, restent TOUJOURS gratuites.",
+    "😴 Un petit message « ton héros se repose » apparaît maintenant dans ta fiche perso dès que l'énergie est basse, pas juste sur la carte familier.",
+  ]},
   { version:"1.83.0", date:"2026-07-20", features:[
     "🗑️ Tu peux maintenant demander à retirer une tâche que tu ne veux plus — ton parent voit la demande et l'approuve ou la garde.",
   ]},
@@ -3602,7 +3614,7 @@ function InlineRitualTimer({ endTime, accent }){
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3627,6 +3639,12 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
+  // v1.84.0 (Lot 1 #B3) — ouvrir le personnalisateur coûte de l'énergie (frein "plaisir")
+  const openAvatar = ()=>{
+    if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#5DECF5",3500); return; }
+    onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
+    setAvatarOpen(true);
+  };
   const [themeRevealed, setThemeRevealed] = useState(false);
   const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
   const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
@@ -3779,7 +3797,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
       {/* Player header card */}
       <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         {/* Avatar — clickable → opens creator/inventory */}
-        <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setAvatarOpen(true);SFX.click();}} title="Personnaliser mon perso">
+        <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={openAvatar} title="Personnaliser mon perso">
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
             style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
           {/* v1.81.0 — ancré sur la vraie géométrie du corps (EquippedGear), voir plus haut */}
@@ -3802,6 +3820,13 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},#5DECF5)`,transition:"width 0.8s ease"}}/>
           </div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#FFD700"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+          {/* v1.84.0 (Lot 1 #B3) — sieste visible ICI aussi (pas juste sur la carte familier) dès
+              qu'au moins une activité plaisir (boutique/avatar) est bloquée par l'énergie */}
+          {(()=>{ const cur=currentEnergy(pState); const thresh=Math.max(SHOP_ENERGY,AVATAR_ENERGY);
+            if(cur>=thresh) return null;
+            const m=minsToEnergy(pState,thresh);
+            return <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#5DECF5",marginTop:3}}>😴 Ton héros se repose… prêt dans ~{m} min</div>;
+          })()}
         </div>
       </div>
 
@@ -3835,7 +3860,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             </div>
             {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
               return (<>
-                <div style={{display:"flex",alignItems:"center",gap:12}} onClick={()=>{setAvatarOpen(true);SFX.click();}} >
+                <div style={{display:"flex",alignItems:"center",gap:12}} onClick={openAvatar} >
                   <div style={{fontSize:48,lineHeight:1,cursor:"pointer",filter:`drop-shadow(0 0 6px ${pt.glow||acc})`,opacity:napping?0.6:1}}>{napping?"😴":eqPet.emoji}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:acc}}>{eqPet.name} — Niv.{lv}</div>
@@ -3856,7 +3881,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                     style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:napping?"#1a1a1a":acc,color:napping?"#777":"#000",border:"2px solid #000",borderRadius:5,cursor:"pointer"}}>{napping?"💤 Sieste":"🎾 Jouer"}</button>
                 </div>
               </>); })() : (
-                <div onClick={()=>{setAvatarOpen(true);SFX.click();}} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+                <div onClick={openAvatar} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
                   <div style={{fontSize:40,opacity:0.5}}>🐾</div>
                   <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒, nourris-le chaque jour et il évoluera avec tes quêtes!</div>
                 </div>
@@ -7016,19 +7041,22 @@ export default function App() {
   // Buy / equip
   const handleBuy = useCallback((item,playerId)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
+    // v1.84.0 (Lot 1 #B3) — magasiner coûte de l'énergie (frein "plaisir", jamais les corvées)
+    const p0=gameStates[idx];
+    if(currentEnergy(p0)<SHOP_ENERGY){ const m=minsToEnergy(p0,SHOP_ENERGY); showToast(`😴 Ton héros se repose… la boutique rouvre dans ~${m} min!`,"#5DECF5",3500); return; }
     setGameStates(gs=>{
       const p=gs[idx];
       const isReward=!item.slot;
       const price=priceOf(item); // items (.cost) ET récompenses (.coins), ×PRICE_MULT
       if((p.coins||0)<price)return gs;
       SFX.buy();
-      const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{})};
+      const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
       persist(config,n);
       showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#FFD700");
       spawnParticles(item.emoji||"🎉");
       return n;
     });
-  },[config,persist,showToast]);
+  },[config,gameStates,persist,showToast]);
 
   const handleUpdateAvatar = useCallback((avatarDef, playerId)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -7802,6 +7830,7 @@ export default function App() {
             onChildPickTask={(taskId)=>handleChildPickTask(view,taskId)}
             onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
             onRequestRemoval={(instanceId)=>handleRequestRemoval(view,instanceId)}
+            showToast={showToast}
             onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
             onRespondOffer={handleRespondOffer}
             onFeedPet={()=>handleFeedPet(view)}
