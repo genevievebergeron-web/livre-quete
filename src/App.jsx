@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.89.0";
+const APP_VERSION = "1.90.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1367,6 +1367,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.90.0", date:"2026-07-21", features:[
+    "🎮 Mini-jeu de niveau : tu choisis maintenant TOI-MÊME ton jeu (Tape vite / Cours et saute / Mange tout) au lieu qu'il soit tiré au hasard — et tu vois les paliers de récompense (XP + pièces) AVANT de jouer.",
+  ]},
   { version:"1.89.0", date:"2026-07-21", features:[
     "🖥️ Sur un ordinateur (grand écran), l'app reste maintenant une colonne confortable et centrée au lieu de s'étirer d'un bord à l'autre — pareil sur téléphone, tablette et ordi.",
   ]},
@@ -2005,6 +2008,7 @@ const mergeFamily = (base, incoming) => {
       return [...m.values()].filter(o => o.status === "pending" || (o.ts || 0) > cutoff).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 40);
     })(),
     bugs: (() => { const m = new Map(); for (const x of [...(bC.bugs || []), ...(iC.bugs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60); })(), // v1.65.0 — bugs signalés : union par id (ne se perdent plus à la synchro)
+    errorLogs: (() => { const m = new Map(); for (const x of [...(bC.errorLogs || []), ...(iC.errorLogs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 80); })(), // v1.90.0 — logs techniques (erreurs JS) : même pattern que bugs, union par id
     boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
       const a = bC.boss, b = iC.boss;
       if (!a) return b || null; if (!b) return a;
@@ -5627,14 +5631,22 @@ function PinKeypad({ onDigit, onBack, onClose, onSubmit, closeLabel="✕" }) {
 // ═══════════════════════════════════════════════════════════════
 // MINI-GAME RUNNER — dino-style endless runner
 // ═══════════════════════════════════════════════════════════════
+// v1.90.0 (Lot 4 #18) — paliers de récompense centralisés ici, réutilisés par
+// chaque mini-jeu ET par l'écran de choix/intro (pour les afficher avant de jouer).
+const MINIGAME_TIERS = {
+  runner: { xp:[0, 5, 12, 22, 35], coins:[0, 2,  6, 12, 20] },
+  pacman: { xp:[0, 5, 12, 24, 40], coins:[0, 2,  7, 14, 22] },
+  whack:  { xp:[0, 8, 18, 30],     coins:[0, 4, 10, 18] },
+};
+
 function MiniGameRunner({ pt, level, onFinish }) {
   const canvasRef = useRef(null);
   const stRef = useRef(null);
   const [phase, setPhase] = useState("intro");
   const phaseRef = useRef("intro");
 
-  const BONUS_XP    = [0, 5, 12, 22, 35];
-  const BONUS_COINS = [0, 2,  6, 12, 20];
+  const BONUS_XP    = MINIGAME_TIERS.runner.xp;
+  const BONUS_COINS = MINIGAME_TIERS.runner.coins;
   const W = 320, H = 160, GROUND = 120;
   const GRAVITY = 0.6, JUMP_VY = -11;
   const DURATION = 16000;
@@ -5819,8 +5831,8 @@ function MiniGamePacman({ pt, level, onFinish }) {
   const [phase, setPhase] = useState("intro");
   const phaseRef = useRef("intro");
 
-  const BONUS_XP    = [0, 5, 12, 24, 40];
-  const BONUS_COINS = [0, 2,  7, 14, 22];
+  const BONUS_XP    = MINIGAME_TIERS.pacman.xp;
+  const BONUS_COINS = MINIGAME_TIERS.pacman.coins;
   const CS = 22; // cell size
   const MOVE_INTERVAL = 200;
   const GHOST_INTERVAL = 380; // fantômes plus lents (moins stressant)
@@ -6063,8 +6075,8 @@ function MiniGamePacman({ pt, level, onFinish }) {
 function MiniGameWhack({ pt, level, onFinish }) {
   const ROUNDS = 3;
   const ROUND_MS = 2300; // plus lent (était 1400)
-  const BONUS_XP = [0, 8, 18, 30];
-  const BONUS_COINS = [0, 4, 10, 18];
+  const BONUS_XP = MINIGAME_TIERS.whack.xp;
+  const BONUS_COINS = MINIGAME_TIERS.whack.coins;
   const TARGET = pt.platformItems?.[0] || "⭐";
 
   const [phase, setPhase] = useState("intro"); // intro|play|done
@@ -6150,21 +6162,36 @@ function MiniGameWhack({ pt, level, onFinish }) {
 // ═══════════════════════════════════════════════════════════════
 // MINI-GAME ROUTER — choisi aléatoirement au level-up
 // ═══════════════════════════════════════════════════════════════
+const MINIGAME_LIST = ["whack", "runner", "pacman"];
+const MINIGAME_INFO = {
+  whack:  { icon:"🔨", name:"Tape vite!",   how:"👆 Touche les cibles avec ton doigt (ou clique avec la souris) le plus vite possible avant qu'elles disparaissent!" },
+  runner: { icon:"🏃", name:"Cours et saute!", how:"👆 Appuie N'IMPORTE OÙ sur l'écran — ou la barre d'espace ⎵ / flèche du haut ⬆️ — pour SAUTER par-dessus les obstacles. Ramasse les pièces!" },
+  pacman: { icon:"😋", name:"Mange tout!",  how:"👆 Glisse ton doigt dans une direction — ou utilise les flèches du clavier ⬆️⬇️⬅️➡️ — pour te déplacer. Mange toutes les pastilles en évitant les fantômes!" },
+};
+// v1.90.0 (Lot 4 #18) — paliers d'un jeu, du meilleur score au moins bon, pour affichage AVANT de jouer.
+function minigameTierRow(type) {
+  const tiers = MINIGAME_TIERS[type];
+  const rows = tiers.xp.map((xp,i)=>({tier:i,xp,coins:tiers.coins[i]})).filter(r=>r.tier>0).reverse();
+  return (
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",maxWidth:360}}>
+      {rows.map(r=>(
+        <div key={r.tier} style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",background:"rgba(0,0,0,0.35)",borderRadius:6,padding:"4px 9px"}}>
+          {"⭐".repeat(r.tier)} +{r.xp} XP · +{r.coins}🪙
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }) {
   const pt = getPlayerTheme(playerThemeId || "none");
-  const [type] = useState(() => {
-    const games = ["whack", "runner", "pacman"];
-    if (forcedType && games.includes(forcedType)) return forcedType; // jeu imposé (ex: cadeau Pac-Man)
-    return games[Math.floor(Math.random() * games.length)];
-  });
-  // Écran d'intro + décompte "GO" pour que l'enfant comprenne AVANT que le chrono parte
-  const [phase, setPhase] = useState("intro"); // intro | countdown | play
+  const forced = forcedType && MINIGAME_LIST.includes(forcedType) ? forcedType : null;
+  // v1.90.0 (Lot 4 #18) — l'enfant choisit son jeu (sauf cadeau imposé, ex Pac-Man) : nouvelle
+  // phase "choice" avant l'intro, qui affiche aussi les paliers de récompense de chaque jeu.
+  const [type, setType] = useState(forced);
+  const [phase, setPhase] = useState(forced ? "intro" : "choice"); // choice | intro | countdown | play
   const [count, setCount] = useState(3);
-  const INFO = {
-    whack:  { icon:"🔨", name:"Tape vite!",   how:"👆 Touche les cibles avec ton doigt (ou clique avec la souris) le plus vite possible avant qu'elles disparaissent!" },
-    runner: { icon:"🏃", name:"Cours et saute!", how:"👆 Appuie N'IMPORTE OÙ sur l'écran — ou la barre d'espace ⎵ / flèche du haut ⬆️ — pour SAUTER par-dessus les obstacles. Ramasse les pièces!" },
-    pacman: { icon:"😋", name:"Mange tout!",  how:"👆 Glisse ton doigt dans une direction — ou utilise les flèches du clavier ⬆️⬇️⬅️➡️ — pour te déplacer. Mange toutes les pastilles en évitant les fantômes!" },
-  }[type];
+  const INFO = type ? MINIGAME_INFO[type] : null;
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -6174,6 +6201,24 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
     return () => clearTimeout(t);
   }, [phase, count]);
 
+  if (phase === "choice") {
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:24,textAlign:"center",overflowY:"auto"}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.4vw,20px)",color:"#fff"}}>Choisis ton mini-jeu! 🎮</div>
+        {MINIGAME_LIST.map(g => (
+          <button key={g} onClick={()=>{SFX.click&&SFX.click();setType(g);setPhase("intro");}}
+            style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:6,alignItems:"center",fontFamily:"'Press Start 2P',monospace",padding:"14px 12px",background:"#1a1a1a",color:"#fff",border:`3px solid ${pt.accent}`,borderRadius:8,cursor:"pointer"}}>
+            <div style={{fontSize:32}}>{MINIGAME_INFO[g].icon}</div>
+            <div style={{fontSize:"clamp(9px,1.4vw,12px)",color:pt.accent}}>{MINIGAME_INFO[g].name}</div>
+            {minigameTierRow(g)}
+          </button>
+        ))}
+        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
+      </div>
+    );
+  }
+
   if (phase === "intro") {
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:18,padding:24,textAlign:"center",overflowY:"auto"}}>
@@ -6181,11 +6226,13 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
         <div style={{fontSize:64,lineHeight:1}}>{INFO.icon}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:pt.accent,textShadow:`0 0 14px ${pt.glow}80`}}>{INFO.name}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.6vw,21px)",color:"#fff",maxWidth:380,lineHeight:1.35}}>{INFO.how}</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>🏆 Plus tu réussis, plus tu gagnes de bonus!</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>🏆 Paliers de récompense :</div>
+        {minigameTierRow(type)}
         <button onClick={()=>{SFX.click&&SFX.click();setCount(3);setPhase("countdown");}}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",padding:"16px 30px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"5px 5px 0 #000",marginTop:6}}>
           ✅ JE SUIS PRÊT!
         </button>
+        {!forced && <button onClick={()=>{SFX.click&&SFX.click();setPhase("choice");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#1a1a1a",color:pt.accent,border:`2px solid ${pt.accent}`,cursor:"pointer",borderRadius:3}}>🔀 Changer de jeu</button>}
         <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
       </div>
     );
@@ -6606,7 +6653,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             ["🎨","13 Thèmes","Minecraft, Harry Potter, Marvel, Ghibli, Roblox… Chaque thème change les couleurs et les titres de toute la page. Tu choisis le tien à ta première connexion!"],
             ["🏅","Badges","Des badges secrets à débloquer en faisant des tâches. Streaks, premières fois, défis épiques… survole un badge pour voir comment le gagner!"],
             ["📅","Calendrier","Note tes devoirs et examens ici! Un rappel va apparaître automatiquement quand la date approche, avec de l'XP bonus pour compléter."],
-            ["🎮","Mini-jeux","Quand tu montes de niveau, un mini-jeu surprise s'active — choisi au hasard! 🎲 Trois jeux possibles: Whack-a-Mole (tape les monstres!), Runner (saute les obstacles!) ou Pac-Quest (mange les pellets, évite le fantôme!). Fais un score parfait pour gagner du XP et des pièces bonus. 🏆"],
+            ["🎮","Mini-jeux","Quand tu montes de niveau, choisis TOI-MÊME ton mini-jeu! 🎮 Trois jeux possibles: Whack-a-Mole (tape les monstres!), Runner (saute les obstacles!) ou Pac-Quest (mange les pellets, évite le fantôme!). Les paliers de récompense sont affichés avant de jouer — fais un score parfait pour gagner le max de XP et de pièces bonus. 🏆"],
             ["🔒","Portail parent","La section Parent est réservée aux adultes (protégée par un code secret). C'est là qu'ils valident tes quêtes et créent des récompenses. Tu peux aussi avoir ton propre code PIN pour protéger ton profil!"],
           ].map(([icon,title,desc])=>(
             <div key={title} style={{display:"flex",gap:12,background:"rgba(0,0,0,0.35)",border:"1px solid #222",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
@@ -6941,6 +6988,30 @@ export default function App() {
   const cfgRef = useRef(config); cfgRef.current = config;
   const gsRef = useRef(gameStates); gsRef.current = gameStates;
   const viewRef = useRef(view); viewRef.current = view; // pour ne pas casser l'écran courant pendant la sync
+  // v1.90.0 — capture globale des erreurs JS techniques → config.errorLogs (synced comme config.bugs),
+  // pour aider au troubleshooting à distance (voir MAINTENANCE.md, chantier "logs techniques" du 21
+  // juillet). Discret : aucune UI enfant, lisible seulement par le parent (ParentPanel, onglet Journal)
+  // et par les passes de maintenance qui lisent /api/famille. Anti-spam : même erreur < 1 min ignorée
+  // (évite qu'une erreur qui boucle remplisse les 80 places d'un coup).
+  const lastErrRef = useRef({ key: "", ts: 0 });
+  useEffect(() => {
+    const logError = (message, stack, source) => {
+      const key = (message || "") + "|" + (stack || "").slice(0, 200);
+      const now = Date.now();
+      if (lastErrRef.current.key === key && now - lastErrRef.current.ts < 60000) return;
+      lastErrRef.current = { key, ts: now };
+      const cfg = cfgRef.current || {};
+      const who = (() => { const v = viewRef.current; return typeof v === "number" ? (cfg.players?.[v]?.name || "?") : "?"; })();
+      const entry = { id: "err_" + uid(), ts: now, who, message: (message || "").slice(0, 300), stack: (stack || "").slice(0, 500), source: source || "", appVersion: APP_VERSION };
+      const n = { ...cfg, errorLogs: [entry, ...(cfg.errorLogs || [])].slice(0, 80) };
+      setConfig(n); persist(n, gsRef.current);
+    };
+    const onError = (event) => { try { logError(event.message, event.error?.stack, event.filename); } catch {} };
+    const onRejection = (event) => { try { const r = event.reason; logError(r?.message || String(r), r?.stack, "promise"); } catch {} };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => { window.removeEventListener("error", onError); window.removeEventListener("unhandledrejection", onRejection); };
+  }, [persist]);
   // Ajoute une entrée au fil de famille (auto: quêtes, niveaux; manuel: chat)
   const pushFeed = useCallback((entry)=>{
     const cfg=cfgRef.current||{}; const fe={ id:"f_"+uid(), ts:Date.now(), likes:[], ...entry };
