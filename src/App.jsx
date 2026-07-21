@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.82.0";
+const APP_VERSION = "1.83.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1342,6 +1342,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.83.0", date:"2026-07-20", features:[
+    "🗑️ Tu peux maintenant demander à retirer une tâche que tu ne veux plus — ton parent voit la demande et l'approuve ou la garde.",
+  ]},
   { version:"1.82.0", date:"2026-07-20", features:[
     "📋 Choisir une tâche à assigner se fait maintenant par grille (comme côté enfant) au lieu d'une longue liste déroulante.",
     "🧹 Créer une tâche personnalisée qui existe déjà (même nom) réutilise l'ancienne au lieu d'en empiler une nouvelle — le catalogue de tâches ne grossit plus à l'infini.",
@@ -1912,6 +1915,10 @@ const mergeFamily = (base, incoming) => {
   const taskMap = new Map();
   (bC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id)) taskMap.set(t.id, t); });
   (iC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
+  // v1.83.0 (Lot 1 #B6) — demandes de retrait de tâche (enfant→parent) : union par id,
+  // en retirant celles dont l'assignation visée a déjà été supprimée entretemps (tombstone naturel).
+  const reqMap = new Map();
+  [...(bC.removalRequests || []), ...(iC.removalRequests || [])].forEach((r) => { if (r && r.id && !_rmSet.has(r.instanceId)) reqMap.set(r.id, r); });
   const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
   const newerC = newer.config || {};
   const config = {
@@ -1921,6 +1928,7 @@ const mergeFamily = (base, incoming) => {
     removedAssignments,
     customTasks: [...taskMap.values()],
     removedCustomTasks,
+    removalRequests: [...reqMap.values()],
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
       const m = new Map();
@@ -3594,7 +3602,7 @@ function InlineRitualTimer({ endTime, accent }){
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -4195,6 +4203,16 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
                 boxShadow:"2px 2px 0 #000",transition:"all 0.08s"}}>
               ✔ J'AI FAIT ÇA!
             </button>}
+            {/* v1.83.0 (Lot 1 #B6) — l'enfant peut demander à retirer une tâche qu'il ne veut plus (le parent approuve) */}
+            {!done&&!pending&&(()=>{
+              const reqPending=(config.removalRequests||[]).some(r=>r.instanceId===ass.instanceId && r.playerId===player.id);
+              return reqPending
+                ? <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#FFA94D",textAlign:"center",marginTop:5}}>🗑️ Retrait demandé — en attente du parent…</div>
+                : <button onClick={()=>{ if(window.confirm(`Demander à retirer « ${task.label} » de tes tâches?`)){ SFX.click(); onRequestRemoval&&onRequestRemoval(ass.instanceId); } }}
+                    style={{width:"100%",padding:"5px",marginTop:5,fontFamily:"'VT323',monospace",fontSize:12,color:"#888",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>
+                    🗑️ Je ne veux plus de cette tâche
+                  </button>;
+            })()}
             {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
               style={{width:"100%",padding:"6px",fontFamily:"'Press Start 2P',monospace",fontSize:"7px",
                 color:"#000",background:"#FF8C00",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
@@ -4910,11 +4928,13 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onClearChildTasks, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
-  const [tab, setTab] = useState(nbPending>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
+  const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
+  const nbValid = nbPending + removalReqs.length;
+  const [tab, setTab] = useState(nbValid>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
   const [xpPlayer, setXpPlayer] = useState(0);
   const [xpDelta, setXpDelta] = useState(10);
   const [pinVal, setPinVal] = useState("");
@@ -4969,7 +4989,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
 
       {/* Tabs */}
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
-        <TabBtn k="valid"    l={`✅ À valider${nbPending>0?` (${nbPending})`:""}`}/>
+        <TabBtn k="valid"    l={`✅ À valider${nbValid>0?` (${nbValid})`:""}`}/>
         <TabBtn k="tasks"    l="📋 Tâches"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
         <TabBtn k="cal"      l="📅 Calendrier"/>
@@ -5037,6 +5057,33 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                   ))}
                 </div>
               ))}
+              {/* v1.83.0 (Lot 1 #B6) — demandes de retrait de tâche envoyées par les enfants */}
+              {removalReqs.length>0 && (
+                <div style={{marginTop:18,paddingTop:14,borderTop:"2px solid #333"}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFA94D",marginBottom:8}}>🗑️ DEMANDES DE RETRAIT ({removalReqs.length})</div>
+                  {removalReqs.map(req=>{
+                    const pl=players.find(p=>p.id===req.playerId);
+                    const ass=(config.assignments||[]).find(a=>a.instanceId===req.instanceId);
+                    const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
+                    if(!task) return null;
+                    return (
+                      <div key={req.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                          <span style={{fontSize:18}}>{task.emoji}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{task.label}</div>
+                            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:pl?.color||"#888"}}>{pl?displayName(pl):""}</span>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <PBtn onClick={()=>onApproveRemoval(req.id)} color="#1a3a1a" textColor="#2ECC40" style={{flex:1}}>✅ Retirer la tâche</PBtn>
+                          <PBtn onClick={()=>onRefuseRemoval(req.id)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Garder la tâche</PBtn>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })()}
@@ -7149,6 +7196,36 @@ export default function App() {
     showToast("🗑️ Tâche retirée","#FF8C00");
   },[config,gameStates,persist,logAction,showToast]);
 
+  // v1.83.0 (Lot 1 #B6) — l'enfant DEMANDE à retirer une tâche (pas de suppression directe :
+  // le parent approuve, même esprit que la validation des tâches complétées).
+  const handleRequestRemoval = useCallback((playerIdx, instanceId)=>{
+    const pid=config.players[playerIdx]?.id; if(!pid) return;
+    if((config.removalRequests||[]).some(r=>r.instanceId===instanceId && r.playerId===pid)) return; // déjà demandé
+    const req={id:"rmreq_"+uid(), instanceId, playerId:pid, requestedAt:Date.now()};
+    const newCfg={...config, removalRequests:[...(config.removalRequests||[]), req]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("🗑️ Demande envoyée au parent","#FFD700");
+  },[config,gameStates,persist,showToast]);
+
+  const handleApproveRemoval = useCallback((reqId)=>{
+    const req=(config.removalRequests||[]).find(r=>r.id===reqId); if(!req) return;
+    const ass=(config.assignments||[]).find(a=>a.instanceId===req.instanceId);
+    const task=ass?[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId):null;
+    const newCfg={...config,
+      assignments:(config.assignments||[]).filter(a=>a.instanceId!==req.instanceId),
+      removedAssignments:_uniq([...(config.removedAssignments||[]), req.instanceId]).slice(-800),
+      removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    logAction(`🗑️ Retrait approuvé: ${task?.label||req.instanceId}`,"#FF8C00");
+    showToast("🗑️ Tâche retirée","#FF8C00");
+  },[config,gameStates,persist,logAction,showToast]);
+
+  const handleRefuseRemoval = useCallback((reqId)=>{
+    const newCfg={...config, removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("Demande de retrait refusée","#FF6464");
+  },[config,gameStates,persist,showToast]);
+
   // Ménage : supprimer TOUTES les tâches qu'un enfant s'est créées (child:true)
   const handleClearChildTasks = useCallback((playerIdx)=>{
     const pid=config.players[playerIdx]?.id; if(!pid) return;
@@ -7724,6 +7801,7 @@ export default function App() {
             onChildAddTask={(data)=>handleChildAddTask(view,data)}
             onChildPickTask={(taskId)=>handleChildPickTask(view,taskId)}
             onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
+            onRequestRemoval={(instanceId)=>handleRequestRemoval(view,instanceId)}
             onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
             onRespondOffer={handleRespondOffer}
             onFeedPet={()=>handleFeedPet(view)}
@@ -7791,6 +7869,8 @@ export default function App() {
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onAddCalendarEvent={handleAddCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
+          onApproveRemoval={handleApproveRemoval}
+          onRefuseRemoval={handleRefuseRemoval}
           onClearChildTasks={handleClearChildTasks}
           onAddCustomTask={handleAddCustomTask}
           onClose={()=>setParentPanel(false)}
