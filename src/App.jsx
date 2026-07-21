@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.90.0";
+const APP_VERSION = "1.91.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1367,6 +1367,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.91.0", date:"2026-07-21", features:[
+    "🔧 Nouveau système de logs techniques (invisible pour les enfants) : capture automatique des erreurs pour aider Gen/Claude à diagnostiquer un pépin, visible dans le portail parent (onglet Journal).",
+  ]},
   { version:"1.90.0", date:"2026-07-21", features:[
     "🎮 Mini-jeu de niveau : tu choisis maintenant TOI-MÊME ton jeu (Tape vite / Cours et saute / Mange tout) au lieu qu'il soit tiré au hasard — et tu vois les paliers de récompense (XP + pièces) AVANT de jouer.",
   ]},
@@ -5141,6 +5144,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
+  const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
@@ -5533,6 +5537,22 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
                 <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #FF8C0022"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.3}}>{b.text}</div>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888",marginTop:3}}>— {b.who} · {new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* v1.90.0 — logs techniques (erreurs JS capturées automatiquement) : repliable, discret,
+              pour ne pas noyer les vrais bugs signalés par les enfants juste au-dessus */}
+          {(config.errorLogs||[]).length>0 && (
+            <div style={{background:"rgba(255,255,255,0.04)",border:"2px solid #444",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
+              <div onClick={()=>setErrLogsOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#999"}}>🔧 LOGS TECHNIQUES ({(config.errorLogs||[]).length})</div>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{errLogsOpen?"▲":"▼"}</span>
+              </div>
+              {errLogsOpen && (config.errorLogs||[]).map(e=>(
+                <div key={e.id} style={{marginTop:8,paddingBottom:6,borderBottom:"1px solid #333"}}>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",lineHeight:1.3,wordBreak:"break-word"}}>{e.message}</div>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#777",marginTop:3}}>— {e.who} · v{e.appVersion} · {new Date(e.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
                 </div>
               ))}
             </div>
