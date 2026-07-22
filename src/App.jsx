@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 
-const APP_VERSION = "1.94.0";
+const APP_VERSION = "1.95.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1383,6 +1383,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.95.0", date:"2026-07-22", features:[
+    "⚡ Encore un peu plus de fluidité côté technique (invisible), surtout pour l'écran Famille et le portail parent.",
+  ]},
   { version:"1.94.0", date:"2026-07-21", features:[
     "⚡ Petite amélioration technique invisible : l'app devrait sembler un peu plus fluide, surtout sur des appareils plus lents.",
   ]},
@@ -5004,7 +5007,9 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
   );
 }
 
-function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat, onGiveCoins, onCreateOffer }) {
+// v1.95.0 (Lot 5 #23) — memo() : évite un re-render quand ses props n'ont pas vraiment changé
+// (efficace maintenant que App() passe des callbacks/allTasks stabilisés, voir plus bas).
+const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen, th, meId, onLike, onPostChat, onGiveCoins, onCreateOffer }) {
   const [profileIdx, setProfileIdx] = useState(null);
   const [chatText, setChatText] = useState("");
   const mayOpen = (i)=> canOpen ? canOpen(i) : true;
@@ -5165,14 +5170,14 @@ function FamilyOverview({ config, gameStates, allTasks, onSelectPlayer, canOpen,
       </div>
     </div>
   );
-}
+});
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
 
 // ─── PARENT PANEL ────────────────────────────────────────────
-function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
+const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th }) {
@@ -5656,7 +5661,7 @@ function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
       </div>
     </div>
   );
-}
+});
 
 // ═══════════════════════════════════════════════════════════════
 // LOGIN SCREEN — "Qui joue?"
@@ -7889,8 +7894,11 @@ export default function App() {
     showToast("↩️ Action annulée!","#FF8C00");
   },[undoStack,config,persist,showToast]);
 
-  const allTasks = [...TASK_CATALOG,...(config?.customTasks||[])];
-  const allRewards = [...REWARD_CATALOG,...(config?.customRewards||[])];
+  // v1.95.0 (Lot 5 #23) — useMemo : sans ça, allTasks/allRewards étaient de nouveaux tableaux
+  // à CHAQUE render, ce qui aurait annulé React.memo sur FamilyOverview/ParentPanel/PlayerDashboard
+  // (les 3 les reçoivent en prop) même après avoir stabilisé leurs callbacks.
+  const allTasks = useMemo(()=>[...TASK_CATALOG,...(config?.customTasks||[])], [config?.customTasks]);
+  const allRewards = useMemo(()=>[...REWARD_CATALOG,...(config?.customRewards||[])], [config?.customRewards]);
   // Resolve week theme (random_week → pick based on current week number) — fallback famille
   const weekNum = Math.ceil(new Date().getDate()/7) + new Date().getMonth()*4;
   const resolvedWeekTheme = config?.theme==="random_week"
@@ -7937,6 +7945,24 @@ export default function App() {
     if(effectiveMode==="week"){ return Math.round((todayDayIdx/6)*100); }
     return 0;
   },[config,now,todayDayIdx,effectiveMode]);
+
+  // v1.95.0 (Lot 5 #23) — callbacks stabilisés (useCallback) pour que React.memo sur
+  // FamilyOverview/ParentPanel serve à quelque chose : sans ça, ces props recréées
+  // en ligne à chaque render de App() auraient toujours été "différentes" pour le
+  // comparateur de memo, qui aurait donc re-render ces enfants de toute façon.
+  // Placés AVANT les "return" précoces ci-dessous (screen loading/setup/login) — les Hooks
+  // doivent être appelés dans le même ordre à chaque render, jamais après un retour conditionnel.
+  // config peut être null ici (écrans loading/setup) → chaînage optionnel partout.
+  const familyMeId = parentMode ? "parent" : (sessionPlayer!=null ? config?.players?.[sessionPlayer]?.id : "parent");
+  const onFamilySelectPlayer = useCallback(i=>{ setView(i); SFX.click(); }, []);
+  const onFamilyCanOpen = useCallback(i=> parentMode || sessionPlayer===i, [parentMode, sessionPlayer]);
+  const onFamilyLike = useCallback((fid)=> toggleFeedLike(fid, familyMeId), [toggleFeedLike, familyMeId]);
+  const onFamilyPostChat = useCallback((text)=>{ pushFeed({type:"chat",playerId:familyMeId,text,emoji:"💬"}); }, [pushFeed, familyMeId]);
+
+  const onParentPanelClose = useCallback(()=>setParentPanel(false), []);
+  const onParentPanelExit = useCallback(()=>{ setParentMode(false); setParentPanel(false); showToast("🔒 Mode parent quitté","#FF8C00"); }, [showToast]);
+  const onParentPanelReset = useCallback(()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ (config?.players||[]).forEach((_,i)=>handleResetPlayer(i)); } }, [config?.players, handleResetPlayer]);
+  const onParentPanelSetup = useCallback(()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }, []);
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
@@ -8125,12 +8151,12 @@ export default function App() {
           );
         })()}
         {view==="family"&&(
-          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={i=>{setView(i);SFX.click();}} canOpen={i=> parentMode || sessionPlayer===i} th={th}
+          <FamilyOverview config={config} gameStates={gameStates} allTasks={allTasks} onSelectPlayer={onFamilySelectPlayer} canOpen={onFamilyCanOpen} th={th}
             onGiveCoins={handleGiveCoins}
             onCreateOffer={handleCreateOffer}
-            meId={parentMode ? "parent" : (sessionPlayer!=null ? config.players[sessionPlayer]?.id : "parent")}
-            onLike={(fid)=>toggleFeedLike(fid, parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"))}
-            onPostChat={(text)=>{ const mid=parentMode?"parent":(sessionPlayer!=null?config.players[sessionPlayer]?.id:"parent"); pushFeed({type:"chat",playerId:mid,text,emoji:"💬"}); }}/>
+            meId={familyMeId}
+            onLike={onFamilyLike}
+            onPostChat={onFamilyPostChat}/>
         )}
         {typeof view==="number"&&(
           <PlayerDashboard
@@ -8224,17 +8250,17 @@ export default function App() {
           onRefuseRemoval={handleRefuseRemoval}
           onClearChildTasks={handleClearChildTasks}
           onAddCustomTask={handleAddCustomTask}
-          onClose={()=>setParentPanel(false)}
-          onExitParent={()=>{setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
+          onClose={onParentPanelClose}
+          onExitParent={onParentPanelExit}
           onUndo={handleUndo}
-          onReset={()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ config.players.forEach((_,i)=>handleResetPlayer(i)); } }}
+          onReset={onParentPanelReset}
           onResetPlayer={handleResetPlayer}
           onAdjustXP={handleAdjustXP}
           onAdjustCoins={handleAdjustCoins}
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}
-          onSetup={()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }}
+          onSetup={onParentPanelSetup}
         />
       )}
 
