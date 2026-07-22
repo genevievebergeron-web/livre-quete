@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.92.0";
+const APP_VERSION = "1.93.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1340,12 +1340,24 @@ const pickStarterThemes = () => {
   return shuffled.slice(0, 2);
 };
 
+// v1.93.0 (Lot 4 #20) — thème hebdomadaire gratuit : chaque semaine (lundi→dimanche, via
+// weekKey), un thème non-secret est débloqué pour TOUT LE MONDE sans XP, en plus des
+// déblocages XP/starter existants (choix additif, pas un remplacement — voir PROJET-ETAT.md
+// pour le raisonnement : ne pas faire perdre leur progression XP déjà gagnée aux enfants).
+const getWeeklyFreeTheme = () => {
+  const pool = Object.keys(PLAYER_THEMES).filter(k => k !== "none" && !PLAYER_THEMES[k].secret);
+  const wk = weekKey();
+  const seed = wk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  return pool[seed % pool.length];
+};
+
 const isThemeUnlocked = (themeId, playerXp, starterThemes = []) => {
   if (themeId === "none") return true; // always free
   const t = PLAYER_THEMES[themeId];
   if (!t) return false;
   if (t.secret) return false; // secret only via random
   if (starterThemes.includes(themeId)) return true; // starter pick
+  if (themeId === getWeeklyFreeTheme()) return true; // thème gratuit de la semaine
   return (playerXp || 0) >= (t.xpUnlock ?? 0);
 };
 
@@ -1371,6 +1383,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.93.0", date:"2026-07-21", features:[
+    "🎲 Un thème gratuit différent est débloqué chaque semaine pour tout le monde dans le sélecteur de thème — pas besoin d'XP pour l'essayer, en plus des thèmes déjà débloqués!",
+  ]},
   { version:"1.92.0", date:"2026-07-21", features:[
     "🌙 Boutique : les récompenses « écran » et « calme » (bain moussant, déjeuner au lit, temps privé avec ton parent, musique) ont maintenant une petite étiquette de couleur — plus facile de choisir une récompense apaisante plutôt que toujours de l'écran.",
   ]},
@@ -4088,6 +4103,8 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
         const canChange = !player.themeChosenAt || weekKey(new Date(player.themeChosenAt)) !== weekKey();
         const list = PT_LIST.filter(t=>!t.secret);
         const nextLocked = list.filter(t=>!isThemeUnlocked(t.id,pState.xp,player.starterThemes||[])).sort((a,b)=>(a.xpUnlock||0)-(b.xpUnlock||0))[0];
+        const weeklyFreeId = getWeeklyFreeTheme();
+        const weeklyFreeTheme = PLAYER_THEMES[weeklyFreeId];
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2500,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -4097,23 +4114,25 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:canChange?"#9fe":"#FFA94D",marginBottom:4,lineHeight:1.3}}>
               {canChange ? "Touche un thème débloqué pour le choisir. Il dure toute la semaine 🗓️" : "Tu as déjà choisi ton thème cette semaine. Tu pourras en changer lundi prochain! 🗓️"}
             </div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:10}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:4}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
+            {weeklyFreeTheme && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#FFD700",marginBottom:10}}>🎲 Thème de la semaine gratuit : {weeklyFreeTheme.icon} {weeklyFreeTheme.name} — débloqué pour tout le monde, sans XP!</div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
               {list.map(t=>{
                 const unlocked=isThemeUnlocked(t.id,pState.xp,player.starterThemes||[]);
                 const current=player.themeId===t.id;
                 const selectable=unlocked&&canChange&&!current;
+                const isWeeklyFree = t.id===weeklyFreeId;
                 return (
                   <button key={t.id} disabled={!selectable}
                     onClick={()=>{ if(selectable){ onChangeTheme&&onChangeTheme(t.id); setThemePicker(false); } }}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 8px",
                       background:current?`${t.accent}25`:unlocked?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.3)",
-                      border:`3px solid ${current?t.accent:unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
+                      border:`3px solid ${current?t.accent:isWeeklyFree?"#FFD700":unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
                       cursor:selectable?"pointer":"default",opacity:unlocked?1:0.5,boxShadow:current?`0 0 14px ${t.glow||t.accent}50`:"none"}}>
                     <span style={{fontSize:30,filter:unlocked?"none":"grayscale(1)"}}>{t.icon}</span>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:current?t.accent:unlocked?"#ddd":"#666",textAlign:"center",lineHeight:1.3}}>{t.name}</span>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#2ECC40":unlocked?(t.accent||"#FFD700"):"#777"}}>
-                      {current?"✅ ACTUEL":unlocked?"Choisir":`🔒 ${t.xpUnlock} XP`}
+                      {current?"✅ ACTUEL":isWeeklyFree&&unlocked?"🎲 Gratuit!":unlocked?"Choisir":`🔒 ${t.xpUnlock} XP`}
                     </span>
                   </button>
                 );
