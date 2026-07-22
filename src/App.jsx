@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-const APP_VERSION = "1.93.0";
+const APP_VERSION = "1.94.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -1383,6 +1383,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.94.0", date:"2026-07-21", features:[
+    "⚡ Petite amélioration technique invisible : l'app devrait sembler un peu plus fluide, surtout sur des appareils plus lents.",
+  ]},
   { version:"1.93.0", date:"2026-07-21", features:[
     "🎲 Un thème gratuit différent est débloqué chaque semaine pour tout le monde dans le sélecteur de thème — pas besoin d'XP pour l'essayer, en plus des thèmes déjà débloqués!",
   ]},
@@ -2938,6 +2941,19 @@ function Countdown({ endTime, th, calm }) {
       </div>
     </div>
   );
+}
+
+// v1.94.0 (Lot 5 #22) — horloge du header isolée dans son propre petit composant (comme
+// Countdown/InlineRitualTimer) : son tick de 1s ne fait re-render QUE ce composant, plus
+// jamais tout l'arbre App() en cascade. La logique métier qui a vraiment besoin de "now"
+// (barre de progression, compte à rebours, indicateur de synchro) reste dans App(), mais
+// son propre tick a été ralenti de 1s à 30s (aucune de ces valeurs n'a besoin d'une
+// précision à la seconde près) — App() ne re-render donc plus que 2x/min au lieu de 60x/min.
+function HeaderClock({ style }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
+  const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0");
+  return <div style={style}>{H}:{M}</div>;
 }
 
 // ─── WEEK VIEW ───────────────────────────────────────────────
@@ -6985,7 +7001,11 @@ export default function App() {
   const [syncedAt, setSyncedAt] = useState(0); // dernier instant de synchro cloud réussie
   const [now, setNow] = useState(new Date());
 
-  useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),1000); return()=>clearInterval(i); },[]);
+  // v1.94.0 (Lot 5 #22) — ralenti de 1s à 30s : rien ici (barre de progression, compte à
+  // rebours, indicateur de synchro) n'a besoin d'une précision à la seconde près, et ce
+  // tick re-render tout l'arbre App() (voir HeaderClock ci-dessus pour l'affichage H:M
+  // qui, lui, garde un tick de 1s mais isolé dans son propre composant).
+  useEffect(()=>{ const i=setInterval(()=>setNow(new Date()),30000); return()=>clearInterval(i); },[]);
 
   // Load + migration automatique des données
   useEffect(()=>{
@@ -7906,8 +7926,7 @@ export default function App() {
     return nowMin <= (eh*60+em+90); // jusqu'à 90 min après l'heure de fin
   })();
 
-  // Clock display
-  const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0"), S=String(now.getSeconds()).padStart(2,"0");
+  // Date display (l'affichage H:M est dans <HeaderClock/>, isolé — voir v1.94.0)
   const daysArr=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"],mthArr=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
   const dateStr=`${daysArr[now.getDay()]} ${now.getDate()} ${mthArr[now.getMonth()]}`;
 
@@ -7972,8 +7991,8 @@ export default function App() {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
-        {/* Clock (discrète : heure:minute, sans clignotement) */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",color:"#7aa"}}>{H}:{M}</div>
+        {/* Clock (discrète : heure:minute, sans clignotement) — composant isolé, v1.94.0 */}
+        <HeaderClock style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",color:"#7aa"}}/>
         {/* Indicateur de synchro cloud */}
         {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
           return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
