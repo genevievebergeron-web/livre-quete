@@ -1,35 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { SFX, setSfxMuted } from "./sfx.js";
 
-const APP_VERSION = "1.95.0";
+const APP_VERSION = "1.96.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 
 // ─── RÉGLAGES D'ACCESSIBILITÉ (neurodivergence) ───────────────
-// Drapeaux globaux pilotés par App selon les réglages de l'enfant affiché.
-let SFX_MUTED = false; // couper le son
+// Drapeau global piloté par App selon les réglages de l'enfant affiché.
 let CALM = false;      // mode calme : pas de confettis/particules, animations réduites (+ classe CSS)
-
-// ─── AUDIO ────────────────────────────────────────────────────
-let _ac = null;
-const ac = () => { try { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); _ac.resume(); return _ac; } catch { return null; } };
-const tone = (f, type, dur, vol, delay = 0) => {
-  if (SFX_MUTED) return; // son coupé (réglage enfant)
-  try { const ctx = ac(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type = type; o.frequency.setValueAtTime(f, ctx.currentTime + delay); g.gain.setValueAtTime(0, ctx.currentTime + delay); g.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + 0.01); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur); o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + dur + 0.05); } catch {}
-};
-const SFX = {
-  click:   () => tone(440, "square", 0.04, 0.1),
-  task:    () => { [523,659,784,1047].forEach((f,i) => tone(f,"square",0.13,0.17,i*0.1)); },
-  epic:    () => { [262,330,392,523,659,784].forEach((f,i) => tone(f,"square",0.16,0.2,i*0.09)); },
-  buy:     () => { [880,1100,1320].forEach((f,i) => tone(f,"sine",0.07,0.25,i*0.08)); },
-  pinOk:   () => { [523,659,784,1047].forEach((f,i) => tone(f,"sine",0.1,0.2,i*0.07)); },
-  pinErr:  () => { [440,415,392].forEach((f,i) => tone(f,"sawtooth",0.13,0.17,i*0.09)); },
-  pinKey:  () => tone(660, "sine", 0.04, 0.15),
-  welcome: () => { [262,330,392,523].forEach((f,i) => tone(f,"square",0.16,0.17,i*0.12)); setTimeout(() => SFX.epic(), 600); },
-  coin:    () => tone(1320, "sine", 0.07, 0.2),
-  alert:   () => { [440,440,440].forEach((f,i) => tone(f,"square",0.1,0.2,i*0.2)); },
-};
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
@@ -1383,6 +1363,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.96.0", date:"2026-07-23", features:[
+    "⚡ Petit ménage technique invisible : aucun changement visible pour toi.",
+  ]},
   { version:"1.95.0", date:"2026-07-22", features:[
     "⚡ Encore un peu plus de fluidité côté technique (invisible), surtout pour l'écran Famille et le portail parent.",
   ]},
@@ -7917,7 +7900,7 @@ export default function App() {
   const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
   // Réglages d'accessibilité de l'enfant affiché → pilotent son/animations/décompte
   const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
-  SFX_MUTED = curSettings.sound === false;
+  setSfxMuted(curSettings.sound === false);
   CALM = !!curSettings.calm;
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
   // (sinon une routine d'hier soir laisse un gros « EN RETARD » rouge en permanence).
