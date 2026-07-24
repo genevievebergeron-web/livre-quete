@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { SFX, setSfxMuted } from "./sfx.js";
+import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, ALL_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
@@ -12,9 +13,10 @@ import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
 import { SetupWizard } from "./setupwizard.jsx";
+import { AVATAR_PARTS, DEFAULT_AVATAR, renderAvatarToCtx, AvatarCanvas } from "./avatar.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "1.109.0";
+const APP_VERSION = "2.0.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -27,10 +29,6 @@ const weeklyRewards = (n=8) => {
   arr.sort((a,b)=>a.k-b.k);
   return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
 };
-
-// ─── RÉGLAGES D'ACCESSIBILITÉ (neurodivergence) ───────────────
-// Drapeau global piloté par App selon les réglages de l'enfant affiché.
-let CALM = false;      // mode calme : pas de confettis/particules, animations réduites (+ classe CSS)
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
@@ -182,6 +180,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.0.0", date:"2026-07-24", features:[
+    "🔧 Les tâches en attente de validation s'affichent maintenant avec leur vrai titre (les quêtes rotatives de la semaine apparaissaient comme \"Tâche\" sans titre).",
+    "💾 Le panel parent a maintenant un bouton Enregistrer visible pour les défis hebdomadaires — plus de mystère sur si c'était sauvegardé ou non.",
+  ]},
   { version:"1.109.0", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -1169,121 +1171,6 @@ function spawnParticles(emoji, big=true) {
 
 // ─── PLAYER DASHBOARD ────────────────────────────────────────
 
-// ─── AVATAR PARTS CATALOG ────────────────────────────────────
-const AVATAR_PARTS = {
-  skin: [
-    {id:"sk1",label:"Clair",  color:"#FFCC99"}, {id:"sk2",label:"Doré",   color:"#E8A060"},
-    {id:"sk3",label:"Brun",   color:"#C07840"}, {id:"sk4",label:"Foncé",  color:"#7B4A20"},
-    {id:"sk5",label:"Azur",   color:"#99CCFF"}, {id:"sk6",label:"Vert",   color:"#88CC88"},
-    {id:"sk7",label:"Rose",   color:"#FFAACC"}, {id:"sk8",label:"Violet", color:"#CC88FF"},
-  ],
-  eyes: [
-    {id:"ey1",emoji:"👀",label:"Normal",    eyeColor:"#333",  eyeShape:"round"},
-    {id:"ey2",emoji:"😊",label:"Joyeux",    eyeColor:"#2244AA",eyeShape:"happy"},
-    {id:"ey3",emoji:"😎",label:"Cool",      eyeColor:"#000",  eyeShape:"cool"},
-    {id:"ey4",emoji:"⭐",label:"Étoile",    eyeColor:"#FFD700",eyeShape:"star"},
-    {id:"ey5",emoji:"😺",label:"Chat",      eyeColor:"#00AA66",eyeShape:"cat"},
-    {id:"ey6",emoji:"👾",label:"Alien",     eyeColor:"#FF4444",eyeShape:"alien"},
-  ],
-  mouth: [
-    {id:"mo1",emoji:"😐",label:"Neutre",   color:"#CC6644"},
-    {id:"mo2",emoji:"😁",label:"Sourire",  color:"#CC4422"},
-    {id:"mo3",emoji:"😤",label:"Sérieux",  color:"#884422"},
-    {id:"mo4",emoji:"😛",label:"Langue",   color:"#FF4488"},
-    {id:"mo5",emoji:"😬",label:"Crispé",   color:"#AA5533"},
-    {id:"mo6",emoji:"🤐",label:"Secret",   color:"#556677"},
-  ],
-  hair: [
-    {id:"ha1",emoji:"🟤",label:"Brun court",  color:"#5C3317",style:"short"},
-    {id:"ha2",emoji:"⬛",label:"Noir",         color:"#111",   style:"short"},
-    {id:"ha3",emoji:"🟡",label:"Blond",        color:"#FFD700",style:"short"},
-    {id:"ha4",emoji:"🔴",label:"Roux",         color:"#CC4400",style:"short"},
-    {id:"ha5",emoji:"⚪",label:"Blanc",        color:"#EEE",   style:"short"},
-    {id:"ha6",emoji:"🟣",label:"Violet",       color:"#9933CC",style:"short"},
-    {id:"ha7",emoji:"🔵",label:"Bleu",         color:"#2244AA",style:"short"},
-    {id:"ha8",emoji:"🩷",label:"Rose",         color:"#FF69B4",style:"short"},
-  ],
-};
-
-const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
-
-// Render avatar to canvas (used both in-panel and in popup)
-function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false) {
-  const av = {...DEFAULT_AVATAR, ...avatarDef};
-  const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
-  const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
-  const mouthPart= AVATAR_PARTS.mouth.find(m=>m.id===av.mouth) || AVATAR_PARTS.mouth[0];
-  const hairPart = AVATAR_PARTS.hair.find(h=>h.id===av.hair) || AVATAR_PARTS.hair[0];
-  const sc = W/72; // scale factor
-  const s = (v) => Math.round(v*sc);
-
-  ctx.clearRect(0,0,W,H);
-  // Hair (back)
-  ctx.fillStyle = hairPart.color;
-  ctx.fillRect(s(3),s(0),s(30),s(8));
-  ctx.fillRect(s(0),s(4),s(4),s(18));
-  ctx.fillRect(s(29),s(4),s(4),s(18));
-  // Head
-  ctx.fillStyle = skinPart.color;
-  ctx.fillRect(s(3),s(2),s(30),s(22));
-  // Hair top
-  ctx.fillStyle = hairPart.color;
-  ctx.fillRect(s(3),s(2),s(30),s(5));
-  // Eyes
-  ctx.fillStyle = eyePart.eyeColor;
-  if(blink){ // yeux fermés (clignement) — petites lignes plates
-    ctx.fillStyle="#000"; ctx.fillRect(s(9),s(12),s(6),s(2)); ctx.fillRect(s(21),s(12),s(6),s(2));
-  }
-  else if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
-  else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#000";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
-  else if(eyePart.eyeShape==="star"){ctx.font=`${s(10)}px serif`;ctx.textAlign="center";ctx.fillText("★",s(12),s(15));ctx.fillText("★",s(24),s(15));}
-  else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
-  else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#000";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
-  else{ctx.fillRect(s(9),s(9),s(5),s(5));ctx.fillRect(s(21),s(9),s(5),s(5));}
-  // Mouth
-  ctx.fillStyle = mouthPart.color;
-  if(av.mouth==="mo2"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));}
-  else if(av.mouth==="mo4"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillStyle="#FF88AA";ctx.fillRect(s(14),s(21),s(8),s(4));}
-  else if(av.mouth==="mo6"){ctx.fillRect(s(10),s(18),s(16),s(2));ctx.fillRect(s(10),s(18),s(2),s(5));ctx.fillRect(s(24),s(18),s(2),s(5));}
-  else{ctx.fillRect(s(11),s(18),s(14),s(3));}
-  // Body
-  ctx.fillStyle = bodyColor || "#4A90D9";
-  ctx.fillRect(s(2),s(26),s(32),s(24));
-  // Outline
-  ctx.strokeStyle="#000"; ctx.lineWidth=1;
-  ctx.strokeRect(s(2),s(26),s(32),s(24));
-  // Arms
-  ctx.fillStyle = skinPart.color;
-  ctx.fillRect(s(-2),s(28),s(6),s(14));
-  ctx.fillRect(s(32),s(28),s(6),s(14));
-  ctx.strokeRect(s(-2),s(28),s(6),s(14));
-  ctx.strokeRect(s(32),s(28),s(6),s(14));
-  // Legs
-  ctx.fillStyle="#1A3A8A";
-  ctx.fillRect(s(6),s(50),s(12),s(14));
-  ctx.fillRect(s(20),s(50),s(12),s(14));
-  ctx.strokeRect(s(6),s(50),s(12),s(14));
-  ctx.strokeRect(s(20),s(50),s(12),s(14));
-}
-
-// Inline avatar component (renders canvas) — clignement subtil des yeux (sauf mode calme)
-function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true }) {
-  const canvasRef = useRef(null);
-  const [blink, setBlink] = useState(false);
-  useEffect(()=>{
-    const c=canvasRef.current; if(!c)return;
-    renderAvatarToCtx(c.getContext("2d"), avatarDef||DEFAULT_AVATAR, bodyColor, size, size, blink);
-  },[avatarDef, bodyColor, size, blink]);
-  useEffect(()=>{
-    if(!animate || CALM) return; // pas de clignement en mode calme
-    let t, stop=false;
-    const next=()=>{ t=setTimeout(()=>{ if(stop)return; setBlink(true); setTimeout(()=>{ if(!stop) setBlink(false); },130); next(); }, 2800+Math.random()*3600); };
-    next();
-    return ()=>{ stop=true; clearTimeout(t); };
-  },[animate]);
-  return <canvas ref={canvasRef} width={size} height={size}
-    style={{imageRendering:"pixelated",borderRadius:4,...style}}/>;
-}
 
 // ─── BOSS DE FAMILLE — grand pool de sprites illustrés (v1.103.0) ──────
 // v1.103.0 (Lot 6, audit 2.0) — remplace les 4 silhouettes procédurales recolorées
@@ -3157,6 +3044,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
+  const [defiDraft, setDefiDraft] = useState({}); // Lot 7C — {[playerId]: {text, emoji}} pour l'édition des défis
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
@@ -3230,7 +3118,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 label=entry?(exam?"Étudier: ":"Devoir: ")+entry.label:"Devoir/examen";
                 xp=exam?20:10; coins=exam?5:3;
               } else {
-                const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+                const _allAss=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])];
+                const ass=_allAss.find(a=>a.instanceId===instanceId);
                 const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
                 if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;}
               }
@@ -3450,6 +3339,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               {players.map(pl=>{
                 const ch = challenges.find(c=>c.playerId===pl.id);
                 const n = checkinCount(ch||{});
+                const draft = defiDraft[pl.id] || { text: ch?.text||"", emoji: ch?.emoji||"⭐" };
+                const saved = draft.text===(ch?.text||"") && draft.emoji===(ch?.emoji||"⭐");
                 return (
                   <div key={pl.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl.color}50`,borderRadius:5,padding:"10px",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
@@ -3457,17 +3348,21 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:pl.color}}>{displayName(pl)}</div>
                       <div style={{marginLeft:"auto",fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD700"}}>{n}/7 jours ⭐</div>
                     </div>
-                    <div style={{display:"flex",gap:5,marginBottom:8}}>
-                      <input defaultValue={ch?.emoji||"⭐"} maxLength={2}
+                    <div style={{display:"flex",gap:5,marginBottom:6}}>
+                      <input value={draft.emoji} maxLength={2}
                         style={{width:34,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:18,padding:"4px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,textAlign:"center"}}
-                        onBlur={e=>{if(onUpdateChallenge) onUpdateChallenge(pl.id, document.getElementById(`defi_text_${pl.id}`)?.value||ch?.text||"", e.target.value||"⭐");}}
-                        id={`defi_emoji_${pl.id}`}/>
-                      <input defaultValue={ch?.text||""} placeholder="Décris le défi…" maxLength={80}
-                        style={{flex:1,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}
-                        id={`defi_text_${pl.id}`}
-                        onBlur={e=>{if(onUpdateChallenge) onUpdateChallenge(pl.id, e.target.value, document.getElementById(`defi_emoji_${pl.id}`)?.value||ch?.emoji||"⭐");}}/>
+                        onChange={e=>setDefiDraft(d=>({...d,[pl.id]:{...draft,emoji:e.target.value||"⭐"}}))}/>
+                      <input value={draft.text} placeholder="Décris le défi…" maxLength={80}
+                        style={{flex:1,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:`2px solid ${saved?"#333":"#FF8C00"}`,borderRadius:4,outline:"none"}}
+                        onChange={e=>setDefiDraft(d=>({...d,[pl.id]:{...draft,text:e.target.value}}))}/>
                     </div>
-                    {ch && <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                    {!saved && onUpdateChallenge && (
+                      <button onClick={()=>{ onUpdateChallenge(pl.id, draft.text, draft.emoji); setDefiDraft(d=>{const n2={...d}; delete n2[pl.id]; return n2;}); }}
+                        style={{width:"100%",padding:"7px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#000",background:"#FF8C00",border:"2px solid #000",borderRadius:3,cursor:"pointer",marginBottom:6}}>
+                        💾 Enregistrer le défi
+                      </button>
+                    )}
+                    {ch && <div style={{display:"flex",gap:2,flexWrap:"wrap",marginTop:4}}>
                       {Array.from({length:7},(_,i)=>{
                         const d = new Date(cwk+"T12:00:00"); d.setDate(d.getDate()+i);
                         const stamp=d.toISOString().slice(0,10);
@@ -5975,7 +5870,7 @@ export default function App() {
   // Réglages d'accessibilité de l'enfant affiché → pilotent son/animations/décompte
   const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
   setSfxMuted(curSettings.sound === false);
-  CALM = !!curSettings.calm;
+  setCalm(curSettings.calm);
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
   // (sinon une routine d'hier soir laisse un gros « EN RETARD » rouge en permanence).
   // Heure de fin: celle de la routine active si elle en a une, sinon l'heure de routine famille
