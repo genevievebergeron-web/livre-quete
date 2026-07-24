@@ -7,8 +7,10 @@ import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE,
 import { Countdown, HeaderClock, TimeTimerDisc } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
+import { DAYS_SHORT, displayName } from "./shared.js";
+import { WeekView } from "./weekview.jsx";
 
-const APP_VERSION = "1.104.0";
+const APP_VERSION = "1.105.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -28,7 +30,6 @@ let CALM = false;      // mode calme : pas de confettis/particules, animations r
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
-const DAYS_SHORT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 const COLORS = ["#4A90D9","#C060D0","#2ECC40","#FF6B35","#FFD700","#FF4444","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
 
 
@@ -164,8 +165,6 @@ const THEMES = {
   forest:    { name:"Forêt",     bg:"#0a1a0a", primary:"#2E7D32", accent:"#A5D6A7", card:"rgba(0,20,0,0.7)",  text:"#fff" },
 };
 
-// Display name: pseudo if set, else real name
-const displayName = (player) => (player?.pseudo?.trim()) || player?.name || "";
 // Returns 2 random non-secret theme IDs for a brand-new player
 const pickStarterThemes = () => {
   const pool = Object.keys(PLAYER_THEMES).filter(k => k !== "none" && !PLAYER_THEMES[k].secret);
@@ -216,6 +215,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.105.0", date:"2026-07-24", features:[
+    "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
+  ]},
   { version:"1.104.0", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -1753,60 +1755,6 @@ function SetupWizard({ existing, onDone }) {
 // GAME ENGINE
 // ═══════════════════════════════════════════════════════════════
 
-// ─── WEEK VIEW ───────────────────────────────────────────────
-function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx }) {
-  const allTasks = [...TASK_CATALOG, ...(config.customTasks||[])];
-  return (
-    <div style={{overflowX:"auto",paddingBottom:8}}>
-      <div style={{display:"grid",gridTemplateColumns:`120px repeat(7,1fr)`,gap:2,minWidth:700}}>
-        {/* Header */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555",display:"flex",alignItems:"center",justifyContent:"safe center"}}>TÂCHE</div>
-        {DAYS_SHORT.map((d,i)=>(
-          <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"#888",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
-            {d}{i===todayDayIdx&&<div style={{fontSize:5,color:th.accent,marginTop:2}}>▲</div>}
-          </div>
-        ))}
-        {/* Rows per assignment */}
-        {config.assignments.map(ass=>{
-          const task=allTasks.find(t=>t.id===ass.taskId);
-          if(!task)return null;
-          const assignedPlayers=config.players.filter(p=>ass.playerIds.includes(p.id));
-          return [
-            <div key={ass.instanceId+"_label"} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px",background:"rgba(0,0,0,0.4)",borderRadius:3}}>
-              <span style={{fontSize:16}}>{task.emoji}</span>
-              <div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ddd",lineHeight:1.2}}>{task.label}</div>
-                <div style={{display:"flex",gap:3}}>
-                  {assignedPlayers.map(pl=><div key={pl.id} style={{width:8,height:8,borderRadius:"50%",background:pl.color}}/>)}
-                </div>
-              </div>
-            </div>,
-            ...DAYS_SHORT.map((_,dayIdx)=>{
-              const inDay=ass.days.includes(dayIdx)||(ass.days.length===0);
-              if(!inDay)return <div key={ass.instanceId+"_d"+dayIdx} style={{background:"rgba(0,0,0,0.2)",borderRadius:3}}/>;
-              return (
-                <div key={ass.instanceId+"_d"+dayIdx} style={{padding:3}}>
-                  {ass.playerIds.map(pid=>{
-                    const pl=config.players.find(p=>p.id===pid);
-                    if(!pl)return null;
-                    const doneKey=`${ass.instanceId}_${pid}_${dayIdx}`;
-                    const done=gameState.completed?.includes(doneKey);
-                    return (
-                      <div key={pid} onClick={()=>!done&&onCompleteTask(ass,pid,dayIdx)}
-                        style={{background:done?`${pl.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${done?pl.color:"#333"}`,borderRadius:3,padding:"3px 4px",cursor:done?"default":"pointer",marginBottom:2,textAlign:"center",transition:"all 0.15s"}} title={displayName(pl)}>
-                        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:done?pl.color:"#555"}}>{done?"✓":displayName(pl).slice(0,3)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })
-          ];
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ─── PLAYER DASHBOARD ────────────────────────────────────────
 
