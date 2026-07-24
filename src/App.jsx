@@ -6,7 +6,7 @@ import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
 import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
 import { Countdown, HeaderClock } from "./timers.jsx";
 
-const APP_VERSION = "1.100.0";
+const APP_VERSION = "1.101.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -214,6 +214,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.101.0", date:"2026-07-24", features:[
+    "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
+  ]},
   { version:"1.100.0", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -2536,7 +2539,9 @@ function InlineRitualTimer({ endTime, accent }){
   );
 }
 
-function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
+// v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
+// donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3681,7 +3686,7 @@ function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTa
     {finalBattle && <HydraFinalGame player={player} pState={pState} color={player.color} onClose={()=>setFinalBattle(false)}/>}
     </div>
   );
-}
+});
 
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
 // ─── PLAYER PROFILE MODAL (#8) ───────────────────────────────
@@ -6769,6 +6774,58 @@ export default function App() {
   const onParentPanelReset = useCallback(()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ (config?.players||[]).forEach((_,i)=>handleResetPlayer(i)); } }, [config?.players, handleResetPlayer]);
   const onParentPanelSetup = useCallback(()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }, []);
 
+  // v1.101.0 (Lot 5 #23) — même traitement que FamilyOverview/ParentPanel ci-dessus, mais pour
+  // PlayerDashboard : ~26 props callback étaient recréées en ligne à chaque render (curry sur
+  // `view`, ou logique courte), rendant un futur React.memo(PlayerDashboard) inefficace. Chaque
+  // handler `handleXxx` sous-jacent est déjà un useCallback stable — seule la couche de currying
+  // par `view`/`config` manquait. Comportement identique, juste la couche stable ajoutée.
+  const onDashUpdateAvatar = useCallback((av,pid)=>{
+    const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
+    setGameStates(gs=>{ const n=[...gs]; n[i]={...n[i],avatar:av}; persist(config,n); return n; });
+  }, [config, persist]);
+  const onDashChildAddTask = useCallback((data)=>handleChildAddTask(view,data), [view, handleChildAddTask]);
+  const onDashChildPickTask = useCallback((taskId)=>handleChildPickTask(view,taskId), [view, handleChildPickTask]);
+  const onDashChildAddRoutineTask = useCallback((data)=>handleChildAddRoutineTask(view,data), [view, handleChildAddRoutineTask]);
+  const onDashRequestRemoval = useCallback((instanceId)=>handleRequestRemoval(view,instanceId), [view, handleRequestRemoval]);
+  const onDashUpdatePseudo = useCallback((pseudo)=>handleUpdatePseudo(view,pseudo), [view, handleUpdatePseudo]);
+  const onDashFeedPet = useCallback(()=>handleFeedPet(view), [view, handleFeedPet]);
+  const onDashPlayPet = useCallback(()=>handlePlayPet(view), [view, handlePlayPet]);
+  const onDashChoosePetEvo = useCallback((petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el), [view, handleChoosePetEvo]);
+  const onDashDismissRefusal = useCallback((key)=>handleDismissRefusal(view,key), [view, handleDismissRefusal]);
+  const onDashBossAttack = useCallback((type)=>handleBossAttack(view,type), [view, handleBossAttack]);
+  const onDashBossPetAttack = useCallback(()=>handleBossPetAttack(view), [view, handleBossPetAttack]);
+  const onDashLogout = useCallback(()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}, []);
+  const onDashOpenParentPin = useCallback(()=>{SFX.click();setParentPinOpen(true);}, []);
+  const onDashReportBug = useCallback((text)=>handleReportBug(text, displayName(config.players[view])), [config, view, handleReportBug]);
+  const onDashCloseHam = useCallback(()=>setHamOpen(false), []);
+  const onDashGoFamily = useCallback(()=>{setView("family");SFX.click();}, []);
+  const onDashGoCalendars = useCallback(()=>{setView("calendars");SFX.click();}, []);
+  const onDashGoTimer = useCallback((ritualId)=>{setTimerRitual(ritualId&&typeof ritualId==="string"?ritualId:null);setView("timer");SFX.click();}, []);
+  const onDashUnclaimReward = useCallback((reward)=>handleUnclaimReward(config.players[view]?.id, reward), [config, view, handleUnclaimReward]);
+  const onDashHideReward = useCallback((reward)=>handleHideReward(config.players[view]?.id, reward), [config, view, handleHideReward]);
+  const onDashClaimDaily = useCallback((obj)=>handleClaimDaily(view, obj), [view, handleClaimDaily]);
+  const onDashOpenChest = useCallback((payload)=>handleOpenChest(config.players[view]?.id, payload), [config, view, handleOpenChest]);
+  const onDashPatchState = useCallback((patch)=>{
+    setGameStates(gs=>{ const n=[...gs]; n[view]={...n[view],...patch}; persist(config,n); return n; });
+    SFX.click();
+  }, [view, config, persist]);
+  const onDashChangeTheme = useCallback((themeId)=>{
+    const now=new Date().toISOString();
+    const newCfg={...config, players: config.players.map((pl,i)=> i===view ? {...pl, themeId, themeChosenAt:now} : pl)};
+    setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
+    showToast("🎨 Nouveau thème activé pour la semaine!","#FFD700",3000);
+  }, [view, config, gameStates, persist, showToast]);
+  const onDashUpdateCalendar = useCallback((newCal)=>{
+    const gs=[...gameStates];
+    gs[view]={...gs[view],calendar:newCal};
+    setGameStates(gs);
+    save({config,gameStates:gs,savedAt:new Date().toISOString()});
+  }, [gameStates, view, config]);
+  const onDashCalendarAdd = useCallback((type)=>{
+    const label=type==="examen"?"📝 Examen noté au calendrier!":"📚 Devoir noté au calendrier!";
+    showToast(`${label} Un rappel apparaîtra avant la date.`,"#5DECF5",3000);
+  }, [showToast]);
+
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
@@ -6975,62 +7032,41 @@ export default function App() {
             onRequestComplete={requestComplete}
             onBuy={handleBuy}
             onEquip={handleEquip}
-            onUpdateAvatar={(av,pid)=>{
-              const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
-              setGameStates(gs=>{ const n=[...gs]; n[i]={...n[i],avatar:av}; persist(config,n); return n; });
-            }}
-            onChildAddTask={(data)=>handleChildAddTask(view,data)}
-            onChildPickTask={(taskId)=>handleChildPickTask(view,taskId)}
-            onChildAddRoutineTask={(data)=>handleChildAddRoutineTask(view,data)}
-            onRequestRemoval={(instanceId)=>handleRequestRemoval(view,instanceId)}
+            onUpdateAvatar={onDashUpdateAvatar}
+            onChildAddTask={onDashChildAddTask}
+            onChildPickTask={onDashChildPickTask}
+            onChildAddRoutineTask={onDashChildAddRoutineTask}
+            onRequestRemoval={onDashRequestRemoval}
             showToast={showToast}
-            onUpdatePseudo={(pseudo)=>handleUpdatePseudo(view,pseudo)}
+            onUpdatePseudo={onDashUpdatePseudo}
             onRespondOffer={handleRespondOffer}
-            onFeedPet={()=>handleFeedPet(view)}
-            onPlayPet={()=>handlePlayPet(view)}
-            onChoosePetEvo={(petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el)}
-            onDismissRefusal={(key)=>handleDismissRefusal(view,key)}
-            onBossAttack={(type)=>handleBossAttack(view,type)}
-            onBossPetAttack={()=>handleBossPetAttack(view)}
+            onFeedPet={onDashFeedPet}
+            onPlayPet={onDashPlayPet}
+            onChoosePetEvo={onDashChoosePetEvo}
+            onDismissRefusal={onDashDismissRefusal}
+            onBossAttack={onDashBossAttack}
+            onBossPetAttack={onDashBossPetAttack}
             allStates={gameStates}
-            onLogout={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
-            onOpenParentPin={()=>{SFX.click();setParentPinOpen(true);}}
-            onReportBug={(text)=>handleReportBug(text, displayName(config.players[view]))}
-            hamOpen={hamOpen} onCloseHam={()=>setHamOpen(false)}
-            onGoFamily={()=>{setView("family");SFX.click();}}
-            onGoCalendars={()=>{setView("calendars");SFX.click();}}
-            onGoTimer={(ritualId)=>{setTimerRitual(ritualId&&typeof ritualId==="string"?ritualId:null);setView("timer");SFX.click();}}
-            onUnclaimReward={(reward)=>handleUnclaimReward(config.players[view]?.id, reward)}
-            onHideReward={(reward)=>handleHideReward(config.players[view]?.id, reward)}
-            onClaimDaily={(obj)=>handleClaimDaily(view, obj)}
-            onOpenChest={(payload)=>handleOpenChest(config.players[view]?.id, payload)}
+            onLogout={onDashLogout}
+            onOpenParentPin={onDashOpenParentPin}
+            onReportBug={onDashReportBug}
+            hamOpen={hamOpen} onCloseHam={onDashCloseHam}
+            onGoFamily={onDashGoFamily}
+            onGoCalendars={onDashGoCalendars}
+            onGoTimer={onDashGoTimer}
+            onUnclaimReward={onDashUnclaimReward}
+            onHideReward={onDashHideReward}
+            onClaimDaily={onDashClaimDaily}
+            onOpenChest={onDashOpenChest}
             parentMode={parentMode}
             playerMode={gameStates[view]?.mode || config.mode || "routine"}
             todayDayIdx={todayDayIdx}
-            onPatchState={(patch)=>{
-              setGameStates(gs=>{ const n=[...gs]; n[view]={...n[view],...patch}; persist(config,n); return n; });
-              SFX.click();
-            }}
-            onChangeTheme={(themeId)=>{
-              const now=new Date().toISOString();
-              const newCfg={...config, players: config.players.map((pl,i)=> i===view ? {...pl, themeId, themeChosenAt:now} : pl)};
-              setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
-              showToast("🎨 Nouveau thème activé pour la semaine!","#FFD700",3000);
-            }}
+            onPatchState={onDashPatchState}
+            onChangeTheme={onDashChangeTheme}
             onDeComplete={handleDeComplete}
             onForceComplete={handleForceComplete}
-            onUpdateCalendar={(newCal)=>{
-              const gs=[...gameStates];
-              gs[view]={...gs[view],calendar:newCal};
-              setGameStates(gs);
-              save({config,gameStates:gs,savedAt:new Date().toISOString()});
-            }}
-            onCalendarAdd={(type)=>{
-              // Plus de XP/pièces juste pour AVOIR noté un devoir (c'était exploitable en spammant).
-              // La récompense vient quand l'enfant ÉTUDIE vraiment (rappel → validation parent).
-              const label=type==="examen"?"📝 Examen noté au calendrier!":"📚 Devoir noté au calendrier!";
-              showToast(`${label} Un rappel apparaîtra avant la date.`,"#5DECF5",3000);
-            }}
+            onUpdateCalendar={onDashUpdateCalendar}
+            onCalendarAdd={onDashCalendarAdd}
             th={th}
           />
         )}
