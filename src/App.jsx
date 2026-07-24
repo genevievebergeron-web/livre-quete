@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.2.0", date:"2026-07-24", features:[
+    "🎨 Palette adoucie partout dans l'app — les couleurs vives (or, cyan, vert, rouge, violet, orange) sont maintenant plus douces, moins agressives à l'œil, et le noir pur est remplacé par un noir un peu plus doux. Même look, contraste moins intense.",
+    "👆 Les boutons principaux réagissent maintenant au toucher/clic (petit effet \"pressé\") pour un retour plus satisfaisant.",
+  ]},
   { version:"2.1.0", date:"2026-07-24", features:[
     "📣 Le fil de famille est maintenant organisé par jour (Aujourd'hui, Hier...) avec une petite barre de couleur pour repérer d'un coup d'œil le genre d'événement (quête, badge, niveau, boss, rituel, message).",
   ]},
@@ -1110,7 +1114,7 @@ const Platformer = ({ player, onClose }) => {
       for(const p of platforms){
         ctx.fillStyle=pColor2; ctx.fillRect(p.x,p.y,p.w,8);
         ctx.fillStyle=darken(pColor2); ctx.fillRect(p.x,p.y+8,p.w,p.h-8);
-        ctx.strokeStyle="#000"; ctx.lineWidth=2; ctx.strokeRect(p.x,p.y,p.w,p.h);
+        ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=2; ctx.strokeRect(p.x,p.y,p.w,p.h);
       }
       // Items
       ctx.textAlign="center"; ctx.font="18px serif";
@@ -1145,7 +1149,7 @@ const Platformer = ({ player, onClose }) => {
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent}}>
         {pt.platformItems[0]} ×{collected} ramassés!
       </div>
-      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🏆 CONTINUER →</button>}
+      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🏆 CONTINUER →</button>}
       {!done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer"}}>Passer</button>}
     </div>
   );
@@ -1212,8 +1216,8 @@ function renderHydraToCtx(ctx, boss, W, H, s){
 function renderBossToCtx(ctx, boss, W=120, H=120){
   const sc=W/24, s=v=>Math.round(v*sc);
   ctx.clearRect(0,0,W,H);
-  const col=boss?.color||"#7B3FF2", belly=boss?.belly||"#C9B3F7", eye=boss?.eye||"#FFE14D";
-  if(boss?.sprite==="hydra" || /hydre|hydra/i.test(boss?.name||"")){ renderHydraToCtx(ctx, boss, W, H, s); ctx.strokeStyle="#000"; ctx.lineWidth=Math.max(1,s(0.4)); return; }
+  const col=boss?.color||"#8F72CC", belly=boss?.belly||"#C9B3F7", eye=boss?.eye||"#FFE14D";
+  if(boss?.sprite==="hydra" || /hydre|hydra/i.test(boss?.name||"")){ renderHydraToCtx(ctx, boss, W, H, s); ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=Math.max(1,s(0.4)); return; }
   // Cornes
   ctx.fillStyle="#2a2230";
   ctx.fillRect(s(4),s(1),s(3),s(4)); ctx.fillRect(s(17),s(1),s(3),s(4));
@@ -1233,7 +1237,7 @@ function renderBossToCtx(ctx, boss, W=120, H=120){
   ctx.fillStyle="#1a0d1a"; ctx.fillRect(s(8),s(15),s(8),s(3));
   ctx.fillStyle="#fff"; ctx.fillRect(s(9),s(15),s(1),s(2)); ctx.fillRect(s(12),s(15),s(1),s(2)); ctx.fillRect(s(15),s(15),s(1),s(1));
   // Contour
-  ctx.strokeStyle="#000"; ctx.lineWidth=Math.max(1,s(0.4));
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=Math.max(1,s(0.4));
 }
 function BossSprite({ boss, size=120, style={} }){
   const ref=useRef(null);
@@ -1284,7 +1288,7 @@ function HydraFinalGame({ player, pState, color, onClose }){
   const send=()=>{ try{ iframeRef.current && iframeRef.current.contentWindow.postMessage(data,"*"); }catch(e){} };
   const handleLoad=()=>{ setLoaded(true); setFailed(false); send(); setTimeout(send,250); };
   return (
-    <div style={{position:"fixed",inset:0,zIndex:4000,background:"#000"}}>
+    <div style={{position:"fixed",inset:0,zIndex:4000,background:"#0d0d0d"}}>
       <iframe key={reloadKey} ref={iframeRef} src="/combat-hydre.html" onLoad={handleLoad} title="Combat final de l'Hydre"
         style={{width:"100%",height:"100%",border:"none",display:"block"}}/>
       {!loaded && !failed && (
@@ -1334,7 +1338,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [avatarOpen, setAvatarOpen] = useState(false);
   // v1.84.0 (Lot 1 #B3) — ouvrir le personnalisateur coûte de l'énergie (frein "plaisir")
   const openAvatar = ()=>{
-    if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#5DECF5",3500); return; }
+    if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
   };
@@ -1389,7 +1393,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     if(parentMode) return;
     const today=todayStamp();
     if(pState.lastSeenDay && pState.lastSeenDay!==today){
-      showToast&&showToast("🌅 Nouvelle journée! Tes routines sont prêtes.","#5DECF5",4000);
+      showToast&&showToast("🌅 Nouvelle journée! Tes routines sont prêtes.","#85CDD1",4000);
     }
     if(pState.lastSeenDay!==today){ onPatchState&&onPatchState({lastSeenDay:today}); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1428,12 +1432,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {/* v1.68.0 (B5) — bannière de fin de rituel (toute une routine complétée) */}
       {ritualWin && (
         <div onClick={()=>setRitualWin(null)} style={{position:"fixed",inset:0,zIndex:2600,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
-          <div style={{maxWidth:360,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#2ECC40"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
+          <div style={{maxWidth:360,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",background:"linear-gradient(160deg,#173a17,#0c220c)",border:`3px solid ${th.accent||"#5CAD68"}`,borderRadius:14,padding:"26px 22px",boxShadow:"0 0 26px rgba(46,204,64,0.5)"}}>
             <div style={{fontSize:60,lineHeight:1}}>{ritualWin.emoji}</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#2ECC40",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#5CAD68",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff",lineHeight:1.3}}>Bravo, tu as fini « {ritualWin.name} » au complet! 🎉</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9ad29a",marginTop:8}}>Quelle belle job. 👏</div>
-            <button onClick={(e)=>{e.stopPropagation();setRitualWin(null);}} style={{marginTop:16,fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 22px",background:th.accent||"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>YEAH!</button>
+            <button onClick={(e)=>{e.stopPropagation();setRitualWin(null);}} style={{marginTop:16,fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 22px",background:th.accent||"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>YEAH!</button>
           </div>
         </div>
       )}
@@ -1444,10 +1448,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
       {/* v1.64.0 — message drôle quand une quête a été refusée par le parent */}
       {!parentMode && (pState.refusals||[]).map(r=>(
-        <div key={r.key} style={{display:"flex",alignItems:"center",gap:10,background:"#3a2410",border:"2px solid #FF8C00",borderRadius:8,padding:"9px 11px"}}>
+        <div key={r.key} style={{display:"flex",alignItems:"center",gap:10,background:"#3a2410",border:"2px solid #D99248",borderRadius:8,padding:"9px 11px"}}>
           <span style={{fontSize:20}}>{r.emoji}</span>
           <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD7A0",lineHeight:1.3}}><b>{r.label}</b> — {r.msg}</span>
-          <button onClick={()=>{ if(SFX.click)SFX.click(); onDismissRefusal&&onDismissRefusal(r.key); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 9px",background:"#FF8C00",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}}>Archiver</button>
+          <button onClick={()=>{ if(SFX.click)SFX.click(); onDismissRefusal&&onDismissRefusal(r.key); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 9px",background:"#D99248",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",whiteSpace:"nowrap"}}>Archiver</button>
         </div>
       ))}
       {/* ☰ Menu (déclenché depuis le header) — méta : réglages, archives, bug, validation parent, quitter */}
@@ -1484,8 +1488,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             </div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:8}}>Tes quêtes complétées aujourd'hui ({rows.length}) :</div>
             {rows.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:18}}>Rien encore aujourd'hui. Fais une quête! 💪</div>}
-            {rows.map((r,i)=>{ const m=r.cat?catMeta(r.cat):null; return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40",flex:1}}>{r.label}{m?<span style={{color:m.color,fontSize:13}}> · {m.label}</span>:""}</span>{r.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{r.time}</span>}<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span></div>); })}
-            <button onClick={()=>setArchivesOpen(false)} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer"}}>← Retour</button>
+            {rows.map((r,i)=>{ const m=r.cat?catMeta(r.cat):null; return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#5CAD68",flex:1}}>{r.label}{m?<span style={{color:m.color,fontSize:13}}> · {m.label}</span>:""}</span>{r.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{r.time}</span>}<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✅</span></div>); })}
+            <button onClick={()=>setArchivesOpen(false)} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:8,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer"}}>← Retour</button>
           </div>
         );
       })()}
@@ -1493,14 +1497,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {bugOpen && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#FF8C00"}}>🐛 J'ai trouvé un bug</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#D99248"}}>🐛 J'ai trouvé un bug</div>
             <button onClick={()=>{setBugOpen(false);setBugText("");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
           </div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:6}}>Explique ce qui ne marche pas — ton parent va le recevoir :</div>
           <textarea value={bugText} onChange={e=>setBugText(e.target.value.slice(0,300))} autoFocus placeholder="ex: quand je clique sur..., il se passe..."
-            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"10px 12px",background:"#111",color:"#fff",border:"2px solid #FF8C00",borderRadius:6,outline:"none",minHeight:120,resize:"vertical"}}/>
+            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"10px 12px",background:"#111",color:"#fff",border:"2px solid #D99248",borderRadius:6,outline:"none",minHeight:120,resize:"vertical"}}/>
           <button disabled={!bugText.trim()} onClick={()=>{ if(bugText.trim()&&onReportBug){ const ok=onReportBug(bugText.trim()); if(ok){setBugOpen(false);setBugText("");} } }}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",padding:"15px",marginTop:10,background:bugText.trim()?"#FF8C00":"#333",color:"#000",border:"3px solid #000",borderRadius:8,cursor:bugText.trim()?"pointer":"not-allowed",opacity:bugText.trim()?1:0.5,boxShadow:"2px 2px 0 #000"}}>📨 Envoyer au parent</button>
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",padding:"15px",marginTop:10,background:bugText.trim()?"#D99248":"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:bugText.trim()?"pointer":"not-allowed",opacity:bugText.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>📨 Envoyer au parent</button>
         </div>
       )}
       {homeTab==="accueil" && (<>
@@ -1518,24 +1522,24 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,14px)",color:player.color,marginBottom:3}}>{displayName(player)}</div>
           {isRandomUnrevealed
-            ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FFD700",marginBottom:5}}>❓ THÈME MYSTÈRE</div>
+            ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:5}}>❓ THÈME MYSTÈRE</div>
             : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#aaa",marginBottom:5,textShadow:`0 0 8px ${pt.glow}60`}}>Niv.{lvTitle.level} — {lvTitle.title}</div>
           }
           {isRandomUnrevealed && <button onClick={()=>{setThemeRevealed(true);SFX.epic();spawnParticles("🎲");}}
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 12px",background:"linear-gradient(90deg,#FF4444,#FFD700,#44FF44)",color:"#000",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"3px 3px 0 #000",marginBottom:4}}>
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 12px",background:"linear-gradient(90deg,#D97070,#D9BC5C,#44FF44)",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d",marginBottom:4}}>
             🎲 RÉVÉLER MON THÈME!
           </button>}
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",marginBottom:2}}>⚡ XP {pState.xp}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",marginBottom:2}}>⚡ XP {pState.xp}</div>
           <div style={{height:9,background:"#111",border:"2px solid #333",borderRadius:1,overflow:"hidden",marginBottom:6}}>
-            <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},#5DECF5)`,transition:"width 0.8s ease"}}/>
+            <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},#85CDD1)`,transition:"width 0.8s ease"}}/>
           </div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#FFD700"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#D9BC5C"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
           {/* v1.84.0 (Lot 1 #B3) — sieste visible ICI aussi (pas juste sur la carte familier) dès
               qu'au moins une activité plaisir (boutique/avatar) est bloquée par l'énergie */}
           {(()=>{ const cur=currentEnergy(pState); const thresh=Math.max(SHOP_ENERGY,AVATAR_ENERGY);
             if(cur>=thresh) return null;
             const m=minsToEnergy(pState,thresh);
-            return <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#5DECF5",marginTop:3}}>😴 Ton héros se repose… prêt dans ~{m} min</div>;
+            return <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#85CDD1",marginTop:3}}>😴 Ton héros se repose… prêt dans ~{m} min</div>;
           })()}
         </div>
       </div>
@@ -1559,13 +1563,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet);
         const cur=currentEnergy(pState);
         const fedToday=pState.lastFedDay===todayStamp();
-        const eColor=cur>=60?"#2ECC40":cur>=30?"#FFD700":"#FF6B6B";
+        const eColor=cur>=60?"#5CAD68":cur>=30?"#D9BC5C":"#D98C8C";
         const napping=cur<PLAY_ENERGY;
         return (
           <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:10}}>
             {/* Série */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#FF8C00":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#D99248":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
             </div>
             {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
@@ -1581,14 +1585,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",marginTop:1}}><div style={{height:"100%",width:cur+"%",background:eColor,transition:"width 0.6s"}}/></div>
                   </div>
                 </div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:fedToday?"#2ECC40":"#FFD700",lineHeight:1.3}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:fedToday?"#5CAD68":"#D9BC5C",lineHeight:1.3}}>
                   {fedToday?"✅ Nourri aujourd'hui — il gagne de l'XP avec tes quêtes!":"🍖 Nourris-le aujourd'hui pour qu'il gagne de l'XP avec tes quêtes!"}
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={(e)=>{e.stopPropagation();onFeedPet&&onFeedPet();}} disabled={fedToday}
-                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#2ECC40",color:fedToday?"#555":"#000",border:"2px solid #000",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#5CAD68",color:fedToday?"#555":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
                   <button onClick={(e)=>{e.stopPropagation();onPlayPet&&onPlayPet();}}
-                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:napping?"#1a1a1a":acc,color:napping?"#777":"#000",border:"2px solid #000",borderRadius:5,cursor:"pointer"}}>{napping?"💤 Sieste":"🎾 Jouer"}</button>
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:napping?"#1a1a1a":acc,color:napping?"#777":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:"pointer"}}>{napping?"💤 Sieste":"🎾 Jouer"}</button>
                 </div>
               </>); })() : (
                 <div onClick={openAvatar} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
@@ -1603,16 +1607,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {(()=>{ const offers=(config.coinOffers||[]).filter(o=>o.toId===player.id && o.status==="pending");
         if(!offers.length) return null;
         return (
-          <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #5DECF555",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:8}}>📬 DEMANDES DE PIÈCES ({offers.length})</div>
+          <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #85CDD155",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:8}}>📬 DEMANDES DE PIÈCES ({offers.length})</div>
             {offers.map(o=>{ const from=config.players.find(p=>p.id===o.fromId); const enough=(pState.coins||0)>=o.amount;
               return (
                 <div key={o.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:120,fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}><b style={{color:from?.color||"#fff"}}>{displayName(from)}</b> te demande {o.amount} 🪙</div>
                   <button disabled={!enough} onClick={()=>{SFX.click();onRespondOffer&&onRespondOffer(o.id,true);}} title={enough?"":"Pas assez de pièces"}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:enough?"#2ECC40":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:enough?"pointer":"not-allowed",opacity:enough?1:0.5}}>✅ Donner</button>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:enough?"#5CAD68":"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:enough?"pointer":"not-allowed",opacity:enough?1:0.5}}>✅ Donner</button>
                   <button onClick={()=>{SFX.click();onRespondOffer&&onRespondOffer(o.id,false);}}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:"#1a1a1a",color:"#FF6B6B",border:"2px solid #FF6B6B55",borderRadius:4,cursor:"pointer"}}>✕</button>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 10px",background:"#1a1a1a",color:"#D98C8C",border:"2px solid #D98C8C55",borderRadius:4,cursor:"pointer"}}>✕</button>
                 </div>
               );
             })}
@@ -1638,7 +1642,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <input value={pseudoDraft} onChange={e=>setPseudoDraft(e.target.value.slice(0,16))} placeholder={player.pseudo||player.name||"Mon pseudo"}
                 style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
               <button onClick={()=>{ if(pseudoDraft.trim()){ SFX.click(); onUpdatePseudo&&onUpdatePseudo(pseudoDraft.trim()); setProfileMsg("✅ Pseudo changé!"); setPseudoDraft(""); } }}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"0 14px",background:pseudoDraft.trim()?(pt.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:pseudoDraft.trim()?1:0.5}}>✅</button>
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"0 14px",background:pseudoDraft.trim()?(pt.accent||player.color):"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",opacity:pseudoDraft.trim()?1:0.5}}>✅</button>
             </div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:3}}>Mon code secret (4 chiffres)</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
@@ -1648,10 +1652,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 style={{width:92,fontFamily:"'Press Start 2P',monospace",fontSize:13,padding:"9px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center",letterSpacing:3}}/>
               <button disabled={!(pinDraft.length===4&&pinDraft===pinDraft2)}
                 onClick={()=>{ if(pinDraft.length===4&&pinDraft===pinDraft2){ SFX.click(); onPatchState&&onPatchState({pin:pinDraft}); setProfileMsg("🔑 Code secret changé!"); setPinDraft("");setPinDraft2(""); } }}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"0 14px",alignSelf:"stretch",background:(pinDraft.length===4&&pinDraft===pinDraft2)?(pt.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(pinDraft.length===4&&pinDraft===pinDraft2)?1:0.5}}>✅</button>
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"0 14px",alignSelf:"stretch",background:(pinDraft.length===4&&pinDraft===pinDraft2)?(pt.accent||player.color):"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",opacity:(pinDraft.length===4&&pinDraft===pinDraft2)?1:0.5}}>✅</button>
             </div>
-            {pinDraft.length===4&&pinDraft2.length===4&&pinDraft!==pinDraft2 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#FF6B6B",marginTop:5}}>Les deux codes ne sont pas pareils.</div>}
-            {profileMsg && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#2ECC40",marginTop:6}}>{profileMsg}</div>}
+            {pinDraft.length===4&&pinDraft2.length===4&&pinDraft!==pinDraft2 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#D98C8C",marginTop:5}}>Les deux codes ne sont pas pareils.</div>}
+            {profileMsg && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#5CAD68",marginTop:6}}>{profileMsg}</div>}
           </div>
 
           {[
@@ -1666,12 +1670,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             const isOn = (key==="sound") ? settings[key]!==false : !!settings[key];
             return (
               <div key={key} onClick={()=>{SFX.click();setSetting(key, !isOn);}}
-                style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#2ECC40"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
+                style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#5CAD68"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
                 <div style={{flex:1}}>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isOn?(pt.accent||"#fff"):"#999"}}>{label}</div>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{desc}</div>
                 </div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#2ECC40"):"#333",color:isOn?"#000":"#888",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#5CAD68"):"#333",color:isOn?"#0d0d0d":"#888",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
               </div>
             );
           })}
@@ -1682,12 +1686,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{display:"flex",gap:6}}>
               {[["Normal",1],["Grand",1.15],["Très grand",1.3]].map(([lbl,val])=>{ const on=(settings.fontScale||1)===val; return (
                 <button key={val} onClick={()=>{SFX.click();setSetting("fontScale",val);}}
-                  style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 4px",background:on?(pt.accent||"#2ECC40"):"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?(pt.accent||"#2ECC40"):"#333"}`,borderRadius:4,cursor:"pointer"}}>{lbl}</button>
+                  style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 4px",background:on?(pt.accent||"#5CAD68"):"#1a1a1a",color:on?"#0d0d0d":"#bbb",border:`2px solid ${on?(pt.accent||"#5CAD68"):"#333"}`,borderRadius:4,cursor:"pointer"}}>{lbl}</button>
               ); })}
             </div>
           </div>
           <button onClick={()=>{SFX.click();setSettingsOpen(false);}}
-            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+            style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
             ← Retour
           </button>
         </div>
@@ -1710,7 +1714,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               {canChange ? "Touche un thème débloqué pour le choisir. Il dure toute la semaine 🗓️" : "Tu as déjà choisi ton thème cette semaine. Tu pourras en changer lundi prochain! 🗓️"}
             </div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:4}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
-            {weeklyFreeTheme && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#FFD700",marginBottom:10}}>🎲 Thème de la semaine gratuit : {weeklyFreeTheme.icon} {weeklyFreeTheme.name} — débloqué pour tout le monde, sans XP!</div>}
+            {weeklyFreeTheme && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#D9BC5C",marginBottom:10}}>🎲 Thème de la semaine gratuit : {weeklyFreeTheme.icon} {weeklyFreeTheme.name} — débloqué pour tout le monde, sans XP!</div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
               {list.map(t=>{
                 const unlocked=isThemeUnlocked(t.id,pState.xp,player.starterThemes||[]);
@@ -1722,11 +1726,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     onClick={()=>{ if(selectable){ onChangeTheme&&onChangeTheme(t.id); setThemePicker(false); } }}
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 8px",
                       background:current?`${t.accent}25`:unlocked?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.3)",
-                      border:`3px solid ${current?t.accent:isWeeklyFree?"#FFD700":unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
+                      border:`3px solid ${current?t.accent:isWeeklyFree?"#D9BC5C":unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
                       cursor:selectable?"pointer":"default",opacity:unlocked?1:0.5,boxShadow:current?`0 0 14px ${t.glow||t.accent}50`:"none"}}>
                     <span style={{fontSize:30,filter:unlocked?"none":"grayscale(1)"}}>{t.icon}</span>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:current?t.accent:unlocked?"#ddd":"#666",textAlign:"center",lineHeight:1.3}}>{t.name}</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#2ECC40":unlocked?(t.accent||"#FFD700"):"#777"}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#5CAD68":unlocked?(t.accent||"#D9BC5C"):"#777"}}>
                       {current?"✅ ACTUEL":isWeeklyFree&&unlocked?"🎲 Gratuit!":unlocked?"Choisir":`🔒 ${t.xpUnlock} XP`}
                     </span>
                   </button>
@@ -1734,7 +1738,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               })}
             </div>
             <button onClick={()=>{SFX.click();setThemePicker(false);}}
-              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
               ← Retour
             </button>
           </div>
@@ -1751,16 +1755,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           const doneKey = rem.instanceId+"_"+player.id;
           const done = pState.completed?.includes(doneKey);
           return (
-            <div key={rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":"#5DECF5"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
-              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
-              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#5DECF5",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
+            <div key={rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":"#85CDD1"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
+              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
+              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#85CDD1",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
               <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
               </div>
               {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
-                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 ✔ J'AI ÉTUDIÉ!
               </button>}
             </div>
@@ -1777,13 +1781,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const today = new Date().toISOString().slice(0,10);
         const done = myChallenge.checkins?.[today];
         return (
-          <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${done?"#2ECC40":"#FFD700"}`,borderRadius:6,padding:"11px 13px",marginBottom:4}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#FFD700",marginBottom:6}}>⭐ DÉFI DE LA SEMAINE</div>
+          <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${done?"#5CAD68":"#D9BC5C"}`,borderRadius:6,padding:"11px 13px",marginBottom:4}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#D9BC5C",marginBottom:6}}>⭐ DÉFI DE LA SEMAINE</div>
             <div style={{fontSize:"clamp(13px,1.6vw,16px)",color:"#FFF",lineHeight:1.4,marginBottom:8}}>{myChallenge.emoji||"⭐"} {myChallenge.text||"Défi à venir…"}</div>
             {done
-              ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#2ECC40"}}>✅ Défi relevé aujourd'hui!</div>
+              ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5CAD68"}}>✅ Défi relevé aujourd'hui!</div>
               : onChallengeCheckin && <button onClick={()=>{SFX.click();onChallengeCheckin(today,true);}}
-                  style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#FFD700",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                  style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#D9BC5C",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                   ✅ J'ai réussi aujourd'hui!
                 </button>}
           </div>
@@ -1794,8 +1798,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const now2=new Date();
         const daysUntilFri = (5 - now2.getDay() + 7) % 7 || 7; // jours jusqu'au prochain vendredi
         return (
-          <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #5DECF5",borderRadius:6,padding:"10px 13px",marginBottom:4,textAlign:"center"}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#5DECF5",marginBottom:5}}>📍 SEMAINE CHEZ L'AUTRE PARENT</div>
+          <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #85CDD1",borderRadius:6,padding:"10px 13px",marginBottom:4,textAlign:"center"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#85CDD1",marginBottom:5}}>📍 SEMAINE CHEZ L'AUTRE PARENT</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",lineHeight:1.3}}>
               Tes quêtes de la maison reprennent vendredi!{daysUntilFri===1?" (demain)":` (dans ${daysUntilFri} jours)`}
             </div>
@@ -1813,16 +1817,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           const doneKey = rem.instanceId+"_"+player.id;
           const done = pState.completed?.includes(doneKey);
           return (
-            <div key={"jour_"+rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":"#5DECF5"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
-              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
-              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#5DECF5",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
+            <div key={"jour_"+rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":"#85CDD1"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
+              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
+              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#85CDD1",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
               <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",padding:"1px 4px"}}>📅 AUJOURD'HUI</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>📅 AUJOURD'HUI</span>
               </div>
               {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
-                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#5DECF5",border:"3px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 ✔ J'AI ÉTUDIÉ!
               </button>}
             </div>
@@ -1849,11 +1853,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return (
                 <div key={o.id} style={{marginBottom:7}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#2ECC40":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#5DECF5"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
-                    {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#2ECC40",color:"#000",border:"2px solid #000",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#5CAD68":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#85CDD1"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
+                    {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#5CAD68",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
                   </div>
                   <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.round(o.prog/o.goal*100)+"%",background:isClaimed?"#2ECC40":`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.5s"}}/>
+                    <div style={{height:"100%",width:Math.round(o.prog/o.goal*100)+"%",background:isClaimed?"#5CAD68":`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.5s"}}/>
                   </div>
                 </div>
               );
@@ -1870,7 +1874,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <button onClick={onClick}
             style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,10px)",padding:"12px 8px",
               display:"flex",flexDirection:"column",alignItems:"center",gap:4,lineHeight:1.3,
-              background:active?acc:"rgba(0,0,0,0.4)",color:active?"#000":"#aaa",
+              background:active?acc:"rgba(0,0,0,0.4)",color:active?"#0d0d0d":"#aaa",
               border:`3px solid ${active?acc:"#333"}`,borderRadius:8,cursor:"pointer",
               boxShadow:active?`0 0 14px ${acc}55`:"none",transition:"all 0.15s"}}>
             <span>{label}</span>
@@ -1895,14 +1899,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 {myRoutines.map(r=>{ const on=pState.activeRoutineId===r.id; return (
                   <button key={r.id} onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:r.id});}}
                     style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
-                      background:on?acc:"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
+                      background:on?acc:"#1a1a1a",color:on?"#0d0d0d":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
                     {r.emoji||"⏰"} {r.name}
                   </button>
                 ); })}
                 {routineMine.length>0 && (()=>{ const on=!pState.activeRoutineId; return (
                   <button onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:null});}}
                     style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
-                      background:on?acc:"#1a1a1a",color:on?"#000":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
+                      background:on?acc:"#1a1a1a",color:on?"#0d0d0d":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
                     🗂️ Tout
                   </button>
                 ); })()}
@@ -1950,7 +1954,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:sel?`${th.accent||player.color}25`:"rgba(0,0,0,0.4)",border:`2px solid ${sel?(th.accent||player.color):"#333"}`,borderRadius:4,cursor:"pointer"}}>
                   <span style={{fontSize:18}}>{sel?"✅":t.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{t.label}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{t.xp}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{t.xp}</span>
                 </div>
               );
             })}
@@ -1978,7 +1982,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 }
                 setRoutineBuilder(null);
               }}
-              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #000"}}>{routineBuilder.editId?"✅ Enregistrer":"✅ Créer mon rituel"}</button>
+              style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?(th.accent||player.color):"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",opacity:(routineBuilder.name.trim()&&routineBuilder.taskIds.length)?1:0.5,boxShadow:"3px 3px 0 #0d0d0d"}}>{routineBuilder.editId?"✅ Enregistrer":"✅ Créer mon rituel"}</button>
           </div>
         </div>
       )}
@@ -1999,7 +2003,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
              : "Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Rituel).")}
       </div>}
       {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
-        if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
+        if(settings.focus && myAssignments.length>0 && undone.length===0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#5CAD68",textAlign:"center",padding:16}}>🎉 Tout est fait! Bravo!</div>;
         // v1.88.0 (Lot 3 #15) — avertissement de transition : ton neutre/encourageant (pas d'urgence
         // rouge, contrairement au décompte) quand il reste peu de tâches — les transitions sont
         // difficiles pour TSA/TDAH, un signal clair "tu y es presque" aide à anticiper la fin.
@@ -2018,20 +2022,20 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const done=pState.completed?.includes(doneKey);
         const pending=pState.pending?.includes(doneKey);
         return (
-          <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#2ECC40":pending?"#FFD700":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
-            {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#2ECC40",borderRadius:5}}>✅ VALIDÉ!</div>}
+          <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
+            {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
               {task.cat && (()=>{ const m=catMeta(task.cat); return <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:m.color,background:`${m.color}1A`,border:`1px solid ${m.color}55`,padding:"1px 4px"}}>{m.label}</span>; })()}
             </div>
-            {!done&&!pending&&<button onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
+            {!done&&!pending&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
               style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
-                color:"#000",background:player.color,border:"3px solid #000",borderRadius:3,cursor:"pointer",
-                boxShadow:"2px 2px 0 #000",transition:"all 0.08s"}}>
+                color:"#0d0d0d",background:player.color,border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",
+                boxShadow:"2px 2px 0 #0d0d0d",transition:"all 0.08s"}}>
               ✔ J'AI FAIT ÇA!
             </button>}
             {/* v1.83.0 (Lot 1 #B6) — l'enfant peut demander à retirer une tâche qu'il ne veut plus (le parent approuve) */}
@@ -2046,15 +2050,15 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             })()}
             {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
               style={{width:"100%",padding:"6px",fontFamily:"'Press Start 2P',monospace",fontSize:"7px",
-                color:"#000",background:"#FF8C00",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
+                color:"#0d0d0d",background:"#D99248",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
               ⚡ VALIDER SANS CODE (parent)
             </button>}
             {done&&parentMode&&<button onClick={()=>onDeComplete(ass.instanceId+"_"+player.id+"#"+todayStamp(), playerIdx)}
               style={{position:"absolute",top:4,right:4,padding:"3px 7px",fontFamily:"'Press Start 2P',monospace",fontSize:"6px",
-                color:"#FF4444",background:"rgba(0,0,0,0.7)",border:"1px solid #FF4444",borderRadius:2,cursor:"pointer",zIndex:10}}>
+                color:"#D97070",background:"rgba(0,0,0,0.7)",border:"1px solid #D97070",borderRadius:2,cursor:"pointer",zIndex:10}}>
               ↩️ Annuler
             </button>}
-            {pending&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",textAlign:"center",marginTop:4}}>⏳ En attente de parent…</div>}
+            {pending&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",textAlign:"center",marginTop:4}}>⏳ En attente de parent…</div>}
           </div>
         );
         };
@@ -2082,9 +2086,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",
                     fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",lineHeight:1.4,textAlign:"left",
                     padding:"11px 12px",background:open?`${acc}22`:"rgba(0,0,0,0.45)",
-                    color:allDone?"#2ECC40":"#fff",border:`2px solid ${open?acc:"#333"}`,borderRadius:8,cursor:"pointer"}}>
+                    color:allDone?"#5CAD68":"#fff",border:`2px solid ${open?acc:"#333"}`,borderRadius:8,cursor:"pointer"}}>
                   <span>{open?"▼":"▶"} {g.label}</span>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:allDone?"#2ECC40":"#888"}}>{allDone?"✅ ":""}{doneN}/{g.items.length}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:allDone?"#5CAD68":"#888"}}>{allDone?"✅ ":""}{doneN}/{g.items.length}</span>
                 </button>
                 {open && <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,marginBottom:4}}>{g.items.map(renderCard)}</div>}
               </div>
@@ -2094,7 +2098,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const _done=a=>pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp());
         const undoneAll = myAssignments.filter(a=>!_done(a)); // v1.88.0 — nommé pour réutilisation (D'abord→Ensuite)
         const list = settings.focus ? undoneAll.slice(0,1) : undoneAll; // v1.60.0 — les quêtes validées quittent la liste → Archives
-        if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#2ECC40",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
+        if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#5CAD68",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
         const cards = list.map(renderCard);
         // v1.88.0 (Lot 3 #14) — "D'abord → Ensuite" : en mode focus (une tâche à la fois), montre
         // ce qui vient après — prévisibilité utile pour TSA/TDAH (savoir à quoi s'attendre).
@@ -2140,7 +2144,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:4}}>
                   <span style={{fontSize:15}}>{t.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",flex:1}}>{t.label}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#5DECF5"}}>{ass.days.map(d=>DAYS_SHORT[d]).join(" ")}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#85CDD1"}}>{ass.days.map(d=>DAYS_SHORT[d]).join(" ")}</span>
                 </div>
               );
             })}
@@ -2166,7 +2170,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <button onClick={()=>{
             if(window.confirm("Terminer le rituel et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
           }}
-          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:"#2ECC40",border:"3px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
+          style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#5CAD68",border:"3px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
           ✅ J'ai fini mon rituel — revenir au mode Semaine 📅
         </button>
       )}
@@ -2177,7 +2181,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             ✏️ Modifier
           </button>
           <button onClick={()=>{ if(window.confirm(`Supprimer le rituel «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
-            style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF6B6B",background:"transparent",border:"1px solid #FF6B6B40",borderRadius:3,cursor:"pointer"}}>
+            style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D98C8C",background:"transparent",border:"1px solid #D98C8C40",borderRadius:3,cursor:"pointer"}}>
             🗑️ Supprimer
           </button>
         </div>
@@ -2186,21 +2190,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       </>)}
       {homeTab==="sem" && (<>
       {/* Calendar CRUD */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5DECF5",marginTop:10,paddingBottom:3,borderBottom:"2px solid #5DECF540"}}>📅 MON CALENDRIER</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#85CDD1",marginTop:10,paddingBottom:3,borderBottom:"2px solid #85CDD140"}}>📅 MON CALENDRIER</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:4}}>Note tes devoirs et examens — un rappel avec du XP bonus apparaîtra avant la date!</div>
       <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
         style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"12px",
-          background:calOpen?"#1a1a1a":"#5DECF5",color:calOpen?"#5DECF5":"#000",
-          border:`3px solid ${calOpen?"#5DECF5":"#000"}`,borderRadius:5,cursor:"pointer",
-          boxShadow:calOpen?"none":"4px 4px 0 #000",transition:"all 0.12s"}}>
+          background:calOpen?"#1a1a1a":"#85CDD1",color:calOpen?"#85CDD1":"#0d0d0d",
+          border:`3px solid ${calOpen?"#85CDD1":"#0d0d0d"}`,borderRadius:5,cursor:"pointer",
+          boxShadow:calOpen?"none":"4px 4px 0 #0d0d0d",transition:"all 0.12s"}}>
         {calOpen?"✕ Fermer":"➕ Ajouter un devoir ou un examen"}
       </button>
       {calOpen && (
-        <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #5DECF5",borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
+        <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #85CDD1",borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
           <div style={{display:"flex",gap:6}}>
             {[["devoir","📚 Devoir"],["examen","📝 Examen"]].map(([v,l])=>(
               <button key={v} onClick={()=>{setCalForm(f=>({...f,type:v}));SFX.click();}}
-                style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px",background:calForm.type===v?"#5DECF5":"#1a1a1a",color:calForm.type===v?"#000":"#888",border:`2px solid ${calForm.type===v?"#5DECF5":"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px",background:calForm.type===v?"#85CDD1":"#1a1a1a",color:calForm.type===v?"#0d0d0d":"#888",border:`2px solid ${calForm.type===v?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>
                 {l}
               </button>
             ))}
@@ -2217,7 +2221,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             onCalendarAdd&&onCalendarAdd(calForm.type);
             setCalForm({type:"devoir",label:"",date:""});
             SFX.click();
-          }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:"#5DECF5",color:"#000",border:"none",borderRadius:3,cursor:"pointer"}}>
+          }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:"#85CDD1",color:"#0d0d0d",border:"none",borderRadius:3,cursor:"pointer"}}>
             ✓ Enregistrer
           </button>
         </div>
@@ -2249,7 +2253,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
       {/* 🎁 Coffres mystères */}
       {(()=>{ const cur=currentEnergy(pState); if(cur>=CHEST_ENERGY) return null; const m=minsToEnergy(pState,CHEST_ENERGY);
-        return <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #5DECF555",borderRadius:6,padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:14,color:"#9fd",lineHeight:1.3}}>💤 Ton familier est fatigué et fait une sieste — les coffres reviennent dans ~{m} min. En attendant, va faire tes quêtes! 🌟</div>;
+        return <div style={{background:"rgba(94,222,245,0.08)",border:"2px solid #85CDD155",borderRadius:6,padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:14,color:"#9fd",lineHeight:1.3}}>💤 Ton familier est fatigué et fait une sieste — les coffres reviennent dans ~{m} min. En attendant, va faire tes quêtes! 🌟</div>;
       })()}
       <div style={{display:"flex",gap:8,marginBottom:10}}>
         {CHESTS.map(ch=>{ const can=pState.coins>=ch.cost && currentEnergy(pState)>=CHEST_ENERGY; return (
@@ -2265,7 +2269,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",background:`linear-gradient(180deg,${ch.color}1A,rgba(0,0,0,0.5))`,border:`2px solid ${ch.color}`,borderRadius:8,cursor:can?"pointer":"not-allowed",opacity:can?1:0.45,boxShadow:can?`0 0 8px ${ch.color}40`:"none"}}>
             <ChestSprite open={false} size={48}/>
             <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:ch.color,textAlign:"center"}}>{ch.name.replace("Coffre ","")}</span>
-            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>{ch.cost} 🪙</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>{ch.cost} 🪙</span>
           </button>
         ); })}
       </div>
@@ -2278,17 +2282,17 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff"}}>{it.name}</div>
             {chestReveal.dup
-              ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>Tu l'avais déjà! Doublon → +{chestReveal.refund} 🪙</div>
-              : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#2ECC40"}}>Nouvel item débloqué! 🎉</div>}
-            <button onClick={()=>{SFX.click();setChestReveal(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"14px 28px",background:rar.color,color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>Super!</button>
+              ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#D9BC5C"}}>Tu l'avais déjà! Doublon → +{chestReveal.refund} 🪙</div>
+              : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#5CAD68"}}>Nouvel item débloqué! 🎉</div>}
+            <button onClick={()=>{SFX.click();setChestReveal(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"14px 28px",background:rar.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>Super!</button>
           </div>
         );
       })()}
 
-      <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #FFD700",borderRadius:5,padding:10}}>
+      <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #D9BC5C",borderRadius:5,padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>(
-            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#FFD700":"#222",color:shopTab===k?"#000":"#888",border:`2px solid ${shopTab===k?"#FFD700":"#555"}`,borderRadius:2,cursor:"pointer"}}>{l}</button>
+            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#888",border:`2px solid ${shopTab===k?"#D9BC5C":"#555"}`,borderRadius:2,cursor:"pointer"}}>{l}</button>
           ))}
         </div>
         {shopTab==="rewards" && (
@@ -2301,22 +2305,22 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const bought=pState.boughtRewards?.includes(r.id);
               return (
                 <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)}
-                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${bought?"#2ECC40":canBuy?"#FFD700":"#333"}`,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${bought?"#5CAD68":canBuy?"#D9BC5C":"#333"}`,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
                   <span style={{fontSize:22}}>{r.emoji}</span>
                   <div style={{flex:1}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#2ECC40":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#5CAD68":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                       {r.label}
-                      {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#000",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
+                      {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
                     </div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#2ECC40":"#FFD700"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
                   </div>
-                  {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>Acheter</span>}
+                  {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
                   {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
                   {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
                     <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
-                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#FF8C00",border:"1px solid #FF8C00",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#D99248",border:"1px solid #D99248",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
                     <button onClick={(e)=>{e.stopPropagation();SFX.click();onHideReward&&onHideReward(r);}}
-                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#2ECC40",border:"1px solid #2ECC40",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Cacher</button>
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#5CAD68",border:"1px solid #5CAD68",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Cacher</button>
                   </div>}
                 </div>
               );
@@ -2333,13 +2337,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const rar=rarityOf(item.cost);
               return (
                 <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
-                  style={{background:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,border:`2px solid ${equipped?"#2ECC40":rar.color}`,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,boxShadow:rar.min>=45?`0 0 10px ${rar.color}55`:"none",position:"relative"}}>
+                  style={{background:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,border:`2px solid ${equipped?"#5CAD68":rar.color}`,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,boxShadow:rar.min>=45?`0 0 10px ${rar.color}55`:"none",position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   {petSpriteKey(item.id)
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
                     : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#2ECC40":owned?"#888":"#FFD700"}}>{equipped?"✅ ON":owned?"Équiper":iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ON":owned?"Équiper":iPrice+" 🪙"}</span>
                 </div>
               );
             })}
@@ -2366,7 +2370,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       </div>)}
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#FFD700",marginBottom:4}}>🏅 BADGES</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#D9BC5C",marginBottom:4}}>🏅 BADGES</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Appuie sur un badge pour voir comment le gagner — certains sont secrets! 🕵️</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {BADGES.filter(b=>b.type==="general"||b.type===resolvedThemeId).map(b=>{
@@ -2375,9 +2379,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             return (
               <div key={b.id} title={earned?`${b.name}: ${b.desc}`:`🔒 ${b.desc}`}
                 onClick={()=>{SFX.click();setBadgeInfo(showing?null:b.id);}}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:showing?0.7:0.3,transition:"opacity 0.3s",cursor:"pointer",borderRadius:6,outline:showing?`2px solid ${pt.accent||"#FFD700"}`:"none",padding:2}}>
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:showing?0.7:0.3,transition:"opacity 0.3s",cursor:"pointer",borderRadius:6,outline:showing?`2px solid ${pt.accent||"#D9BC5C"}`:"none",padding:2}}>
                 <BadgeIcon badge={b} earned={earned} size={40}/>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#FFD700"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#D9BC5C"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
               </div>
             );
           })}
@@ -2387,10 +2391,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           if(!b)return null;
           const earned=(pState.badges||[]).includes(b.id);
           return (
-            <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${earned?(pt.accent||"#FFD700"):"#444"}`,borderRadius:6,padding:"8px 12px",display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${earned?(pt.accent||"#D9BC5C"):"#444"}`,borderRadius:6,padding:"8px 12px",display:"flex",gap:10,alignItems:"center"}}>
               <span style={{fontSize:24,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</span>
               <div style={{flex:1}}>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#FFD700"):"#aaa"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#D9BC5C"):"#aaa"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",lineHeight:1.3}}>{b.desc}</div>
               </div>
               <button onClick={()=>setBadgeInfo(null)} style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:14}}>✕</button>
@@ -2410,7 +2414,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const _petId=pState.equipped?.pet; const _petLv=petLevel((pState.petXp||{})[_petId]||0); const _petReady=!!_petId && pState.lastFedDay===todayStamp() && _petLv>=4;
         const atkBtn=(type,label,sub,enabled)=>(
           <button disabled={!enabled} onClick={()=>{ if(enabled){SFX.click();onBossAttack&&onBossAttack(type);} }}
-            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 6px",lineHeight:1.5,background:enabled?(boss.color||"#FF5555"):"#1a1a1a",color:enabled?"#000":"#555",border:"2px solid #000",borderRadius:6,cursor:enabled?"pointer":"not-allowed",opacity:enabled?1:0.5,boxShadow:enabled?"2px 2px 0 #000":"none"}}>
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 6px",lineHeight:1.5,background:enabled?(boss.color||"#FF5555"):"#1a1a1a",color:enabled?"#0d0d0d":"#555",border:"2px solid #0d0d0d",borderRadius:6,cursor:enabled?"pointer":"not-allowed",opacity:enabled?1:0.5,boxShadow:enabled?"2px 2px 0 #0d0d0d":"none"}}>
             {label}<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{sub}</span>
           </button>
         );
@@ -2423,31 +2427,31 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               {boss.forest && <div style={{fontSize:20,letterSpacing:8,marginTop:2,opacity:0.85}}>🌲🌳🌲</div>}
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:boss.color||"#FF5555",marginTop:8}}>{boss.emoji} {boss.name}</div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"8px 0 2px"}}>PV DU BOSS</div>
-              <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#FF4444,#FFD700)",transition:"width 0.5s"}}/></div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
+              <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#D97070,#D9BC5C)",transition:"width 0.5s"}}/></div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
             <button onClick={()=>{ if(SFX.click)SFX.click(); setFinalBattle(true); }}
-              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1.5,padding:"13px 8px",background:"linear-gradient(90deg,#7B2FF2,#FF5555)",color:"#fff",border:"2px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 3px 0 #000"}}>
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1.5,padding:"13px 8px",background:"linear-gradient(90deg,#7B2FF2,#FF5555)",color:"#fff",border:"2px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 3px 0 #0d0d0d"}}>
               🐉 COMBAT FINAL<br/><span style={{fontFamily:"'VT323',monospace",fontSize:13}}>Affronte ta tête d'Hydre en mini-jeu!</span>
             </button>
             {!won && <div style={{background:`${boss.color||"#FF5555"}22`,border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"7px 10px",textAlign:"center"}}>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>{mod.emoji} {mod.label} (aujourd'hui)</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>{mod.emoji} {mod.label} (aujourd'hui)</span>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#eee"}}>{mod.desc}</div>
             </div>}
-            {enraged && <div style={{background:"#3a0e0e",border:"2px solid #FF4444",borderRadius:8,padding:"7px 10px",textAlign:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#FF8888"}}>🔥 Le boss ENRAGE! Il vide les PV de la famille 2× plus vite — achevez-le!</div>}
+            {enraged && <div style={{background:"#3a0e0e",border:"2px solid #D97070",borderRadius:8,padding:"7px 10px",textAlign:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#FF8888"}}>🔥 Le boss ENRAGE! Il vide les PV de la famille 2× plus vite — achevez-le!</div>}
             <div>
-              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#FF4444":"#2ECC40"}}>{fhp}%</span></div>
-              <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden",marginTop:2}}><div style={{height:"100%",width:fhp+"%",background:fhp<30?"#FF4444":"#2ECC40",transition:"width 0.5s"}}/></div>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#D97070":"#5CAD68"}}>{fhp}%</span></div>
+              <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden",marginTop:2}}><div style={{height:"100%",width:fhp+"%",background:fhp<30?"#D97070":"#5CAD68",transition:"width 0.5s"}}/></div>
               {!won && fhp<40 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#FF8888",marginTop:5,lineHeight:1.3}}>⚠️ Le boss reprend des forces! Faites des quêtes et attaquez vite pour défendre la famille!</div>}
             </div>
-            {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#2ECC40",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#FFD700",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
+            {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#5CAD68",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#D9BC5C",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
               <div style={{display:"flex",gap:8}}>
                 {atkBtn("petite",`${boss.atkEmoji?.petite||"🗡️"} Petite`,`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
                 {atkBtn("grosse",`${boss.atkEmoji?.grosse||"💥"} Grosse`,`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
               </div>
               <button onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
-                style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#FFD700":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#000":"#999",border:"2px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>
+                style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#D9BC5C":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#0d0d0d":"#999",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 🐾 Attaque du familier<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{PET_ATTACK_COST} jetons · dégâts selon ton familier{_petReady?"":" — nourris-le, niv.4+"}</span>
               </button>
               {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
@@ -2495,7 +2499,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
   const [chatText, setChatText] = useState("");
   const mayOpen = (i)=> canOpen ? canOpen(i) : true;
   const feedName = (pid)=> pid==="parent" ? "👤 Parent" : (displayName((config.players||[]).find(p=>p.id===pid))||"?");
-  const feedColor = (pid)=> pid==="parent" ? "#FF8C00" : ((config.players||[]).find(p=>p.id===pid)?.color||"#888");
+  const feedColor = (pid)=> pid==="parent" ? "#D99248" : ((config.players||[]).find(p=>p.id===pid)?.color||"#888");
   const timeAgo = (ts)=>{ const s=Math.floor((Date.now()-(ts||0))/1000); if(s<60)return "à l'instant"; const m=Math.floor(s/60); if(m<60)return `il y a ${m} min`; const h=Math.floor(m/60); if(h<24)return `il y a ${h} h`; return `il y a ${Math.floor(h/24)} j`; };
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
@@ -2511,16 +2515,16 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         const pct=Math.min(100,Math.round(hpLeft/hpMax*100));
         const won=!!b.defeatedAt; const fhp=familyHp(b);
         return (
-          <div style={{background:won?"rgba(20,55,25,0.5)":"rgba(50,18,35,0.5)",border:`2px solid ${won?"#2ECC40":b.color}`,borderRadius:10,padding:12,display:"flex",gap:12,alignItems:"center"}}>
+          <div style={{background:won?"rgba(20,55,25,0.5)":"rgba(50,18,35,0.5)",border:`2px solid ${won?"#5CAD68":b.color}`,borderRadius:10,padding:12,display:"flex",gap:12,alignItems:"center"}}>
             <BossSprite boss={b} size={84} style={{flexShrink:0,filter:won?"grayscale(0.6) opacity(0.7)":"none"}}/>
             {b.forest && <span style={{fontSize:22,flexShrink:0}}>🌲{won?"":"🔥"}🌲</span>}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:won?"#2ECC40":b.color}}>{won?`🏆 ${b.name} vaincu!`:`${b.emoji} ${b.name}`}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:won?"#5CAD68":b.color}}>{won?`🏆 ${b.name} vaincu!`:`${b.emoji} ${b.name}`}</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",margin:"3px 0"}}>{won?"Bravo la famille! Vous l'avez battu ensemble! 🎉":"Faites des quêtes → attaquez le boss dans l'onglet ⚔️ BOSS!"}</div>
               <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden"}}>
-                <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,#FF4444,#FFD700)`,transition:"width 0.6s ease"}}/>
+                <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,#D97070,#D9BC5C)`,transition:"width 0.6s ease"}}/>
               </div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>{hpLeft} / {hpMax} PV{won?" ✓":` · ❤️ Famille ${fhp}%`}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>{hpLeft} / {hpMax} PV{won?" ✓":` · ❤️ Famille ${fhp}%`}</div>
             </div>
           </div>
         );
@@ -2556,8 +2560,8 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                 </div>
               </div>
               <div style={{display:"flex",gap:10}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡ {ps.xp}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700"}}>🪙 {ps.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {ps.xp}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>🪙 {ps.coins}</span>
               </div>
               <div style={{display:"flex",gap:6,marginTop:8}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>{mayOpen(i)?"Voir mes quêtes →":"Voir le profil →"}</div>
@@ -2588,7 +2592,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
               <div key={p.id} style={{marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:p.color}}>{displayName(p)}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡{total}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡{total}</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,alignItems:"end",height:46}}>
                   {days.map((v,di)=>(
@@ -2601,7 +2605,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
               </div>
             ))}
             {anyXp && leader.length>1 && leader[0].total>0 && (
-              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD700",marginTop:4,textAlign:"center"}}>🏆 En tête cette semaine : <b style={{color:leader[0].p.color}}>{displayName(leader[0].p)}</b> ({leader[0].total} XP) — continuez! 🔥</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#D9BC5C",marginTop:4,textAlign:"center"}}>🏆 En tête cette semaine : <b style={{color:leader[0].p.color}}>{displayName(leader[0].p)}</b> ({leader[0].total} XP) — continuez! 🔥</div>
             )}
           </div>
         );
@@ -2615,7 +2619,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
           <input value={chatText} onChange={e=>setChatText(e.target.value.slice(0,140))} placeholder="Écris un mot à la famille…" maxLength={140}
             style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none"}}/>
           <button onClick={()=>{ if(chatText.trim()){ onPostChat&&onPostChat(chatText.trim()); setChatText(""); SFX.click(); } }}
-            style={{flexShrink:0,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 12px",background:th.accent,color:"#000",border:"2px solid #000",borderRadius:5,cursor:"pointer"}}>Envoyer</button>
+            style={{flexShrink:0,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 12px",background:th.accent,color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:"pointer"}}>Envoyer</button>
         </div>
         {(config.feed||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Rien encore. Les accomplissements de chacun s'afficheront ici! 🌟</div>}
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"40vh",overflowY:"auto"}}>
@@ -2647,7 +2651,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
             const liked=(f.likes||[]).includes(meId);
             // Lot 6 #28 — accent de couleur par type d'événement (même sémantique que le reste de l'app :
             // vert=quête, cyan=niveau/XP, or=badge, rouge=boss, orange=rituel) pour distinguer d'un coup d'œil.
-            const TYPE_ACCENT={task:"#2ECC40",level:"#5DECF5",badge:"#FFD700",boss:"#FF6B6B",ritual:"#FF8C00"};
+            const TYPE_ACCENT={task:"#5CAD68",level:"#85CDD1",badge:"#D9BC5C",boss:"#D98C8C",ritual:"#D99248"};
             const accent=f.type==="chat"?feedColor(f.playerId):(TYPE_ACCENT[f.type]||"#2a2a2a");
             return (
               <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderLeft:`3px solid ${accent}`,borderRadius:6}}>
@@ -2659,7 +2663,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666",marginTop:2}}>{timeAgo(f.ts)}</div>
                 </div>
                 <button onClick={()=>{onLike&&onLike(f.id);SFX.click();}}
-                  style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#FF6B6B":"#888",border:`1px solid ${liked?"#FF6B6B":"#444"}`,borderRadius:14,cursor:"pointer"}}>
+                  style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#D98C8C":"#888",border:`1px solid ${liked?"#D98C8C":"#444"}`,borderRadius:14,cursor:"pointer"}}>
                   {liked?"❤️":"🤍"} {(f.likes||[]).length||""}
                 </button>
               </div>
@@ -2706,35 +2710,35 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
 
   const TabBtn = ({k,l}) => (
     <button onClick={()=>setTab(k)} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",
-      padding:"8px 4px",background:tab===k?"#FF8C00":"#222",color:tab===k?"#000":"#888",
-      border:`2px solid ${tab===k?"#FF8C00":"#444"}`,borderRadius:3,cursor:"pointer"}}>
+      padding:"8px 4px",background:tab===k?"#D99248":"#222",color:tab===k?"#0d0d0d":"#888",
+      border:`2px solid ${tab===k?"#D99248":"#444"}`,borderRadius:3,cursor:"pointer"}}>
       {l}
     </button>
   );
   const Row = ({children,style={}}) => <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,...style}}>{children}</div>;
   const PBtn = ({onClick,color="#333",textColor="#fff",children,style={}}) => (
     <button onClick={onClick} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",
-      padding:"8px 12px",background:color,color:textColor,border:"2px solid #000",borderRadius:3,
-      cursor:"pointer",boxShadow:"2px 2px 0 #000",flexShrink:0,...style}}>
+      padding:"8px 12px",background:color,color:textColor,border:"2px solid #0d0d0d",borderRadius:3,
+      cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",flexShrink:0,...style}}>
       {children}
     </button>
   );
 
   return (
     <div style={{position:"fixed",top:0,right:0,bottom:0,width:"min(340px,90vw)",
-      background:"#0d0d0d",borderLeft:"4px solid #FF8C00",zIndex:500,
+      background:"#0d0d0d",borderLeft:"4px solid #D99248",zIndex:500,
       display:"flex",flexDirection:"column",boxShadow:"-4px 0 30px rgba(255,140,0,0.3)",
       animation:"slideInRight 0.25s ease"}}>
       <style>{`@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
 
       {/* Header */}
-      <div style={{background:"#FF8C00",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",color:"#000"}}>🔓 MODE PARENT</div>
+      <div style={{background:"#D99248",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",color:"#0d0d0d"}}>🔓 MODE PARENT</div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           <button onClick={onExitParent} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,
-            padding:"6px 9px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>🔒 Quitter</button>
+            padding:"6px 9px",background:"#0d0d0d",color:"#D99248",border:"none",cursor:"pointer",borderRadius:2}}>🔒 Quitter</button>
           <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,
-            padding:"5px 10px",background:"#000",color:"#FF8C00",border:"none",cursor:"pointer",borderRadius:2}}>✕</button>
+            padding:"5px 10px",background:"#0d0d0d",color:"#D99248",border:"none",cursor:"pointer",borderRadius:2}}>✕</button>
         </div>
       </div>
 
@@ -2788,7 +2792,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pl.color}}>{displayName(pl)}</span>
                     <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>{its.length} à valider</span>
                     <button onClick={()=>its.forEach(it=>onApprovePending(it.playerIdx,it.doneKey))}
-                      style={{marginLeft:"auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:"#1a3a1a",color:"#2ECC40",border:"1px solid #2ECC4055",borderRadius:3,cursor:"pointer"}}>✅ Tout valider</button>
+                      style={{marginLeft:"auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:"#1a3a1a",color:"#5CAD68",border:"1px solid #5CAD6855",borderRadius:3,cursor:"pointer"}}>✅ Tout valider</button>
                   </div>
                   {its.map(it=>(
                 <div key={it.doneKey} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${it.pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
@@ -2797,13 +2801,13 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{it.label}</div>
                       <div style={{display:"flex",gap:8,marginTop:2}}>
-                        {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{it.xp}</span>}
-                        {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙{it.coins}</span>}
+                        {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{it.xp}</span>}
+                        {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙{it.coins}</span>}
                       </div>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#2ECC40" style={{flex:1}}>✅ Valider</PBtn>
+                    <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>✅ Valider</PBtn>
                     <PBtn onClick={()=>onRefusePending(it.playerIdx,it.doneKey)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Refuser</PBtn>
                   </div>
                 </div>
@@ -2829,7 +2833,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                           </div>
                         </div>
                         <div style={{display:"flex",gap:6}}>
-                          <PBtn onClick={()=>onApproveRemoval(req.id)} color="#1a3a1a" textColor="#2ECC40" style={{flex:1}}>✅ Retirer la tâche</PBtn>
+                          <PBtn onClick={()=>onApproveRemoval(req.id)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>✅ Retirer la tâche</PBtn>
                           <PBtn onClick={()=>onRefuseRemoval(req.id)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Garder la tâche</PBtn>
                         </div>
                       </div>
@@ -2848,10 +2852,10 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             {/* v1.82.0 (Lot 1 #3/B7) — grille catégorisée (TaskChooser), même composant que côté enfant,
                 au lieu d'un <select> plat qui devenait long à parcourir à mesure que le catalogue grossit. */}
             <button onClick={()=>{SFX.click();setChooserOpen(true);}}
-              style={{width:"100%",textAlign:"left",background:"#111",border:"2px solid #FF8C00",color:addTaskId?"#fff":"#888",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8,cursor:"pointer"}}>
+              style={{width:"100%",textAlign:"left",background:"#111",border:"2px solid #D99248",color:addTaskId?"#fff":"#888",padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,borderRadius:3,marginBottom:8,cursor:"pointer"}}>
               {(()=>{ const t=allTasks.find(x=>x.id===addTaskId); return t ? `${t.emoji} ${t.label} (⚡${t.xp} 🪙${t.coins})` : "— Choisir une tâche —"; })()}
             </button>
-            {chooserOpen && <TaskChooser allTasks={allTasks} th={{accent:"#FF8C00"}}
+            {chooserOpen && <TaskChooser allTasks={allTasks} th={{accent:"#D99248"}}
               onPick={(id)=>{setAddTaskId(id);setChooserOpen(false);}}
               onCreateOwn={()=>{setChooserOpen(false);setCustomOpen(true);}}
               onClose={()=>setChooserOpen(false)}/>}
@@ -2859,7 +2863,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               {players.map(pl=>{
                 const sel=addPlayerIds.includes(pl.id);
                 return <div key={pl.id} onClick={()=>setAddPlayerIds(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])}
-                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>
                   {displayName(pl)}
                 </div>;
               })}
@@ -2869,7 +2873,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             <div style={{display:"flex",gap:6,marginBottom:8}}>
               {[["routine","⏰ Rituel"],["week","📅 Planifié"]].map(([k,l])=>(
                 <button key={k} onClick={()=>{setAddType(k);SFX.click();}}
-                  style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:addType===k?"#FF8C00":"#1a1a1a",color:addType===k?"#000":"#888",border:`2px solid ${addType===k?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:addType===k?"#D99248":"#1a1a1a",color:addType===k?"#0d0d0d":"#888",border:`2px solid ${addType===k?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
@@ -2879,25 +2883,25 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:5}}>RÉCURRENCE — QUELS JOURS?</div>
                 <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
                   {[["Chaque jour",[0,1,2,3,4,5,6]],["Lun–Ven",[0,1,2,3,4]],["Fin de sem.",[5,6]]].map(([lbl,dd])=>(
-                    <button key={lbl} onClick={()=>{SFX.click();setAddDays(dd);}} style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 10px",background:eq(dd)?"#FF8C00":"#1a1a1a",color:eq(dd)?"#000":"#bbb",border:"2px solid #444",borderRadius:14,cursor:"pointer"}}>{lbl}</button>
+                    <button key={lbl} onClick={()=>{SFX.click();setAddDays(dd);}} style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 10px",background:eq(dd)?"#D99248":"#1a1a1a",color:eq(dd)?"#0d0d0d":"#bbb",border:"2px solid #444",borderRadius:14,cursor:"pointer"}}>{lbl}</button>
                   ))}
                 </div>
                 <div style={{display:"flex",gap:3}}>
                   {DAYS_SHORT.map((d,i)=>{ const on=addDays.includes(i); return (
-                    <button key={i} onClick={()=>{SFX.click();setAddDays(a=>on?a.filter(x=>x!==i):[...a,i]);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px 0",background:on?"#FF8C00":"#1a1a1a",color:on?"#000":"#666",border:`2px solid ${on?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>{d[0]}</button>
+                    <button key={i} onClick={()=>{SFX.click();setAddDays(a=>on?a.filter(x=>x!==i):[...a,i]);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px 0",background:on?"#D99248":"#1a1a1a",color:on?"#0d0d0d":"#666",border:`2px solid ${on?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{d[0]}</button>
                   );})}
                 </div>
               </div>
             ); })()}
             <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)){ onAddAssignment(addTaskId,addPlayerIds,addType,addDays); setAddTaskId(""); } }}
-              color={addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?1:0.5,marginBottom:8}}>
+              color={addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?"#D99248":"#333"} textColor="#0d0d0d" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?1:0.5,marginBottom:8}}>
               ➕ Ajouter {addType==="week"?`(${addDays.length} jour${addDays.length>1?"s":""}/sem.)`:"(rituel)"}
             </PBtn>
             <button onClick={()=>{ SFX.click(); setCustomOpen(true); }}
-              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #FF8C0060",color:"#FF8C00",borderRadius:4,cursor:"pointer",marginBottom:14}}>
+              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px",background:"rgba(0,0,0,0.4)",border:"2px dashed #D9924860",color:"#D99248",borderRadius:4,cursor:"pointer",marginBottom:14}}>
               + Créer une tâche personnalisée
             </button>
-            {customOpen && <CustomTaskModal title="Nouvelle tâche personnalisée" confirmLabel="Créer la tâche" th={{accent:"#FF8C00"}}
+            {customOpen && <CustomTaskModal title="Nouvelle tâche personnalisée" confirmLabel="Créer la tâche" th={{accent:"#D99248"}}
               onClose={()=>setCustomOpen(false)}
               onCreate={(data)=>{ const id=onAddCustomTask(data); if(id)setAddTaskId(id); setCustomOpen(false); }}/>}
 
@@ -2913,11 +2917,11 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
                     <div style={{display:"flex",gap:6}}>
                       {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#5DECF5":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?"📅 semaine":"⏰ routine"}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#85CDD1":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?"📅 semaine":"⏰ routine"}</span>
                       {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
                     </div>
                   </div>
-                  <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#FF4444",cursor:"pointer",fontSize:16,padding:4}}>×</button>
+                  <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:4}}>×</button>
                 </div>
               );
             })}
@@ -2927,7 +2931,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             {/* 🧹 Ménage : supprimer les tâches qu'un enfant s'est créées */}
             {(config.customTasks||[]).some(t=>t.child) && (
               <div style={{marginTop:14,paddingTop:12,borderTop:"2px solid #333"}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:6}}>🧹 MÉNAGE — TÂCHES PERSO DES ENFANTS</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D99248",marginBottom:6}}>🧹 MÉNAGE — TÂCHES PERSO DES ENFANTS</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:8}}>Supprime d'un coup les tâches qu'un enfant s'est inventées (les vraies tâches du catalogue ne sont pas touchées).</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {players.map((pl,i)=>{ const childTaskIds=new Set((config.customTasks||[]).filter(t=>t.child).map(t=>t.id)); const n=(config.assignments||[]).filter(a=>a.playerIds?.includes(pl.id)&&childTaskIds.has(a.taskId)).length; if(!n) return null;
@@ -2949,7 +2953,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                     {players.map((pl,i)=>(
                       <div key={pl.id} onClick={()=>{setRChildIdx(i);setRTaskIds([]);SFX.click();}}
-                        style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:rChildIdx===i?pl.color:"#1a1a1a",color:rChildIdx===i?"#000":"#666",border:`2px solid ${rChildIdx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                        style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:rChildIdx===i?pl.color:"#1a1a1a",color:rChildIdx===i?"#0d0d0d":"#666",border:`2px solid ${rChildIdx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
                     ))}
                   </div>
                   <input value={rName} onChange={e=>setRName(e.target.value.slice(0,16))} placeholder="Nom du rituel (ex: Matin)"
@@ -2959,7 +2963,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     {childRoutineTasks.map(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null; const sel=rTaskIds.includes(a.instanceId);
                       return (
                         <div key={a.instanceId} onClick={()=>{SFX.click();setRTaskIds(ids=>sel?ids.filter(x=>x!==a.instanceId):[...ids,a.instanceId]);}}
-                          style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:sel?"#1a3a1a":"rgba(0,0,0,0.4)",border:`2px solid ${sel?"#2ECC40":"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                          style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:sel?"#1a3a1a":"rgba(0,0,0,0.4)",border:`2px solid ${sel?"#5CAD68":"#333"}`,borderRadius:4,cursor:"pointer"}}>
                           <span style={{fontSize:15}}>{sel?"✅":t.emoji}</span>
                           <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1}}>{t.label}</span>
                         </div>
@@ -2967,7 +2971,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     })}
                   </div>
                   <PBtn onClick={()=>{ if(rName.trim()&&rTaskIds.length){ onAssignRoutine&&onAssignRoutine(rChildIdx,{name:rName.trim(),emoji:"🌅",taskIds:rTaskIds}); setRName("");setRTaskIds([]); } }}
-                    color={rName.trim()&&rTaskIds.length?"#2ECC40":"#333"} textColor="#000" style={{width:"100%",opacity:rName.trim()&&rTaskIds.length?1:0.5}}>
+                    color={rName.trim()&&rTaskIds.length?"#5CAD68":"#333"} textColor="#0d0d0d" style={{width:"100%",opacity:rName.trim()&&rTaskIds.length?1:0.5}}>
                     🧩 Assigner ce rituel à {child?displayName(child):"…"}
                   </PBtn>
                 </div>
@@ -2996,19 +3000,19 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
                       <div style={{width:8,height:8,borderRadius:"50%",background:pl.color,flexShrink:0}}/>
                       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:pl.color}}>{displayName(pl)}</div>
-                      <div style={{marginLeft:"auto",fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD700"}}>{n}/7 jours ⭐</div>
+                      <div style={{marginLeft:"auto",fontFamily:"'VT323',monospace",fontSize:15,color:"#D9BC5C"}}>{n}/7 jours ⭐</div>
                     </div>
                     <div style={{display:"flex",gap:5,marginBottom:6}}>
                       <input value={draft.emoji} maxLength={2}
                         style={{width:34,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:18,padding:"4px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,textAlign:"center"}}
                         onChange={e=>setDefiDraft(d=>({...d,[pl.id]:{...draft,emoji:e.target.value||"⭐"}}))}/>
                       <input value={draft.text} placeholder="Décris le défi…" maxLength={80}
-                        style={{flex:1,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:`2px solid ${saved?"#333":"#FF8C00"}`,borderRadius:4,outline:"none"}}
+                        style={{flex:1,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:`2px solid ${saved?"#333":"#D99248"}`,borderRadius:4,outline:"none"}}
                         onChange={e=>setDefiDraft(d=>({...d,[pl.id]:{...draft,text:e.target.value}}))}/>
                     </div>
                     {!saved && onUpdateChallenge && (
                       <button onClick={()=>{ onUpdateChallenge(pl.id, draft.text, draft.emoji); setDefiDraft(d=>{const n2={...d}; delete n2[pl.id]; return n2;}); }}
-                        style={{width:"100%",padding:"7px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#000",background:"#FF8C00",border:"2px solid #000",borderRadius:3,cursor:"pointer",marginBottom:6}}>
+                        style={{width:"100%",padding:"7px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#0d0d0d",background:"#D99248",border:"2px solid #0d0d0d",borderRadius:3,cursor:"pointer",marginBottom:6}}>
                         💾 Enregistrer le défi
                       </button>
                     )}
@@ -3017,7 +3021,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                         const d = new Date(cwk+"T12:00:00"); d.setDate(d.getDate()+i);
                         const stamp=d.toISOString().slice(0,10);
                         const done=ch.checkins?.[stamp];
-                        return <div key={stamp} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"3px 4px",background:done?"#1a3a1a":"#111",color:done?"#2ECC40":"#555",border:`1px solid ${done?"#2ECC40":"#333"}`,borderRadius:3}}>J{i+1}{done?" ✓":""}</div>;
+                        return <div key={stamp} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"3px 4px",background:done?"#1a3a1a":"#111",color:done?"#5CAD68":"#555",border:`1px solid ${done?"#5CAD68":"#333"}`,borderRadius:3}}>J{i+1}{done?" ✓":""}</div>;
                       })}
                     </div>}
                   </div>
@@ -3039,20 +3043,20 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         {tab==="actions" && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>ACTIONS GLOBALES</div>
           {/* Boss de famille surprise */}
-          <div style={{background:"rgba(50,18,35,0.4)",border:"2px solid #7B3FF2",borderRadius:6,padding:"10px",marginBottom:12}}>
+          <div style={{background:"rgba(50,18,35,0.4)",border:"2px solid #8F72CC",borderRadius:6,padding:"10px",marginBottom:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#C9B3F7",marginBottom:5}}>🐉 BOSS DE FAMILLE</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#999",marginBottom:8}}>Lance un boss : chaque quête faite donne un jeton d'attaque. La famille l'attaque dans l'onglet ⚔️ BOSS. Choisis sa difficulté (ses PV).</div>
             {bossActive
               ? <PBtn onClick={()=>{}} color="#333" textColor="#fff" style={{width:"100%",opacity:0.6}}>⚔️ Un boss est déjà en cours…</PBtn>
               : <div style={{display:"flex",gap:6}}>
                   {[["facile","Facile"],["moyen","Moyen"],["costaud","Costaud"]].map(([k,l])=>(
-                    <PBtn key={k} onClick={()=>{ onLaunchBoss&&onLaunchBoss(k); }} color="#7B3FF2" textColor="#fff" style={{flex:1}}>{l}</PBtn>
+                    <PBtn key={k} onClick={()=>{ onLaunchBoss&&onLaunchBoss(k); }} color="#8F72CC" textColor="#fff" style={{flex:1}}>{l}</PBtn>
                   ))}
                 </div>}
           </div>
           <Row>
             {undoStack.length>0
-              ? <PBtn onClick={onUndo} color="#FF6464" textColor="#000" style={{flex:1}}>↩️ Annuler dernière</PBtn>
+              ? <PBtn onClick={onUndo} color="#FF6464" textColor="#0d0d0d" style={{flex:1}}>↩️ Annuler dernière</PBtn>
               : <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#444"}}>Rien à annuler</div>}
           </Row>
           <Row>
@@ -3070,15 +3074,15 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 </span>
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                <PBtn onClick={()=>onAdjustXP(i,10)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 XP</PBtn>
-                <PBtn onClick={()=>onAdjustXP(i,25)} color="#1a3a1a" textColor="#2ECC40" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+25 XP</PBtn>
+                <PBtn onClick={()=>onAdjustXP(i,10)} color="#1a3a1a" textColor="#5CAD68" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 XP</PBtn>
+                <PBtn onClick={()=>onAdjustXP(i,25)} color="#1a3a1a" textColor="#5CAD68" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+25 XP</PBtn>
                 <PBtn onClick={()=>onAdjustXP(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 XP</PBtn>
-                <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#FF4444" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 À zéro</PBtn>
+                <PBtn onClick={()=>onResetPlayer(i)} color="#2a0a0a" textColor="#D97070" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🔄 À zéro</PBtn>
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
-                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,10)} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 🪙</PBtn>
-                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,50)} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+50 🪙</PBtn>
-                <PBtn onClick={()=>{const v=parseInt(prompt("Combien de pièces ajouter (ou négatif pour retirer)?","50")||"0",10); if(v)onAdjustCoins&&onAdjustCoins(i,v);}} color="#3a3000" textColor="#FFD700" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🪙 Montant…</PBtn>
+                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,10)} color="#3a3000" textColor="#D9BC5C" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+10 🪙</PBtn>
+                <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,50)} color="#3a3000" textColor="#D9BC5C" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+50 🪙</PBtn>
+                <PBtn onClick={()=>{const v=parseInt(prompt("Combien de pièces ajouter (ou négatif pour retirer)?","50")||"0",10); if(v)onAdjustCoins&&onAdjustCoins(i,v);}} color="#3a3000" textColor="#D9BC5C" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🪙 Montant…</PBtn>
                 <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 🪙</PBtn>
               </div>
             </div>
@@ -3098,16 +3102,16 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>➕ AJOUTER UN ÉVÉNEMENT</div>
               <input value={ceLabel} onChange={e=>setCeLabel(e.target.value.slice(0,50))} placeholder="Ex: Cours de natation, Rendez-vous dentiste…"
-                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #5DECF5",borderRadius:4,marginBottom:8,outline:"none"}}/>
+                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #85CDD1",borderRadius:4,marginBottom:8,outline:"none"}}/>
               <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
                 {[["evenement","📅 Événement"],["devoir","📚 Devoir"],["examen","📝 Examen"],
                   ["sante",CAL_TYPES.sante.label],["sport",CAL_TYPES.sport.label],["intervenant",CAL_TYPES.intervenant.label],["camp",CAL_TYPES.camp.label]].map(([v,l])=>(
-                  <button key={v} onClick={()=>{setCeType(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceType===v?"#5DECF5":"#1a1a1a",color:ceType===v?"#000":"#888",border:`2px solid ${ceType===v?"#5DECF5":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                  <button key={v} onClick={()=>{setCeType(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceType===v?"#85CDD1":"#1a1a1a",color:ceType===v?"#0d0d0d":"#888",border:`2px solid ${ceType===v?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
                 ))}
               </div>
               <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
                 {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>{setCeRecur(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceRecur===v?"#FF8C00":"#1a1a1a",color:ceRecur===v?"#000":"#888",border:`2px solid ${ceRecur===v?"#FF8C00":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                  <button key={v} onClick={()=>{setCeRecur(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceRecur===v?"#D99248":"#1a1a1a",color:ceRecur===v?"#0d0d0d":"#888",border:`2px solid ${ceRecur===v?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
                 ))}
               </div>
               {ceRecur==="none" && <input type="date" value={ceDate} onChange={e=>setCeDate(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none",display:"block"}}/>}
@@ -3115,22 +3119,22 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                 {players.map(pl=>{ const sel=cePlayers.includes(pl.id); return (
-                  <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                  <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
                 ); })}
               </div>
               <PBtn onClick={()=>{ if(ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)){ onAddCalendarEvent&&onAddCalendarEvent(cePlayers,{type:ceType,label:ceLabel.trim(),date:ceRecur==="none"?ceDate:null,recur:ceRecur==="none"?null:(ceRecur==="weekly"?{freq:"weekly",day:ceDay}:{freq:"daily"})}); setCeLabel("");setCeDate(""); } }}
-                color={ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?"#5DECF5":"#333"} textColor="#000" style={{width:"100%",marginBottom:14,opacity:ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?1:0.5}}>➕ Ajouter au calendrier</PBtn>
+                color={ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?"#85CDD1":"#333"} textColor="#0d0d0d" style={{width:"100%",marginBottom:14,opacity:ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?1:0.5}}>➕ Ajouter au calendrier</PBtn>
 
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>CALENDRIER COMMUN</div>
               {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun événement.</div>}
               {allEntries.map(e=>(
-                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#FFD700":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
+                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#D9BC5C":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
                   <span style={{fontSize:16}}>{calEventIcon(e)}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
                     <div style={{display:"flex",gap:6,marginTop:2}}>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.playerColor}}>{e.playerName}</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#FFD700":"#666"}}>{recurLbl(e)}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#D9BC5C":"#666"}}>{recurLbl(e)}</span>
                     </div>
                   </div>
                 </div>
@@ -3142,10 +3146,10 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         {tab==="log" && <>
           {/* 🐛 Bugs signalés par les enfants */}
           {(config.bugs||[]).length>0 && (
-            <div style={{background:"rgba(255,140,0,0.08)",border:"2px solid #FF8C0055",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF8C00",marginBottom:8}}>🐛 BUGS SIGNALÉS ({(config.bugs||[]).length})</div>
+            <div style={{background:"rgba(255,140,0,0.08)",border:"2px solid #D9924855",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D99248",marginBottom:8}}>🐛 BUGS SIGNALÉS ({(config.bugs||[]).length})</div>
               {(config.bugs||[]).map(b=>(
-                <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #FF8C0022"}}>
+                <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #D9924822"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.3}}>{b.text}</div>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888",marginTop:3}}>— {b.who} · {new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
                 </div>
@@ -3171,8 +3175,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
           {/* Changelog de mise à jour */}
           {(config.updateFeedEntries||[]).map((entry,i)=>(
-            <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #5DECF555",borderRadius:6,padding:"10px 12px",marginBottom:8}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:6}}>📖 LIVRE DE QUÊTES v{entry.version} — NOUVELLES PAGES!</div>
+            <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginBottom:8}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:6}}>📖 LIVRE DE QUÊTES v{entry.version} — NOUVELLES PAGES!</div>
               {entry.features.map((f,j)=>(
                 <div key={j} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.4,paddingLeft:8}}>• {f}</div>
               ))}
@@ -3194,11 +3198,11 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           <input type="password" inputMode="numeric" maxLength={4} value={pinVal}
             onChange={e=>setPinVal(e.target.value.replace(/\D/g,"").slice(0,4))}
             placeholder="Nouveau PIN (4 chiffres)"
-            style={{width:"100%",background:"#111",border:"2px solid #FF8C00",color:"#fff",
+            style={{width:"100%",background:"#111",border:"2px solid #D99248",color:"#fff",
               padding:"12px",fontFamily:"'Press Start 2P',monospace",fontSize:18,
               borderRadius:3,textAlign:"center",letterSpacing:8,marginBottom:10}}/>
           <PBtn onClick={()=>{if(pinVal.length===4){onChangePin(pinVal);setPinVal("");}}}
-            color={pinVal.length===4?"#FF8C00":"#333"} textColor="#000" style={{width:"100%",opacity:pinVal.length===4?1:0.5}}>
+            color={pinVal.length===4?"#D99248":"#333"} textColor="#0d0d0d" style={{width:"100%",opacity:pinVal.length===4?1:0.5}}>
             ✓ Confirmer
           </PBtn>
         </>}
@@ -3209,7 +3213,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12,lineHeight:1.4}}>
             Télécharge une copie du livre de quêtes pour le transférer sur un autre appareil ou garder une sauvegarde.
           </div>
-          <PBtn onClick={onExport} color="#1a3a1a" textColor="#2ECC40" style={{width:"100%",marginBottom:10}}>
+          <PBtn onClick={onExport} color="#1a3a1a" textColor="#5CAD68" style={{width:"100%",marginBottom:10}}>
             📤 Télécharger la sauvegarde
           </PBtn>
           <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Restaurer une sauvegarde :</div>
@@ -3346,7 +3350,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
       // Eyes
       ctx.fillStyle = "#fff";
       ctx.fillRect(st.px + 2, st.py - 20, 5, 5);
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = "#0d0d0d";
       ctx.fillRect(st.px + 4, st.py - 19, 3, 3);
 
       // Obstacles (themed cacti/blocks)
@@ -3357,7 +3361,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
       });
 
       // Coins
-      ctx.fillStyle = "#FFD700";
+      ctx.fillStyle = "#D9BC5C";
       st.coins.forEach(c => {
         ctx.beginPath();
         ctx.arc(c.x, c.y, 6, 0, Math.PI * 2);
@@ -3366,7 +3370,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
         ctx.beginPath();
         ctx.arc(c.x - 2, c.y - 2, 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#FFD700";
+        ctx.fillStyle = "#D9BC5C";
       });
 
       // Score & timer
@@ -3399,7 +3403,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
         <div style={{fontSize:36}}>🏃</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>RUNNER!{"\n"}Saute les obstacles, ramasse les pièces!{"\n"}ESPACE ou TAP pour sauter</div>
-        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>COURIR! 🏃</button>
+        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>COURIR! 🏃</button>
       </>)}
 
       {phase === "play" && (
@@ -3411,8 +3415,8 @@ function MiniGameRunner({ pt, level, onFinish }) {
         <div style={{fontSize:36}}>{tier>=4?"🏆":tier>=3?"🥇":tier>=2?"🥈":tier>=1?"🥉":"😅"}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent}}>NIVEAU {level}!</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#fff",marginTop:4}}>PIÈCES: {score} 🪙</div>
-        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#FFD700"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
-        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#D9BC5C"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
       </>)}
     </div>
   );
@@ -3570,7 +3574,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
             ctx.lineWidth = 1;
             ctx.strokeRect(x+1.5, y+1.5, CS-3, CS-3);
           } else if (st.maze[r][c] === 2) {
-            ctx.fillStyle = "#FFD700";
+            ctx.fillStyle = "#D9BC5C";
             ctx.beginPath();
             ctx.arc(x+CS/2, y+CS/2, 3, 0, Math.PI*2);
             ctx.fill();
@@ -3581,7 +3585,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
       // Pac-man (mouth opens/closes)
       const mouthAngle = (Math.floor(now/80) % 2 === 0) ? 0.3 : 0.05;
       const angle = st.pdir.dx===1 ? 0 : st.pdir.dx===-1 ? Math.PI : st.pdir.dy===1 ? Math.PI/2 : -Math.PI/2;
-      ctx.fillStyle = pt.charBodyColor || "#FFD700";
+      ctx.fillStyle = pt.charBodyColor || "#D9BC5C";
       ctx.beginPath();
       ctx.moveTo(st.px*CS+CS/2, st.py*CS+CS/2);
       ctx.arc(st.px*CS+CS/2, st.py*CS+CS/2, CS/2-2, angle+mouthAngle, angle+Math.PI*2-mouthAngle);
@@ -3638,7 +3642,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
         <div style={{fontSize:36}}>👻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>PAC-QUEST!{"\n"}Mange les pellets, évite le fantôme!{"\n"}Flèches ou WASD</div>
-        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 👾</button>
+        <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 👾</button>
       </>)}
 
       {phase === "play" && (<>
@@ -3658,8 +3662,8 @@ function MiniGamePacman({ pt, level, onFinish }) {
         <div style={{fontSize:36}}>{tier>=4?"🏆":tier>=3?"🥇":tier>=2?"🥈":tier>=1?"🥉":"😅"}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent}}>NIVEAU {level}!</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#fff"}}>PELLETS: {score}/{total}</div>
-        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#FFD700"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
-        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+        {bonusXp>0&&<div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#D9BC5C"}}>+{bonusXp} XP  +{bonusCoins} 🪙</div>}
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
       </>)}
     </div>
   );
@@ -3727,7 +3731,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
         <div style={{fontSize:40}}>{TARGET}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent,textAlign:"center",textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>Mini-jeu!{"\n"}Tape les {TARGET} le plus vite possible!</div>
-        <button onClick={start} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8,boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 🎮</button>
+        <button onClick={start} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8,boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 🎮</button>
       </>)}
 
       {phase === "play" && (<>
@@ -3747,9 +3751,9 @@ function MiniGameWhack({ pt, level, onFinish }) {
         <div style={{fontSize:48}}>{medal}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:14,color:pt.accent,letterSpacing:3}}>{stars}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#ddd"}}>{msg}</div>
-        {bonusXp > 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD700",textShadow:"0 0 8px #FFD700"}}>+{bonusXp} XP · +{bonusCoins} 🪙</div>}
+        {bonusXp > 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#D9BC5C",textShadow:"0 0 8px #D9BC5C"}}>+{bonusXp} XP · +{bonusCoins} 🪙</div>}
         {bonusXp === 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555"}}>Pas de bonus cette fois...</div>}
-        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 24px",background:pt.primary,color:"#000",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
+        <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
       </>)}
     </div>
   );
@@ -3800,7 +3804,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
   if (phase === "choice") {
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:24,textAlign:"center",overflowY:"auto"}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#D9BC5C"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.4vw,20px)",color:"#fff"}}>Choisis ton mini-jeu! 🎮</div>
         {MINIGAME_LIST.map(g => (
           <button key={g} onClick={()=>{SFX.click&&SFX.click();setType(g);setPhase("intro");}}
@@ -3818,14 +3822,14 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
   if (phase === "intro") {
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:18,padding:24,textAlign:"center",overflowY:"auto"}}>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#FFD700"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:"#D9BC5C"}}>{isGift ? "🎁 CADEAU SURPRISE!" : `🎉 NIVEAU ${level} ATTEINT!`}</div>
         <div style={{fontSize:64,lineHeight:1}}>{INFO.icon}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:pt.accent,textShadow:`0 0 14px ${pt.glow}80`}}>{INFO.name}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.6vw,21px)",color:"#fff",maxWidth:380,lineHeight:1.35}}>{INFO.how}</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#FFD700"}}>🏆 Paliers de récompense :</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#D9BC5C"}}>🏆 Paliers de récompense :</div>
         {minigameTierRow(type)}
         <button onClick={()=>{SFX.click&&SFX.click();setCount(3);setPhase("countdown");}}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",padding:"16px 30px",background:pt.accent,color:"#000",border:"4px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"5px 5px 0 #000",marginTop:6}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",padding:"16px 30px",background:pt.accent,color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"5px 5px 0 #0d0d0d",marginTop:6}}>
           ✅ JE SUIS PRÊT!
         </button>
         {!forced && <button onClick={()=>{SFX.click&&SFX.click();setPhase("choice");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#1a1a1a",color:pt.accent,border:`2px solid ${pt.accent}`,cursor:"pointer",borderRadius:3}}>🔀 Changer de jeu</button>}
@@ -3837,7 +3841,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
         <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#aaa"}}>{INFO.icon} {INFO.name}</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#2ECC40",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#5CAD68",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
           {count>0 ? count : "GO!"}
         </div>
       </div>
@@ -3932,7 +3936,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
   const cidx = lockChild?sessionPlayer:childIdx;
   const child=config.players[cidx]; const routines=(gameStates[cidx]?.routines)||[];
   const ritual=routines.find(r=>r.id===ritualId);
-  const acc=th.accent||(child?.color)||"#FFD700";
+  const acc=th.accent||(child?.color)||"#D9BC5C";
   // v1.68.0 (B4) — les TÂCHES du rituel, pour les cocher pendant le minuteur (avant : on n'y avait pas accès)
   const _allT=[...TASK_CATALOG, ...((config&&config.customTasks)||[])];
   const _pid=child?.id;
@@ -3945,10 +3949,10 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
       {ritualTasks.map(({iid,ass,t})=>{ const st=_taskStatus(iid); return (
         <div key={iid} style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:18}}>{t.emoji}</span>
-          <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,color:st==="done"?"#2ECC40":"#eee",textDecoration:st?"line-through":"none",opacity:st?0.65:1}}>{t.label}</span>
-          {st==="done" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#2ECC40"}}>✅</span>
+          <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,color:st==="done"?"#5CAD68":"#eee",textDecoration:st?"line-through":"none",opacity:st?0.65:1}}>{t.label}</span>
+          {st==="done" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✅</span>
            : st==="pending" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFC107"}}>⏳ attente</span>
-           : <button onClick={()=>{ SFX.click&&SFX.click(); onCompleteTask&&onCompleteTask(ass,_pid); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"7px 10px",background:"#2ECC40",color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer"}}>Fait!</button>}
+           : <button onClick={()=>{ SFX.click&&SFX.click(); onCompleteTask&&onCompleteTask(ass,_pid); }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"7px 10px",background:"#5CAD68",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer"}}>Fait!</button>}
         </div> ); })}
     </div>
   ) : null;
@@ -3969,7 +3973,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
     <div style={{padding:"12px 10px",display:"flex",flexDirection:"column",gap:12}}>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:acc}}>⏱ MINUTERIE</div>
       {!lockChild && <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-        {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);setTimeUp(false);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#000":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
+        {config.players.map((pl,i)=>(<div key={pl.id} onClick={()=>{setChildIdx(i);setRitualId(null);setStartTs(null);setTimeUp(false);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:cidx===i?pl.color:"#1a1a1a",color:cidx===i?"#0d0d0d":"#666",border:`2px solid ${cidx===i?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>))}
       </div>}
 
       {!startTs && (<>
@@ -3977,7 +3981,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         <div style={{display:"flex",gap:6}}>
           {[["deadline","🕐 Heure de fin"],["down","⏳ Minutes"],["up","⏱ Chrono"]].map(([k,l])=>(
             <button key={k} onClick={()=>{setMode(k);SFX.click();}}
-              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.85vw,7px)",padding:"11px 4px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#000":"#999",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{l}</button>
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.85vw,7px)",padding:"11px 4px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#0d0d0d":"#999",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:6,cursor:"pointer"}}>{l}</button>
           ))}
         </div>
         {/* Quelle tâche on chronomètre (libre) */}
@@ -3986,10 +3990,10 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"9px 11px",background:"#111",color:"#fff",border:`2px solid ${ritualId?"#333":acc}`,borderRadius:6,outline:"none"}}/>
         {routines.length>0 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",alignSelf:"center"}}>ou un rituel (donne de l'XP 🎁) :</span>
-          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");if(r.endTime){setMode("deadline");setEndTime(r.endTime);}SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#000":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}{r.endTime?` · ${r.endTime.replace(":","h")}`:""}</button>))}
+          {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");if(r.endTime){setMode("deadline");setEndTime(r.endTime);}SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#0d0d0d":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}{r.endTime?` · ${r.endTime.replace(":","h")}`:""}</button>))}
         </div>}
         {/* Rappel clair : outil vs rituel */}
-        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:ritual?"#2ECC40":"#888",lineHeight:1.3,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"6px 9px"}}>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:ritual?"#5CAD68":"#888",lineHeight:1.3,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"6px 9px"}}>
           {ritual ? `🎁 Rituel « ${ritual.name} » : le réussir dans les temps donne de l'XP!` : "🛠️ Minuterie libre : c'est juste un outil pour t'aider — pas de récompense. Choisis un rituel ci-dessus pour gagner de l'XP."}
         </div>
         {/* v1.68.0 (B4) — les tâches du rituel, cochables ici même */}
@@ -3999,7 +4003,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginTop:2}}>Combien de minutes? <b style={{color:acc}}>{targetMin} min</b></div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
             {[1,2,5,10,15,20].map(v=>(
-              <button key={v} onClick={()=>{setTargetMin(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:targetMin===v?acc:"#1a1a1a",color:targetMin===v?"#000":acc,border:`2px solid ${acc}`,borderRadius:5,cursor:"pointer"}}>{v}</button>
+              <button key={v} onClick={()=>{setTargetMin(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:targetMin===v?acc:"#1a1a1a",color:targetMin===v?"#0d0d0d":acc,border:`2px solid ${acc}`,borderRadius:5,cursor:"pointer"}}>{v}</button>
             ))}
             <input type="number" min="1" max="120" value={targetMin} onChange={e=>setTargetMin(Math.max(1,Math.min(120,parseInt(e.target.value)||1)))}
               style={{width:60,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none",textAlign:"center"}}/>
@@ -4010,7 +4014,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginTop:2}}>À quelle heure tu dois être prêt? <b style={{color:acc}}>{endTime.replace(":","h")}</b></div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
             {["07:00","07:30","08:00"].map(v=>(
-              <button key={v} onClick={()=>{setEndTime(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:endTime===v?acc:"#1a1a1a",color:endTime===v?"#000":acc,border:`2px solid ${acc}`,borderRadius:5,cursor:"pointer"}}>{v.replace(":","h")}</button>
+              <button key={v} onClick={()=>{setEndTime(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:endTime===v?acc:"#1a1a1a",color:endTime===v?"#0d0d0d":acc,border:`2px solid ${acc}`,borderRadius:5,cursor:"pointer"}}>{v.replace(":","h")}</button>
             ))}
             <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value||"07:30")}
               style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none"}}/>
@@ -4018,27 +4022,27 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Le minuteur va compter jusqu'à cette heure. À 5 minutes : « Let's go! » 🚀</div>
         </>}
         <button onClick={start}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
           ▶️ {mode==="deadline"?`Partir (jusqu'à ${endTime.replace(":","h")})`:mode==="down"?`Partir (${targetMin} min)`:"Partir le chrono"}
         </button>
       </>)}
 
       {startTs && !timeUp && (<>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:acc,textAlign:"center"}}>{ritual?`${ritual.emoji||"⏰"} ${ritual.name}`:`⏳ ${taskName()}`}{mode==="deadline"?` — jusqu'à ${endTime.replace(":","h")}`:""}</div>
-        {mode==="deadline" && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:urgent5?"#FF6B6B":"#bbb",textAlign:"center"}}>il reste <b>{Math.ceil(remaining/60000)}</b> min</div>}
+        {mode==="deadline" && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:urgent5?"#D98C8C":"#bbb",textAlign:"center"}}>il reste <b>{Math.ceil(remaining/60000)}</b> min</div>}
         {/* v1.88.0 (Lot 3 #13) — disque visuel, seulement quand on a une vraie durée totale (pas en chrono libre) */}
         {(mode==="down"||mode==="deadline") && (()=>{ const totalMs = mode==="down" ? targetMin*60000 : Math.max(1,deadlineMs-(startTs||0)); return (
           <TimeTimerDisc progress={remaining/totalMs} color={acc} urgent={lowTime}/>
         ); })()}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:lowTime?"#FF6B6B":urgent5?"#FFA94D":"#fff",textAlign:"center",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
-        {mode==="down" && <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:Math.round(remaining/(targetMin*60000)*100)+"%",background:lowTime?"#FF6B6B":acc,transition:"width 0.25s linear"}}/></div>}
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(34px,9vw,64px)",color:lowTime?"#D98C8C":urgent5?"#FFA94D":"#fff",textAlign:"center",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{String(mm).padStart(2,"0")}:{String(ss).padStart(2,"0")}</div>
+        {mode==="down" && <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:Math.round(remaining/(targetMin*60000)*100)+"%",background:lowTime?"#D98C8C":acc,transition:"width 0.25s linear"}}/></div>}
         {urgent5
           ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,15px)",color:"#FFA94D",textAlign:"center",animation:"pulse 0.7s infinite"}}>🚀 LET'S GO! Plus que {Math.ceil(remaining/60000)} min!</div>
           : <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(elapsed/20000)%TIMER_ENCOURAGE.length]}</div>}
         {/* v1.68.0 (B4) — coche les tâches du rituel pendant que le minuteur tourne */}
         {ritualChecklistEl}
         <button onClick={succeed}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🎉 J'ai réussi!</button>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🎉 J'ai réussi!</button>
         <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
       </>)}
 
@@ -4046,7 +4050,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,16px)",color:acc,textAlign:"center"}}>⏰ Temps écoulé!</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#ddd",textAlign:"center",lineHeight:1.3}}>As-tu réussi « {taskName()} »?</div>
         <button onClick={succeed}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>🎉 Oui, réussi!</button>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🎉 Oui, réussi!</button>
         <button onClick={fail}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",background:"#1a1a1a",color:"#FFA94D",border:"2px solid #FFA94D55",borderRadius:8,cursor:"pointer"}}>😅 Oups, prochaine fois (pas de récompense)</button>
       </>)}
@@ -4190,7 +4194,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
 
   const player = selIdx !== null ? config.players[selIdx] : null;
   const ps = selIdx !== null ? (gameStates[selIdx] || {}) : {};
-  const accentColor = player?.color || "#FFD700";
+  const accentColor = player?.color || "#D9BC5C";
 
   const BtnBack = ({onClick, label="← Retour"}) => (
     <button onClick={()=>{SFX.click();onClick();}} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#444",background:"none",border:"none",cursor:"pointer",marginTop:8}}>{label}</button>
@@ -4199,16 +4203,16 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
   return (
     <div style={{minHeight:"100vh",background:"#0d0d0d",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <style>{GLOBAL_CSS}</style>
-      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#5DECF520 0%,transparent 60%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#85CDD120 0%,transparent 60%)",pointerEvents:"none"}}/>
 
       {/* ── Écran 1 : Tu es...? ── */}
       {mode === "who" && (
         <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:24,color:"#666",marginBottom:36}}>Tu es...?</div>
           <div style={{display:"flex",gap:16,justifyContent:"center"}}>
-            {[["🧒","Enfant","#5DECF5",()=>{SFX.click();setMode("child-select");}],
-              ["👨‍👩","Parent","#FF8C00",()=>{SFX.click();setMode("parent");setPpPin("");setPinError(false);}]
+            {[["🧒","Enfant","#85CDD1",()=>{SFX.click();setMode("child-select");}],
+              ["👨‍👩","Parent","#D99248",()=>{SFX.click();setMode("parent");setPpPin("");setPinError(false);}]
             ].map(([icon,label,color,fn])=>(
               <button key={label} onClick={fn}
                 style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"20px 22px",background:"rgba(0,0,0,0.7)",color,border:`3px solid ${color}`,borderRadius:10,cursor:"pointer",lineHeight:2.2,minWidth:120,transition:"all 0.15s"}}
@@ -4231,12 +4235,12 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
       {mode === "info" && (
         <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:0}}>
           <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,2.2vw,13px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:6}}>⚔️ MON LIVRE DE QUÊTES</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,2.2vw,13px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:6}}>⚔️ MON LIVRE DE QUÊTES</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#888"}}>Ton guide d'aventurier·ère</div>
           </div>
 
           <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#5DECF5",marginBottom:8}}>💡 C'est quoi cette appli?</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#85CDD1",marginBottom:8}}>💡 C'est quoi cette appli?</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.5}}>
               Tu fais des tâches dans la vraie vie, et ici tu gagnes des XP et des pièces! Monte de niveau, choisis ton thème, débloque des badges et échange tes pièces contre de vraies récompenses. C'est comme un jeu vidéo, mais les points sont vrais. 🎮
             </div>
@@ -4255,17 +4259,17 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             <div key={title} style={{display:"flex",gap:12,background:"rgba(0,0,0,0.35)",border:"1px solid #222",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
               <span style={{fontSize:22,flexShrink:0,marginTop:2}}>{icon}</span>
               <div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginBottom:4}}>{title}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginBottom:4}}>{title}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#aaa",lineHeight:1.45}}>{desc}</div>
               </div>
             </div>
           ))}
 
-          <div style={{background:"rgba(93,236,245,0.07)",border:"2px solid #5DECF544",borderRadius:10,padding:"12px 16px",marginTop:4,marginBottom:4}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:8}}>⚡ COMMENT GAGNER PLUS D'XP?</div>
+          <div style={{background:"rgba(93,236,245,0.07)",border:"2px solid #85CDD144",borderRadius:10,padding:"12px 16px",marginTop:4,marginBottom:4}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:8}}>⚡ COMMENT GAGNER PLUS D'XP?</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.7}}>
               📋 Faire tes quêtes du jour (surtout les épiques!)<br/>
-              🔥 Garder un <span style={{color:"#FFD700"}}>streak</span> — plusieurs jours de suite<br/>
+              🔥 Garder un <span style={{color:"#D9BC5C"}}>streak</span> — plusieurs jours de suite<br/>
               📅 Valider tes devoirs et examens dans le calendrier<br/>
               🎮 Faire un score parfait au mini-jeu de niveau<br/>
               🏅 Débloquer de nouveaux badges
@@ -4275,8 +4279,8 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
           <div style={{textAlign:"center",marginTop:4,marginBottom:8}}>
             <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#333",marginBottom:12}}>v{APP_VERSION}</div>
             <button onClick={()=>{SFX.click();setMode("who");}}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 24px",background:"rgba(0,0,0,0.7)",color:"#FFD700",border:"3px solid #FFD700",borderRadius:8,cursor:"pointer",transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 0 16px #FFD70055";}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 24px",background:"rgba(0,0,0,0.7)",color:"#D9BC5C",border:"3px solid #D9BC5C",borderRadius:8,cursor:"pointer",transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 0 16px #D9BC5C55";}}
               onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
               ← RETOUR
             </button>
@@ -4287,7 +4291,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
       {/* ── Écran 2 : Qui es-tu? ── */}
       {mode === "child-select" && (
         <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#FFD700",textShadow:"3px 3px 0 #000,0 0 20px #FFD70080",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#666",marginBottom:20}}>Qui es-tu?</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
             {(config?.players||[]).map((pl, i) => {
@@ -4300,7 +4304,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
                   <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(pl.themeId).charBodyColor||pl.color} size={36}/>
                   <span style={{flex:1,textAlign:"left"}}>{pl.name}</span>
-                  {isNew && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#2ECC40",fontWeight:"bold"}}>NOUVEAU ✨</span>}
+                  {isNew && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#5CAD68",fontWeight:"bold"}}>NOUVEAU ✨</span>}
                   {!isNew && psi.pin && <span style={{color:"#444",fontSize:12}}>🔑</span>}
                 </button>
               );
@@ -4342,7 +4346,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
               </div>
               {draftTheme && (
                 <button onClick={()=>{SFX.click();setObStep("avatar");}}
-                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer"}}>
                   Continuer →
                 </button>
               )}
@@ -4363,7 +4367,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
               <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:10,flexWrap:"wrap"}}>
                 {[["hair","Cheveux"],["skin","Peau"],["eyes","Yeux"],["mouth","Bouche"]].map(([k,l])=>(
                   <button key={k} onClick={()=>{setAvatarTab(k);SFX.click();}}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:avatarTab===k?accentColor:"#1a1a1a",color:avatarTab===k?"#000":"#666",border:`2px solid ${avatarTab===k?accentColor:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:avatarTab===k?accentColor:"#1a1a1a",color:avatarTab===k?"#0d0d0d":"#666",border:`2px solid ${avatarTab===k?accentColor:"#333"}`,borderRadius:3,cursor:"pointer"}}>
                     {l}
                   </button>
                 ))}
@@ -4374,7 +4378,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                     {AVATAR_PARTS.hair.map(h=>(
                       <div key={h.id} onClick={()=>{setDraftAvatar(a=>({...a,hair:h.id}));SFX.click();}}
                         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"6px 4px",background:draftAvatar.hair===h.id?`${h.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.hair===h.id?h.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
-                        <div style={{width:24,height:12,background:h.color,borderRadius:"3px 3px 0 0",border:"1px solid #000"}}/>
+                        <div style={{width:24,height:12,background:h.color,borderRadius:"3px 3px 0 0",border:"1px solid #0d0d0d"}}/>
                         <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{h.label}</span>
                       </div>
                     ))}
@@ -4385,7 +4389,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                     {AVATAR_PARTS.skin.map(s=>(
                       <div key={s.id} onClick={()=>{setDraftAvatar(a=>({...a,skin:s.id}));SFX.click();}}
                         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"6px 4px",background:draftAvatar.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${draftAvatar.skin===s.id?s.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
-                        <div style={{width:24,height:24,background:s.color,borderRadius:3,border:"1px solid #000"}}/>
+                        <div style={{width:24,height:24,background:s.color,borderRadius:3,border:"1px solid #0d0d0d"}}/>
                         <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#ccc"}}>{s.label}</span>
                       </div>
                     ))}
@@ -4415,7 +4419,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                 )}
               </div>
               <button onClick={()=>{SFX.click();setObStep("pseudo");}}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer"}}>
                 Continuer →
               </button>
               <div><BtnBack onClick={()=>setObStep("theme")}/></div>
@@ -4437,7 +4441,7 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
                 style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 16px",background:"rgba(0,0,0,0.7)",color:accentColor,border:`3px solid ${accentColor}`,borderRadius:6,width:"100%",textAlign:"center",outline:"none",marginBottom:20,boxSizing:"border-box"}}
               />
               <button onClick={()=>{SFX.click();setObStep("pin-create");setObPin("");setObFirstPin("");}}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 28px",background:accentColor,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer"}}>
                 Continuer →
               </button>
               <div><BtnBack onClick={()=>setObStep("avatar")}/></div>
@@ -4485,22 +4489,22 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
             onClose={()=>{ if(confirmStepRef.current){confirmStepRef.current=false;setConfirmStep(false);firstPinRef.current="";setFirstPin("");pPinRef.current="";setPPin("");}else{setMode("child-select");setSelIdx(null);} }}
             onSubmit={pPin.length===4?doPlayerSubmit:undefined}
           />
-          {pPin.length===4&&<button onClick={doPlayerSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:accentColor,color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
+          {pPin.length===4&&<button onClick={doPlayerSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:accentColor,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
       )}
 
       {/* ── PIN parent ── */}
       {mode === "parent" && (
-        <div style={{background:"rgba(0,0,0,0.85)",border:"3px solid #FF8C00",borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FF8C00",marginBottom:16}}>🔐 PIN PARENT</div>
-          <PinDots value={ppPin} error={pinError} color="#FF8C00"/>
+        <div style={{background:"rgba(0,0,0,0.85)",border:"3px solid #D99248",borderRadius:12,padding:"24px 28px",textAlign:"center",maxWidth:300,width:"100%"}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D99248",marginBottom:16}}>🔐 PIN PARENT</div>
+          <PinDots value={ppPin} error={pinError} color="#D99248"/>
           <PinKeypad
             onDigit={handleParentDigit}
             onBack={()=>{ ppPinRef.current=ppPinRef.current.slice(0,-1); setPpPin(ppPinRef.current); }}
             onClose={()=>{setMode("who");setPpPin("");setPinError(false);}}
             onSubmit={ppPin.length===4?doParentSubmit:undefined}
           />
-          {ppPin.length===4&&<button onClick={doParentSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:"#FF8C00",color:"#000",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
+          {ppPin.length===4&&<button onClick={doParentSubmit} style={{marginTop:10,width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"10px 0",background:"#D99248",color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer"}}>✅ VALIDER</button>}
         </div>
       )}
 
@@ -4751,7 +4755,7 @@ export default function App() {
   },[config?.weeklyChallenge]);
 
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
-  const logAction = useCallback((msg,color="#FF8C00")=>{
+  const logAction = useCallback((msg,color="#D99248")=>{
     const entry={time:new Date().toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"}),msg,color};
     setActionLog(l=>[entry,...l.slice(0,19)]);
   },[]);
@@ -4778,7 +4782,7 @@ export default function App() {
     const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
-    showToast("📨 Envoyée à tes parents pour validation!","#5DECF5",3500);
+    showToast("📨 Envoyée à tes parents pour validation!","#85CDD1",3500);
   },[config,gameStates,persist,showToast]);
 
   // Retrouve la tâche (catalogue, perso ou calendrier) derrière un doneKey
@@ -4847,10 +4851,10 @@ export default function App() {
       setConfig(newCfg);
       persist(newCfg,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
-      showToast(`✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#2ECC40",4000);
+      showToast(`✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#5CAD68",4000);
       return n;
     });
-    logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#2ECC40");
+    logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#5CAD68");
   },[config,persist,resolvePendingTask,logAction,showToast]);
 
   // v1.64.0 — l'enfant « archive » (efface) un message de refus
@@ -4869,8 +4873,8 @@ export default function App() {
         refusedKeys:[...new Set([...(p.refusedKeys||[]), doneKey])].slice(-400), // tombstone → ne revient plus au portail parent
         refusals:[...(p.refusals||[]).filter(r=>r.key!==doneKey), refusal].slice(-10) }; // message drôle pour l'enfant
       persist(config,n); return n; });
-    logAction(`✗ Refusé: ${displayName(player)} — ${task?.label||doneKey}`,"#FF8C00");
-    showToast(`✗ Demande refusée`,"#FF8C00");
+    logAction(`✗ Refusé: ${displayName(player)} — ${task?.label||doneKey}`,"#D99248");
+    showToast(`✗ Demande refusée`,"#D99248");
   },[config,persist,resolvePendingTask,logAction,showToast]);
 
   // Mini-game ended — apply bonus then show reward popup
@@ -4885,7 +4889,7 @@ export default function App() {
         persist(config,n);
         return n;
       });
-      showToast(`🎮 Bonus mini-jeu! +${bonusXp} XP · +${bonusCoins} 🪙`,"#FFD700",4000);
+      showToast(`🎮 Bonus mini-jeu! +${bonusXp} XP · +${bonusCoins} 🪙`,"#D9BC5C",4000);
     }
     setRewardPopup(pendingReward);
   },[miniGame,config,persist,showToast]);
@@ -4938,7 +4942,7 @@ export default function App() {
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
     // v1.84.0 (Lot 1 #B3) — magasiner coûte de l'énergie (frein "plaisir", jamais les corvées)
     const p0=gameStates[idx];
-    if(currentEnergy(p0)<SHOP_ENERGY){ const m=minsToEnergy(p0,SHOP_ENERGY); showToast(`😴 Ton héros se repose… la boutique rouvre dans ~${m} min!`,"#5DECF5",3500); return; }
+    if(currentEnergy(p0)<SHOP_ENERGY){ const m=minsToEnergy(p0,SHOP_ENERGY); showToast(`😴 Ton héros se repose… la boutique rouvre dans ~${m} min!`,"#85CDD1",3500); return; }
     setGameStates(gs=>{
       const p=gs[idx];
       const isReward=!item.slot;
@@ -4947,7 +4951,7 @@ export default function App() {
       SFX.buy();
       const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
       persist(config,n);
-      showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#FFD700");
+      showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#D9BC5C");
       spawnParticles(item.emoji||"🎉");
       return n;
     });
@@ -4961,7 +4965,7 @@ export default function App() {
   const handleEquip = useCallback((item,playerId)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
     setGameStates(gs=>{ const n=[...gs]; n[idx]={...n[idx],equipped:{...(n[idx].equipped||{}),[item.slot]:item.id}}; persist(config,n); return n; });
-    showToast(`✅ ${item.emoji} équipé!`,"#2ECC40");
+    showToast(`✅ ${item.emoji} équipé!`,"#5CAD68");
   },[config,persist,showToast]);
 
   // ── Parent mode actions ──────────────────────────────────
@@ -4974,23 +4978,23 @@ export default function App() {
       n[playerIdx]={...p, xp:Math.max(0,p.xp-(task?.xp||0)), coins:Math.max(0,p.coins-(task?.coins||0)),
         completed:(p.completed||[]).filter(k=>k!==doneKey)};
       persist(config,n); return n; });
-    logAction(`↩️ ${player?.name}: tâche annulée (${task?.label||doneKey})`,"#FF8C00");
-    showToast(`↩️ Tâche annulée pour ${player?.name}`,"#FF8C00");
+    logAction(`↩️ ${player?.name}: tâche annulée (${task?.label||doneKey})`,"#D99248");
+    showToast(`↩️ Tâche annulée pour ${player?.name}`,"#D99248");
   },[config,persist,logAction,showToast]);
 
   const handleAdjustXP = useCallback((playerIdx, delta) => {
     const player = config.players[playerIdx];
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],xp:Math.max(0,n[playerIdx].xp+delta),coins:Math.max(0,n[playerIdx].coins+(delta>0?Math.abs(Math.floor(delta/2)):0))}; persist(config,n); return n; });
-    logAction(`${delta>0?"+":""}${delta} XP → ${player?.name}`,"#5DECF5");
-    showToast(`${delta>0?"+":""}${delta} XP pour ${player?.name}`,"#5DECF5");
+    logAction(`${delta>0?"+":""}${delta} XP → ${player?.name}`,"#85CDD1");
+    showToast(`${delta>0?"+":""}${delta} XP pour ${player?.name}`,"#85CDD1");
   },[config,persist,logAction,showToast]);
 
   // Ajuster les pièces seulement (ex: rembourser une récompense)
   const handleAdjustCoins = useCallback((playerIdx, delta) => {
     const player = config.players[playerIdx];
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],coins:Math.max(0,(n[playerIdx].coins||0)+delta)}; persist(config,n); return n; });
-    logAction(`${delta>0?"+":""}${delta} 🪙 → ${player?.name}`,"#FFD700");
-    showToast(`${delta>0?"+":""}${delta} 🪙 pour ${player?.name}`,"#FFD700");
+    logAction(`${delta>0?"+":""}${delta} 🪙 → ${player?.name}`,"#D9BC5C");
+    showToast(`${delta>0?"+":""}${delta} 🪙 pour ${player?.name}`,"#D9BC5C");
   },[config,persist,logAction,showToast]);
 
   const handleForceComplete = useCallback((ass, playerId) => {
@@ -5006,8 +5010,8 @@ export default function App() {
         completed:[...new Set([...(p.completed||[]),doneKey])],
         pending:(p.pending||[]).filter(k=>k!==doneKey)};
       persist(config,n); return n; });
-    logAction(`✅ Override: ${player?.name} — ${task.label}`,"#2ECC40");
-    showToast(`✅ Tâche forcée pour ${player?.name}`,"#2ECC40");
+    logAction(`✅ Override: ${player?.name} — ${task.label}`,"#5CAD68");
+    showToast(`✅ Tâche forcée pour ${player?.name}`,"#5CAD68");
     spawnParticles(task.emoji);
   },[config,persist,logAction,showToast]);
 
@@ -5021,8 +5025,8 @@ export default function App() {
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
-    logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#2ECC40");
-    showToast("➕ Tâche ajoutée!","#2ECC40");
+    logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#5CAD68");
+    showToast("➕ Tâche ajoutée!","#5CAD68");
   },[config,gameStates,persist,logAction,showToast]);
 
   // Lance un boss de famille — le parent choisit la difficulté (PV du boss)
@@ -5037,7 +5041,7 @@ export default function App() {
     const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:boss.emoji,text:`⚔️ Un ${boss.name} (${diff.label}, ${hpMax} PV) apparaît! Faites des quêtes pour l'attaquer dans l'onglet BOSS!`};
     const newCfg={...config, boss, feed:[fe,...(config.feed||[])].slice(0,60)};
     setConfig(newCfg); persist(newCfg, gameStates);
-    showToast(`${boss.emoji} ${boss.name} apparaît! Battez-le en famille!`,"#FF6B6B",4500);
+    showToast(`${boss.emoji} ${boss.name} apparaît! Battez-le en famille!`,"#D98C8C",4500);
   },[config,gameStates,persist,showToast]);
 
   // Attaque du boss : dépense des jetons (gagnés en faisant des quêtes) → enlève des PV
@@ -5061,8 +5065,8 @@ export default function App() {
       const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#FFD700",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#FF6B6B",locked?3600:2200); },60); }
+      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#D98C8C",locked?3600:2200); },60); }
       return n;
     });
   },[persist,showToast]);
@@ -5071,14 +5075,14 @@ export default function App() {
   const handleBossPetAttack = useCallback((playerIdx)=>{
     const boss = cfgRef.current?.boss; if(!boss || boss.defeatedAt) return;
     const p0 = gameStates[playerIdx]; const petId = p0?.equipped?.pet;
-    if(!petId){ showToast("Équipe un familier pour qu'il attaque! 🐾","#FF8C00",2800); return; }
-    if(p0.lastFedDay!==todayStamp()){ showToast("Ton familier a faim — nourris-le pour qu'il se batte! 🍖","#FF8C00",3000); return; }
+    if(!petId){ showToast("Équipe un familier pour qu'il attaque! 🐾","#D99248",2800); return; }
+    if(p0.lastFedDay!==todayStamp()){ showToast("Ton familier a faim — nourris-le pour qu'il se batte! 🍖","#D99248",3000); return; }
     const petLv = petLevel((p0.petXp||{})[petId]||0);
-    if(petLv<4){ showToast("Ton familier est trop jeune pour se battre (niv. 4) 🐣","#FF8C00",3000); return; }
+    if(petLv<4){ showToast("Ton familier est trop jeune pour se battre (niv. 4) 🐣","#D99248",3000); return; }
     const bid = boss.startedAt;
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
       const bb=(p.bossBattle&&p.bossBattle.bossId===bid)?p.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
-      if((bb.earned-bb.spent) < PET_ATTACK_COST){ setTimeout(()=>showToast(`Il faut ${PET_ATTACK_COST} jetons (fais des quêtes) pour lancer ton familier!`,"#FF8C00",3000),0); return gs; }
+      if((bb.earned-bb.spent) < PET_ATTACK_COST){ setTimeout(()=>showToast(`Il faut ${PET_ATTACK_COST} jetons (fais des quêtes) pour lancer ton familier!`,"#D99248",3000),0); return gs; }
       const mod = bossModifierOfDay(bid); const legend = petIsLegendary((p.petEvo||{})[petId], petLv);
       const dmg = petAttackDamage(petLv, legend, mod);
       const newBB={...bb, spent:bb.spent+PET_ATTACK_COST, dmg:bb.dmg+dmg};
@@ -5093,8 +5097,8 @@ export default function App() {
       const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#FFD700",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#FFD700",locked?3600:2800); },60); }
+      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#D9BC5C",locked?3600:2800); },60); }
       return n;
     });
   },[gameStates,persist,showToast]);
@@ -5103,8 +5107,8 @@ export default function App() {
   const handleAssignRoutine = useCallback((playerIdx, routine)=>{
     if(playerIdx==null||!routine?.name?.trim()||!(routine.taskIds||[]).length)return;
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; const r={id:"rt_"+uid(), emoji:"🌅", endTime:"", ...routine, name:routine.name.trim()}; n[playerIdx]={...p, routines:[...(p.routines||[]), r]}; persist(config,n); return n; });
-    logAction(`🧩 Routine « ${routine.name.trim()} » assignée à ${config.players[playerIdx]?.name||""}`,"#2ECC40");
-    showToast("✅ Routine assignée à l'enfant!","#2ECC40");
+    logAction(`🧩 Routine « ${routine.name.trim()} » assignée à ${config.players[playerIdx]?.name||""}`,"#5CAD68");
+    showToast("✅ Routine assignée à l'enfant!","#5CAD68");
   },[config,persist,logAction,showToast]);
 
   const handleRemoveAssignment = useCallback((instanceId)=>{
@@ -5115,8 +5119,8 @@ export default function App() {
       assignments:(config.assignments||[]).filter(a=>a.instanceId!==instanceId),
       removedAssignments:_uniq([...(config.removedAssignments||[]), instanceId]).slice(-800)};
     setConfig(newCfg); persist(newCfg,gameStates);
-    logAction(`🗑️ Tâche retirée: ${task?.label||instanceId}`,"#FF8C00");
-    showToast("🗑️ Tâche retirée","#FF8C00");
+    logAction(`🗑️ Tâche retirée: ${task?.label||instanceId}`,"#D99248");
+    showToast("🗑️ Tâche retirée","#D99248");
   },[config,gameStates,persist,logAction,showToast]);
 
   // v1.83.0 (Lot 1 #B6) — l'enfant DEMANDE à retirer une tâche (pas de suppression directe :
@@ -5127,7 +5131,7 @@ export default function App() {
     const req={id:"rmreq_"+uid(), instanceId, playerId:pid, requestedAt:Date.now()};
     const newCfg={...config, removalRequests:[...(config.removalRequests||[]), req]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("🗑️ Demande envoyée au parent","#FFD700");
+    showToast("🗑️ Demande envoyée au parent","#D9BC5C");
   },[config,gameStates,persist,showToast]);
 
   const handleApproveRemoval = useCallback((reqId)=>{
@@ -5139,8 +5143,8 @@ export default function App() {
       removedAssignments:_uniq([...(config.removedAssignments||[]), req.instanceId]).slice(-800),
       removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
     setConfig(newCfg); persist(newCfg,gameStates);
-    logAction(`🗑️ Retrait approuvé: ${task?.label||req.instanceId}`,"#FF8C00");
-    showToast("🗑️ Tâche retirée","#FF8C00");
+    logAction(`🗑️ Retrait approuvé: ${task?.label||req.instanceId}`,"#D99248");
+    showToast("🗑️ Tâche retirée","#D99248");
   },[config,gameStates,persist,logAction,showToast]);
 
   const handleRefuseRemoval = useCallback((reqId)=>{
@@ -5160,7 +5164,7 @@ export default function App() {
       assignments:(config.assignments||[]).filter(a=>!removedSet.has(a.instanceId)),
       removedAssignments:_uniq([...(config.removedAssignments||[]), ...toRemove]).slice(-800)};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast(`🗑️ ${toRemove.length} tâche(s) perso supprimée(s)`,"#FF8C00");
+    showToast(`🗑️ ${toRemove.length} tâche(s) perso supprimée(s)`,"#D99248");
   },[config,gameStates,persist,showToast]);
 
   const handleAddCustomTask = useCallback((data)=>{
@@ -5170,11 +5174,11 @@ export default function App() {
     // handleChildAddTask) : un libellé déjà présent réutilise la tâche existante au lieu d'en
     // empiler une nouvelle — évite que le catalogue/menu de choix grossisse à l'infini.
     const existing=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(label));
-    if(existing){ showToast(`${existing.emoji} «${existing.label}» existe déjà — réutilisée!`,"#FFD700",4000); return existing.id; }
+    if(existing){ showToast(`${existing.emoji} «${existing.label}» existe déjà — réutilisée!`,"#D9BC5C",4000); return existing.id; }
     const newTask={id:"cust_"+uid(),emoji:data.emoji||"⭐",label,xp:20,coins:10,diff:"medium",cat:"custom"};
     const newCfg={...config,customTasks:[...(config.customTasks||[]),newTask]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast(`${newTask.emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#2ECC40",4000);
+    showToast(`${newTask.emoji} «${newTask.label}» créée — assigne-la maintenant!`,"#5CAD68",4000);
     return newTask.id;
   },[config,gameStates,persist,showToast]);
 
@@ -5195,7 +5199,7 @@ export default function App() {
     const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
     const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
+    showToast("➕ Quête ajoutée à ta journée!","#5CAD68");
   },[config,gameStates,persist,showToast]);
 
   // v1.57.0 — l'enfant choisit la voie d'évolution de son familier (tier 1/2/3 → élément)
@@ -5203,7 +5207,7 @@ export default function App() {
     if(playerIdx==null||!petId||!tier||!element)return;
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; const pe={...(p.petEvo||{})}; pe[petId]={...(pe[petId]||{}), [tier]:element}; n[playerIdx]={...p, petEvo:pe}; persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("✨"); SFX.epic&&SFX.epic(); }catch{} },120);
-    showToast("✨ Ton familier a évolué!","#FFD700",3500);
+    showToast("✨ Ton familier a évolué!","#D9BC5C",3500);
   },[config,persist,showToast]);
 
   // v1.53.0 — l'enfant CHOISIT une tâche existante (grille) : on réutilise le taskId → aucun doublon créé
@@ -5215,7 +5219,7 @@ export default function App() {
     const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now()};
     const newCfg={...config, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("➕ Quête ajoutée à ta journée!","#2ECC40");
+    showToast("➕ Quête ajoutée à ta journée!","#5CAD68");
   },[config,gameStates,persist,showToast]);
 
   // L'enfant crée sa propre tâche de RITUEL (days:[] = type rituel) et on retourne l'instanceId
@@ -5229,7 +5233,7 @@ export default function App() {
     const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel (persiste dans SON rituel)
     const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("➕ Tâche ajoutée à ton rituel!","#2ECC40");
+    showToast("➕ Tâche ajoutée à ton rituel!","#5CAD68");
     return instanceId;
   },[config,gameStates,persist,showToast]);
 
@@ -5280,8 +5284,8 @@ export default function App() {
     if(ok){
       const fromP=config.players[fi], toP=config.players[ti];
       pushFeed({type:"gift",playerId:fromId,emoji:"🪙",text:`${displayName(fromP)} a donné ${amt} pièces à ${displayName(toP)} 💛`});
-      showToast(`🪙 ${amt} pièces envoyées à ${displayName(toP)}!`,"#FFD700",3000);
-    } else { showToast("Pas assez de pièces 😅","#FF6B6B",2500); }
+      showToast(`🪙 ${amt} pièces envoyées à ${displayName(toP)}!`,"#D9BC5C",3000);
+    } else { showToast("Pas assez de pièces 😅","#D98C8C",2500); }
     return ok;
   },[config,persist,showToast,pushFeed]);
 
@@ -5292,7 +5296,7 @@ export default function App() {
     const bug={ id:"bug_"+uid(), ts:Date.now(), who:who||"?", text:t.slice(0,300) };
     const n={...cfg, bugs:[bug, ...(cfg.bugs||[])].slice(0,50)};
     setConfig(n); persist(n, gsRef.current);
-    showToast("🐛 Merci! Le bug a été envoyé au parent.","#2ECC40",3500);
+    showToast("🐛 Merci! Le bug a été envoyé au parent.","#5CAD68",3500);
     return true;
   },[persist,showToast]);
 
@@ -5305,7 +5309,7 @@ export default function App() {
     const n={...cfg, coinOffers:[offer, ...(cfg.coinOffers||[])].slice(0,40)};
     setConfig(n); persist(n, gsRef.current);
     const toP=cfg.players.find(p=>p.id===toId);
-    showToast(`📨 Demande envoyée à ${displayName(toP)} (${amt} 🪙)`,"#5DECF5",3000);
+    showToast(`📨 Demande envoyée à ${displayName(toP)} (${amt} 🪙)`,"#85CDD1",3000);
     return true;
   },[persist,showToast]);
 
@@ -5332,8 +5336,8 @@ export default function App() {
     });
     if(ok){ const toP=cfg.players[hi], fromP=cfg.players[ri];
       pushFeed({type:"gift",playerId:offer.toId,emoji:"🪙",text:`${displayName(toP)} a envoyé ${offer.amount} pièces à ${displayName(fromP)} 💛`});
-      showToast(`✅ ${offer.amount} 🪙 envoyées!`,"#FFD700",3000);
-    } else showToast("Tu n'as pas assez de pièces 😅","#FF6B6B",2500);
+      showToast(`✅ ${offer.amount} 🪙 envoyées!`,"#D9BC5C",3000);
+    } else showToast("Tu n'as pas assez de pièces 😅","#D98C8C",2500);
   },[persist,showToast,pushFeed]);
 
   // L'enfant change SON pseudo (dans config.players)
@@ -5341,7 +5345,7 @@ export default function App() {
     const clean=(pseudo||"").trim().slice(0,16); if(!clean||!config.players[playerIdx])return;
     const newCfg={...config, players:config.players.map((pl,i)=>i===playerIdx?{...pl,pseudo:clean}:pl)};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("✅ Pseudo changé!","#2ECC40");
+    showToast("✅ Pseudo changé!","#5CAD68");
   },[config,gameStates,persist,showToast]);
 
   // Annuler une récompense réclamée (remet les pièces) — accessible enfant ET parent
@@ -5366,7 +5370,7 @@ export default function App() {
         coins:(p.coins||0)+priceOf(reward),                         // rembourse ce qui a été payé (×PRICE_MULT)
         refundedRewards:[...new Set([...(p.refundedRewards||[]), key])].slice(-200) };
       persist(config,n); return n; });
-    if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#FF8C00");
+    if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#D99248");
   },[config,persist,showToast]);
 
   // Minuterie : l'enfant a complété un rituel chronométré → bonus XP + entrée au fil
@@ -5384,7 +5388,7 @@ export default function App() {
       const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:txt};
       const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};
       setConfig(newCfg); persist(newCfg,n); return n; });
-    setTimeout(()=>{ try{ if(!CALM) spawnParticles("⏱"); SFX.epic&&SFX.epic(); }catch{} showToast(`⏱ Rituel fini en ${minutes} min! +${bonus} XP 🎉`,"#FFD700",4500); },150);
+    setTimeout(()=>{ try{ if(!CALM) spawnParticles("⏱"); SFX.epic&&SFX.epic(); }catch{} showToast(`⏱ Rituel fini en ${minutes} min! +${bonus} XP 🎉`,"#D9BC5C",4500); },150);
   },[config,persist,showToast]);
 
   // Parent : ajoute un événement au calendrier d'un ou plusieurs enfants (récurrent ou daté)
@@ -5396,7 +5400,7 @@ export default function App() {
         n[i]={...n[i], calendar:[...(n[i].calendar||[]), e]};
       });
       persist(config,n); return n; });
-    showToast("📅 Événement ajouté au calendrier!","#5DECF5");
+    showToast("📅 Événement ajouté au calendrier!","#85CDD1");
   },[config,persist,showToast]);
 
   // Objectif du jour réclamé → bonus XP/pièces (une fois par jour)
@@ -5407,7 +5411,7 @@ export default function App() {
       n[playerIdx]={...p, xp:(p.xp||0)+(obj.xp||0), coins:(p.coins||0)+(obj.coins||0), dailyClaimed:{day:wk,ids:[...dc.ids,obj.id]}};
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎯"); SFX.epic&&SFX.epic(); }catch{} },120);
-    showToast(`🎯 Objectif réussi! +${obj.xp} XP${obj.coins?` +${obj.coins} 🪙`:""}`,"#2ECC40",3500);
+    showToast(`🎯 Objectif réussi! +${obj.xp} XP${obj.coins?` +${obj.coins} 🪙`:""}`,"#5CAD68",3500);
   },[config,persist,showToast]);
 
   // Ouvrir un coffre : déduit le coût, ajoute l'item (ou rembourse un doublon)
@@ -5424,28 +5428,28 @@ export default function App() {
   const handleFeedPet = useCallback((playerIdx)=>{
     const p=gameStates[playerIdx]; if(!p) return;
     const today=todayStamp();
-    if(p.lastFedDay===today){ showToast("Ton familier a déjà mangé aujourd'hui 🐾 Reviens demain!","#FF8C00",3000); return; }
+    if(p.lastFedDay===today){ showToast("Ton familier a déjà mangé aujourd'hui 🐾 Reviens demain!","#D99248",3000); return; }
     const eqPet=p.equipped?.pet;
     setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]; const _g=gainPet(q,eqPet,12);
       n[playerIdx]={...q, lastFedDay:today, energy:Math.min(ENERGY_MAX, currentEnergy(q)+FEED_ENERGY), energyTs:new Date().toISOString(),
         petXp:_g.petXp, petDay:_g.petDay };
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🍖"); SFX.coin&&SFX.coin(); }catch{} },80);
-    showToast("🍖 Miam! Ton familier est rassasié et plein d'énergie!","#2ECC40",3000);
+    showToast("🍖 Miam! Ton familier est rassasié et plein d'énergie!","#5CAD68",3000);
   },[gameStates,config,persist,showToast]);
 
   // 🎾 Jouer avec le familier → coûte de l'énergie, donne de l'XP au familier
   const handlePlayPet = useCallback((playerIdx)=>{
     const p=gameStates[playerIdx]; if(!p) return;
     const eqPet=p.equipped?.pet;
-    if(!eqPet){ showToast("Équipe d'abord un familier 🐾","#FF8C00",2500); return; }
-    if(currentEnergy(p)<PLAY_ENERGY){ const m=minsToEnergy(p,PLAY_ENERGY); showToast(`💤 Ton familier fait une sieste… reviens dans ~${m} min!`,"#5DECF5",3500); return; }
+    if(!eqPet){ showToast("Équipe d'abord un familier 🐾","#D99248",2500); return; }
+    if(currentEnergy(p)<PLAY_ENERGY){ const m=minsToEnergy(p,PLAY_ENERGY); showToast(`💤 Ton familier fait une sieste… reviens dans ~${m} min!`,"#85CDD1",3500); return; }
     setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]; const _g=gainPet(q,eqPet,10);
       n[playerIdx]={...q, energy:Math.max(0, currentEnergy(q)-PLAY_ENERGY), energyTs:new Date().toISOString(),
         petXp:_g.petXp, petDay:_g.petDay };
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎾"); SFX.click&&SFX.click(); }catch{} },80);
-    showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#FFD700",2800);
+    showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#D9BC5C",2800);
   },[gameStates,config,persist,showToast]);
 
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
@@ -5453,15 +5457,15 @@ export default function App() {
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
     const wk=todayStamp();
     setGameStates(gs=>{ const n=[...gs]; const p=n[idx]; const sameWeek=p.hiddenWeek===wk; const hidden=sameWeek?[...(p.hiddenRewards||[])]:[]; if(!hidden.includes(reward.id))hidden.push(reward.id); n[idx]={...p, hiddenRewards:hidden, hiddenWeek:wk}; persist(config,n); return n; });
-    showToast("✅ Récompense rangée — une nouvelle apparaît!","#2ECC40");
+    showToast("✅ Récompense rangée — une nouvelle apparaît!","#5CAD68");
   },[config,persist,showToast]);
 
   const handleResetPlayer = useCallback((playerIdx) => {
     const player=config.players[playerIdx];
     if(!window.confirm(`Reset ${player?.name}? XP, pièces et tâches seront à 0.`))return;
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
-    logAction(`🔄 Reset complet: ${player?.name}`,"#FF4444");
-    showToast(`🔄 ${player?.name} réinitialisé`,"#FF4444");
+    logAction(`🔄 Reset complet: ${player?.name}`,"#D97070");
+    showToast(`🔄 ${player?.name} réinitialisé`,"#D97070");
   },[config,persist,logAction,showToast]);
 
   const handleExport = useCallback(() => {
@@ -5474,8 +5478,8 @@ export default function App() {
     importConfig(file, ({config:c, gameStates:gs}) => {
       setConfig(c); setGameStates(gs); setScreen("game");
       persist(c, gs);
-      showToast("📥 Config importée!","#2ECC40");
-      logAction("📥 Config importée","#2ECC40");
+      showToast("📥 Config importée!","#5CAD68");
+      logAction("📥 Config importée","#5CAD68");
     });
   },[persist, showToast, logAction]);
 
@@ -5493,7 +5497,7 @@ export default function App() {
     if(!undoStack.length)return;
     const last=undoStack[undoStack.length-1]; setUndoStack(u=>u.slice(0,-1));
     setGameStates(gs=>{ const n=[...gs]; const p=n[last.playerIdx]; n[last.playerIdx]={...p,xp:Math.max(0,p.xp-last.xp),coins:Math.max(0,p.coins-last.coins),completed:(p.completed||[]).filter(k=>k!==last.doneKey)}; persist(config,n); return n; });
-    showToast("↩️ Action annulée!","#FF8C00");
+    showToast("↩️ Action annulée!","#D99248");
   },[undoStack,config,persist,showToast]);
 
   // v1.95.0 (Lot 5 #23) — useMemo : sans ça, allTasks/allRewards étaient de nouveaux tableaux
@@ -5562,7 +5566,7 @@ export default function App() {
   const onFamilyPostChat = useCallback((text)=>{ pushFeed({type:"chat",playerId:familyMeId,text,emoji:"💬"}); }, [pushFeed, familyMeId]);
 
   const onParentPanelClose = useCallback(()=>setParentPanel(false), []);
-  const onParentPanelExit = useCallback(()=>{ setParentMode(false); setParentPanel(false); showToast("🔒 Mode parent quitté","#FF8C00"); }, [showToast]);
+  const onParentPanelExit = useCallback(()=>{ setParentMode(false); setParentPanel(false); showToast("🔒 Mode parent quitté","#D99248"); }, [showToast]);
   const onParentPanelReset = useCallback(()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ (config?.players||[]).forEach((_,i)=>handleResetPlayer(i)); } }, [config?.players, handleResetPlayer]);
   const onParentPanelSetup = useCallback(()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }, []);
 
@@ -5605,7 +5609,7 @@ export default function App() {
     const now=new Date().toISOString();
     const newCfg={...config, players: config.players.map((pl,i)=> i===view ? {...pl, themeId, themeChosenAt:now} : pl)};
     setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
-    showToast("🎨 Nouveau thème activé pour la semaine!","#FFD700",3000);
+    showToast("🎨 Nouveau thème activé pour la semaine!","#D9BC5C",3000);
   }, [view, config, gameStates, persist, showToast]);
   const onDashUpdateCalendar = useCallback((newCal)=>{
     const gs=[...gameStates];
@@ -5615,10 +5619,10 @@ export default function App() {
   }, [gameStates, view, config]);
   const onDashCalendarAdd = useCallback((type)=>{
     const label=type==="examen"?"📝 Examen noté au calendrier!":"📚 Devoir noté au calendrier!";
-    showToast(`${label} Un rappel apparaîtra avant la date.`,"#5DECF5",3000);
+    showToast(`${label} Un rappel apparaîtra avant la date.`,"#85CDD1",3000);
   }, [showToast]);
 
-  if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#FFD700",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
+  if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
@@ -5676,18 +5680,18 @@ export default function App() {
         {/* Indicateur de synchro cloud */}
         {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
           return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
-            style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#2ECC40":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
+            style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#5CAD68":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
         {/* Contrôles header */}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {parentMode ? (<>
             <button onClick={()=>{SFX.click();setParentPanel(true);}}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",background:"#FF8C00",color:"#000",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer",boxShadow:"0 0 10px #FF8C0060",position:"relative"}}>
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 12px",background:"#D99248",color:"#0d0d0d",border:"2px solid #D99248",borderRadius:3,cursor:"pointer",boxShadow:"0 0 10px #D9924860",position:"relative"}}>
               🔓 PARENT ▸
               {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
-                return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#FF4444",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #000"}}>{nb}</span>:null; })()}
+                return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#D97070",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #0d0d0d"}}>{nb}</span>:null; })()}
             </button>
-            <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#FF8C00");}}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#FF8C00",border:"2px solid #FF8C00",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">🔒</button>
+            <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#D99248");}}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#D99248",border:"2px solid #D99248",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">🔒</button>
           </>) : sessionPlayer!=null ? (
             // ☰ Menu enfant (contient réglages, archives, bug, validation parent, quitter)
             <button onClick={()=>{SFX.click(); if(typeof view!=="number") setView(sessionPlayer); setHamOpen(true);}}
@@ -5723,21 +5727,21 @@ export default function App() {
       {!(sessionPlayer!=null && !parentMode) &&
       <div style={{display:"flex",gap:0,maxWidth:900,margin:"0 auto",background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
         <button onClick={()=>{setView("family");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
         </button>
         <button onClick={()=>{setView("calendars");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="calendars"?th.accent:"transparent",color:view==="calendars"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="calendars"?th.accent:"transparent",color:view==="calendars"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           📅 Calendriers
         </button>
         <button onClick={()=>{setView("timer");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           ⏱ Minuterie
         </button>
         {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde. */}
         {(config.players||[]).map((pl,i)=>({pl,i})).filter(({i})=> parentMode || sessionPlayer===null || sessionPlayer===i).map(({pl,i})=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#000":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
             {displayName(pl)}
           </button>
         ))}
@@ -5746,7 +5750,7 @@ export default function App() {
       {/* ── FOOTER COLLANT enfant : retour à l'accueil depuis Famille/Calendrier/Minuterie ── */}
       {(sessionPlayer!=null && !parentMode && (view==="family"||view==="calendars"||view==="timer")) && (
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(0,0,0,0.92)",borderTop:"2px solid #333",display:"flex",justifyContent:"center",padding:"8px 10px"}}>
-          <button onClick={()=>{setView(sessionPlayer);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#000",background:th.accent,border:"none",borderRadius:10,padding:"12px 26px",cursor:"pointer"}}>🏠 Accueil</button>
+          <button onClick={()=>{setView(sessionPlayer);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:th.accent,border:"none",borderRadius:10,padding:"12px 26px",cursor:"pointer"}}>🏠 Accueil</button>
         </div>
       )}
 
@@ -5768,7 +5772,7 @@ export default function App() {
                     {items.map(({d,e},k)=>(
                       <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #222"}}>
                         <span style={{fontSize:14}}>{calEventIcon(e)}</span>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5",minWidth:46}}>{fmt(d)}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:46}}>{fmt(d)}</span>
                         <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
                       </div>
                     ))}
@@ -5790,8 +5794,8 @@ export default function App() {
           const cats=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
           const maxN=Math.max(...cats.map(c=>counts[c]));
           return (
-            <div style={{background:th.card||"rgba(0,0,0,0.5)",border:`2px solid ${(th.accent||"#FFD700")}55`,borderRadius:10,padding:14,margin:"4px 0 12px"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||"#FFD700",marginBottom:4}}>📊 Stats de la famille</div>
+            <div style={{background:th.card||"rgba(0,0,0,0.5)",border:`2px solid ${(th.accent||"#D9BC5C")}55`,borderRadius:10,padding:14,margin:"4px 0 12px"}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||"#D9BC5C",marginBottom:4}}>📊 Stats de la famille</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",marginBottom:10}}>{total} quêtes accomplies ensemble! 🎉</div>
               <div style={{display:"flex",flexDirection:"column",gap:7}}>
                 {cats.map(c=>{ const m=catMeta(c); const w=Math.round(counts[c]/maxN*100); return (
@@ -5901,22 +5905,22 @@ export default function App() {
       )}
 
       {parentPinOpen&&(
-        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#FF8C00"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
+        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#D99248"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
       )}
       {bossWin&&(
         <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#1a2e1a,#0c220c)",border:`5px solid ${bossWin.color||"#FFD700"}`,borderRadius:16,padding:"28px 26px",maxWidth:380,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",boxShadow:`0 0 50px ${bossWin.color||"#FFD700"}70`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#1a2e1a,#0c220c)",border:`5px solid ${bossWin.color||"#D9BC5C"}`,borderRadius:16,padding:"28px 26px",maxWidth:380,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",boxShadow:`0 0 50px ${bossWin.color||"#D9BC5C"}70`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
             <div style={{fontSize:64,lineHeight:1,marginBottom:6}}>{bossWin.emoji||"🐲"}</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#FFD700",marginBottom:8}}>🏆 VICTOIRE!</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:19,color:"#fff",marginBottom:8,lineHeight:1.3}}>Vous avez vaincu<br/><b style={{color:bossWin.color||"#FFD700"}}>{bossWin.name}</b> en équipe! 💪</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#2ECC40",margin:"12px 0 8px",lineHeight:1.6}}>+40 🪙 · +50 ⚡<br/>🐲 Badge « Tombeur de Boss »!</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#D9BC5C",marginBottom:8}}>🏆 VICTOIRE!</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:19,color:"#fff",marginBottom:8,lineHeight:1.3}}>Vous avez vaincu<br/><b style={{color:bossWin.color||"#D9BC5C"}}>{bossWin.name}</b> en équipe! 💪</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#5CAD68",margin:"12px 0 8px",lineHeight:1.6}}>+40 🪙 · +50 ⚡<br/>🐲 Badge « Tombeur de Boss »!</div>
             {bossWin.items && bossWin.items.length>0 && (
               <div style={{background:"rgba(255,91,174,0.12)",border:"2px solid #FF5BAE",borderRadius:10,padding:"10px 12px",margin:"4px 0 8px"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF5BAE",marginBottom:6}}>🎁 ITEM ULTRA LÉGENDAIRE!</div>
                 {bossWin.items.map((it,i)=>(<div key={i} style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff"}}><span style={{fontSize:22}}>{it.emoji}</span> {it.name}</div>))}
               </div>
             )}
-            <button onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000",marginTop:4}}>🎉 Bravo!</button>
+            <button onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>🎉 Bravo!</button>
           </div>
         </div>
       )}
@@ -5935,7 +5939,7 @@ export default function App() {
           onClick={()=>{
             // Copie l'adresse au presse-papier + confirme (mailto ne mène nulle part sans app de courriel)
             try{ navigator.clipboard&&navigator.clipboard.writeText(BUG_EMAIL); }catch{}
-            showToast(`🐛 Bug? Écris à ${BUG_EMAIL} (adresse copiée!)`,"#FF8C00",7000);
+            showToast(`🐛 Bug? Écris à ${BUG_EMAIL} (adresse copiée!)`,"#D99248",7000);
             const subject=encodeURIComponent(`[Bug v${APP_VERSION}] `);
             const body=encodeURIComponent(`Version: ${APP_VERSION}\nDate: ${new Date().toLocaleString("fr-CA")}\n\nDécris le bug ici:\n\n`);
             try{ window.open(`mailto:${BUG_EMAIL}?subject=${subject}&body=${body}`,"_blank"); }catch{}

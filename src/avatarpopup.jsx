@@ -26,10 +26,10 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"safe center",padding:12}}>
-      <div style={{background:pt.bg||"#1a1a2e",border:`2px solid ${pt.accent||"#FFD700"}88`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
+      <div style={{background:pt.bg||"#1a1a2e",border:`2px solid ${pt.accent||"#D9BC5C"}88`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#FFD700"}}>{displayName(player)} — Mon Perso</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#D9BC5C"}}>{displayName(player)} — Mon Perso</div>
           <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
         </div>
 
@@ -37,16 +37,16 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:20,padding:"10px 0"}}>
           <div style={{position:"relative"}}>
             <AvatarCanvas avatarDef={avatarDef} bodyColor={pt.charBodyColor||player.color} size={120}
-              style={{border:`4px solid ${pt.accent||"#FFD700"}`,boxShadow:`0 0 20px ${pt.glow||"#FFD700"}50`}}/>
+              style={{border:`4px solid ${pt.accent||"#D9BC5C"}`,boxShadow:`0 0 20px ${pt.glow||"#D9BC5C"}50`}}/>
             {/* v1.81.0 — items équipés PORTÉS sur l'avatar, ancrés sur la vraie géométrie du corps (EquippedGear) */}
             <EquippedGear eq={eq} items={allShopItems} size={120}/>
             {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-10,left:-14,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={48}/></div> : <span style={{position:"absolute",bottom:-12,left:-12,fontSize:28,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>)}
           </div>
           <div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:player.color,marginBottom:6}}>{displayName(player)}</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#FFD700",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId).title}</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5"}}>⚡ {pState.xp} XP</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#D9BC5C",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId).title}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {pState.xp} XP</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.values(eq).filter(Boolean).length}</div>
           </div>
         </div>
@@ -55,7 +55,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
         <div style={{display:"flex",gap:6}}>
           {[["creator","✏️ Créer"],["pet","🐾 Familier"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
             <button key={k} onClick={()=>{setTab(k);SFX.click();}}
-              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px",background:tab===k?(pt.accent||"#FFD700"):"#222",color:tab===k?"#000":"#888",border:`2px solid ${tab===k?(pt.accent||"#FFD700"):"#444"}`,borderRadius:4,cursor:"pointer"}}>
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px",background:tab===k?(pt.accent||"#D9BC5C"):"#222",color:tab===k?"#0d0d0d":"#888",border:`2px solid ${tab===k?(pt.accent||"#D9BC5C"):"#444"}`,borderRadius:4,cursor:"pointer"}}>
               {l}
             </button>
           ))}
@@ -66,7 +66,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             {Object.entries(PART_TABS).map(([k,l])=>(
               <button key={k} onClick={()=>{setPartTab(k);SFX.click();}}
-                style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 9px",background:partTab===k?(pt.accent||"#FFD700"):"#222",color:partTab===k?"#000":"#888",border:`2px solid ${partTab===k?(pt.accent||"#FFD700"):"#444"}`,borderRadius:3,cursor:"pointer"}}>
+                style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 9px",background:partTab===k?(pt.accent||"#D9BC5C"):"#222",color:partTab===k?"#0d0d0d":"#888",border:`2px solid ${partTab===k?(pt.accent||"#D9BC5C"):"#444"}`,borderRadius:3,cursor:"pointer"}}>
                 {l}
               </button>
             ))}
@@ -76,7 +76,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
               {AVATAR_PARTS.skin.map(s=>(
                 <div key={s.id} onClick={()=>update("skin",s.id)}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.skin===s.id?s.color:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:avatarDef.skin===s.id?`0 0 10px ${s.color}80`:"none"}}>
-                  <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #000"}}/>
+                  <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #0d0d0d"}}/>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{s.label}</span>
                 </div>
               ))}
@@ -109,7 +109,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
               {AVATAR_PARTS.hair.map(h=>(
                 <div key={h.id} onClick={()=>update("hair",h.id)}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.hair===h.id?`${h.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.hair===h.id?h.color:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:avatarDef.hair===h.id?`0 0 10px ${h.color}60`:"none"}}>
-                  <div style={{width:28,height:14,background:h.color,borderRadius:"4px 4px 0 0",border:"2px solid #000"}}/>
+                  <div style={{width:28,height:14,background:h.color,borderRadius:"4px 4px 0 0",border:"2px solid #0d0d0d"}}/>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc"}}>{h.label}</span>
                 </div>
               ))}
@@ -128,12 +128,12 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                 <div key={item.id} onClick={()=>{ if(item.slot){onEquip(item);SFX.click();} }}
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px 5px",
                     background:isEq?`${pt.accent}20`:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,
-                    border:`2px solid ${isEq?(pt.accent||"#2ECC40"):rar.color}`,borderRadius:6,cursor:item.slot?"pointer":"default",
-                    boxShadow:isEq?`0 0 10px ${pt.glow||"#FFD700"}60`:(rar.min>=45?`0 0 8px ${rar.color}55`:"none")}}>
+                    border:`2px solid ${isEq?(pt.accent||"#5CAD68"):rar.color}`,borderRadius:6,cursor:item.slot?"pointer":"default",
+                    boxShadow:isEq?`0 0 10px ${pt.glow||"#D9BC5C"}60`:(rar.min>=45?`0 0 8px ${rar.color}55`:"none")}}>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   <span style={{fontSize:24}}>{item.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc",textAlign:"center",lineHeight:1.2}}>{item.name||item.label}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#2ECC40":"#888"}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#5CAD68":"#888"}}>
                     {isEq?"✅ ÉQUIPÉ":item.slot?"Équiper":"-"}
                   </span>
                 </div>
@@ -146,7 +146,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
         {tab==="pet" && (()=>{
           const petXp = pState.petXp || {};
           const ownedPets = allShopItems.filter(i => i.slot==="pet" && pState.owned?.includes(i.id));
-          const acc = pt.accent||"#FFD700";
+          const acc = pt.accent||"#D9BC5C";
           const eqPet = ownedPets.find(p=>p.id===eq.pet);
           return (
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -162,7 +162,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{eqPet.name} — Niv.{lv}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:_leg?"#FFD45A":"#fff",marginTop:2}}>Stade : {petFormLabel(_evo,lv)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
                     <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
-                      <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#5DECF5)`,transition:"width 0.8s ease"}}/>
+                      <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#85CDD1)`,transition:"width 0.8s ease"}}/>
                     </div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{bar.max?`${xp} XP — évolution complète!`:`${bar.cur}/${bar.needed} XP vers Niv.${lv+1}`}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#7aa",marginTop:6}}>Ton familier gagne de l'XP à chaque quête validée 🌟</div>
@@ -183,7 +183,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                         <div style={{height:6,width:"90%",background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
                           <div style={{height:"100%",width:pctp+"%",background:acc}}/>
                         </div>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#2ECC40":"#777"}}>{isEq?"✅ ÉQUIPÉ":"Équiper"}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#5CAD68":"#777"}}>{isEq?"✅ ÉQUIPÉ":"Équiper"}</span>
                       </div>
                     );
                   })}
@@ -192,7 +192,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             </div>
           );
         })()}
-        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:6,background:pt.accent||"#FFD700",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>← Retour</button>
+        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:6,background:pt.accent||"#D9BC5C",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>← Retour</button>
       </div>
     </div>
   );

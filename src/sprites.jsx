@@ -55,7 +55,7 @@ export function equipAnchorStyle(key, size) {
     position:"absolute", left:Math.round(A.cx/72*size), top:Math.round(A.cy/72*size),
     width:w, height:w,
     transform:`translate(-50%,-50%)${A.rotate?` rotate(${A.rotate}deg)`:""}`,
-    filter:A.shadow?"drop-shadow(0 2px 0 #000)":undefined,
+    filter:A.shadow?"drop-shadow(0 2px 0 #0d0d0d)":undefined,
     pointerEvents:"none",
   };
 }

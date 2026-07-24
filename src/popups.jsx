@@ -20,7 +20,7 @@ const FUNNY_PIN_MSGS = [
 // v1.57.0 — Choix d'évolution : 2 éléments tirés au hasard, l'enfant choisit la voie de son familier
 export function EvolutionModal({ petId, tier, evo, onChoose, th }) {
   const opts = petEvoOptions(petId, tier, evo);
-  const acc = th?.accent || "#FFD700";
+  const acc = th?.accent || "#D9BC5C";
   const spriteKey = petSpriteKey(petId);
   const legend = tier===3;
   return (
@@ -104,12 +104,12 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
         <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:14}}>
           {[0,1,2,3].map(i=><div key={i} style={{width:20,height:20,borderRadius:"50%",border:`3px solid ${T.accent}`,background:i<buf.length?T.accent:"transparent",boxShadow:i<buf.length?`0 0 10px ${T.accent}`:"none",transition:"all 0.15s"}}/>)}
         </div>
-        {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF4444",marginBottom:4,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
+        {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D97070",marginBottom:4,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
         {failCount>=2&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:6,textAlign:"center"}}>{FUNNY_PIN_MSGS[Math.min(failCount-2,FUNNY_PIN_MSGS.length-1)]}</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
           {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
             <button key={k} onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"#888":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #000"}}>
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"#888":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #0d0d0d"}}>
               {k}
             </button>
           ))}
@@ -122,7 +122,7 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
             else{SFX.pinErr();setErr(true);setFailCount(f=>f+1);bufRef.current="";setBuf("");setTimeout(()=>setErr(false),1500);}
           }}
           disabled={buf.length!==4}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 0",width:"100%",maxWidth:200,display:"block",margin:"0 auto 10px",background:buf.length===4?T.accent:"#222",color:buf.length===4?"#000":"#444",border:`3px solid ${buf.length===4?T.accent:"#333"}`,cursor:buf.length===4?"pointer":"not-allowed",borderRadius:4,boxShadow:buf.length===4?`0 0 12px ${T.accent}80`:"none",transition:"all 0.15s"}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 0",width:"100%",maxWidth:200,display:"block",margin:"0 auto 10px",background:buf.length===4?T.accent:"#222",color:buf.length===4?"#0d0d0d":"#444",border:`3px solid ${buf.length===4?T.accent:"#333"}`,cursor:buf.length===4?"pointer":"not-allowed",borderRadius:4,boxShadow:buf.length===4?`0 0 12px ${T.accent}80`:"none",transition:"all 0.15s"}}>
           ✅ VALIDER
         </button>
         <button onClick={onCancel} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#888",border:"2px solid #555",cursor:"pointer",borderRadius:2}}>Annuler</button>
@@ -140,13 +140,13 @@ export function RewardPopup({ task, player, newBadges, onClose, th }) {
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:T.accent,marginBottom:8}}>⚡ QUÊTE {(getPlayerTheme(player?.themeId)?.taskVerb||"validée").toUpperCase()}!</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(16px,2.5vw,20px)",color:"#fff",marginBottom:16,lineHeight:1.4}}>{task.label}</div>
         <div style={{display:"flex",gap:20,justifyContent:"center",marginBottom:18}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#5DECF5"}}>+{task.xp} ⚡</div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#FFD700"}}>+{task.coins} 🪙</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#85CDD1"}}>+{task.xp} ⚡</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#D9BC5C"}}>+{task.coins} 🪙</div>
         </div>
         {player && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:player.color,marginBottom:14}}>Bravo {displayName(player)}! 🎉</div>}
         {newBadges&&newBadges.length>0&&(
           <div style={{background:"rgba(0,0,0,0.4)",borderRadius:6,padding:"10px 14px",marginBottom:14}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#FFD700",marginBottom:8}}>🏅 BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""}!</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:8}}>🏅 BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""}!</div>
             {newBadges.map(b=>(
               <div key={b.id} style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
                 <span style={{fontSize:22}}>{b.emoji}</span> <strong>{b.name}</strong>
@@ -154,7 +154,7 @@ export function RewardPopup({ task, player, newBadges, onClose, th }) {
             ))}
           </div>
         )}
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#2ECC40",color:"#000",border:"4px solid #000",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>→ CONTINUER ←</button>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#5CAD68",color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>→ CONTINUER ←</button>
       </div>
     </div>
   );

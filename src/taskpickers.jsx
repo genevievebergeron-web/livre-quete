@@ -8,7 +8,7 @@ import { catMeta } from "./catalog.js";
 // v1.53.0 — Sélecteur de tâches en GRILLE groupée + code couleur par étiquette.
 // L'enfant CHOISIT une tâche existante (réutilise son taskId → zéro doublon). Repli: créer la sienne.
 export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
-  const acc=th?.accent||"#FFD700";
+  const acc=th?.accent||"#D9BC5C";
   const tasks=(allTasks||[]).filter(t=>t && t.label && !t.child); // tâches curées (catalogue + parent), pas le bric-à-brac
   const order=["routine","cuisine","menage","outdoor","defi","custom"];
   const groups={}; tasks.forEach(t=>{ const c=t.cat||"custom"; (groups[c]=groups[c]||[]).push(t); });
@@ -48,7 +48,7 @@ const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","�
 
 export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
   const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium");
-  const acc=th?.accent||"#FFD700";
+  const acc=th?.accent||"#D9BC5C";
   const DIFFS=[["easy","🟢 Facile","+10 XP · 5 🪙"],["medium","🟡 Moyen","+20 XP · 10 🪙"],["hard","🔴 Difficile","+40 XP · 20 🪙"]];
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto"}}>
@@ -70,7 +70,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {DIFFS.map(([k,l,sub])=>(
           <button key={k} onClick={()=>{SFX.click();setDiff(k);}}
-            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 4px",lineHeight:1.5,background:diff===k?acc:"#1a1a1a",color:diff===k?"#000":"#999",border:`2px solid ${diff===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 4px",lineHeight:1.5,background:diff===k?acc:"#1a1a1a",color:diff===k?"#0d0d0d":"#999",border:`2px solid ${diff===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
             {l}<br/><span style={{fontFamily:"'VT323',monospace",fontSize:11}}>{sub}</span>
           </button>
         ))}
@@ -78,7 +78,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
       <div style={{display:"flex",gap:8}}>
         <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
         <button disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff}); } }}
-          style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #000"}}>
+          style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>
           ✅ {confirmLabel}
         </button>
       </div>

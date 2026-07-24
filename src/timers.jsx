@@ -20,15 +20,15 @@ export function Countdown({ endTime, th, calm }) {
   // Mode calme : pas de rouge, pas d'urgence, pas de pulsation — juste l'heure et une barre neutre
   const danger = !calm && isLate;
   return (
-    <div style={{padding:"10px 14px",background:danger?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${danger?"#FF4444":urgent?"#FFD700":th.accent}60`,borderRadius:6,animation:(urgent||danger)?"redPulse 1s ease-in-out infinite":"none"}}>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:danger?"#FF4444":urgent?"#FFD700":th.accent,marginBottom:6,textAlign:"center"}}>
+    <div style={{padding:"10px 14px",background:danger?"rgba(255,50,50,0.2)":urgent?"rgba(255,180,0,0.15)":"rgba(0,0,0,0.4)",border:`3px solid ${danger?"#D97070":urgent?"#D9BC5C":th.accent}60`,borderRadius:6,animation:(urgent||danger)?"redPulse 1s ease-in-out infinite":"none"}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:danger?"#D97070":urgent?"#D9BC5C":th.accent,marginBottom:6,textAlign:"center"}}>
         {calm ? "⏱ Rituel jusqu'à "+endTime : (isLate?"⚠️ EN RETARD!":urgent?"🏃 DÉPÊCHE-TOI!":"⏱ RITUEL TERMINE À "+endTime)}
       </div>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:danger?"#FF4444":urgent?"#FFD700":"#fff",textAlign:"center",textShadow:calm?"none":`0 0 20px ${danger?"#FF4444":urgent?"#FFD700":th.accent}`,letterSpacing:2,marginBottom:8}}>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(22px,4vw,44px)",color:danger?"#D97070":urgent?"#D9BC5C":"#fff",textAlign:"center",textShadow:calm?"none":`0 0 20px ${danger?"#D97070":urgent?"#D9BC5C":th.accent}`,letterSpacing:2,marginBottom:8}}>
         {isLate?(calm?"":"+"):""}{h>0?h+"h ":""}{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
       </div>
       <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden"}}>
-        <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${th.primary},${danger?"#FF4444":th.accent})`,transition:"width 1s ease"}}/>
+        <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${th.primary},${danger?"#D97070":th.accent})`,transition:"width 1s ease"}}/>
       </div>
     </div>
   );
@@ -48,7 +48,7 @@ export function HeaderClock({ style }) {
 }
 
 // Disque Time Timer (anneau qui rétrécit) — SVG pur, aucune dépendance au-delà de ses props.
-export function TimeTimerDisc({ progress, size=110, color="#5DECF5", urgentColor="#FF6B6B", urgent=false }) {
+export function TimeTimerDisc({ progress, size=110, color="#85CDD1", urgentColor="#D98C8C", urgent=false }) {
   const r = size/2 - 8;
   const c = 2*Math.PI*r;
   const p = Math.max(0, Math.min(1, progress||0));

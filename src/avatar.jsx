@@ -16,10 +16,10 @@ export const AVATAR_PARTS = {
   eyes: [
     {id:"ey1",emoji:"👀",label:"Normal",    eyeColor:"#333",  eyeShape:"round"},
     {id:"ey2",emoji:"😊",label:"Joyeux",    eyeColor:"#2244AA",eyeShape:"happy"},
-    {id:"ey3",emoji:"😎",label:"Cool",      eyeColor:"#000",  eyeShape:"cool"},
-    {id:"ey4",emoji:"⭐",label:"Étoile",    eyeColor:"#FFD700",eyeShape:"star"},
+    {id:"ey3",emoji:"😎",label:"Cool",      eyeColor:"#0d0d0d",  eyeShape:"cool"},
+    {id:"ey4",emoji:"⭐",label:"Étoile",    eyeColor:"#D9BC5C",eyeShape:"star"},
     {id:"ey5",emoji:"😺",label:"Chat",      eyeColor:"#00AA66",eyeShape:"cat"},
-    {id:"ey6",emoji:"👾",label:"Alien",     eyeColor:"#FF4444",eyeShape:"alien"},
+    {id:"ey6",emoji:"👾",label:"Alien",     eyeColor:"#D97070",eyeShape:"alien"},
   ],
   mouth: [
     {id:"mo1",emoji:"😐",label:"Neutre",   color:"#CC6644"},
@@ -32,7 +32,7 @@ export const AVATAR_PARTS = {
   hair: [
     {id:"ha1",emoji:"🟤",label:"Brun court",  color:"#5C3317",style:"short"},
     {id:"ha2",emoji:"⬛",label:"Noir",         color:"#111",   style:"short"},
-    {id:"ha3",emoji:"🟡",label:"Blond",        color:"#FFD700",style:"short"},
+    {id:"ha3",emoji:"🟡",label:"Blond",        color:"#D9BC5C",style:"short"},
     {id:"ha4",emoji:"🔴",label:"Roux",         color:"#CC4400",style:"short"},
     {id:"ha5",emoji:"⚪",label:"Blanc",        color:"#EEE",   style:"short"},
     {id:"ha6",emoji:"🟣",label:"Violet",       color:"#9933CC",style:"short"},
@@ -68,13 +68,13 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   // Eyes
   ctx.fillStyle = eyePart.eyeColor;
   if(blink){ // yeux fermés (clignement) — petites lignes plates
-    ctx.fillStyle="#000"; ctx.fillRect(s(9),s(12),s(6),s(2)); ctx.fillRect(s(21),s(12),s(6),s(2));
+    ctx.fillStyle="#0d0d0d"; ctx.fillRect(s(9),s(12),s(6),s(2)); ctx.fillRect(s(21),s(12),s(6),s(2));
   }
   else if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
-  else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#000";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
+  else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#0d0d0d";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
   else if(eyePart.eyeShape==="star"){ctx.font=`${s(10)}px serif`;ctx.textAlign="center";ctx.fillText("★",s(12),s(15));ctx.fillText("★",s(24),s(15));}
   else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
-  else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#000";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
+  else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#0d0d0d";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
   else{ctx.fillRect(s(9),s(9),s(5),s(5));ctx.fillRect(s(21),s(9),s(5),s(5));}
   // Mouth
   ctx.fillStyle = mouthPart.color;
@@ -86,7 +86,7 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   ctx.fillStyle = bodyColor || "#4A90D9";
   ctx.fillRect(s(2),s(26),s(32),s(24));
   // Outline
-  ctx.strokeStyle="#000"; ctx.lineWidth=1;
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
   ctx.strokeRect(s(2),s(26),s(32),s(24));
   // Arms
   ctx.fillStyle = skinPart.color;

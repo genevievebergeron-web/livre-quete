@@ -62,7 +62,7 @@ export const TASK_CATALOG = [
 ];
 
 export const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰ Rituel", defi:"🎯 Défis", outdoor:"🌳 Dehors" };
-export const DIFF_COLOR = d => ({ easy:"#2ECC40", medium:"#FFD700", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
+export const DIFF_COLOR = d => ({ easy:"#5CAD68", medium:"#D9BC5C", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
 // (emoji = placeholder temporaire — remplacé par du pixel-art dans le milestone art)
@@ -115,7 +115,7 @@ export const CAT_META = {
   routine:{label:"Routine",color:"#9B5DE5"},
   cuisine:{label:"Cuisine",color:"#FF8C42"},
   menage:{label:"Ménage",color:"#4A90D9"},
-  outdoor:{label:"Dehors",color:"#2ECC40"},
+  outdoor:{label:"Dehors",color:"#5CAD68"},
   defi:{label:"Défi",color:"#FF2D6F"},
   custom:{label:"Mes tâches",color:"#FFD24D"},
 };

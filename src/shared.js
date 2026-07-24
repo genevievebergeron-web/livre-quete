@@ -10,7 +10,7 @@ export const uid = () => Math.random().toString(36).slice(2,9);
 
 export const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
-export const COLORS = ["#4A90D9","#C060D0","#2ECC40","#FF6B35","#FFD700","#FF4444","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
+export const COLORS = ["#4A90D9","#C060D0","#5CAD68","#FF6B35","#D9BC5C","#D97070","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
 
 export const weekKey = (dd=new Date()) => { const d=new Date(dd); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
 
@@ -60,13 +60,13 @@ export const GLOBAL_CSS = `
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
   @keyframes shimmer{from{left:-50%}to{left:150%}}
   @keyframes mixedBg{0%{background:#0a0a14}20%{background:#140a0a}40%{background:#0a140a}60%{background:#0a0a14}80%{background:#14140a}100%{background:#0a0a14}}
-  @keyframes redPulse{from{box-shadow:0 0 8px #FF444440}to{box-shadow:0 0 20px #FF4444AA}}
+  @keyframes redPulse{from{box-shadow:0 0 8px #D9707040}to{box-shadow:0 0 20px #D97070AA}}
   @keyframes slideIn{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
   @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-  @keyframes glowPulse{0%,100%{text-shadow:3px 3px 0 #000,0 0 12px currentColor}60%{text-shadow:3px 3px 0 #000,0 0 32px currentColor,0 0 54px currentColor}}
+  @keyframes glowPulse{0%,100%{text-shadow:3px 3px 0 #0d0d0d,0 0 12px currentColor}60%{text-shadow:3px 3px 0 #0d0d0d,0 0 32px currentColor,0 0 54px currentColor}}
   @keyframes blink{0%,100%{opacity:1}49%{opacity:1}50%,99%{opacity:0}}
   @keyframes xpFill{from{width:0}to{width:var(--xp-target)}}
-  :root{--hp:#ff4444;--mp:#4488ff;--gold:#FFD700;--xp-clr:#4ade80;--xp-bg:#0d2010;}
+  :root{--hp:#ff4444;--mp:#4488ff;--gold:#D9BC5C;--xp-clr:#4ade80;--xp-bg:#0d2010;}
   .float-y{animation:floatY 2.4s ease-in-out infinite}
   .float-y-slow{animation:floatY 3.2s ease-in-out infinite}
   .glow-pulse{animation:glowPulse 2.8s ease-in-out infinite}
@@ -76,9 +76,14 @@ export const GLOBAL_CSS = `
   /* Mode calme (réglage enfant) : coupe animations, clignotements et lueurs pulsées */
   .calm-mode *{animation:none!important;transition:none!important}
   .calm-mode .blink{opacity:1!important}
-  .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #000,0 0 28px #FFD70045,4px 4px 0 #000!important;border-radius:4px!important}
-  .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#000;border:3px solid #000;box-shadow:4px 4px 0 #000;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
-  .btn-pixel-primary:hover{box-shadow:2px 2px 0 #000;transform:translate(2px,2px)}
+  .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #0d0d0d,0 0 28px #D9BC5C45,4px 4px 0 #0d0d0d!important;border-radius:4px!important}
+  .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#0d0d0d;border:3px solid #0d0d0d;box-shadow:4px 4px 0 #0d0d0d;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
+  .btn-pixel-primary:hover{box-shadow:2px 2px 0 #0d0d0d;transform:translate(2px,2px)}
+  /* Lot 6 #26 — retour tactile "bouton pixel enfoncé" générique, indépendant de la couleur du
+     bouton (contrairement à .btn-pixel-primary qui suppose le fond doré). :active plutôt que
+     :hover pour bien réagir au toucher sur tablette/téléphone, pas seulement à la souris. */
+  .btn-press{transition:transform 0.08s,box-shadow 0.08s}
+  .btn-press:active{transform:translate(2px,2px);box-shadow:0 0 0 #0d0d0d!important}
   .hp-bar-fill{background:var(--hp);height:100%;border-radius:2px;transition:width 0.4s}
   .mp-bar-fill{background:var(--mp);height:100%;border-radius:2px;transition:width 0.4s}
   .xp-step-fill{background:var(--xp-clr);height:100%;border-radius:2px;transition:width 0.5s ease}
@@ -100,9 +105,9 @@ export const displayName = (player) => (player?.pseudo?.trim()) || player?.name 
 // (themes.js, thèmes cosmétiques choisis par le joueur). Utilisé par App.jsx (thème hebdo) et
 // par des composants extraits (PinPad, RewardPopup).
 export const THEMES = {
-  minecraft: { name:"Minecraft", bg:"#1a1a2e", primary:"#5D9E34", accent:"#FFD700", card:"rgba(0,0,0,0.5)", text:"#fff" },
-  galaxy:    { name:"Galaxie",   bg:"#0a0a1a", primary:"#7B2FBE", accent:"#00D4FF", card:"rgba(10,0,30,0.7)", text:"#fff" },
-  ocean:     { name:"Océan",     bg:"#001a2e", primary:"#0066CC", accent:"#00FFB2", card:"rgba(0,10,30,0.7)", text:"#fff" },
-  volcano:   { name:"Volcan",    bg:"#1a0a00", primary:"#CC3300", accent:"#FF8C00", card:"rgba(30,10,0,0.7)", text:"#fff" },
+  minecraft: { name:"Minecraft", bg:"#1a1a2e", primary:"#5D9E34", accent:"#D9BC5C", card:"rgba(0,0,0,0.5)", text:"#fff" },
+  galaxy:    { name:"Galaxie",   bg:"#0a0a1a", primary:"#7A5FA8", accent:"#6BC4D9", card:"rgba(10,0,30,0.7)", text:"#fff" },
+  ocean:     { name:"Océan",     bg:"#001a2e", primary:"#3D75A8", accent:"#5CCCA0", card:"rgba(0,10,30,0.7)", text:"#fff" },
+  volcano:   { name:"Volcan",    bg:"#1a0a00", primary:"#B8543A", accent:"#D99248", card:"rgba(30,10,0,0.7)", text:"#fff" },
   forest:    { name:"Forêt",     bg:"#0a1a0a", primary:"#2E7D32", accent:"#A5D6A7", card:"rgba(0,20,0,0.7)",  text:"#fff" },
 };

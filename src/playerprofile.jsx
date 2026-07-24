@@ -88,7 +88,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🏆 CLASSEMENT FAMILLE</div>
             {siblings.map((s,rank)=>(
               <div key={s.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#FFD700":"#666",width:14}}>#{rank+1}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#D9BC5C":"#666",width:14}}>#{rank+1}</span>
                 <span style={{fontFamily:"'VT323',monospace",fontSize:16,color:s.isMe?s.color:"#aaa",flex:1,minWidth:50}}>{s.name}</span>
                 <div style={{flex:2,height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${Math.round(s.xp/maxXp*100)}%`,background:s.isMe?s.color:"#444",transition:"width 0.8s ease"}}/>
@@ -100,39 +100,39 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
         )}
         {/* 🪙 Échange de pièces — un enfant peut DONNER des pièces à un frère */}
         {canTrade && (
-          <div style={{background:"rgba(255,215,0,0.07)",border:"2px solid #FFD70055",borderRadius:8,padding:"10px 12px",marginBottom:12}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FFD700",marginBottom:6}}>🎁 DONNER DES PIÈCES</div>
+          <div style={{background:"rgba(255,215,0,0.07)",border:"2px solid #D9BC5C55",borderRadius:8,padding:"10px 12px",marginBottom:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginBottom:6}}>🎁 DONNER DES PIÈCES</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>Tu as {myCoins} 🪙. Choisis combien donner à {displayName(player)} :</div>
             <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
               {[5,10,25].map(v=>(
                 <button key={v} disabled={v>myCoins} onClick={()=>setGiveAmt(v)}
-                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:giveAmt===v?"#FFD700":"#1a1a1a",color:giveAmt===v?"#000":(v>myCoins?"#555":"#FFD700"),border:`2px solid ${v>myCoins?"#333":"#FFD700"}`,borderRadius:4,cursor:v>myCoins?"not-allowed":"pointer",opacity:v>myCoins?0.5:1}}>{v}</button>
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:giveAmt===v?"#D9BC5C":"#1a1a1a",color:giveAmt===v?"#0d0d0d":(v>myCoins?"#555":"#D9BC5C"),border:`2px solid ${v>myCoins?"#333":"#D9BC5C"}`,borderRadius:4,cursor:v>myCoins?"not-allowed":"pointer",opacity:v>myCoins?0.5:1}}>{v}</button>
               ))}
               <input type="number" min="1" max={myCoins} value={giveAmt||""} onChange={e=>setGiveAmt(Math.max(0,Math.min(myCoins,parseInt(e.target.value)||0)))}
                 placeholder="autre" style={{width:64,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center"}}/>
               <button disabled={!(giveAmt>0&&giveAmt<=myCoins)}
                 onClick={()=>{ if(giveAmt>0&&giveAmt<=myCoins&&onGiveCoins){ const ok=onGiveCoins(meId,player.id,giveAmt); if(ok){SFX.coin&&SFX.coin();setGiveAmt(0);onClose&&onClose();} } }}
-                style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(giveAmt>0&&giveAmt<=myCoins)?"#FFD700":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:(giveAmt>0&&giveAmt<=myCoins)?"pointer":"not-allowed",opacity:(giveAmt>0&&giveAmt<=myCoins)?1:0.5}}>🎁 Donner</button>
+                style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:(giveAmt>0&&giveAmt<=myCoins)?"#D9BC5C":"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:(giveAmt>0&&giveAmt<=myCoins)?"pointer":"not-allowed",opacity:(giveAmt>0&&giveAmt<=myCoins)?1:0.5}}>🎁 Donner</button>
             </div>
             {/* 📨 Demander des pièces (offre que le frère doit accepter) */}
-            <div style={{borderTop:"1px solid #FFD70033",marginTop:10,paddingTop:8}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#5DECF5",marginBottom:6}}>📨 DEMANDER DES PIÈCES</div>
+            <div style={{borderTop:"1px solid #D9BC5C33",marginTop:10,paddingTop:8}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:6}}>📨 DEMANDER DES PIÈCES</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>{displayName(player)} a {gs.coins||0} 🪙. Demande-lui un montant — il devra accepter.</div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                 {[5,10,25].map(v=>(
                   <button key={v} onClick={()=>setReqAmt(v)}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:reqAmt===v?"#5DECF5":"#1a1a1a",color:reqAmt===v?"#000":"#5DECF5",border:"2px solid #5DECF5",borderRadius:4,cursor:"pointer"}}>{v}</button>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"7px 10px",background:reqAmt===v?"#85CDD1":"#1a1a1a",color:reqAmt===v?"#0d0d0d":"#85CDD1",border:"2px solid #85CDD1",borderRadius:4,cursor:"pointer"}}>{v}</button>
                 ))}
                 <input type="number" min="1" value={reqAmt||""} onChange={e=>setReqAmt(Math.max(0,parseInt(e.target.value)||0))}
                   placeholder="autre" style={{width:64,fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center"}}/>
                 <button disabled={!(reqAmt>0)}
                   onClick={()=>{ if(reqAmt>0&&onCreateOffer){ const ok=onCreateOffer(meId,player.id,reqAmt); if(ok){SFX.click&&SFX.click();setReqAmt(0);onClose&&onClose();} } }}
-                  style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:reqAmt>0?"#5DECF5":"#333",color:"#000",border:"2px solid #000",borderRadius:4,cursor:reqAmt>0?"pointer":"not-allowed",opacity:reqAmt>0?1:0.5}}>📨 Demander</button>
+                  style={{flex:1,minWidth:90,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:reqAmt>0?"#85CDD1":"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:reqAmt>0?"pointer":"not-allowed",opacity:reqAmt>0?1:0.5}}>📨 Demander</button>
               </div>
             </div>
           </div>
         )}
-        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:10,background:player.color,color:"#000",border:"2px solid #000",borderRadius:4,cursor:"pointer",boxShadow:"3px 3px 0 #000"}}>✕ FERMER</button>
+        <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:10,background:player.color,color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>✕ FERMER</button>
       </div>
     </div>
   );

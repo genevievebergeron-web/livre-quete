@@ -7,7 +7,7 @@
 export const PLAYER_THEMES = {
   none: {
     id:"none", name:"Aucun", icon:"⬜",
-    bg:"#1a1a2e", primary:"#5D9E34", accent:"#FFD700", glow:"#FFD700",
+    bg:"#1a1a2e", primary:"#5D9E34", accent:"#D9BC5C", glow:"#D9BC5C",
     levels:["Débutant","Aventurier","Héros","Champion","LÉGENDE"],
     levelsF:["Débutante","Aventurière","Héroïne","Championne","LÉGENDE"],
     taskVerb:"complétée", winMsg:"Mission accomplie!", coinName:"Pièce",
@@ -19,14 +19,14 @@ export const PLAYER_THEMES = {
   },
   lego: {
     id:"lego", name:"LEGO", icon:"🧱",
-    bg:"#1a1a0a", primary:"#E3000B", accent:"#FFD700", glow:"#FFD700",
+    bg:"#1a1a0a", primary:"#E3000B", accent:"#D9BC5C", glow:"#D9BC5C",
     levels:["Apprenti","Constructeur","Architecte","Maître","LEGO MASTER"],
     levelsF:["Apprentie","Constructrice","Architecte","Maître","LEGO MASTER"],
     taskVerb:"construite", winMsg:"Tu as construit cette quête!", coinName:"Brique",
     platformBg:"#2a2a00", platformColor:"#E3000B", platformItem:"🧱",
     platformItems:["🧱","⚙️","🪄","🔵","🟡"],
     platformHazard:"💥", platformObstacle:"🟥",
-    charBodyColor:"#FFD700",
+    charBodyColor:"#D9BC5C",
     shopCategory:{ id:"lego", label:"🧱 LEGO", items:[
       {id:"lg1",emoji:"🧱",name:"Brique légendaire",  cost:20,slot:"themed"},
       {id:"lg2",emoji:"🪄",name:"Minifig spéciale",   cost:35,slot:"themed"},
@@ -38,7 +38,7 @@ export const PLAYER_THEMES = {
   },
   medieval: {
     id:"medieval", name:"Médiéval", icon:"⚔️",
-    bg:"#1a1400", primary:"#8B6914", accent:"#DAA520", glow:"#FFD700",
+    bg:"#1a1400", primary:"#8B6914", accent:"#DAA520", glow:"#D9BC5C",
     levels:["Paysan","Écuyer","Chevalier","Seigneur","ROI"],
     levelsF:["Paysanne","Écuyère","Chevalière","Dame","REINE"],
     taskVerb:"accomplie", winMsg:"Quête accomplie, noble guerrier!", coinName:"Pièce d'or",
@@ -234,7 +234,7 @@ export const PLAYER_THEMES = {
   // ── ROBLOX ────────────────────────────────────────────────
   roblox: {
     id:"roblox", name:"Roblox", icon:"🎮",
-    bg:"#0a0a0a", primary:"#CC0000", accent:"#FF4444", glow:"#FF6666",
+    bg:"#0a0a0a", primary:"#CC0000", accent:"#D97070", glow:"#FF6666",
     levels:["Noob","Builder","Pro","Admin","OWNER"],
     levelsF:["Noob","Builder","Pro","Admin","OWNER"],
     taskVerb:"obbyée", winMsg:"OOF. Quête complétée. Tu n'es plus un noob. Presque.",
@@ -294,7 +294,7 @@ export const PLAYER_THEMES = {
   // ── HORREUR ───────────────────────────────────────────────
   horreur: {
     id:"horreur", name:"Horreur", icon:"😱",
-    bg:"#050005", primary:"#880000", accent:"#FF2222", glow:"#FF4444",
+    bg:"#050005", primary:"#880000", accent:"#FF2222", glow:"#D97070",
     levels:["Trouillard","Nerveux","Courageux","Survivant","DERNIER SURVIVANT"],
     levelsF:["Trouillarde","Nerveuse","Courageuse","Survivante","DERNIER SURVIVANT"],
     taskVerb:"survécue", winMsg:"Tu as accompli ça. Dans le noir. Sans mourir. Impressive.",
@@ -475,7 +475,7 @@ export const PLAYER_THEMES = {
   // ── MINECRAFT ++ ──────────────────────────────────────────
   minecraftpp: {
     id:"minecraftpp", name:"Minecraft ++", icon:"⛏️",
-    bg:"#0d1a0d", primary:"#4A9E34", accent:"#5DECF5", glow:"#5DECF5",
+    bg:"#0d1a0d", primary:"#4A9E34", accent:"#85CDD1", glow:"#85CDD1",
     levels:["Bois","Pierre","Fer","Or","DIAMANT LÉGENDAIRE"],
     levelsF:["Bois","Pierre","Fer","Or","DIAMANT LÉGENDAIRE"],
     taskVerb:"craftée", winMsg:"Steve a construit une maison entière en une nuit. Toi t'as rangé une brassée. Respect quand même.",
@@ -653,7 +653,7 @@ export const PLAYER_THEMES = {
   // ── MARVEL ───────────────────────────────────────────────────
   marvel: {
     id:"marvel", name:"Marvel", icon:"⚡",
-    bg:"#05000f", primary:"#CC1111", accent:"#FF4444", glow:"#FF8888",
+    bg:"#05000f", primary:"#CC1111", accent:"#D97070", glow:"#FF8888",
     levels:["Civil","Agent S.H.I.E.L.D","Avenger","Super-héros","VENGEUR LÉGENDAIRE"],
     levelsF:["Civile","Agente S.H.I.E.L.D","Avenger","Super-héroïne","VENGERESSE LÉGENDAIRE"],
     taskVerb:"sauvée", winMsg:"L'univers est en sécurité. Pour l'instant. Va ranger ta chambre, Spider-Man.",

@@ -137,7 +137,7 @@ export function SetupWizard({ existing, onDone }) {
   // Styles
   const card = { background:T.card, border:`2px solid ${T.accent}40`, borderRadius:8, padding:"16px 18px" };
   const Btn = ({active,children,onClick,style={},...p}) => (
-    <button onClick={()=>{SFX.click();onClick?.();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",padding:"8px 14px",background:active?T.accent:"#222",color:active?"#000":"#888",border:`2px solid ${active?T.accent:"#444"}`,borderRadius:3,cursor:"pointer",boxShadow:active?`3px 3px 0 #000,0 0 10px ${T.accent}50`:"2px 2px 0 #000",transition:"all 0.1s",...style}} {...p}>{children}</button>
+    <button className="btn-press" onClick={()=>{SFX.click();onClick?.();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",padding:"8px 14px",background:active?T.accent:"#222",color:active?"#0d0d0d":"#888",border:`2px solid ${active?T.accent:"#444"}`,borderRadius:3,cursor:"pointer",boxShadow:active?`3px 3px 0 #0d0d0d,0 0 10px ${T.accent}50`:"2px 2px 0 #0d0d0d",transition:"all 0.1s",...style}} {...p}>{children}</button>
   );
 
   const canProceed = () => {
@@ -168,7 +168,7 @@ export function SetupWizard({ existing, onDone }) {
       <div style={{width:"100%",maxWidth:680,display:"flex",flexDirection:"column",gap:8}}>
         <div style={{display:"flex",gap:5,flexWrap:"wrap",justifyContent:"center"}}>
           {STEPS.map((s,i)=>(
-            <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.75vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#222",color:i<=step?"#000":"#444",borderRadius:2,border:`2px solid ${i===step?"#000":i<step?"#000":"#333"}`,cursor:i<step?"pointer":"default",boxShadow:i===step?"3px 3px 0 #000":i<step?"2px 2px 0 #000":"none",transition:"all 0.15s"}}>
+            <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.75vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#222",color:i<=step?"#0d0d0d":"#444",borderRadius:2,border:`2px solid ${i===step?"#0d0d0d":i<step?"#0d0d0d":"#333"}`,cursor:i<step?"pointer":"default",boxShadow:i===step?"3px 3px 0 #0d0d0d":i<step?"2px 2px 0 #0d0d0d":"none",transition:"all 0.15s"}}>
               {i<step?"✓ ":""}{s}
             </div>
           ))}
@@ -277,8 +277,8 @@ export function SetupWizard({ existing, onDone }) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{task.label}</div>
                     <div style={{display:"flex",gap:6}}>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5DECF5"}}>⚡{task.xp}</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙{task.coins}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{task.xp}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙{task.coins}</span>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff)}}>{task.diff}</span>
                     </div>
                   </div>
@@ -303,7 +303,7 @@ export function SetupWizard({ existing, onDone }) {
                       <span style={{fontSize:17}}>{task.emoji}</span>
                       <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</span>
                       <button onClick={()=>duplicateAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:14,padding:2}} title="Dupliquer">⧉</button>
-                      <button onClick={()=>removeAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#FF4444",cursor:"pointer",fontSize:16,padding:2}}>×</button>
+                      <button onClick={()=>removeAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:2}}>×</button>
                     </div>
                     {/* Player assignment — each toggled player gets their own independent copy */}
                     <div style={{marginBottom:mode==="week"?6:4}}>
@@ -313,11 +313,11 @@ export function SetupWizard({ existing, onDone }) {
                           const sel=ass.playerIds.includes(pl.id);
                           return <div key={pl.id} onClick={()=>toggleAssignmentPlayer(ass.instanceId,pl.id)}
                             style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",
-                              background:sel?pl.color:"#1a1a1a",color:sel?"#000":"#555",
+                              background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",
                               border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer",
                               boxShadow:sel?`0 0 8px ${pl.color}60`:"none",transition:"all 0.12s",
                               display:"flex",alignItems:"center",gap:4}}>
-                            <span style={{width:7,height:7,borderRadius:"50%",background:sel?"#000":pl.color,display:"inline-block"}}/>
+                            <span style={{width:7,height:7,borderRadius:"50%",background:sel?"#0d0d0d":pl.color,display:"inline-block"}}/>
                             {displayName(pl)}
                           </div>;
                         })}
@@ -333,7 +333,7 @@ export function SetupWizard({ existing, onDone }) {
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
                         {DAYS_SHORT.map((d,i)=>(
                           <div key={i} onClick={()=>toggleAssignmentDay(ass.instanceId,i)}
-                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"2px 5px",background:ass.days.includes(i)?T.accent:"#222",color:ass.days.includes(i)?"#000":"#555",border:`1px solid ${ass.days.includes(i)?T.accent:"#444"}`,borderRadius:2,cursor:"pointer"}}>
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"2px 5px",background:ass.days.includes(i)?T.accent:"#222",color:ass.days.includes(i)?"#0d0d0d":"#555",border:`1px solid ${ass.days.includes(i)?T.accent:"#444"}`,borderRadius:2,cursor:"pointer"}}>
                             {d}
                           </div>
                         ))}
@@ -363,9 +363,9 @@ export function SetupWizard({ existing, onDone }) {
                   <span style={{fontSize:26}}>{r.emoji}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:sel?"#fff":"#aaa"}}>{r.label}</div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFD700"}}>🪙 {r.coins} pièces</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙 {r.coins} pièces</div>
                   </div>
-                  <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"safe center",color:"#000",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
+                  <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"safe center",color:"#0d0d0d",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
                 </div>
               );
             })}
