@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.4.0", date:"2026-07-24", features:[
+    "🏡 Nouvel Espace Famille : vos 4 avatars flânent maintenant ensemble dans une petite scène sur la Vue Famille — cliquez sur un avatar pour ouvrir son profil.",
+  ]},
   { version:"2.3.0", date:"2026-07-24", features:[
     "🎨 La palette adoucie touche maintenant aussi les couleurs déjà choisies pour vous 4 (avant, seules les couleurs de l'interface avaient changé) — vos avatars deviennent plus doux dès la prochaine ouverture.",
     "📱 Correctif : sur téléphone, le menu du bas ne se cache plus derrière les boutons du système.",
@@ -2504,6 +2507,67 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   );
 });
 
+// ─── ESPACE FAMILLE (Lot 6 #27) ──────────────────────────────
+// Petite scène où les 4 avatars flânent (idle, purement décoratif — aucune position n'est
+// enregistrée ni synchronisée, ça repart à zéro à chaque chargement). Clic sur un avatar =
+// ouvre son profil (même modal que l'ancien bouton "📊 Profil"). Clic ailleurs dans la scène =
+// fait marcher SON PROPRE avatar jusque là (si on est connecté comme un enfant, pas en mode
+// parent). Volontairement pas de mécanique de jeu (pas de score, pas de collecte) — un espace
+// social, pas un jeu de plus.
+function FamilySpace({ config, gameStates, meId, onOpenProfile, th }) {
+  const players = config.players || [];
+  const [positions, setPositions] = useState(() => {
+    const obj = {};
+    players.forEach((p, i) => { obj[p.id] = players.length>1 ? 12 + i*(76/(players.length-1)) : 50; });
+    return obj;
+  });
+  // Flânerie ambiante : chaque avatar a une chance de dériver vers une nouvelle position
+  // toutes les quelques secondes — juste pour que la scène se sente vivante.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPositions(prev => {
+        const next = {...prev};
+        players.forEach(p => {
+          if (Math.random() < 0.5) {
+            const cur = next[p.id] ?? 50;
+            next[p.id] = Math.max(8, Math.min(92, cur + (Math.random()-0.5)*34));
+          }
+        });
+        return next;
+      });
+    }, 4000 + Math.random()*2000);
+    return () => clearInterval(interval);
+  }, [players.length]);
+
+  const handleSceneClick = (e) => {
+    if (!meId || meId === "parent") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(8, Math.min(92, ((e.clientX - rect.left) / rect.width) * 100));
+    setPositions(prev => ({...prev, [meId]: pct}));
+  };
+
+  return (
+    <div onClick={handleSceneClick} style={{position:"relative",height:150,background:`linear-gradient(180deg, ${th.bg||"#1a1a2e"} 0%, ${th.primary||"#2a2a4a"}33 100%)`,borderRadius:10,border:`2px solid ${th.accent||"#5CAD68"}33`,overflow:"hidden",cursor:"pointer",marginBottom:2}}>
+      <div style={{position:"absolute",bottom:0,left:0,right:0,height:16,background:`${th.accent||"#5CAD68"}22`,borderTop:`2px solid ${th.accent||"#5CAD68"}55`}}/>
+      {players.map((p,i)=>{
+        const gs = gameStates[i] || {};
+        const x = positions[p.id] ?? 50;
+        const isMe = p.id===meId;
+        return (
+          <div key={p.id}
+            onClick={(e)=>{ e.stopPropagation(); SFX.click(); onOpenProfile(i); }}
+            className="float-y"
+            style={{position:"absolute",bottom:12,left:`${x}%`,transform:"translateX(-50%)",transition:"left 3.5s ease-in-out",cursor:"pointer",textAlign:"center",zIndex:isMe?2:1}}>
+            <AvatarCanvas avatarDef={gs.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(p.themeId).charBodyColor||p.color} size={44}
+              style={{border:`2px solid ${p.color}`,borderRadius:6,boxShadow:isMe?`0 0 10px ${p.color}80`:"none"}}/>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color,marginTop:2,textShadow:"1px 1px 0 #0d0d0d"}}>{displayName(p)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
 
 // v1.95.0 (Lot 5 #23) — memo() : évite un re-render quand ses props n'ont pas vraiment changé
@@ -2521,6 +2585,9 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onCreateOffer={onCreateOffer} onClose={()=>setProfileIdx(null)} assignments={[...(config.assignments||[]),...(isCustodyWeek()?(config.weeklyQuests?.assignments||[]):[])]}/>
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
+
+      {/* Lot 6 #27 — espace famille : les avatars flânent, clic pour ouvrir un profil ou se déplacer */}
+      <FamilySpace config={config} gameStates={gameStates} meId={meId} onOpenProfile={setProfileIdx} th={th}/>
 
       {/* ⚔️ Boss de famille — PV du boss (attaqué via les jetons gagnés en quêtes) */}
       {config.boss && (()=>{
