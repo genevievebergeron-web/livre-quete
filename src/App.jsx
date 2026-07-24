@@ -13,7 +13,7 @@ import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "1.107.0";
+const APP_VERSION = "1.108.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -210,6 +210,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.108.0", date:"2026-07-24", features:[
+    "🔄 QUÊTES ROTATIVES! Chaque semaine chez maman, tes tâches d'entretien (vaisselle, plancher, verdure pour Boulette, etc.) tournent automatiquement entre vous 4 — plus besoin que quelqu'un les assigne à la main.",
+    "⭐ DÉFI DE LA SEMAINE! Un défi personnel juste pour toi (pas une corvée — plutôt un objectif du genre \"pratiquer le hockey\" ou \"communiquer mes émotions\"). Coche-le chaque jour où tu réussis — 7 jours sur 7 et tu débloques un cadre d'avatar spécial!",
+    "📍 Une bannière discrète t'avertit quand c'est la semaine chez l'autre parent : tes quêtes de la maison t'attendent à ton retour.",
+  ]},
   { version:"1.107.0", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -967,6 +972,8 @@ const migrateGameState = (gs) => {
     badges: gs.badges || [],
     boughtRewards: gs.boughtRewards || [],
     refundedRewards: gs.refundedRewards || [], // v1.69.0 — tombstone anti-remboursement-infini
+    pending: gs.rotativeCleanupV1 ? (gs.pending || []) : [], // v1.108.0 — ménage unique (Gen) : vide les tâches en suspens pour la bascule vers les quêtes rotatives
+    rotativeCleanupV1: true, // v1.108.0 — drapeau : ménage de transition Lot 7 appliqué (xp/coins/badges/completed/routines intacts)
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
@@ -1006,6 +1013,11 @@ const migrateSavedData = (data) => {
   if (mergedConfig.pin == null) mergedConfig.pin = "1146"; // fix: spread can't override undefined
   if (!Array.isArray(mergedConfig.players)) mergedConfig.players = [];
   if (!Array.isArray(mergedConfig.assignments)) mergedConfig.assignments = [];
+  if (!mergedConfig.rotativeCleanupV1) { // v1.108.0 — ménage unique (demandé par Gen) : bascule vers les quêtes rotatives (Lot 7B) —
+    mergedConfig.assignments = [];       // vide les anciennes assignations manuelles pour laisser toute la place à weeklyQuests
+    mergedConfig.removalRequests = [];   // demandes de retrait orphelines (pointaient sur des assignations qui disparaissent)
+    mergedConfig.rotativeCleanupV1 = true;
+  }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   return {
     ...data,
@@ -2650,7 +2662,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const stamp="#"+todayStamp();
         const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));
         const countToday=doneToday.length;
-        const axp={}; (config.assignments||[]).forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
+        const axp={}; assignments.forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
         const xpToday=doneToday.reduce((s,k)=>{const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); return s+(axp[inst]||0);},0);
         const OBJ=[
           {id:"o3",  label:"Faire 3 quêtes",  prog:Math.min(countToday,3), goal:3,  xp:10, coins:5},
@@ -3304,7 +3316,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
 // ─── FAMILY OVERVIEW ─────────────────────────────────────────
 // ─── PLAYER PROFILE MODAL (#8) ───────────────────────────────
-function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins, onCreateOffer }) {
+function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins, onCreateOffer, assignments }) {
   const gs = pState;
   const [giveAmt, setGiveAmt] = useState(0);
   const [reqAmt, setReqAmt] = useState(0);
@@ -3315,7 +3327,7 @@ function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, 
   const bar = xpBar(gs.xp||0);
   const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
   const myBadges = (gs.badges||[]).map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).slice(-6);
-  const myDone = config.assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
+  const myDone = assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
   const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
   const maxXp = Math.max(...siblings.map(s=>s.xp),1);
   return (
@@ -3443,7 +3455,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
   return (
     <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
       {profileIdx!==null&&(
-        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onCreateOffer={onCreateOffer} onClose={()=>setProfileIdx(null)}/>
+        <PlayerProfile player={config.players[profileIdx]} pState={gameStates[profileIdx]||{xp:0,coins:0,completed:[],badges:[]}} config={config} gameStates={gameStates} th={th} meId={meId} onGiveCoins={onGiveCoins} onCreateOffer={onCreateOffer} onClose={()=>setProfileIdx(null)} assignments={[...(config.assignments||[]),...(isCustodyWeek()?(config.weeklyQuests?.assignments||[]):[])]}/>
       )}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent,marginBottom:4}}>👨‍👩‍👧‍👦 VUE FAMILLE</div>
 
@@ -3472,8 +3484,9 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
       <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10}}>
         {(config.players||[]).map((player,i)=>{
           const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
-          const myDone=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)&&ps.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
-          const myTotal=(config.assignments||[]).filter(a=>a.playerIds.includes(player.id)).length;
+          const _allAss=[...(config.assignments||[]),...(isCustodyWeek()?(config.weeklyQuests?.assignments||[]):[])];
+          const myDone=_allAss.filter(a=>a.playerIds.includes(player.id)&&ps.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
+          const myTotal=_allAss.filter(a=>a.playerIds.includes(player.id)).length;
           const pct=myTotal>0?Math.round((myDone/myTotal)*100):0;
           const lv=getLevel(ps.xp);
           return (
@@ -3604,7 +3617,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
-  onExport, onImport, onSetup, players, th }) {
+  onExport, onImport, onSetup, players, th, onUpdateChallenge }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const nbValid = nbPending + removalReqs.length;
@@ -3666,6 +3679,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
         <TabBtn k="valid"    l={`✅ À valider${nbValid>0?` (${nbValid})`:""}`}/>
         <TabBtn k="tasks"    l="📋 Tâches"/>
+        <TabBtn k="defis"    l="🌟 Défis"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
         <TabBtn k="cal"      l="📅 Calendrier"/>
         <TabBtn k="log"      l="🕐 Journal"/>
@@ -3897,6 +3911,59 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             })()}
           </div>
         )}
+
+        {/* DÉFIS TAB — Lot 7C : gestion des défis perso hebdomadaires */}
+        {tab==="defis" && (()=>{
+          const cwk = custodyWeekKey();
+          const inCustody = isCustodyWeek();
+          const challenges = config.weeklyChallenge?.challenges || [];
+          const checkinCount = (ch) => Object.values(ch.checkins||{}).filter(Boolean).length;
+          return (
+            <div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>🌟 DÉFIS PERSONNELS DE LA SEMAINE</div>
+              {!inCustody && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",marginBottom:10}}>📍 Semaine de pause — les défis reprennent vendredi.</div>}
+              {players.map(pl=>{
+                const ch = challenges.find(c=>c.playerId===pl.id);
+                const n = checkinCount(ch||{});
+                return (
+                  <div key={pl.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl.color}50`,borderRadius:5,padding:"10px",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:pl.color,flexShrink:0}}/>
+                      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:pl.color}}>{displayName(pl)}</div>
+                      <div style={{marginLeft:"auto",fontFamily:"'VT323',monospace",fontSize:15,color:"#FFD700"}}>{n}/7 jours ⭐</div>
+                    </div>
+                    <div style={{display:"flex",gap:5,marginBottom:8}}>
+                      <input defaultValue={ch?.emoji||"⭐"} maxLength={2}
+                        style={{width:34,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:18,padding:"4px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,textAlign:"center"}}
+                        onBlur={e=>{if(onUpdateChallenge) onUpdateChallenge(pl.id, document.getElementById(`defi_text_${pl.id}`)?.value||ch?.text||"", e.target.value||"⭐");}}
+                        id={`defi_emoji_${pl.id}`}/>
+                      <input defaultValue={ch?.text||""} placeholder="Décris le défi…" maxLength={80}
+                        style={{flex:1,boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}
+                        id={`defi_text_${pl.id}`}
+                        onBlur={e=>{if(onUpdateChallenge) onUpdateChallenge(pl.id, e.target.value, document.getElementById(`defi_emoji_${pl.id}`)?.value||ch?.emoji||"⭐");}}/>
+                    </div>
+                    {ch && <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                      {Array.from({length:7},(_,i)=>{
+                        const d = new Date(cwk+"T12:00:00"); d.setDate(d.getDate()+i);
+                        const stamp=d.toISOString().slice(0,10);
+                        const done=ch.checkins?.[stamp];
+                        return <div key={stamp} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"3px 4px",background:done?"#1a3a1a":"#111",color:done?"#2ECC40":"#555",border:`1px solid ${done?"#2ECC40":"#333"}`,borderRadius:3}}>J{i+1}{done?" ✓":""}</div>;
+                      })}
+                    </div>}
+                  </div>
+                );
+              })}
+              {inCustody && (
+                <div style={{marginTop:8,borderTop:"2px solid #333",paddingTop:12}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>📅 QUÊTES RÉCURRENTES</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666"}}>
+                    {(config.weeklyQuests?.assignments||[]).length} tâches auto-générées pour la semaine de garde (rotation déterministe).
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ACTIONS TAB */}
         {tab==="actions" && <>
@@ -6759,6 +6826,7 @@ export default function App() {
           onExport={handleExport}
           onImport={handleImport}
           onSetup={onParentPanelSetup}
+          onUpdateChallenge={handleUpdateChallenge}
         />
       )}
 

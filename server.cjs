@@ -160,6 +160,13 @@ const mergeFamily = (base, incoming) => {
     pin: newerC.pin || bC.pin || iC.pin || "1146",
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+    // Lot 7 — last-write-wins par weekKey (plus récent gagne)
+    weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests; if (!a) return b||null; if (!b) return a; return (a.generatedForWeek||"") >= (b.generatedForWeek||"") ? a : b; })(),
+    weeklyChallenge: (() => { const a=bC.weeklyChallenge, b=iC.weeklyChallenge; if (!a) return b||null; if (!b) return a;
+      if (a.weekKey !== b.weekKey) return (a.weekKey||"") >= (b.weekKey||"") ? a : b;
+      // Même semaine : fusionner les checkins par enfant (union des jours cochés)
+      const cMap = new Map(); for (const c of [...(a.challenges||[]),...(b.challenges||[])]) { if (!c?.playerId) continue; if (!cMap.has(c.playerId)) cMap.set(c.playerId, {...c}); else { const ex=cMap.get(c.playerId); cMap.set(c.playerId, {...b.challenges?.find(x=>x.playerId===c.playerId)||ex, checkins:{...ex.checkins,...c.checkins}}); } } return {...b, challenges:[...cMap.values()]}; })(),
+    custodySchedule: newerC.custodySchedule || bC.custodySchedule || iC.custodySchedule,
   };
   return { ...newer, config, gameStates, savedAt: preferIncoming ? incoming.savedAt : base.savedAt };
 };
