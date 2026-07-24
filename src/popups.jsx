@@ -108,7 +108,7 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
         {failCount>=2&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:6,textAlign:"center"}}>{FUNNY_PIN_MSGS[Math.min(failCount-2,FUNNY_PIN_MSGS.length-1)]}</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
           {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
-            <button key={k} onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
+            <button key={k} className="btn-press" onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
               style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"#888":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #0d0d0d"}}>
               {k}
             </button>
@@ -154,7 +154,7 @@ export function RewardPopup({ task, player, newBadges, onClose, th }) {
             ))}
           </div>
         )}
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#5CAD68",color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>→ CONTINUER ←</button>
+        <button className="btn-press" onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"11px 22px",background:"#5CAD68",color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>→ CONTINUER ←</button>
       </div>
     </div>
   );

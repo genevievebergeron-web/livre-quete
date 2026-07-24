@@ -8,7 +8,7 @@ import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE,
 import { Countdown, HeaderClock, TimeTimerDisc } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
-import { DAYS_SHORT, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS } from "./shared.js";
+import { DAYS_SHORT, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.3.0", date:"2026-07-24", features:[
+    "🎨 La palette adoucie touche maintenant aussi les couleurs déjà choisies pour vous 4 (avant, seules les couleurs de l'interface avaient changé) — vos avatars deviennent plus doux dès la prochaine ouverture.",
+    "📱 Correctif : sur téléphone, le menu du bas ne se cache plus derrière les boutons du système.",
+    "🖥️ Correctif : sur ordinateur, le nom des sections (Accueil/Aujourd'hui/Semaine/Boutique) ne se cache plus derrière le petit texte de version en bas.",
+    "👆 Le retour tactile \"bouton pressé\" est maintenant partout, pas juste sur un bouton.",
+  ]},
   { version:"2.2.0", date:"2026-07-24", features:[
     "🎨 Palette adoucie partout dans l'app — les couleurs vives (or, cyan, vert, rouge, violet, orange) sont maintenant plus douces, moins agressives à l'œil, et le noir pur est remplacé par un noir un peu plus doux. Même look, contraste moins intense.",
     "👆 Les boutons principaux réagissent maintenant au toucher/clic (petit effet \"pressé\") pour un retour plus satisfaisant.",
@@ -1012,6 +1018,14 @@ const migrateSavedData = (data) => {
     mergedConfig.removalRequests = [];   // demandes de retrait orphelines (pointaient sur des assignations qui disparaissent)
     mergedConfig.rotativeCleanupV1 = true;
   }
+  if (!mergedConfig.colorToneDownV1) { // v2.2.0 (Lot 6 #26, demandé par Gen) : les couleurs de joueur sont
+    // enregistrées une fois au choix et ne se recalculent plus jamais depuis COLORS — sans cette
+    // migration ponctuelle, la palette adoucie n'aurait aucun effet sur les enfants déjà configurés.
+    mergedConfig.players = (mergedConfig.players || []).map(p =>
+      p && COLOR_DESATURATE_MAP[p.color] ? { ...p, color: COLOR_DESATURATE_MAP[p.color] } : p
+    );
+    mergedConfig.colorToneDownV1 = true;
+  }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   return {
     ...data,
@@ -1149,7 +1163,7 @@ const Platformer = ({ player, onClose }) => {
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent}}>
         {pt.platformItems[0]} ×{collected} ramassés!
       </div>
-      {done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🏆 CONTINUER →</button>}
+      {done && <button className="btn-press" onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:pt.accent,color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🏆 CONTINUER →</button>}
       {!done && <button onClick={()=>onClose(collected)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer"}}>Passer</button>}
     </div>
   );
@@ -1437,7 +1451,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.7vw,14px)",color:th.accent||"#5CAD68",margin:"12px 0 6px"}}>RITUEL COMPLÉTÉ!</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff",lineHeight:1.3}}>Bravo, tu as fini « {ritualWin.name} » au complet! 🎉</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9ad29a",marginTop:8}}>Quelle belle job. 👏</div>
-            <button onClick={(e)=>{e.stopPropagation();setRitualWin(null);}} style={{marginTop:16,fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 22px",background:th.accent||"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>YEAH!</button>
+            <button className="btn-press" onClick={(e)=>{e.stopPropagation();setRitualWin(null);}} style={{marginTop:16,fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 22px",background:th.accent||"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>YEAH!</button>
           </div>
         </div>
       )}
@@ -1503,7 +1517,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:6}}>Explique ce qui ne marche pas — ton parent va le recevoir :</div>
           <textarea value={bugText} onChange={e=>setBugText(e.target.value.slice(0,300))} autoFocus placeholder="ex: quand je clique sur..., il se passe..."
             style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"10px 12px",background:"#111",color:"#fff",border:"2px solid #D99248",borderRadius:6,outline:"none",minHeight:120,resize:"vertical"}}/>
-          <button disabled={!bugText.trim()} onClick={()=>{ if(bugText.trim()&&onReportBug){ const ok=onReportBug(bugText.trim()); if(ok){setBugOpen(false);setBugText("");} } }}
+          <button className="btn-press" disabled={!bugText.trim()} onClick={()=>{ if(bugText.trim()&&onReportBug){ const ok=onReportBug(bugText.trim()); if(ok){setBugOpen(false);setBugText("");} } }}
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,11px)",padding:"15px",marginTop:10,background:bugText.trim()?"#D99248":"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:bugText.trim()?"pointer":"not-allowed",opacity:bugText.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>📨 Envoyer au parent</button>
         </div>
       )}
@@ -1525,7 +1539,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:5}}>❓ THÈME MYSTÈRE</div>
             : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#aaa",marginBottom:5,textShadow:`0 0 8px ${pt.glow}60`}}>Niv.{lvTitle.level} — {lvTitle.title}</div>
           }
-          {isRandomUnrevealed && <button onClick={()=>{setThemeRevealed(true);SFX.epic();spawnParticles("🎲");}}
+          {isRandomUnrevealed && <button className="btn-press" onClick={()=>{setThemeRevealed(true);SFX.epic();spawnParticles("🎲");}}
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 12px",background:"linear-gradient(90deg,#D97070,#D9BC5C,#44FF44)",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d",marginBottom:4}}>
             🎲 RÉVÉLER MON THÈME!
           </button>}
@@ -1690,7 +1704,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               ); })}
             </div>
           </div>
-          <button onClick={()=>{SFX.click();setSettingsOpen(false);}}
+          <button className="btn-press" onClick={()=>{SFX.click();setSettingsOpen(false);}}
             style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:8,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
             ← Retour
           </button>
@@ -1737,7 +1751,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 );
               })}
             </div>
-            <button onClick={()=>{SFX.click();setThemePicker(false);}}
+            <button className="btn-press" onClick={()=>{SFX.click();setThemePicker(false);}}
               style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",marginTop:14,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
               ← Retour
             </button>
@@ -1763,7 +1777,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
               </div>
-              {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
+              {!done&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
                 style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 ✔ J'AI ÉTUDIÉ!
               </button>}
@@ -1786,7 +1800,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{fontSize:"clamp(13px,1.6vw,16px)",color:"#FFF",lineHeight:1.4,marginBottom:8}}>{myChallenge.emoji||"⭐"} {myChallenge.text||"Défi à venir…"}</div>
             {done
               ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5CAD68"}}>✅ Défi relevé aujourd'hui!</div>
-              : onChallengeCheckin && <button onClick={()=>{SFX.click();onChallengeCheckin(today,true);}}
+              : onChallengeCheckin && <button className="btn-press" onClick={()=>{SFX.click();onChallengeCheckin(today,true);}}
                   style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#D9BC5C",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                   ✅ J'ai réussi aujourd'hui!
                 </button>}
@@ -1825,7 +1839,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>📅 AUJOURD'HUI</span>
               </div>
-              {!done&&<button onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
+              {!done&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
                 style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 ✔ J'AI ÉTUDIÉ!
               </button>}
@@ -1970,7 +1984,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{SFX.click();setRoutineBuilder(null);}}
               style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>Annuler</button>
-            <button disabled={!routineBuilder.name.trim()||routineBuilder.taskIds.length===0}
+            <button className="btn-press" disabled={!routineBuilder.name.trim()||routineBuilder.taskIds.length===0}
               onClick={()=>{
                 const name=routineBuilder.name.trim(); if(!name||routineBuilder.taskIds.length===0)return;
                 const data={name,emoji:routineBuilder.emoji,endTime:routineBuilder.endTime||"",taskIds:routineBuilder.taskIds};
@@ -2167,7 +2181,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
-        <button onClick={()=>{
+        <button className="btn-press" onClick={()=>{
             if(window.confirm("Terminer le rituel et revenir au mode Semaine?")){ onPatchState({mode:"week",activeRoutineId:null}); SFX.epic && SFX.epic(); }
           }}
           style={{width:"100%",padding:"11px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#5CAD68",border:"3px solid #0d0d0d",borderRadius:4,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
@@ -2284,7 +2298,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {chestReveal.dup
               ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#D9BC5C"}}>Tu l'avais déjà! Doublon → +{chestReveal.refund} 🪙</div>
               : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#5CAD68"}}>Nouvel item débloqué! 🎉</div>}
-            <button onClick={()=>{SFX.click();setChestReveal(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"14px 28px",background:rar.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>Super!</button>
+            <button className="btn-press" onClick={()=>{SFX.click();setChestReveal(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"14px 28px",background:rar.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>Super!</button>
           </div>
         );
       })()}
@@ -2430,7 +2444,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#D97070,#D9BC5C)",transition:"width 0.5s"}}/></div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
-            <button onClick={()=>{ if(SFX.click)SFX.click(); setFinalBattle(true); }}
+            <button className="btn-press" onClick={()=>{ if(SFX.click)SFX.click(); setFinalBattle(true); }}
               style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1.5,padding:"13px 8px",background:"linear-gradient(90deg,#7B2FF2,#FF5555)",color:"#fff",border:"2px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 3px 0 #0d0d0d"}}>
               🐉 COMBAT FINAL<br/><span style={{fontFamily:"'VT323',monospace",fontSize:13}}>Affronte ta tête d'Hydre en mini-jeu!</span>
             </button>
@@ -2450,7 +2464,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 {atkBtn("petite",`${boss.atkEmoji?.petite||"🗡️"} Petite`,`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
                 {atkBtn("grosse",`${boss.atkEmoji?.grosse||"💥"} Grosse`,`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
               </div>
-              <button onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
+              <button className="btn-press" onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
                 style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#D9BC5C":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#0d0d0d":"#999",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 🐾 Attaque du familier<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{PET_ATTACK_COST} jetons · dégâts selon ton familier{_petReady?"":" — nourris-le, niv.4+"}</span>
               </button>
@@ -2464,7 +2478,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {/* v1.89.0 (desktop/mobile flex) — la bande reste pleine largeur (continuité visuelle),
           mais les boutons eux-mêmes restent groupés dans une colonne de largeur raisonnable
           au lieu de s'étirer d'un bord à l'autre d'un écran d'ordinateur. */}
-      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",justifyContent:"center",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)"}}>
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",justifyContent:"center",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)",paddingBottom:"env(safe-area-inset-bottom)"}}>
         <div style={{display:"flex",width:"100%",maxWidth:900}}>
         {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
           const tabs=[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],...(bossActive?[["boss","⚔️","BOSS"]]:[]),["sem","📅","Semaine"],["shop","🛒","Boutique"]];
@@ -2717,7 +2731,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   );
   const Row = ({children,style={}}) => <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,...style}}>{children}</div>;
   const PBtn = ({onClick,color="#333",textColor="#fff",children,style={}}) => (
-    <button onClick={onClick} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",
+    <button className="btn-press" onClick={onClick} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",
       padding:"8px 12px",background:color,color:textColor,border:"2px solid #0d0d0d",borderRadius:3,
       cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",flexShrink:0,...style}}>
       {children}
@@ -3828,7 +3842,7 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(17px,2.6vw,21px)",color:"#fff",maxWidth:380,lineHeight:1.35}}>{INFO.how}</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#D9BC5C"}}>🏆 Paliers de récompense :</div>
         {minigameTierRow(type)}
-        <button onClick={()=>{SFX.click&&SFX.click();setCount(3);setPhase("countdown");}}
+        <button className="btn-press" onClick={()=>{SFX.click&&SFX.click();setCount(3);setPhase("countdown");}}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",padding:"16px 30px",background:pt.accent,color:"#0d0d0d",border:"4px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"5px 5px 0 #0d0d0d",marginTop:6}}>
           ✅ JE SUIS PRÊT!
         </button>
@@ -4021,7 +4035,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           </div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Le minuteur va compter jusqu'à cette heure. À 5 minutes : « Let's go! » 🚀</div>
         </>}
-        <button onClick={start}
+        <button className="btn-press" onClick={start}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
           ▶️ {mode==="deadline"?`Partir (jusqu'à ${endTime.replace(":","h")})`:mode==="down"?`Partir (${targetMin} min)`:"Partir le chrono"}
         </button>
@@ -4041,7 +4055,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
           : <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:acc,textAlign:"center",minHeight:24}}>{TIMER_ENCOURAGE[Math.floor(elapsed/20000)%TIMER_ENCOURAGE.length]}</div>}
         {/* v1.68.0 (B4) — coche les tâches du rituel pendant que le minuteur tourne */}
         {ritualChecklistEl}
-        <button onClick={succeed}
+        <button className="btn-press" onClick={succeed}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🎉 J'ai réussi!</button>
         <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
       </>)}
@@ -4049,7 +4063,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
       {startTs && timeUp && (<>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,16px)",color:acc,textAlign:"center"}}>⏰ Temps écoulé!</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#ddd",textAlign:"center",lineHeight:1.3}}>As-tu réussi « {taskName()} »?</div>
-        <button onClick={succeed}
+        <button className="btn-press" onClick={succeed}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🎉 Oui, réussi!</button>
         <button onClick={fail}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",background:"#1a1a1a",color:"#FFA94D",border:"2px solid #FFA94D55",borderRadius:8,cursor:"pointer"}}>😅 Oups, prochaine fois (pas de récompense)</button>
@@ -5749,14 +5763,14 @@ export default function App() {
 
       {/* ── FOOTER COLLANT enfant : retour à l'accueil depuis Famille/Calendrier/Minuterie ── */}
       {(sessionPlayer!=null && !parentMode && (view==="family"||view==="calendars"||view==="timer")) && (
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(0,0,0,0.92)",borderTop:"2px solid #333",display:"flex",justifyContent:"center",padding:"8px 10px"}}>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(0,0,0,0.92)",borderTop:"2px solid #333",display:"flex",justifyContent:"center",padding:"8px 10px",paddingBottom:"calc(8px + env(safe-area-inset-bottom))"}}>
           <button onClick={()=>{setView(sessionPlayer);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:th.accent,border:"none",borderRadius:10,padding:"12px 26px",cursor:"pointer"}}>🏠 Accueil</button>
         </div>
       )}
 
       {/* ── CONTENT ── */}
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
-      <div style={{position:"relative",zIndex:10,maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
+      <div style={{position:"relative",maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="calendars"&&(()=>{
           const order=(config.players||[]).map((p,i)=>i).sort((a,b)=> (a===sessionPlayer?-1:b===sessionPlayer?1:0));
           const fmt=(iso)=>{ const d=new Date(iso+"T00:00:00"); return DAYS_SHORT[(d.getDay()+6)%7]+" "+d.getDate(); };
@@ -5920,7 +5934,7 @@ export default function App() {
                 {bossWin.items.map((it,i)=>(<div key={i} style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#fff"}}><span style={{fontSize:22}}>{it.emoji}</span> {it.name}</div>))}
               </div>
             )}
-            <button onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>🎉 Bravo!</button>
+            <button className="btn-press" onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 24px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>🎉 Bravo!</button>
           </div>
         </div>
       )}
@@ -5933,7 +5947,7 @@ export default function App() {
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 
       {/* ── VERSION FOOTER ── */}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"safe center",gap:10,padding:"5px 12px",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:50,borderTop:"1px solid #222"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",alignItems:"center",justifyContent:"safe center",gap:10,padding:"5px 12px",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:50,borderTop:"1px solid #222",paddingBottom:"calc(5px + env(safe-area-inset-bottom))"}}>
         <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#444"}}>Livre de Quêtes v{APP_VERSION}</span>
         <button
           onClick={()=>{

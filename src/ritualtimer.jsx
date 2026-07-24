@@ -40,8 +40,8 @@ export function InlineRitualTimer({ endTime, accent }){
       <div style={{textAlign:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(20px,5vw,32px)",color:low?"#D97070":acc,margin:"6px 0 10px"}}>{fmt(secs)}</div>
       <div style={{display:"flex",gap:6}}>
         {!running
-          ? <button onClick={()=>{if(SFX.click)SFX.click();start();}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>▶ Partir</button>
-          : <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#D99248",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>⏸ Pause</button>}
+          ? <button className="btn-press" onClick={()=>{if(SFX.click)SFX.click();start();}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>▶ Partir</button>
+          : <button className="btn-press" onClick={()=>{if(SFX.click)SFX.click();setRunning(false);}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#D99248",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>⏸ Pause</button>}
         <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);setSecs(0);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"11px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:6,cursor:"pointer"}}>↺ Reset</button>
       </div>
     </div>

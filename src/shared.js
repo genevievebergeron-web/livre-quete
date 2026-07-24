@@ -10,7 +10,17 @@ export const uid = () => Math.random().toString(36).slice(2,9);
 
 export const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
-export const COLORS = ["#4A90D9","#C060D0","#5CAD68","#FF6B35","#D9BC5C","#D97070","#00BCD4","#9C27B0","#FF69B4","#0a0a0a","#F0F0FF"];
+export const COLORS = ["#5F87B3","#A874B0","#5CAD68","#C77B54","#D9BC5C","#D97070","#4FA8B3","#8A5A96","#C4789E","#0a0a0a","#F0F0FF"];
+
+// Lot 6 #26 — mapping ancien→nouveau pour la migration ponctuelle des couleurs de joueurs déjà
+// choisies (voir migrateSavedData, App.jsx) : la couleur d'un enfant est enregistrée une fois
+// dans son profil et ne se recalcule plus jamais depuis COLORS — sans cette migration, le
+// changement de palette ci-dessus n'aurait aucun effet sur les enfants déjà configurés.
+export const COLOR_DESATURATE_MAP = {
+  "#4A90D9":"#5F87B3", "#C060D0":"#A874B0", "#2ECC40":"#5CAD68", "#FF6B35":"#C77B54",
+  "#FFD700":"#D9BC5C", "#FF4444":"#D97070", "#00BCD4":"#4FA8B3", "#9C27B0":"#8A5A96",
+  "#FF69B4":"#C4789E",
+};
 
 export const weekKey = (dd=new Date()) => { const d=new Date(dd); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
 
