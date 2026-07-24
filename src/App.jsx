@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.4.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.4.1", date:"2026-07-24", features:[
+    "🐾 Ton familier s'affiche maintenant en vrai pixel-art sur ta page d'accueil, comme partout ailleurs — plus d'emoji générique.",
+    "🏡 Correctif : dans l'Espace Famille, les avatars ne se chevauchent plus quand ils se déplacent.",
+  ]},
   { version:"2.4.0", date:"2026-07-24", features:[
     "🏡 Nouvel Espace Famille : vos 4 avatars flânent maintenant ensemble dans une petite scène sur la Vue Famille — cliquez sur un avatar pour ouvrir son profil.",
   ]},
@@ -1590,9 +1594,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
             </div>
             {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
+              const _evo=(pState.petEvo||{})[eqPet.id]; const _leg=petIsLegendary(_evo,lv);
               return (<>
                 <div style={{display:"flex",alignItems:"center",gap:12}} onClick={openAvatar} >
-                  <div style={{fontSize:48,lineHeight:1,cursor:"pointer",filter:`drop-shadow(0 0 6px ${pt.glow||acc})`,opacity:napping?0.6:1}}>{napping?"😴":eqPet.emoji}</div>
+                  <div style={{width:48,height:48,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",filter:`drop-shadow(0 0 6px ${pt.glow||acc})`,opacity:napping?0.6:1}}>
+                    {napping ? <div style={{fontSize:48,lineHeight:1}}>😴</div> : petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={48} palOverride={petPalOverride(_evo)} legendary={_leg}/> : <div style={{fontSize:48,lineHeight:1}}>{eqPet.emoji}</div>}
+                  </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:acc}}>{eqPet.name} — Niv.{lv}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#bbb",margin:"1px 0 3px"}}>🐾 {petStage(xp)} {napping?"· 💤 fait la sieste":""}</div>
@@ -2514,12 +2521,31 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 // fait marcher SON PROPRE avatar jusque là (si on est connecté comme un enfant, pas en mode
 // parent). Volontairement pas de mécanique de jeu (pas de score, pas de collecte) — un espace
 // social, pas un jeu de plus.
+// Lot 6 #27 correctif — écarte les positions trop proches (avatars/étiquettes qui se
+// chevauchent) en les repoussant le long de l'axe, de gauche à droite puis droite à gauche
+// pour rester dans les bornes [8,92] même quand plusieurs avatars sont collés.
+const FAMILY_SPACE_MIN_GAP = 16;
+function resolveFamilySpaceOverlaps(posMap, playerIds, minGap = FAMILY_SPACE_MIN_GAP) {
+  const sorted = [...playerIds].sort((a, b) => (posMap[a] ?? 50) - (posMap[b] ?? 50));
+  const out = { ...posMap };
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1], cur = sorted[i];
+    if ((out[cur] ?? 50) - (out[prev] ?? 50) < minGap) out[cur] = Math.min(92, (out[prev] ?? 50) + minGap);
+  }
+  for (let i = sorted.length - 2; i >= 0; i--) {
+    const next = sorted[i + 1], cur = sorted[i];
+    if ((out[next] ?? 50) - (out[cur] ?? 50) < minGap) out[cur] = Math.max(8, (out[next] ?? 50) - minGap);
+  }
+  return out;
+}
+
 function FamilySpace({ config, gameStates, meId, onOpenProfile, th }) {
   const players = config.players || [];
+  const playerIds = players.map(p => p.id);
   const [positions, setPositions] = useState(() => {
     const obj = {};
     players.forEach((p, i) => { obj[p.id] = players.length>1 ? 12 + i*(76/(players.length-1)) : 50; });
-    return obj;
+    return resolveFamilySpaceOverlaps(obj, playerIds);
   });
   // Flânerie ambiante : chaque avatar a une chance de dériver vers une nouvelle position
   // toutes les quelques secondes — juste pour que la scène se sente vivante.
@@ -2533,7 +2559,7 @@ function FamilySpace({ config, gameStates, meId, onOpenProfile, th }) {
             next[p.id] = Math.max(8, Math.min(92, cur + (Math.random()-0.5)*34));
           }
         });
-        return next;
+        return resolveFamilySpaceOverlaps(next, playerIds);
       });
     }, 4000 + Math.random()*2000);
     return () => clearInterval(interval);
@@ -2543,7 +2569,7 @@ function FamilySpace({ config, gameStates, meId, onOpenProfile, th }) {
     if (!meId || meId === "parent") return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(8, Math.min(92, ((e.clientX - rect.left) / rect.width) * 100));
-    setPositions(prev => ({...prev, [meId]: pct}));
+    setPositions(prev => resolveFamilySpaceOverlaps({...prev, [meId]: pct}, playerIds));
   };
 
   return (
