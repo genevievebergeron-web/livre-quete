@@ -47,6 +47,13 @@ export const TASK_CATALOG = [
   { id:"td07", emoji:"📖",  label:"Lire calmement dans mon lit avant bonne nuit", xp:30, coins:15, diff:"medium", cat:"defi" },
   { id:"td08", emoji:"💤",  label:"M'endormir seul",                         xp:70, coins:35, diff:"boss",   cat:"defi"    },
   { id:"td09", emoji:"🐇",  label:"Cueillir des verdures pour Boulette",     xp:20, coins:10, diff:"easy",   cat:"defi"    },
+  // Quêtes récurrentes de la semaine de garde (rc_*) — auto-générées, ne pas modifier manuellement
+  { id:"rc_brassee",        emoji:"🧺", label:"Faire une brassée avec mon frère",      xp:35, coins:18, diff:"hard",  cat:"menage"  },
+  { id:"rc_lavabo_cuisine", emoji:"🚰", label:"Nettoyer le lavabo de la cuisine",       xp:15, coins:8,  diff:"easy",  cat:"menage"  },
+  { id:"rc_contour_bain",   emoji:"🛁", label:"Nettoyer le contour du bain",            xp:20, coins:10, diff:"easy",  cat:"menage"  },
+  { id:"rc_chaises",        emoji:"🪑", label:"Nettoyer les chaises de la cuisine",     xp:15, coins:8,  diff:"easy",  cat:"cuisine" },
+  { id:"rc_veranda",        emoji:"🪴", label:"Arroser les plantes de la véranda",      xp:15, coins:8,  diff:"easy",  cat:"outdoor" },
+  { id:"rc_balcon",         emoji:"🌺", label:"Arroser les plantes du balcon",          xp:15, coins:8,  diff:"easy",  cat:"outdoor" },
   // Outdoor & Jardin
   { id:"to01", emoji:"⚽",  label:"Jouer dehors en harmonie",                xp:35, coins:18, diff:"hard",   cat:"outdoor" },
   { id:"to02", emoji:"🚴",  label:"Faire du vélo",                           xp:25, coins:12, diff:"medium", cat:"outdoor" },
