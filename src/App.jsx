@@ -16,9 +16,11 @@ import { SetupWizard } from "./setupwizard.jsx";
 import { AVATAR_PARTS, DEFAULT_AVATAR, renderAvatarToCtx, AvatarCanvas } from "./avatar.jsx";
 import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
+import { spawnParticles } from "./particles.js";
+import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.0.2";
+const APP_VERSION = "2.0.3";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -179,6 +181,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.0.3", date:"2026-07-24", features:[
+    "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
+  ]},
   { version:"2.0.2", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -1144,30 +1149,6 @@ const Platformer = ({ player, onClose }) => {
 };
 const darken = (hex) => { try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${Math.floor(r*0.6)},${Math.floor(g*0.6)},${Math.floor(b*0.6)})`;}catch{return "#333";} };
 
-// ─── PIN PAD ─────────────────────────────────────────────────
-// ─── PARTICLES FX ────────────────────────────────────────────
-// v1.88.0 (Lot 3 #11) — `big` (défaut true, rétrocompatible) contrôle l'intensité : les VRAIS
-// jalons (level-up, victoire de boss, coffre, etc.) gardent l'intensité complète (7 emoji + 18
-// confettis), mais une tâche ordinaire validée (le déclencheur le plus fréquent — des dizaines
-// de fois par jour) passe en version réduite (3 + 6) — moins de densité sur les actions courantes
-// sans retirer la fête pour les vrais accomplissements.
-function spawnParticles(emoji, big=true) {
-  if (CALM) return; // mode calme : pas de particules/flash
-  const emojis = [emoji,"⭐","✨","💫"];
-  const nEmoji = big ? 7 : 3, nConfetti = big ? 18 : 6;
-  for(let i=0;i<nEmoji;i++) setTimeout(()=>{
-    const p=document.createElement("div");
-    p.style.cssText=`position:fixed;left:${Math.random()*70+15}vw;top:${Math.random()*50+25}vh;font-size:22px;pointer-events:none;z-index:2999;animation:floatUp 1.4s ease-out forwards;`;
-    p.textContent=emojis[Math.floor(Math.random()*emojis.length)]; document.body.appendChild(p); setTimeout(()=>p.remove(),1500);
-  },i*90);
-  const cols=["#FFD700","#4A90D9","#C060D0","#2ECC40","#FF6464"];
-  for(let i=0;i<nConfetti;i++) setTimeout(()=>{
-    const c=document.createElement("div");
-    c.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-10px;width:${Math.random()*8+4}px;height:${Math.random()*8+4}px;background:${cols[Math.floor(Math.random()*5)]};z-index:2998;border-radius:2px;animation:confettiFall ${Math.random()*1+1.5}s ease-in ${Math.random()*0.4}s forwards;`;
-    document.body.appendChild(c); setTimeout(()=>c.remove(),2200);
-  },i*35);
-}
-
 
 // ═══════════════════════════════════════════════════════════════
 // GAME ENGINE
@@ -1321,47 +1302,6 @@ function HydraFinalGame({ player, pState, color, onClose }){
     </div>
   );
 }
-// v1.73.0 — minuteur compact INLINE pour la vue rituel (3 modes : minuterie / heure butoir / chrono)
-function InlineRitualTimer({ endTime, accent }){
-  const [mode,setMode]=useState("down"); const [running,setRunning]=useState(false);
-  const [secs,setSecs]=useState(0); const [mins,setMins]=useState(10); const [endT,setEndT]=useState(endTime||"08:00");
-  const ref=useRef(null);
-  useEffect(()=>{ if(!running){ if(ref.current)clearInterval(ref.current); return; }
-    ref.current=setInterval(()=>{ setSecs(s=>{ if(mode==="up") return s+1; if(s<=1){ try{ if(!CALM)spawnParticles("⏰"); SFX.epic&&SFX.epic(); }catch{} setRunning(false); return 0; } return s-1; }); },1000);
-    return ()=>clearInterval(ref.current);
-  },[running,mode]);
-  const acc=accent||"#FFD700";
-  const start=()=>{ let s=0; if(mode==="down") s=Math.max(1,mins)*60; else if(mode==="deadline"){ const [h,m]=(endT||"08:00").split(":").map(Number); const now=new Date(); const end=new Date(); end.setHours(h||0,m||0,0,0); if(end<now) end.setDate(end.getDate()+1); s=Math.max(0,Math.round((end-now)/1000)); } else s=0; setSecs(s); setRunning(true); };
-  const fmt=(s)=>{ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; return (h>0?h+":"+String(m).padStart(2,"0"):String(m))+":"+String(ss).padStart(2,"0"); };
-  const low=mode!=="up"&&running&&secs<=60;
-  return (
-    <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:10,padding:12,marginTop:6}}>
-      <div style={{display:"flex",gap:5,marginBottom:8}}>
-        {[["down","⏳ Minuterie"],["deadline","⏰ Heure butoir"],["up","⏱ Chrono"]].map(([k,l])=>(
-          <button key={k} onClick={()=>{ if(SFX.click)SFX.click(); setMode(k); setRunning(false); setSecs(0); }} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:6,lineHeight:1.4,padding:"7px 3px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#000":"#888",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{l}</button>
-        ))}
-      </div>
-      {!running && mode==="down" && (
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8,justifyContent:"center"}}>
-          {[2,5,10,15,30].map(m=>(<button key={m} onClick={()=>{if(SFX.click)SFX.click();setMins(m);}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 11px",background:mins===m?acc:"#1a1a1a",color:mins===m?"#000":"#bbb",border:"2px solid #444",borderRadius:12,cursor:"pointer"}}>{m} min</button>))}
-        </div>
-      )}
-      {!running && mode==="deadline" && (
-        <div style={{textAlign:"center",marginBottom:8}}>
-          <input type="time" value={endT} onChange={e=>setEndT(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:18,padding:"6px 10px",background:"#111",color:"#fff",border:`2px solid ${acc}`,borderRadius:6}}/>
-        </div>
-      )}
-      <div style={{textAlign:"center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(20px,5vw,32px)",color:low?"#FF4444":acc,margin:"6px 0 10px"}}>{fmt(secs)}</div>
-      <div style={{display:"flex",gap:6}}>
-        {!running
-          ? <button onClick={()=>{if(SFX.click)SFX.click();start();}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#2ECC40",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>▶ Partir</button>
-          : <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);}} style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"11px",background:"#FF8C00",color:"#000",border:"3px solid #000",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #000"}}>⏸ Pause</button>}
-        <button onClick={()=>{if(SFX.click)SFX.click();setRunning(false);setSecs(0);}} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"11px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:6,cursor:"pointer"}}>↺ Reset</button>
-      </div>
-    </div>
-  );
-}
-
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
 const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
