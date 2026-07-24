@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-24 — v1.108.0_
+_Mis à jour: 2026-07-24 — v1.109.0_
+
+> **v1.109.0 (24 juillet, poussé) — Lot 5 #24 : onzième incrément, `SetupWizard` → `src/setupwizard.jsx`.** Le plus gros morceau extrait à ce jour (~390 lignes) : assistant de configuration initiale en 5 étapes (Mode, Joueurs, Tâches, Récompenses, PIN), avec son propre glisser-déposer pour réordonner les tâches assignées. Six utilitaires migrés vers `shared.js` pour éviter tout import circulaire — `uid`, `weekKey`, `pickStarterThemes`, `getWeeklyFreeTheme`, `isThemeUnlocked` (chaîne de dépendances propre : weekKey → getWeeklyFreeTheme → isThemeUnlocked) et `GLOBAL_CSS` (le gros bloc de styles/animations globaux). `COLORS` et `pickStarterThemes` n'étaient en fait utilisés QUE dans SetupWizard (vérifié par grep avant de bouger quoi que ce soit) — `COLORS` n'a donc même pas eu besoin d'être ré-importé dans App.jsx. `App.jsx` : 6717 → 6404 lignes (cumulé depuis le début du chantier : 8296 → 6404, **-22.8%**). **Vérifié en Chrome** : localStorage sauvegardé puis vidé pour forcer le flux `SetupWizard` neuf (pas juste lecture de code) — étape Mode → Joueurs (sélecteur de thème par joueur avec déblocages/verrous corrects, `isThemeUnlocked`/`pickStarterThemes` fonctionnels) → Tâches (catalogue complet affiché, y compris les nouvelles entrées `rc_*` du Lot 7B) → ajout d'une tâche au clic (compteur 0→1, confirmant `uid()` migré fonctionne) — zéro erreur console à chaque étape. localStorage restauré après test. `npm run build` propre, 47 modules (+1).
 
 > **v1.108.0 (24 juillet, poussé) — Lot 7 complet (semaine de garde + quêtes récurrentes + défi perso) + fix critique + ménage de transition.** Trois choses dans ce commit :
 >
