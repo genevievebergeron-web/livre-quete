@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.0.3";
+const APP_VERSION = "2.1.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.1.0", date:"2026-07-24", features:[
+    "📣 Le fil de famille est maintenant organisé par jour (Aujourd'hui, Hier...) avec une petite barre de couleur pour repérer d'un coup d'œil le genre d'événement (quête, badge, niveau, boss, rituel, message).",
+  ]},
   { version:"2.0.3", date:"2026-07-24", features:[
     "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
   ]},
@@ -2626,11 +2629,28 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                 i=j+1;
               } else { grouped.push(f); i++; }
             }
-            return grouped;
+            // Lot 6 #28 — en-têtes de jour (Aujourd'hui/Hier/jour de semaine/date) pour mieux
+            // repérer où on est dans le temps sur une liste par ailleurs plate.
+            const dayLabel=(ts)=>{
+              const d=new Date(ts), now=new Date();
+              const yest=new Date(now); yest.setDate(yest.getDate()-1);
+              if(d.toDateString()===now.toDateString()) return "Aujourd'hui";
+              if(d.toDateString()===yest.toDateString()) return "Hier";
+              const diffDays=Math.floor((now-d)/86400000);
+              return diffDays<7 ? d.toLocaleDateString('fr-CA',{weekday:'long'}) : d.toLocaleDateString('fr-CA',{day:'numeric',month:'long'});
+            };
+            let lastDay=null; const out=[];
+            grouped.forEach(f=>{ const dl=dayLabel(f.ts); if(dl!==lastDay){ out.push({__dayHeader:true,label:dl,key:"day_"+dl+"_"+f.ts}); lastDay=dl; } out.push(f); });
+            return out;
           })().map(f=>{
+            if(f.__dayHeader) return <div key={f.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666",textTransform:"uppercase",margin:"8px 0 2px",paddingBottom:3,borderBottom:"1px solid #2a2a2a"}}>{f.label}</div>;
             const liked=(f.likes||[]).includes(meId);
+            // Lot 6 #28 — accent de couleur par type d'événement (même sémantique que le reste de l'app :
+            // vert=quête, cyan=niveau/XP, or=badge, rouge=boss, orange=rituel) pour distinguer d'un coup d'œil.
+            const TYPE_ACCENT={task:"#2ECC40",level:"#5DECF5",badge:"#FFD700",boss:"#FF6B6B",ritual:"#FF8C00"};
+            const accent=f.type==="chat"?feedColor(f.playerId):(TYPE_ACCENT[f.type]||"#2a2a2a");
             return (
-              <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`1px solid ${f.type==="chat"?(feedColor(f.playerId)+"55"):"#2a2a2a"}`,borderRadius:6}}>
+              <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderLeft:`3px solid ${accent}`,borderRadius:6}}>
                 <span style={{fontSize:18}}>{f.emoji||"✨"}</span>
                 <div style={{flex:1,minWidth:0}}>
                   {f.type==="chat"
