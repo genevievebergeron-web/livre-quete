@@ -4,10 +4,11 @@ import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEM
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
 import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
-import { Countdown, HeaderClock } from "./timers.jsx";
+import { Countdown, HeaderClock, TimeTimerDisc } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
+import { Toast, PinDots, PinKeypad } from "./ui.jsx";
 
-const APP_VERSION = "1.103.0";
+const APP_VERSION = "1.104.0";
 // Tampon de date locale (YYYY-MM-DD) — sert à réinitialiser les tâches chaque jour
 // tout en restant compatible avec la fusion multi-appareils (chaque jour = clé distincte).
 const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -215,6 +216,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"1.104.0", date:"2026-07-24", features:[
+    "⚡ Encore un peu de ménage technique invisible : aucun changement visible pour toi.",
+  ]},
   { version:"1.103.0", date:"2026-07-24", features:[
     "🐲 18 NOUVEAUX BOSS! Fini les 4 monstres qui se ressemblaient juste avec une couleur différente — chaque combat de boss peut maintenant faire apparaître un démon des racines, un yéti, une méduse, une hydre, un dragon et plein d'autres, chacun avec son propre look. Choisis avec maman!",
   ]},
@@ -1297,11 +1301,6 @@ function PinPad({ pin, label, onSuccess, onCancel, th }) {
   );
 }
 
-// ─── TOAST ───────────────────────────────────────────────────
-function Toast({ msg, color }) {
-  return <div style={{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,0.93)",border:`3px solid ${color||"#2ECC40"}`,borderRadius:4,padding:"9px 18px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:color||"#2ECC40",zIndex:990,whiteSpace:"nowrap",animation:"toastIn 0.3s ease",maxWidth:"90vw",textAlign:"center"}}>{msg}</div>;
-}
-
 // ─── PARTICLES FX ────────────────────────────────────────────
 // v1.88.0 (Lot 3 #11) — `big` (défaut true, rétrocompatible) contrôle l'intensité : les VRAIS
 // jalons (level-up, victoire de boss, coffre, etc.) gardent l'intensité complète (7 emoji + 18
@@ -1754,26 +1753,6 @@ function SetupWizard({ existing, onDone }) {
 // GAME ENGINE
 // ═══════════════════════════════════════════════════════════════
 
-// ─── COUNTDOWN (Routine mode) ────────────────────────────────
-// v1.88.0 (Lot 3 #13) — minuterie visuelle style "Time Timer" : un disque dont la portion colorée
-// rétrécit avec le temps qui passe, en complément du chrono numérique (pas un remplacement) —
-// aide à "sentir" le temps sans lire de chiffres, utile pour la cécité temporelle (TDAH).
-// `progress` = fraction de temps RESTANT (1 = plein, 0 = écoulé). Pas de rouge par défaut
-// (cohérent avec le "décompte calme" déjà en place) — la couleur vient du thème/accent.
-function TimeTimerDisc({ progress, size=110, color="#5DECF5", urgentColor="#FF6B6B", urgent=false }) {
-  const r = size/2 - 8;
-  const c = 2*Math.PI*r;
-  const p = Math.max(0, Math.min(1, progress||0));
-  const offset = c * (1-p);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:"block",margin:"0 auto"}}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#222" strokeWidth="10"/>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={urgent?urgentColor:color} strokeWidth="10"
-        strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
-        transform={`rotate(-90 ${size/2} ${size/2})`} style={{transition:"stroke-dashoffset 0.9s linear, stroke 0.3s"}}/>
-    </svg>
-  );
-}
 // ─── WEEK VIEW ───────────────────────────────────────────────
 function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx }) {
   const allTasks = [...TASK_CATALOG, ...(config.customTasks||[])];
@@ -4357,41 +4336,6 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
     </div>
   );
 });
-
-// ═══════════════════════════════════════════════════════════════
-// LOGIN SCREEN — "Qui joue?"
-// ═══════════════════════════════════════════════════════════════
-// ── Mini keypad réutilisable ──────────────────────────────────
-function PinDots({ value, error, color="#FFD700" }) {
-  return (
-    <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
-      {[0,1,2,3].map(n=>(
-        <div key={n} style={{width:30,height:38,background:error?"#FF4444":(value.length>n?color:"#1a1a1a"),borderRadius:4,border:`2px solid ${error?"#FF4444":(value.length>n?color:"#444")}`,transition:"all 0.12s",transform:error?"scale(1.1)":"scale(1)"}}/>
-      ))}
-    </div>
-  );
-}
-function PinKeypad({ onDigit, onBack, onClose, onSubmit, closeLabel="✕" }) {
-  useEffect(() => {
-    const handle = (e) => {
-      if (e.key >= "0" && e.key <= "9") { SFX.click(); onDigit(e.key); }
-      else if (e.key === "Backspace") { SFX.click(); onBack(); }
-      else if (e.key === "Enter" && onSubmit) { SFX.click(); onSubmit(); }
-    };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, [onDigit, onBack, onClose, onSubmit]);
-  return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-      {["1","2","3","4","5","6","7","8","9","⌫","0",closeLabel].map(d=>(
-        <button key={d} onClick={()=>{ SFX.click(); if(d==="⌫") onBack(); else if(d===closeLabel) onClose(); else onDigit(d); }}
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,padding:"11px 0",background:d===closeLabel?"#330000":"#1a1a1a",color:d===closeLabel?"#FF4444":"#ccc",border:"2px solid #2a2a2a",borderRadius:4,cursor:"pointer"}}>
-          {d}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════
 // MINI-GAME RUNNER — dino-style endless runner

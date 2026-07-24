@@ -46,3 +46,19 @@ export function HeaderClock({ style }) {
   const H=String(now.getHours()).padStart(2,"0"), M=String(now.getMinutes()).padStart(2,"0");
   return <div style={style}>{H}:{M}</div>;
 }
+
+// Disque Time Timer (anneau qui rétrécit) — SVG pur, aucune dépendance au-delà de ses props.
+export function TimeTimerDisc({ progress, size=110, color="#5DECF5", urgentColor="#FF6B6B", urgent=false }) {
+  const r = size/2 - 8;
+  const c = 2*Math.PI*r;
+  const p = Math.max(0, Math.min(1, progress||0));
+  const offset = c * (1-p);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:"block",margin:"0 auto"}}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#222" strokeWidth="10"/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={urgent?urgentColor:color} strokeWidth="10"
+        strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`} style={{transition:"stroke-dashoffset 0.9s linear, stroke 0.3s"}}/>
+    </svg>
+  );
+}
