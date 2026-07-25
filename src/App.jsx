@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.8";
+const APP_VERSION = "2.5.9";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.9", date:"2026-07-25", features:[
+    "🔋 Correctif : les coffres ne se « rechargent » plus aussi vite — la sync multi-appareils pouvait remettre de l'énergie qui avait déjà été dépensée. Les délais de recharge sont maintenant respectés peu importe depuis quel appareil tu ouvres l'appli.",
+    "🪙 Correctif : les pièces ne reviennent plus comme par magie après une sync — un vieil appareil ne peut plus faire remonter ton solde après que tu l'aies dépensé.",
+  ]},
   { version:"2.5.8", date:"2026-07-25", features:[
     "👁️ Correctif technique (portail parent) : les onglets par enfant s'appellent maintenant « 👁️ Voir [prénom] » pour rappeler que c'est un aperçu, pas un panneau de gestion (les ajustements XP/pièces restent dans Actions).",
   ]},
@@ -829,6 +833,10 @@ const mergeGS = (a, b, preferIncoming) => {
     // → dernière écriture gagne (l'appareil qui a changé le solde le plus récemment gagne).
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
     coinsLifetime: Math.max(a.coinsLifetime || 0, b.coinsLifetime || 0), // v2.5.0 — jamais décrémenté, donc fusion sûre par max (comme xp)
+    // coinsWeek doit être géré EXPLICITEMENT — sinon le spread ...b l'écrase toujours par l'incoming.
+    // Bug v2.5.3 : un vieux device synquant avec un coinsWeek d'une semaine passée déclenchait un
+    // reset spurieux à la prochaine migration. Fix : on garde la semaine la plus récente (lexicographique).
+    coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées (sinon l'union les ré-ajoutait au portail parent)
@@ -856,9 +864,11 @@ const mergeGS = (a, b, preferIncoming) => {
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
     petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
     petNickname: {...(a.petNickname||{}), ...(b.petNickname||{})}, // v2.4.2 — surnom par familier (union ; dernier nom donné gagne par petId)
-    // Énergie : consommable → dernière écriture gagne (la paire valeur+horodatage voyage ensemble)
-    energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
-    energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
+    // Énergie : consommable → l'horodatage energyTs arbitre directement (pas le flag coarse preferIncoming).
+    // Bug v2.5.3 : preferIncoming basé sur savedAt global pouvait annuler une consommation d'énergie
+    // si l'appareil qui avait ouvert un coffre avait un savedAt plus vieux que l'autre.
+    energy: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0; return bT>=aT ? (b.energy??a.energy??100) : (a.energy??b.energy??100); })(),
+    energyTs: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0; return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
