@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.5";
+const APP_VERSION = "2.5.6";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.6", date:"2026-07-25", features:[
+    "🏷️ Petit correctif d'étiquette : la boutique dit maintenant « ÉQUIPÉ » comme partout ailleurs dans l'app (au lieu de « ON »).",
+  ]},
   { version:"2.5.5", date:"2026-07-25", features:[
     "🔓 Correctif : quitter le mode parent te ramène directement à ta propre page, sans devoir retaper ton code secret.",
   ]},
@@ -2433,7 +2436,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
                     : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ON":owned?"Équiper":iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?"Équiper":iPrice+" 🪙"}</span>
                 </div>
               );
             })}
