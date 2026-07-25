@@ -46,8 +46,15 @@ export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
 
 const EMOJI_CHOICES = ["⭐","✅","🎯","🧹","🧺","🛏️","🍽️","🥣","🚿","🛁","🪥","🦷","👕","🎒","📚","✏️","📝","🧮","🐕","🐈","🌱","🗑️","♻️","🧴","🧽","🚽","🪣","👟","🧦","🍳","🥪","💊","💧","🪟","🛋️","🧸","🎮","⚽","🎨","🎵","🚲","🏃","💪","🌙","☀️","🍎"];
 
-export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th }){
-  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium");
+// v2.5.10 (Correctif 2C) — portée de la tâche, seulement affichée quand `scopeOptions` est vrai
+// (l'enfant crée depuis sa propre journée). Les autres appelants (rituel, parent) ignorent ce champ.
+const SCOPES=[
+  ["once","1️⃣ Juste pour aujourd'hui","Elle disparaît après aujourd'hui"],
+  ["reusable","🔁 Juste pour moi, à chaque fois","Elle reste dispo pour toi seulement"],
+  ["propose","🧑‍🤝‍🧑 Proposer à toute la famille","Un parent doit l'approuver d'abord"],
+];
+export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th, scopeOptions=false }){
+  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium"); const [scope,setScope]=useState("once");
   const acc=th?.accent||"#D9BC5C";
   const DIFFS=[["easy","🟢 Facile","+10 XP · 5 🪙"],["medium","🟡 Moyen","+20 XP · 10 🪙"],["hard","🔴 Difficile","+40 XP · 20 🪙"]];
   return (
@@ -75,9 +82,20 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
           </button>
         ))}
       </div>
+      {scopeOptions && (<>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>C'est pour qui?</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+          {SCOPES.map(([k,l,sub])=>(
+            <button key={k} onClick={()=>{SFX.click();setScope(k);}}
+              style={{display:"flex",flexDirection:"column",alignItems:"flex-start",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 11px",background:scope===k?acc:"#1a1a1a",color:scope===k?"#0d0d0d":"#999",border:`2px solid ${scope===k?acc:"#333"}`,borderRadius:5,cursor:"pointer",textAlign:"left"}}>
+              {l}<span style={{fontFamily:"'VT323',monospace",fontSize:12,marginTop:3,fontWeight:"normal"}}>{sub}</span>
+            </button>
+          ))}
+        </div>
+      </>)}
       <div style={{display:"flex",gap:8}}>
         <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
-        <button className="btn-press" disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff}); } }}
+        <button className="btn-press" disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff,...(scopeOptions?{scope}:{})}); } }}
           style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>
           ✅ {confirmLabel}
         </button>

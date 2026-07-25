@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.8";
+const APP_VERSION = "2.5.10";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.10", date:"2026-07-25", features:[
+    "🧑‍🤝‍🧑 Nouveau! Quand tu te crées une tâche, tu choisis maintenant : juste pour aujourd'hui, juste pour toi à chaque fois, ou proposer à toute la famille (un parent doit l'approuver).",
+  ]},
   { version:"2.5.8", date:"2026-07-25", features:[
     "👁️ Correctif technique (portail parent) : les onglets par enfant s'appellent maintenant « 👁️ Voir [prénom] » pour rappeler que c'est un aperçu, pas un panneau de gestion (les ajustements XP/pièces restent dans Actions).",
   ]},
@@ -922,6 +925,12 @@ const mergeFamily = (base, incoming) => {
   // en retirant celles dont l'assignation visée a déjà été supprimée entretemps (tombstone naturel).
   const reqMap = new Map();
   [...(bC.removalRequests || []), ...(iC.removalRequests || [])].forEach((r) => { if (r && r.id && !_rmSet.has(r.instanceId)) reqMap.set(r.id, r); });
+  // v2.5.10 (Correctif 2C) — propositions de tâche enfant→parent : union par id, moins les tombstones
+  // (approuvées ou refusées sur un appareil, ne doivent pas revenir via une copie pas encore synchronisée).
+  const removedProposals = _uniq([...(bC.removedProposals || []), ...(iC.removedProposals || [])]).slice(-800);
+  const _rmProp = new Set(removedProposals);
+  const propMap = new Map();
+  [...(bC.childTaskProposals || []), ...(iC.childTaskProposals || [])].forEach((p) => { if (p && p.id && !_rmProp.has(p.id)) propMap.set(p.id, p); });
   const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
   const newerC = newer.config || {};
   const config = {
@@ -932,6 +941,8 @@ const mergeFamily = (base, incoming) => {
     customTasks: [...taskMap.values()],
     removedCustomTasks,
     removalRequests: [...reqMap.values()],
+    childTaskProposals: [...propMap.values()],
+    removedProposals,
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
       const m = new Map();
@@ -1071,6 +1082,8 @@ const migrateSavedData = (data) => {
   if (mergedConfig.pin == null) mergedConfig.pin = "1146"; // fix: spread can't override undefined
   if (!Array.isArray(mergedConfig.players)) mergedConfig.players = [];
   if (!Array.isArray(mergedConfig.assignments)) mergedConfig.assignments = [];
+  if (!Array.isArray(mergedConfig.childTaskProposals)) mergedConfig.childTaskProposals = []; // v2.5.10 (Correctif 2C)
+  if (!Array.isArray(mergedConfig.removedProposals)) mergedConfig.removedProposals = [];
   if (!mergedConfig.rotativeCleanupV1) { // v1.108.0 — ménage unique (demandé par Gen) : bascule vers les quêtes rotatives (Lot 7B) —
     mergedConfig.assignments = [];       // vide les anciennes assignations manuelles pour laisser toute la place à weeklyQuests
     mergedConfig.removalRequests = [];   // demandes de retrait orphelines (pointaient sur des assignations qui disparaissent)
@@ -2223,7 +2236,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         onClose={()=>setChooserOpen(false)}
         onPick={(taskId)=>{ onChildPickTask&&onChildPickTask(taskId); setChooserOpen(false); }}
         onCreateOwn={()=>{ setChooserOpen(false); setAddTaskOpen(true); }}/>}
-      {addTaskOpen && <CustomTaskModal title="➕ Ma nouvelle quête" confirmLabel="Ajouter à ma journée" th={th}
+      {addTaskOpen && <CustomTaskModal title="➕ Ma nouvelle quête" confirmLabel="Ajouter à ma journée" th={th} scopeOptions
         onClose={()=>setAddTaskOpen(false)}
         onCreate={(data)=>{ onChildAddTask&&onChildAddTask(data); setAddTaskOpen(false); }}/>}
 
@@ -2864,11 +2877,13 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 // ─── PARENT PANEL ────────────────────────────────────────────
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
+  onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
-  const nbValid = nbPending + removalReqs.length;
+  const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
+  const nbValid = nbPending + removalReqs.length + proposals.length;
   const [tab, setTab] = useState(nbValid>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
   const [xpPlayer, setXpPlayer] = useState(0);
   const [xpDelta, setXpDelta] = useState(10);
@@ -2967,7 +2982,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           return (
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>DEMANDES DES ENFANTS{items.length>0?` (${items.length})`:""}</div>
-              {items.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
+              {items.length===0&&removalReqs.length===0&&proposals.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
               {byChild.map(({pl,i,its})=>(
                 <div key={pl.id} style={{marginBottom:14}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,paddingBottom:4,borderBottom:`2px solid ${pl.color}55`}}>
@@ -3017,6 +3032,31 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                         <div style={{display:"flex",gap:6}}>
                           <PBtn onClick={()=>onApproveRemoval(req.id)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>✅ Retirer la tâche</PBtn>
                           <PBtn onClick={()=>onRefuseRemoval(req.id)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Garder la tâche</PBtn>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* v2.5.10 (Correctif 2C) — tâches personnalisées proposées par les enfants ("proposer à toute
+                  la famille"), séparée de l'onglet "Tâches" (qui sert à AJOUTER, pas à approuver). */}
+              {proposals.length>0 && (
+                <div style={{marginTop:18,paddingTop:14,borderTop:"2px solid #333"}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#8FCCE8",marginBottom:8}}>🧑‍🤝‍🧑 TÂCHES PERSONNALISÉES DES ENFANTS ({proposals.length})</div>
+                  {proposals.map(prop=>{
+                    const pl=players.find(p=>p.id===prop.playerId);
+                    return (
+                      <div key={prop.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                          <span style={{fontSize:18}}>{prop.emoji}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{prop.label}</div>
+                            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:pl?.color||"#888"}}>Proposée par {pl?displayName(pl):"?"}</span>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <PBtn onClick={()=>onApproveProposal(prop.id)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>✅ Approuver</PBtn>
+                          <PBtn onClick={()=>onRefuseProposal(prop.id)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Refuser</PBtn>
                         </div>
                       </div>
                     );
@@ -5369,21 +5409,76 @@ export default function App() {
   const handleChildAddTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return;
     const label=data.label.trim();
+    // v2.5.10 (Correctif 2C) — l'enfant choisit la portée de sa tâche : A) once (comportement d'origine,
+    // 1 jour, nettoyée le lendemain), B) reusable (privée mais permanente, ownerId posé), C) propose
+    // (rien n'est créé tout de suite — va dans config.childTaskProposals, en attente d'approbation parent).
+    const scope=data.scope||"once";
+    if(scope==="propose"){
+      // anti-doublon élargi : si une tâche de ce nom existe déjà (catalogue ou perso) ou est déjà proposée,
+      // pas la peine de proposer un doublon — on informe l'enfant plutôt que de créer une 2e demande.
+      const already=[...TASK_CATALOG,...(config.customTasks||[])].some(t=>normLabel(t.label)===normLabel(label))
+        || (config.childTaskProposals||[]).some(p=>normLabel(p.label)===normLabel(label));
+      if(already){ showToast(`«${label}» existe déjà — pas besoin de la proposer!`,"#D9BC5C",3500); return; }
+      const prop={id:"prop_"+uid(), playerId:pid, label, emoji:data.emoji||"⭐", diff:data.diff||"medium", requestedAt:Date.now()};
+      const newCfg={...config, childTaskProposals:[...(config.childTaskProposals||[]),prop]};
+      setConfig(newCfg); persist(newCfg,gameStates);
+      showToast("🧑‍🤝‍🧑 Proposée à la famille — en attente d'un parent!","#D9BC5C",4000);
+      return;
+    }
     // v1.53.0 anti-doublon : si une tâche au MÊME libellé existe déjà, on la réutilise au lieu d'en recréer une
     const existing=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(label));
     const _dp=CHILD_DIFF_PRESETS[data.diff]||CHILD_DIFF_PRESETS.medium; // plafond anti-farm
     const taskId=existing?existing.id:("cust_"+uid());
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label,xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label,xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true,
+      ...(scope==="reusable"&&!existing?{ownerId:pid}:{})}; // v2.5.10 — portée B : privée mais réutilisable, jamais nettoyée
     // La quête doit apparaître dans la vue ACTUELLE de l'enfant : si mode Semaine → aujourd'hui; si Routine → tâche de routine
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now()}; // à usage unique (nettoyée après aujourd'hui)
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",createdAt:Date.now(),
+      ...(scope==="reusable"?{}:{oneDay:todayStamp()})}; // v2.5.10 — portée A seulement : à usage unique (nettoyée après aujourd'hui)
     const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
     const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    showToast("➕ Quête ajoutée à ta journée!","#5CAD68");
+    showToast(scope==="reusable"?"🔁 Quête perso ajoutée — elle reste pour toi!":"➕ Quête ajoutée à ta journée!","#5CAD68");
   },[config,gameStates,persist,showToast]);
+
+  // v2.5.10 (Correctif 2C) — le parent approuve une tâche proposée : elle rejoint le catalogue familial
+  // partagé (même forme que handleAddCustomTask), disponible pour tous via TaskChooser. Aucune
+  // auto-assignation — le parent (ou l'enfant) l'assigne ensuite normalement, même flux que d'habitude.
+  const handleApproveProposal = useCallback((propId)=>{
+    const prop=(config.childTaskProposals||[]).find(p=>p.id===propId); if(!prop) return;
+    const pl=config.players.find(p=>p.id===prop.playerId);
+    const already=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(prop.label));
+    const newTask=already||{id:"cust_"+uid(),emoji:prop.emoji||"⭐",label:prop.label,xp:20,coins:10,diff:prop.diff||"medium",cat:"custom"};
+    const newCfg={...config,
+      customTasks:already?(config.customTasks||[]):[...(config.customTasks||[]),newTask],
+      childTaskProposals:(config.childTaskProposals||[]).filter(p=>p.id!==propId),
+      removedProposals:_uniq([...(config.removedProposals||[]),propId]).slice(-800)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    logAction(`✅ Tâche approuvée: ${newTask.label} (proposée par ${pl?displayName(pl):"?"})`,"#5CAD68");
+    showToast(`✅ «${newTask.label}» ajoutée aux tâches de la famille!`,"#5CAD68");
+  },[config,gameStates,persist,logAction,showToast]);
+
+  const handleRefuseProposal = useCallback((propId)=>{
+    const prop=(config.childTaskProposals||[]).find(p=>p.id===propId); if(!prop) return;
+    const playerIdx=config.players.findIndex(p=>p.id===prop.playerId);
+    const newCfg={...config,
+      childTaskProposals:(config.childTaskProposals||[]).filter(p=>p.id!==propId),
+      removedProposals:_uniq([...(config.removedProposals||[]),propId]).slice(-800)};
+    setConfig(newCfg);
+    if(playerIdx>=0){
+      // même patron que refusPending (v1.64.0) : message drôle affiché à l'enfant, archivable, réutilise
+      // exactement le même mécanisme d'affichage (PlayerDashboard, aucune nouvelle UI nécessaire)
+      const key="propref_"+propId;
+      const refusal={ key, label:prop.label, emoji:prop.emoji||"✗", msg:refusMsg(key), ts:Date.now() };
+      setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+        n[playerIdx]={...p, refusals:[...(p.refusals||[]).filter(r=>r.key!==key), refusal].slice(-10)};
+        persist(newCfg,n); return n; });
+    } else persist(newCfg,gameStates);
+    logAction(`✗ Tâche proposée refusée: ${prop.label}`,"#D99248");
+    showToast("Proposition refusée","#FF6464");
+  },[config,gameStates,persist,logAction,showToast]);
 
   // v1.57.0 — l'enfant choisit la voie d'évolution de son familier (tier 1/2/3 → élément)
   const handleChoosePetEvo = useCallback((playerIdx, petId, tier, element)=>{
@@ -6085,6 +6180,8 @@ export default function App() {
           onRemoveAssignment={handleRemoveAssignment}
           onApproveRemoval={handleApproveRemoval}
           onRefuseRemoval={handleRefuseRemoval}
+          onApproveProposal={handleApproveProposal}
+          onRefuseProposal={handleRefuseProposal}
           onClearChildTasks={handleClearChildTasks}
           onAddCustomTask={handleAddCustomTask}
           onClose={onParentPanelClose}
