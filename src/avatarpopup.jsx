@@ -159,7 +159,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                     <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:sz,filter:`drop-shadow(0 0 ${4+lv*2}px ${_leg?"#FFD45A":(pt.glow||acc)})`,transition:"all 0.4s"}}>
                       {petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={sz} palOverride={petPalOverride(_evo)} legendary={_leg}/> : <span style={{fontSize:sz,lineHeight:1}}>{eqPet.emoji}</span>}
                     </div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{eqPet.name} — Niv.{lv}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc,marginTop:8}}>{pState.petNickname?.[eqPet.id]||eqPet.name} — Niv.{lv}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:_leg?"#FFD45A":"#fff",marginTop:2}}>Stade : {petFormLabel(_evo,lv)} {lv>=PET_LEVELS.length?"✨ (max!)":""}</div>
                     <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
                       <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#85CDD1)`,transition:"width 0.8s ease"}}/>
@@ -178,7 +178,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                       <div key={p.id} onClick={()=>{onEquip(p);SFX.click();}}
                         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 4px",background:isEq?`${acc}20`:"rgba(0,0,0,0.4)",border:`2px solid ${isEq?acc:"#333"}`,borderRadius:6,cursor:"pointer",boxShadow:isEq?`0 0 10px ${pt.glow||acc}60`:"none"}}>
                         <span style={{fontSize:26}}>{p.emoji}</span>
-                        <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{p.name}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{pState.petNickname?.[p.id]||p.name}</span>
                         <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:acc}}>Niv.{lv} · {petStage(xp)}</span>
                         <div style={{height:6,width:"90%",background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
                           <div style={{height:"100%",width:pctp+"%",background:acc}}/>

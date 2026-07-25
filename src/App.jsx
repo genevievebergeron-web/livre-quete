@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.4.1";
+const APP_VERSION = "2.4.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.4.2", date:"2026-07-25", features:[
+    "🐾 Tu peux maintenant donner un surnom à ton familier! Touche le petit ✏️ à côté de son nom pour le renommer comme tu veux.",
+  ]},
   { version:"2.4.1", date:"2026-07-24", features:[
     "🐾 Ton familier s'affiche maintenant en vrai pixel-art sur ta page d'accueil, comme partout ailleurs — plus d'emoji générique.",
     "🏡 Correctif : dans l'Espace Famille, les avatars ne se chevauchent plus quand ils se déplacent.",
@@ -820,6 +823,7 @@ const mergeGS = (a, b, preferIncoming) => {
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
     petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
+    petNickname: {...(a.petNickname||{}), ...(b.petNickname||{})}, // v2.4.2 — surnom par familier (union ; dernier nom donné gagne par petId)
     // Énergie : consommable → dernière écriture gagne (la paire valeur+horodatage voyage ensemble)
     energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
     energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
@@ -994,6 +998,7 @@ const migrateGameState = (gs) => {
     petMigV2: true, // v1.52.0 — drapeau : migration de courbe des familiers appliquée
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
     petEvo: gs.petEvo || {}, // v1.57.0 — voies d'évolution par familier {petId:{1,2,3}}
+    petNickname: gs.petNickname || {}, // v2.4.2 — surnom personnalisé par familier {petId:string}
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
     refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
     refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
@@ -1332,7 +1337,7 @@ function HydraFinalGame({ player, pState, color, onClose }){
 }
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
-const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -1368,6 +1373,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
   const [calOpen, setCalOpen] = useState(false);
   const [calForm, setCalForm] = useState({type:"devoir", label:"", date:""});
+  const [petNickEditing, setPetNickEditing] = useState(false);
+  const [petNickDraft, setPetNickDraft] = useState("");
   const T = th;
   // Resolve random theme per player (stable per session via player.id)
   const resolvedThemeId = player.themeId==="random"
@@ -1601,7 +1608,20 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     {napping ? <div style={{fontSize:48,lineHeight:1}}>😴</div> : petSpriteKey(eqPet.id) ? <PetSprite itemId={eqPet.id} size={48} palOverride={petPalOverride(_evo)} legendary={_leg}/> : <div style={{fontSize:48,lineHeight:1}}>{eqPet.emoji}</div>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:acc}}>{eqPet.name} — Niv.{lv}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      {petNickEditing
+                        ? (<><input autoFocus value={petNickDraft}
+                            onChange={e=>setPetNickDraft(e.target.value)}
+                            onKeyDown={e=>{ if(e.key==="Enter"){ onRenamePet&&onRenamePet(eqPet.id,petNickDraft); setPetNickEditing(false); } if(e.key==="Escape") setPetNickEditing(false); }}
+                            onClick={e=>e.stopPropagation()} maxLength={20}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,background:"#111",border:`1px solid ${acc}`,color:acc,borderRadius:3,padding:"2px 5px",width:110}}/>
+                          <button onClick={e=>{e.stopPropagation();onRenamePet&&onRenamePet(eqPet.id,petNickDraft);setPetNickEditing(false);}}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"2px 5px",background:acc,color:"#0d0d0d",border:"none",borderRadius:3,cursor:"pointer"}}>✔</button></>)
+                        : (<><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:acc}}>{pState.petNickname?.[eqPet.id]||eqPet.name} — Niv.{lv}</div>
+                          <button onClick={e=>{e.stopPropagation();setPetNickDraft(pState.petNickname?.[eqPet.id]||eqPet.name);setPetNickEditing(true);}}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"1px 3px",background:"transparent",border:`1px solid ${acc}44`,color:acc,borderRadius:3,cursor:"pointer",lineHeight:1,flexShrink:0}} title="Renommer">✏️</button></>)
+                      }
+                    </div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#bbb",margin:"1px 0 3px"}}>🐾 {petStage(xp)} {napping?"· 💤 fait la sieste":""}</div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>XP familier</div>
                     <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",margin:"1px 0 4px"}}><div style={{height:"100%",width:pctp+"%",background:acc}}/></div>
@@ -5559,6 +5579,13 @@ export default function App() {
     showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#D9BC5C",2800);
   },[gameStates,config,persist,showToast]);
 
+  // v2.4.2 — l'enfant donne un surnom à son familier équipé
+  const handleRenamePet = useCallback((playerIdx, petId, nickname)=>{
+    setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]||{};
+      n[playerIdx]={...q, petNickname:{...(q.petNickname||{}), [petId]: nickname.trim().slice(0,20)}};
+      persist(config,n); return n; });
+  },[config,persist]);
+
   // Cacher une récompense (terminée/utilisée) → une nouvelle prend sa place
   const handleHideReward = useCallback((playerId, reward)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
@@ -5693,6 +5720,7 @@ export default function App() {
   const onDashUpdatePseudo = useCallback((pseudo)=>handleUpdatePseudo(view,pseudo), [view, handleUpdatePseudo]);
   const onDashFeedPet = useCallback(()=>handleFeedPet(view), [view, handleFeedPet]);
   const onDashPlayPet = useCallback(()=>handlePlayPet(view), [view, handlePlayPet]);
+  const onDashRenamePet = useCallback((petId,nickname)=>handleRenamePet(view,petId,nickname), [view, handleRenamePet]);
   const onDashChoosePetEvo = useCallback((petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el), [view, handleChoosePetEvo]);
   const onDashDismissRefusal = useCallback((key)=>handleDismissRefusal(view,key), [view, handleDismissRefusal]);
   const onDashBossAttack = useCallback((type)=>handleBossAttack(view,type), [view, handleBossAttack]);
@@ -5947,6 +5975,7 @@ export default function App() {
             onRespondOffer={handleRespondOffer}
             onFeedPet={onDashFeedPet}
             onPlayPet={onDashPlayPet}
+            onRenamePet={onDashRenamePet}
             onChoosePetEvo={onDashChoosePetEvo}
             onDismissRefusal={onDashDismissRefusal}
             onBossAttack={onDashBossAttack}
