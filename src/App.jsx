@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.11";
+const APP_VERSION = "2.5.12";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.12", date:"2026-07-25", features:[
+    "🖼️ Ton perso s'affiche maintenant en grand sur l'écran « Qui es-tu? » — plus besoin de te connecter pour voir à quoi il ressemble!",
+  ]},
   { version:"2.5.11", date:"2026-07-25", features:[
     "🔧 Correctif : une quête ajoutée (ou une tâche piquée dans la liste) ne devrait plus jamais « disparaître » après coup à cause d'une synchro entre appareils — la sauvegarde locale ne se fait plus écraser par une synchro plus vieille arrivée en retard.",
   ]},
@@ -1995,7 +1998,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent||player.color,marginBottom:6}}>🎯 OBJECTIFS DU JOUR</div>
             {OBJ.map(o=>{ const done=o.prog>=o.goal; const isClaimed=claimed.includes(o.id);
               return (
-                <div key={o.id} style={{marginBottom:7}}>
+                <div key={o.id} style={{marginBottom:14}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
                     <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#5CAD68":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#85CDD1"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
                     {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#5CAD68",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
@@ -2757,7 +2760,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         );
       })()}
       {/* Player cards grid */}
-      <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10}}>
+      <div className="fo-grid" style={{display:"grid",gridTemplateColumns:`repeat(${Math.min((config.players||[]).length,2)},1fr)`,gap:10,marginTop:14}}>
         {(config.players||[]).map((player,i)=>{
           const ps=gameStates[i]||{xp:0,coins:0,completed:[]};
           const _allAss=[...(config.assignments||[]),...(isCustodyWeek()?(config.weeklyQuests?.assignments||[]):[])];
@@ -4553,10 +4556,13 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
               const isNew = !psi.avatar?.configured && !psi.pin;
               return (
                 <button key={pl.id} onClick={()=>handleChildSelect(i)}
-                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 16px",background:"rgba(0,0,0,0.7)",color:pl.color,border:`3px solid ${pl.color}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"all 0.15s"}}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 16px 10px 10px",background:"rgba(0,0,0,0.7)",color:pl.color,border:`3px solid ${pl.color}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"all 0.15s"}}
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 0 16px ${pl.color}55`;e.currentTarget.style.transform="translateX(4px)";}}
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
-                  <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(pl.themeId).charBodyColor||pl.color} size={36}/>
+                  {/* v2.5.12 — portrait avatar bien visible (avant: 36px noyé dans la ligne) : même cadre
+                      carré à coins arrondis que les avatars de la Vue Famille (FamilySpace) et du profil. */}
+                  <AvatarCanvas avatarDef={psi.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(pl.themeId).charBodyColor||pl.color} size={56}
+                    style={{flexShrink:0,border:`2px solid ${pl.color}`,borderRadius:8,background:`${pl.color}15`}}/>
                   <span style={{flex:1,textAlign:"left"}}>{pl.name}</span>
                   {isNew && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#5CAD68",fontWeight:"bold"}}>NOUVEAU ✨</span>}
                   {!isNew && psi.pin && <span style={{color:"#444",fontSize:12}}>🔑</span>}
