@@ -8,7 +8,7 @@ import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE,
 import { Countdown, HeaderClock, TimeTimerDisc } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
-import { DAYS_SHORT, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.12";
+const APP_VERSION = "2.5.13";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.13", date:"2026-07-25", features:[
+    "🗓️ Les dates de ton calendrier s'affichent maintenant en clair (« Mer 29 juil ») plutôt qu'en format brut (« 2026-07-29 »).",
+  ]},
   { version:"2.5.12", date:"2026-07-25", features:[
     "🖼️ Ton perso s'affiche maintenant en grand sur l'écran « Qui es-tu? » — plus besoin de te connecter pour voir à quoi il ressemble!",
   ]},
@@ -902,6 +905,7 @@ const mergeGS = (a, b, preferIncoming) => {
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
 
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
+    dismissedAnnouncements: _uniq([...(a.dismissedAnnouncements||[]), ...(b.dismissedAnnouncements||[])]), // v2.6.0 — union des annonces archivées
   };
 };
 // Fusion d'un joueur (config) — garde UN seul thème par enfant.
@@ -1013,6 +1017,8 @@ const mergeFamily = (base, incoming) => {
     pin: newerC.pin || bC.pin || iC.pin || "1146",
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+    // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
+    announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
   };
   return { ...newer, config, gameStates, savedAt: isNewer(incoming.savedAt, base.savedAt) ? incoming.savedAt : base.savedAt };
 };
@@ -1091,6 +1097,7 @@ const migrateGameState = (gs) => {
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
     petEvo: gs.petEvo || {}, // v1.57.0 — voies d'évolution par familier {petId:{1,2,3}}
     petNickname: gs.petNickname || {}, // v2.4.2 — surnom personnalisé par familier {petId:string}
+    dismissedAnnouncements: gs.dismissedAnnouncements || [], // v2.6.0 — annonces parent archivées par l'enfant
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
     refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
     refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
@@ -1438,9 +1445,40 @@ function HydraFinalGame({ player, pState, color, onClose }){
     </div>
   );
 }
+// v2.6.0 — case à cocher locale (éphémère) pour les tâches des annonces parent
+function TaskCheck({ text }) {
+  const [done, setDone] = useState(false);
+  return (
+    <div onClick={()=>setDone(!done)} style={{cursor:"pointer",padding:"4px 0",display:"flex",gap:8,alignItems:"flex-start",
+      color:done?"#555":"#ddd",textDecoration:done?"line-through":"none",fontSize:14,lineHeight:1.4}}>
+      <span style={{flexShrink:0,fontSize:16}}>{done?"✅":"⬜"}</span>
+      <span>{text}</span>
+    </div>
+  );
+}
+// v2.6.0 — compte à rebours live vers l'heure cible d'une annonce parent
+function AnnouncementCountdown({ target }) {
+  const [remaining, setRemaining] = useState("");
+  useEffect(()=>{
+    const tick = ()=>{
+      const diff = new Date(target) - new Date();
+      if(diff<=0){ setRemaining("Les invités arrivent maintenant ! 🎉"); return; }
+      const h = Math.floor(diff/3600000);
+      const m = Math.floor((diff%3600000)/60000);
+      const s = Math.floor((diff%60000)/1000);
+      setRemaining(h>0 ? `⏱ ${h}h ${m}min avant que les invités commencent à arriver !`
+                       : `⏱ ${m}min ${s}s avant que les invités commencent à arriver !`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return ()=>clearInterval(id);
+  }, [target]);
+  return <div style={{marginTop:10,color:"#FFD54F",fontWeight:"bold",fontSize:14,textAlign:"center"}}>{remaining}</div>;
+}
+
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
-const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -1639,6 +1677,31 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         </div>
       )}
       {homeTab==="accueil" && (<>
+      {/* ── v2.6.0 ANNONCES PARENT ──────────────────────────────── */}
+      {!parentMode && (config.announcements||[])
+        .filter(a=> !a.expiresAt || a.expiresAt >= todayStamp())
+        .filter(a=> a.targetAll || (a.targetPlayerIds||[]).includes(player.id))
+        .filter(a=> !(pState.dismissedAnnouncements||[]).includes(a.id))
+        .map(a=>(
+          <div key={a.id} style={{background:a.secret?"rgba(180,120,0,0.22)":"rgba(60,160,60,0.15)",
+            border:`2px solid ${a.secret?"#C8942A":"#4CAF50"}`,borderRadius:10,padding:14,marginBottom:4}}>
+            {a.secret && <div style={{color:"#FFB300",fontWeight:"bold",fontSize:11,marginBottom:6,letterSpacing:1,fontFamily:"'Press Start 2P',monospace"}}>🤫 MESSAGE SECRET</div>}
+            {a.title && <div style={{color:"#FFD54F",fontWeight:"bold",fontSize:16,marginBottom:10,
+              letterSpacing:0.3,textAlign:"center",lineHeight:1.3,fontFamily:"'Press Start 2P',monospace"}}>{a.title}</div>}
+            <div style={{fontSize:15,lineHeight:1.5,fontFamily:"'VT323',monospace",color:"#eee"}}>{a.emoji} {a.text}</div>
+            {a.countdownTo && <AnnouncementCountdown target={a.countdownTo}/>}
+            {(a.sharedTasks||[]).length>0 && <><div style={{marginTop:12,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>AVANT 10H30 :</div>
+              {(a.sharedTasks||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
+            {((a.playerTasks||{})[player.id]||[]).length>0 && <><div style={{marginTop:10,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>TES MISSIONS (dans la journée) :</div>
+              {((a.playerTasks||{})[player.id]||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
+            <button onClick={()=>{if(SFX.click)SFX.click();onDismissAnnouncement&&onDismissAnnouncement(a.id);}}
+              style={{marginTop:12,padding:"8px 16px",borderRadius:8,fontFamily:"'Press Start 2P',monospace",
+                fontSize:8,background:"#333",border:"2px solid #555",color:"#eee",cursor:"pointer",display:"block",width:"100%"}}>
+              🤐 Compris, je reste discret·e !
+            </button>
+          </div>
+        ))
+      }
       {/* Player header card */}
       <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         {/* Avatar — clickable → opens creator/inventory */}
@@ -2380,7 +2443,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <span style={{fontSize:14}}>{calEventIcon(entry)}</span>
               <div style={{flex:1}}>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{entry.label}</div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666"}}>{entry.date}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666"}}>{fmtDateShort(entry.date)}</div>
               </div>
               {(parentMode||true)&&<button onClick={()=>{
                 const newCal=(pState.calendar||[]).filter(e=>e.id!==entry.id);
@@ -2914,7 +2977,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
-  onExport, onImport, onSetup, players, th, onUpdateChallenge }) {
+  onExport, onImport, onSetup, players, th, onUpdateChallenge,
+  onCreateAnnouncement, onDeleteAnnouncement }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
@@ -2931,6 +2995,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
   const [defiDraft, setDefiDraft] = useState({}); // Lot 7C — {[playerId]: {text, emoji}} pour l'édition des défis
+  // v2.6.0 — formulaire création d'annonce parent
+  const [annDraft, setAnnDraft] = useState({ emoji:"📣", title:"", text:"", secret:false, targetAll:true, targetPlayerIds:[], countdownTo:"", expiresAt:"", sharedTasks:[], playerTasksDraft:{} });
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
@@ -2981,6 +3047,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         <TabBtn k="defis"    l="🌟 Défis"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
         <TabBtn k="cal"      l="➕ Ajouter au calendrier"/>
+        <TabBtn k="annonces" l="📣 Annonces"/>
         <TabBtn k="log"      l="🕐 Journal"/>
         <TabBtn k="pin"      l="🔐 Code"/>
         <TabBtn k="export"   l="💾 Sauvegarde"/>
@@ -3399,6 +3466,100 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             </div>
           );
         })()}
+
+        {/* ── v2.6.0 ANNONCES PARENT ──────────────────────────── */}
+        {tab==="annonces" && <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {/* Annonces existantes */}
+          {(config.announcements||[]).length===0
+            ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#666",textAlign:"center",padding:"20px 0"}}>Aucune annonce active.</div>
+            : (config.announcements||[]).map(a=>(
+              <div key={a.id} style={{background:"rgba(180,120,0,0.12)",border:"2px solid #C8942A55",borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD54F",marginBottom:4}}>{a.emoji} {a.title||a.text.slice(0,40)}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#aaa",marginBottom:6}}>{a.text.slice(0,80)}{a.text.length>80?"…":""}</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666"}}>Expire : {a.expiresAt||"—"}</span>
+                  <button onClick={()=>onDeleteAnnouncement&&onDeleteAnnouncement(a.id)}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#5a1a1a",color:"#ff6b6b",border:"2px solid #ff6b6b44",borderRadius:4,cursor:"pointer"}}>🗑 Supprimer</button>
+                </div>
+              </div>
+            ))
+          }
+          {/* Formulaire nouvelle annonce */}
+          <div style={{background:"rgba(0,0,0,0.4)",border:"2px solid #444",borderRadius:8,padding:"12px 14px",marginTop:4}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#D99248",marginBottom:10}}>➕ Nouvelle annonce</div>
+            <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}>
+              <input value={annDraft.emoji} onChange={e=>setAnnDraft(d=>({...d,emoji:e.target.value.slice(0,4)}))}
+                style={{width:48,fontFamily:"'VT323',monospace",fontSize:20,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,textAlign:"center"}}/>
+              <input placeholder="Grand titre (ex: LIS CECI SANS RÉACTION)" value={annDraft.title}
+                onChange={e=>setAnnDraft(d=>({...d,title:e.target.value}))}
+                style={{flex:1,fontFamily:"'VT323',monospace",fontSize:14,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4}}/>
+            </div>
+            <textarea placeholder="Message…" value={annDraft.text} onChange={e=>setAnnDraft(d=>({...d,text:e.target.value}))}
+              style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,minHeight:80,resize:"vertical",marginBottom:8}}/>
+            <label style={{display:"flex",gap:8,alignItems:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",marginBottom:8,cursor:"pointer"}}>
+              <input type="checkbox" checked={annDraft.secret} onChange={e=>setAnnDraft(d=>({...d,secret:e.target.checked}))} style={{width:16,height:16}}/>
+              🤫 Message secret (ne pas réagir)
+            </label>
+            <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+              <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa"}}>Countdown :</span>
+              <input type="datetime-local" value={annDraft.countdownTo} onChange={e=>setAnnDraft(d=>({...d,countdownTo:e.target.value}))}
+                style={{flex:1,fontFamily:"'VT323',monospace",fontSize:13,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+              <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa"}}>Expiration :</span>
+              <input type="date" value={annDraft.expiresAt} onChange={e=>setAnnDraft(d=>({...d,expiresAt:e.target.value}))}
+                style={{flex:1,fontFamily:"'VT323',monospace",fontSize:13,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4}}/>
+            </div>
+            <label style={{display:"flex",gap:8,alignItems:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",marginBottom:8,cursor:"pointer"}}>
+              <input type="checkbox" checked={annDraft.targetAll} onChange={e=>setAnnDraft(d=>({...d,targetAll:e.target.checked}))} style={{width:16,height:16}}/>
+              Pour tous les enfants
+            </label>
+            {!annDraft.targetAll && <div style={{marginBottom:8}}>{players.map(p=>(
+              <label key={p.id} style={{display:"flex",gap:8,alignItems:"center",fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",cursor:"pointer",marginBottom:4}}>
+                <input type="checkbox" checked={(annDraft.targetPlayerIds||[]).includes(p.id)}
+                  onChange={e=>setAnnDraft(d=>({...d,targetPlayerIds:e.target.checked?[...(d.targetPlayerIds||[]),p.id]:(d.targetPlayerIds||[]).filter(x=>x!==p.id)}))} style={{width:14,height:14}}/>
+                {p.name}
+              </label>
+            ))}</div>}
+            {/* Tâches chouchoutage par enfant */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",marginBottom:6}}>TÂCHES CHOUCHOUTAGE (par enfant) :</div>
+            {players.map(p=>(
+              <div key={p.id} style={{marginBottom:6}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#D99248",marginBottom:3}}>{p.name} :</div>
+                <textarea placeholder={`Ex: Demander à Carl s'il veut un café…`}
+                  value={((annDraft.playerTasksDraft||{})[p.id]||"")}
+                  onChange={e=>setAnnDraft(d=>({...d,playerTasksDraft:{...(d.playerTasksDraft||{}),[p.id]:e.target.value}}))}
+                  style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,minHeight:50,resize:"vertical"}}/>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#555"}}>Une tâche par ligne</div>
+              </div>
+            ))}
+            <button disabled={!annDraft.text.trim()} onClick={()=>{
+              if(!annDraft.text.trim())return;
+              const playerTasks={};
+              for(const p of players){
+                const raw=(annDraft.playerTasksDraft||{})[p.id]||"";
+                const tasks=raw.split("\n").map(s=>s.trim()).filter(Boolean);
+                if(tasks.length) playerTasks[p.id]=tasks;
+              }
+              onCreateAnnouncement&&onCreateAnnouncement({
+                emoji:annDraft.emoji||"📣",
+                title:annDraft.title.trim()||undefined,
+                text:annDraft.text.trim(),
+                secret:annDraft.secret,
+                targetAll:annDraft.targetAll,
+                targetPlayerIds:annDraft.targetAll?[]:annDraft.targetPlayerIds,
+                countdownTo:annDraft.countdownTo||undefined,
+                expiresAt:annDraft.expiresAt||undefined,
+                playerTasks:Object.keys(playerTasks).length?playerTasks:undefined,
+              });
+              setAnnDraft({emoji:"📣",title:"",text:"",secret:false,targetAll:true,targetPlayerIds:[],countdownTo:"",expiresAt:"",sharedTasks:[],playerTasksDraft:{}});
+            }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px",background:annDraft.text.trim()?"#D99248":"#333",
+              color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:annDraft.text.trim()?"pointer":"not-allowed",
+              width:"100%",opacity:annDraft.text.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
+              📣 Envoyer l'annonce
+            </button>
+          </div>
+        </div>}
 
         {tab==="log" && <>
           {/* 🐛 Bugs signalés par les enfants */}
@@ -5123,6 +5284,21 @@ export default function App() {
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]; n[playerIdx]={...p, refusals:(p.refusals||[]).filter(r=>r.key!==key)}; persist(config,n); return n; });
   },[config,persist]);
 
+  // v2.6.0 — annonces parent : archivage par l'enfant
+  const handleDismissAnnouncement = useCallback((playerIdx, announcementId)=>{
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]; n[playerIdx]={...p, dismissedAnnouncements:[...(p.dismissedAnnouncements||[]), announcementId]}; persist(config,n); return n; });
+  },[config,persist]);
+  // v2.6.0 — création d'une annonce parent
+  const handleCreateAnnouncement = useCallback((announcement)=>{
+    const newCfg={...config, announcements:[...(config.announcements||[]), {...announcement, id:uid(), createdAt:todayStamp()}]};
+    setConfig(newCfg); persist(newCfg, gameStates);
+  },[config,gameStates,persist]);
+  // v2.6.0 — suppression d'une annonce parent
+  const handleDeleteAnnouncement = useCallback((announcementId)=>{
+    const newCfg={...config, announcements:(config.announcements||[]).filter(a=>a.id!==announcementId)};
+    setConfig(newCfg); persist(newCfg, gameStates);
+  },[config,gameStates,persist]);
+
   // Refus parent : retire la demande sans XP
   const refusePending = useCallback((playerIdx, doneKey)=>{
     const task=resolvePendingTask(playerIdx,doneKey);
@@ -5914,6 +6090,7 @@ export default function App() {
   const onDashRenamePet = useCallback((petId,nickname)=>handleRenamePet(view,petId,nickname), [view, handleRenamePet]);
   const onDashChoosePetEvo = useCallback((petId,tier,el)=>handleChoosePetEvo(view,petId,tier,el), [view, handleChoosePetEvo]);
   const onDashDismissRefusal = useCallback((key)=>handleDismissRefusal(view,key), [view, handleDismissRefusal]);
+  const onDashDismissAnnouncement = useCallback((id)=>handleDismissAnnouncement(view,id), [view, handleDismissAnnouncement]); // v2.6.0
   const onDashBossAttack = useCallback((type)=>handleBossAttack(view,type), [view, handleBossAttack]);
   const onDashBossPetAttack = useCallback(()=>handleBossPetAttack(view), [view, handleBossPetAttack]);
   const onDashLogout = useCallback(()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}, []);
@@ -6089,7 +6266,6 @@ export default function App() {
       <div style={{position:"relative",maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="calendars"&&(()=>{
           const order=(config.players||[]).map((p,i)=>i).sort((a,b)=> (a===sessionPlayer?-1:b===sessionPlayer?1:0));
-          const fmt=(iso)=>{ const d=new Date(iso+"T00:00:00"); return DAYS_SHORT[(d.getDay()+6)%7]+" "+d.getDate(); };
           return (
             <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent}}>📅 CALENDRIERS</div>
@@ -6102,7 +6278,7 @@ export default function App() {
                     {items.map(({d,e},k)=>(
                       <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #222"}}>
                         <span style={{fontSize:14}}>{calEventIcon(e)}</span>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:46}}>{fmt(d)}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:84}}>{fmtDateShort(d)}</span>
                         <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
                       </div>
                     ))}
@@ -6173,6 +6349,7 @@ export default function App() {
             onRenamePet={onDashRenamePet}
             onChoosePetEvo={onDashChoosePetEvo}
             onDismissRefusal={onDashDismissRefusal}
+            onDismissAnnouncement={onDashDismissAnnouncement}
             onBossAttack={onDashBossAttack}
             onBossPetAttack={onDashBossPetAttack}
             allStates={gameStates}
@@ -6234,6 +6411,8 @@ export default function App() {
           onImport={handleImport}
           onSetup={onParentPanelSetup}
           onUpdateChallenge={handleUpdateChallenge}
+          onCreateAnnouncement={handleCreateAnnouncement}
+          onDeleteAnnouncement={handleDeleteAnnouncement}
         />
       )}
 

@@ -6,6 +6,14 @@ import { PLAYER_THEMES } from "./themes.js";
 import { custodyWeekKey } from "./recurring.js";
 
 export const DAYS_SHORT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+export const MONTHS_SHORT = ["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
+
+// Backlog UX #8 — date lisible ("Mar 21 juil") plutôt qu'un ISO brut ("2026-07-21") dans
+// les écrans de calendrier destinés aux enfants.
+export const fmtDateShort = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return `${DAYS_SHORT[(d.getDay()+6)%7]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+};
 
 export const uid = () => Math.random().toString(36).slice(2,9);
 
