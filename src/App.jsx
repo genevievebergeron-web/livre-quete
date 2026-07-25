@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.5.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -112,12 +112,18 @@ const familyHp = (boss, enraged=false) => {
 const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
 const bossDamageTotal = (gameStates, bossId) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0);
 const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
-// v1.76.0 — l'Hydre ne peut être ACHEVÉE que si toutes les corvées du jour (cust_hydre_) sont complétées par les enfants assignés
+// v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
+// v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
+// en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
+// test du 1er juillet, jamais nettoyées) même quand le boss actif n'avait plus rien à voir avec l'Hydre.
 const bossQuestsAllDone = (config, states) => {
   try {
     const todayIdx=(new Date().getDay()+6)%7, stamp=todayStamp();
-    const corv=(config?.assignments||[]).filter(a=>typeof a.taskId==="string" && a.taskId.startsWith("cust_hydre_") && Array.isArray(a.days) && a.days.includes(todayIdx));
-    if(!corv.length) return true; // aucune corvée d'Hydre aujourd'hui → pas de verrou
+    const bossId = config?.boss?.id;
+    if(!bossId) return true; // aucun boss actif → pas de verrou
+    const prefix = "cust_"+bossId+"_";
+    const corv=(config?.assignments||[]).filter(a=>typeof a.taskId==="string" && a.taskId.startsWith(prefix) && Array.isArray(a.days) && a.days.includes(todayIdx));
+    if(!corv.length) return true; // aucune corvée pour CE boss aujourd'hui → pas de verrou
     for(const a of corv){
       for(const pid of (a.playerIds||[])){
         const idx=(config.players||[]).findIndex(p=>p.id===pid);
@@ -181,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.2", date:"2026-07-25", features:[
+    "🐉 Correctif : le verrou « toutes les corvées avant le coup final » vise maintenant le VRAI boss actif, plus jamais bloqué par de vieilles corvées d'un ancien combat.",
+    "🧹 Nettoyage technique : les vieilles assignations de tâches qui ne pointaient plus vers rien ont été retirées.",
+  ]},
   { version:"2.5.1", date:"2026-07-25", features:[
     "🧹 Correctif technique : une tâche personnalisée supprimée sur un appareil pendant qu'elle était encore assignée sur un autre ne laisse plus d'assignation « fantôme » derrière elle.",
   ]},
@@ -1053,6 +1063,15 @@ const migrateSavedData = (data) => {
       p && COLOR_DESATURATE_MAP[p.color] ? { ...p, color: COLOR_DESATURATE_MAP[p.color] } : p
     );
     mergedConfig.colorToneDownV1 = true;
+  }
+  if (!mergedConfig.orphanAssignCleanupV1) { // v2.5.2 (Correctif 2B) — ménage ponctuel (demandé par Gen) :
+    // purge les assignations déjà en prod dont le taskId ne correspond à AUCUNE tâche connue (ni
+    // TASK_CATALOG ni customTasks) — ~125 orphelines générales + les 16 "cust_hydre_*" du bug boss #1
+    // (données de test du 1er juillet jamais nettoyées, jamais complétables). Purge seulement, jamais
+    // de reconstruction (le nom/emoji d'origine n'existe plus nulle part).
+    const knownTaskIds = new Set([...TASK_CATALOG.map(t=>t.id), ...(mergedConfig.customTasks||[]).map(t=>t.id)]);
+    mergedConfig.assignments = (mergedConfig.assignments||[]).filter(a => knownTaskIds.has(a.taskId));
+    mergedConfig.orphanAssignCleanupV1 = true;
   }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   return {
@@ -5194,7 +5213,7 @@ export default function App() {
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
       if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#D98C8C",locked?3600:2200); },60); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#D98C8C",locked?3600:2200); },60); }
       return n;
     });
   },[persist,showToast]);
@@ -5226,7 +5245,7 @@ export default function App() {
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
       if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?"🐉":"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`🐉 L'Hydre RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#D9BC5C",locked?3600:2800); },60); }
+      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#D9BC5C",locked?3600:2800); },60); }
       return n;
     });
   },[gameStates,persist,showToast]);
