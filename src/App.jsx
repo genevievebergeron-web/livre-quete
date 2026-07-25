@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.5.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -181,6 +181,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.1", date:"2026-07-25", features:[
+    "🧹 Correctif technique : une tâche personnalisée supprimée sur un appareil pendant qu'elle était encore assignée sur un autre ne laisse plus d'assignation « fantôme » derrière elle.",
+  ]},
   { version:"2.5.0", date:"2026-07-25", features:[
     "🪙 Nouveauté : dès maintenant, tes pièces repartent à 0 chaque vendredi minuit (comme un budget de la semaine) — mais tout ce que tu as GAGNÉ au total continue de compter pour tes badges 💰 Petit Trésor et 🤑 Oncle Picsou, ça ne redescend jamais!",
   ]},
@@ -874,12 +877,18 @@ const mergeFamily = (base, incoming) => {
   const assignMap = new Map();
   (bC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId)) assignMap.set(a.instanceId, a); });
   (iC.assignments || []).forEach((a) => { if (!_rmSet.has(a.instanceId) && !assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
-  // Tâches perso : union par id, MOINS les supprimées (tombstones durables, comme les assignations)
+  // Tâches perso : union par id, MOINS les supprimées (tombstones durables, comme les assignations) —
+  // v2.5.0 (Correctif 2A) : SAUF si une assignation survivante (assignMap, déjà calculé ci-dessus)
+  // référence encore cette tâche — sinon une tâche supprimée sur un appareil pendant qu'une assignation
+  // qui la référence survit sur un autre appareil devient une « assignation orpheline » (taskId sans
+  // tâche correspondante, jamais complétable) — c'est la cause des ~125 orphelines trouvées en prod.
   const removedCustomTasks = _uniq([...(bC.removedCustomTasks || []), ...(iC.removedCustomTasks || [])]).slice(-1000);
   const _rmCT = new Set(removedCustomTasks);
+  const referencedTaskIds = new Set([...assignMap.values()].map((a) => a.taskId));
+  const _keepTask = (t) => referencedTaskIds.has(t.id) || !_rmCT.has(t.id);
   const taskMap = new Map();
-  (bC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id)) taskMap.set(t.id, t); });
-  (iC.customTasks || []).forEach((t) => { if (!_rmCT.has(t.id) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
+  (bC.customTasks || []).forEach((t) => { if (_keepTask(t)) taskMap.set(t.id, t); });
+  (iC.customTasks || []).forEach((t) => { if (_keepTask(t) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
   // v1.83.0 (Lot 1 #B6) — demandes de retrait de tâche (enfant→parent) : union par id,
   // en retirant celles dont l'assignation visée a déjà été supprimée entretemps (tombstone naturel).
   const reqMap = new Map();
