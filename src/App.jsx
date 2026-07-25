@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.13";
+const APP_VERSION = "2.5.14";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.14", date:"2026-07-25", features:[
+    "🧢 Le popup « Mon Perso » (avatar/familier) garde maintenant ton nom et le bouton ✕ visibles même quand tu défiles dans ton inventaire.",
+    "🏷️ Ton nom reste affiché en haut de l'écran sur Famille, Calendrier et Minuterie.",
+  ]},
   { version:"2.5.13", date:"2026-07-25", features:[
     "🗓️ Les dates de ton calendrier s'affichent maintenant en clair (« Mer 29 juil ») plutôt qu'en format brut (« 2026-07-29 »).",
   ]},
@@ -6176,7 +6180,7 @@ export default function App() {
       <div style={{position:"sticky",top:0,zIndex:100,maxWidth:900,margin:"0 auto",background:`${th.bg}F2`,borderBottom:`2px solid ${th.accent}55`,padding:"9px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         {/* Title + mode badge */}
         <div style={{flex:1,minWidth:120}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : "⚔️ LIVRE DE QUÊTES"}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : (sessionPlayer!=null && config.players[sessionPlayer] ? `⚔️ Les quêtes de ${displayName(config.players[sessionPlayer])}` : "⚔️ LIVRE DE QUÊTES")}</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
         {/* Clock (discrète : heure:minute, sans clignotement) — composant isolé, v1.94.0 */}

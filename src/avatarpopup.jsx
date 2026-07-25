@@ -27,8 +27,10 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"safe center",padding:12}}>
       <div style={{background:pt.bg||"#1a1a2e",border:`2px solid ${pt.accent||"#D9BC5C"}88`,borderRadius:10,padding:20,width:"min(520px,95vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
-        {/* Header */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        {/* Header — sticky (Backlog UX #6) : reste visible même en scrollant loin dans l'inventaire/familiers.
+            Marges/paddings négatifs+positifs pour étendre le header par-dessus le padding du conteneur
+            scrollable (ligne juste au-dessus) tout en gardant le même espacement visuel. */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:5,background:pt.bg||"#1a1a2e",marginTop:-20,marginLeft:-20,marginRight:-20,paddingTop:20,paddingLeft:20,paddingRight:20,paddingBottom:10}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#D9BC5C"}}>{displayName(player)} — Mon Perso</div>
           <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
         </div>
