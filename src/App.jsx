@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.6";
+const APP_VERSION = "2.5.7";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.7", date:"2026-07-25", features:[
+    "🏷️ Dans le portail parent, l'onglet pour ajouter un événement au calendrier s'appelle maintenant « Ajouter au calendrier » — pour ne plus le confondre avec l'onglet « Calendriers » (qui sert juste à consulter).",
+  ]},
   { version:"2.5.6", date:"2026-07-25", features:[
     "🏷️ Petit correctif d'étiquette : la boutique dit maintenant « ÉQUIPÉ » comme partout ailleurs dans l'app (au lieu de « ON »).",
   ]},
@@ -2924,7 +2927,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         <TabBtn k="tasks"    l="📋 Tâches"/>
         <TabBtn k="defis"    l="🌟 Défis"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
-        <TabBtn k="cal"      l="📅 Calendrier"/>
+        <TabBtn k="cal"      l="➕ Ajouter au calendrier"/>
         <TabBtn k="log"      l="🕐 Journal"/>
         <TabBtn k="pin"      l="🔐 Code"/>
         <TabBtn k="export"   l="💾 Sauvegarde"/>
