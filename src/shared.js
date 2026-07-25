@@ -3,6 +3,7 @@
 // utilisées à la fois par App.jsx (44+ appels) et par des composants extraits (ex. WeekView,
 // SetupWizard) — vivent ici pour éviter tout import circulaire entre App.jsx et les modules extraits.
 import { PLAYER_THEMES } from "./themes.js";
+import { custodyWeekKey } from "./recurring.js";
 
 export const DAYS_SHORT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 
@@ -31,12 +32,13 @@ export const pickStarterThemes = () => {
   return shuffled.slice(0, 2);
 };
 
-// v1.93.0 (Lot 4 #20) — thème hebdomadaire gratuit : chaque semaine (lundi→dimanche, via
-// weekKey), un thème non-secret est débloqué pour TOUT LE MONDE sans XP, en plus des
-// déblocages XP/starter existants.
+// v1.93.0 (Lot 4 #20) — thème hebdomadaire gratuit : chaque semaine, un thème non-secret est
+// débloqué pour TOUT LE MONDE sans XP, en plus des déblocages XP/starter existants.
+// v2.5.0 (Correctif 1) — aligné sur custodyWeekKey (vendredi→vendredi) plutôt que weekKey
+// (lundi→dimanche), pour cohérence avec le reset hebdomadaire des pièces.
 export const getWeeklyFreeTheme = () => {
   const pool = Object.keys(PLAYER_THEMES).filter(k => k !== "none" && !PLAYER_THEMES[k].secret);
-  const wk = weekKey();
+  const wk = custodyWeekKey();
   const seed = wk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
   return pool[seed % pool.length];
 };

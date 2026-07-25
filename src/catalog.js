@@ -160,8 +160,8 @@ export const BADGES = [
   { id:"b_xp100",    emoji:"⚡", name:"Chargé à Bloc",        desc:"Accumule 250 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=250 },
   { id:"b_xp300",    emoji:"🌩️", name:"Orage Intérieur",      desc:"Accumule 600 XP",                      type:"general", check:(ps)=>(ps.xp||0)>=600 },
   { id:"b_xp500",    emoji:"🌟", name:"Supernova",            desc:"Accumule 1200 XP",                     type:"general", check:(ps)=>(ps.xp||0)>=1200 },
-  { id:"b_coins50",  emoji:"💰", name:"Petit Trésor",         desc:"Accumule 100 pièces d'un coup",        type:"general", check:(ps)=>(ps.coins||0)>=100 },
-  { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Accumule 300 pièces",                  type:"general", check:(ps)=>(ps.coins||0)>=300 },
+  { id:"b_coins50",  emoji:"💰", name:"Petit Trésor",         desc:"Gagne 100 pièces au total",            type:"general", check:(ps)=>(ps.coinsLifetime||0)>=100 }, // v2.5.0 — coinsLifetime (jamais réinitialisé), pas coins (reset chaque vendredi)
+  { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Gagne 300 pièces au total",            type:"general", check:(ps)=>(ps.coinsLifetime||0)>=300 }, // v2.5.0 — idem
   { id:"b_buy1",     emoji:"🛒", name:"Première Récompense",  desc:"Achète une récompense",               type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=1 },
   { id:"b_buy5",     emoji:"🛍️", name:"Problème de Shopping", desc:"Achète 10 récompenses",                type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=10 },
   { id:"b_streak3",  emoji:"📅", name:"Machine à Habitudes",  desc:"6 quêtes dans la même journée",        type:"general", check:(ps,c)=>c>=6 },
