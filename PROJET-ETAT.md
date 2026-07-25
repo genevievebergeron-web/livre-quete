@@ -469,3 +469,12 @@ const persist = useCallback((cfg, gs) =>
 ### #12 — Humour et trolling
 - Messages sarcastiques/drôles aléatoires dans l'UI
 - Easter eggs, réactions aux actions répétées
+
+### #13 — Budget-temps quotidien par enfant (contrôle parental)
+- **Problème** : un enfant peut rester connecté indéfiniment ; l'énergie est un frein doux sur les loisirs mais pas sur la session globale.
+- **Config parent** : `config.players[i].dailyMinutesLimit` (`number | null`) — défini par le parent dans le portail, `null` = pas de limite.
+- **Suivi** : `pState.sessionMinutes: {day: "YYYY-MM-DD", minutes: number}` — accumulé via `setInterval(1 min)` quand l'enfant est en session (`sessionPlayer !== null`). Flush sur `visibilitychange`. `mergeGS` : même jour → `Math.max`; jour différent → garder le plus récent.
+- **Affichage** : barre de progression discrète dans le header enfant (ex. « 18/30 min »), visible seulement si limite configurée.
+- **Lock screen** : quand `minutes >= limit`, remplacer le dashboard par « 🛌 C'est l'heure de la pause ! » + bouton "Déverrouiller" → `PinPad` parent existant. Après succès : remet `sessionMinutes.minutes = 0` (extension accordée).
+- **Portail parent** : section dans l'onglet ⚡ Actions — sélecteur par enfant (15/20/30/45/60/90 min ou illimité) + temps utilisé aujourd'hui affiché.
+- **Fichiers** : `migrateGameState`, `mergeGS`, `ParentPanel` (onglet Actions), `PlayerDashboard` (timer + lock screen), `useEffect` timer dans `App`.
