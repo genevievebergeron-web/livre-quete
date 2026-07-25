@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.3";
+const APP_VERSION = "2.5.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.5", date:"2026-07-25", features:[
+    "🔓 Correctif : quitter le mode parent te ramène directement à ta propre page, sans devoir retaper ton code secret.",
+  ]},
+  { version:"2.5.4", date:"2026-07-25", features:[
+    "🛠️ Correctif technique (portail parent) : l'assistant « Modifier le livre » a maintenant un bouton « Fermer sans enregistrer » toujours visible, et laisse sauter directement à une étape plus loin sans devoir cliquer « Suivant » à chaque fois.",
+  ]},
   { version:"2.5.3", date:"2026-07-25", features:[
     "🐾 Tu peux maintenant donner un surnom à ton familier! Touche le petit ✏️ à côté de son nom pour le renommer comme tu veux.",
   ]},
@@ -4688,6 +4694,7 @@ export default function App() {
   const [parentPinOpen, setParentPinOpen] = useState(false);
   const [parentMode, setParentMode] = useState(false);
   const [sessionPlayer, setSessionPlayer] = useState(null); // enfant connecté (idx) — null = parent/aucun
+  const [returnToPlayer, setReturnToPlayer] = useState(null); // v2.5.3 (Correctif 3) — enfant à restaurer en sortant du mode parent, SEULEMENT si on y est entré depuis sa session (pas depuis l'écran de login)
   const [editingBook, setEditingBook] = useState(false); // true = "Modifier le livre" (édite la config existante)
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
   const [hamOpen, setHamOpen] = useState(false); // menu ☰ enfant (piloté depuis le header)
@@ -5740,7 +5747,9 @@ export default function App() {
   const onFamilyPostChat = useCallback((text)=>{ pushFeed({type:"chat",playerId:familyMeId,text,emoji:"💬"}); }, [pushFeed, familyMeId]);
 
   const onParentPanelClose = useCallback(()=>setParentPanel(false), []);
-  const onParentPanelExit = useCallback(()=>{ setParentMode(false); setParentPanel(false); showToast("🔒 Mode parent quitté","#D99248"); }, [showToast]);
+  const onParentPanelExit = useCallback(()=>{ setParentMode(false); setParentPanel(false);
+    if(returnToPlayer!=null){ setSessionPlayer(returnToPlayer); setView(returnToPlayer); setReturnToPlayer(null); } // v2.5.3 (Correctif 3) — restaure la session enfant si on est entré depuis elle
+    showToast("🔒 Mode parent quitté","#D99248"); }, [showToast, returnToPlayer]);
   const onParentPanelReset = useCallback(()=>{ if(window.confirm("Remettre tous les joueurs à zéro?")){ (config?.players||[]).forEach((_,i)=>handleResetPlayer(i)); } }, [config?.players, handleResetPlayer]);
   const onParentPanelSetup = useCallback(()=>{ setEditingBook(true); setScreen("setup"); setParentPanel(false); }, []);
 
@@ -5798,7 +5807,8 @@ export default function App() {
   }, [showToast]);
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
-  if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}/>;
+  if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}
+    onCancel={editingBook?()=>{setEditingBook(false);setScreen("game");setParentPanel(true);}:null}/>;
   if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates}
     onSelectPlayer={(idx)=>{
@@ -5865,7 +5875,7 @@ export default function App() {
               {(()=>{ const nb=gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
                 return nb>0?<span style={{position:"absolute",top:-7,right:-7,background:"#D97070",color:"#fff",borderRadius:"50%",minWidth:16,height:16,fontSize:9,lineHeight:"16px",fontFamily:"'Press Start 2P',monospace",padding:"0 2px",border:"2px solid #0d0d0d"}}>{nb}</span>:null; })()}
             </button>
-            <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false);showToast("🔒 Mode parent quitté","#D99248");}}
+            <button onClick={()=>{SFX.click();setParentMode(false);setParentPanel(false); if(returnToPlayer!=null){ setSessionPlayer(returnToPlayer); setView(returnToPlayer); setReturnToPlayer(null); } showToast("🔒 Mode parent quitté","#D99248");}}
               style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#D99248",border:"2px solid #D99248",borderRadius:3,cursor:"pointer"}} title="Quitter le mode parent">🔒</button>
           </>) : sessionPlayer!=null ? (
             // ☰ Menu enfant (contient réglages, archives, bug, validation parent, quitter)
@@ -6081,7 +6091,7 @@ export default function App() {
       )}
 
       {parentPinOpen&&(
-        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#D99248"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
+        <PinPad pin={config.pin} label="Accès mode parent" onSuccess={()=>{ const turningOn=!parentMode; setParentMode(turningOn); setParentPinOpen(false); if(turningOn){ if(sessionPlayer!=null) setReturnToPlayer(sessionPlayer); setSessionPlayer(null); setView("family"); } showToast(turningOn?"🔓 Mode parent activé!":"🔒 Mode parent désactivé","#D99248"); }} onCancel={()=>setParentPinOpen(false)} th={th}/>
       )}
       {bossWin&&(
         <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>

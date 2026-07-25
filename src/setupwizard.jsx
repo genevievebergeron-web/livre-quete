@@ -7,7 +7,7 @@ import { PT_LIST } from "./themes.js";
 import { TASK_CATALOG, REWARD_CATALOG, CAT_LABELS, DIFF_COLOR } from "./catalog.js";
 import { uid, COLORS, THEMES, GLOBAL_CSS, isThemeUnlocked, pickStarterThemes, displayName, DAYS_SHORT } from "./shared.js";
 
-export function SetupWizard({ existing, onDone }) {
+export function SetupWizard({ existing, onDone, onCancel }) {
   // En édition (« Modifier le livre »), on arrive direct sur Joueurs (le Mode global n'est plus le point d'entrée)
   const [step, setStep] = useState(existing ? 1 : 0);
   const STEPS = ["Mode","Joueurs","Tâches","Récompenses","PIN"];
@@ -154,9 +154,16 @@ export function SetupWizard({ existing, onDone }) {
       <style>{GLOBAL_CSS}</style>
 
       {/* ── HEADER ── */}
-      <div style={{textAlign:"center",marginTop:8,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+      <div style={{width:"100%",maxWidth:680,display:"flex",flexDirection:"column",alignItems:"center",gap:6,position:"relative"}}>
+        {/* v2.5.2 — sortie de secours toujours visible en mode édition ("Modifier le livre") : avant, la seule
+            issue était de finir les 5 étapes ou de recharger la page en abandonnant tout état local en cours. */}
+        {onCancel && (
+          <button className="btn-press" onClick={()=>{SFX.click();onCancel();}} style={{position:"absolute",top:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",padding:"6px 10px",background:"#222",color:"#D98C8C",border:"2px solid #D98C8C",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
+            ✕ Fermer sans enregistrer
+          </button>
+        )}
         {/* Floating emoji flankers + title */}
-        <div style={{display:"flex",alignItems:"center",gap:"clamp(8px,2vw,20px)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"clamp(8px,2vw,20px)",marginTop:8}}>
           <span className="float-y" style={{fontSize:"clamp(18px,3.5vw,32px)",animationDelay:"0s"}}>⚔️</span>
           <span className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,2.2vw,20px)",color:T.accent}}>LIVRE DE QUÊTES</span>
           <span className="float-y" style={{fontSize:"clamp(18px,3.5vw,32px)",animationDelay:"1.2s"}}>🛡️</span>
@@ -167,11 +174,13 @@ export function SetupWizard({ existing, onDone }) {
       {/* ── STEP INDICATORS + XP BAR ── */}
       <div style={{width:"100%",maxWidth:680,display:"flex",flexDirection:"column",gap:8}}>
         <div style={{display:"flex",gap:5,flexWrap:"wrap",justifyContent:"center"}}>
-          {STEPS.map((s,i)=>(
-            <div key={i} onClick={()=>i<step&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.75vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#222",color:i<=step?"#0d0d0d":"#444",borderRadius:2,border:`2px solid ${i===step?"#0d0d0d":i<step?"#0d0d0d":"#333"}`,cursor:i<step?"pointer":"default",boxShadow:i===step?"3px 3px 0 #0d0d0d":i<step?"2px 2px 0 #0d0d0d":"none",transition:"all 0.15s"}}>
+          {STEPS.map((s,i)=>{
+            const clickable = i<step || (existing && i>step); // v2.5.2 — en mode édition, les champs sont déjà pré-remplis : naviguer librement en avant est sûr
+            return (
+            <div key={i} onClick={()=>clickable&&setStep(i)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,0.75vw,7px)",padding:"4px 8px",background:i===step?T.accent:i<step?T.primary:"#222",color:i<=step?"#0d0d0d":"#444",borderRadius:2,border:`2px solid ${i===step?"#0d0d0d":i<step?"#0d0d0d":"#333"}`,cursor:clickable?"pointer":"default",boxShadow:i===step?"3px 3px 0 #0d0d0d":i<step?"2px 2px 0 #0d0d0d":"none",transition:"all 0.15s"}}>
               {i<step?"✓ ":""}{s}
             </div>
-          ))}
+          );})}
         </div>
         {/* XP progress bar */}
         <div style={{background:"var(--xp-bg)",border:"2px solid #1a3a1a",borderRadius:3,height:10,overflow:"hidden",position:"relative"}}>
