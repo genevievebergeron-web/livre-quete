@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.10";
+const APP_VERSION = "2.5.11";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.11", date:"2026-07-25", features:[
+    "🔧 Correctif : une quête ajoutée (ou une tâche piquée dans la liste) ne devrait plus jamais « disparaître » après coup à cause d'une synchro entre appareils — la sauvegarde locale ne se fait plus écraser par une synchro plus vieille arrivée en retard.",
+  ]},
   { version:"2.5.10", date:"2026-07-25", features:[
     "🧑‍🤝‍🧑 Nouveau! Quand tu te crées une tâche, tu choisis maintenant : juste pour aujourd'hui, juste pour toi à chaque fois, ou proposer à toute la famille (un parent doit l'approuver).",
   ]},
@@ -758,7 +761,20 @@ const remotePush = (data) => {
         } catch {}
         await fetch("/api/famille", { method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: FAMILY_ID, data: toWrite }) });
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(toWrite)); LAST_SAVED_AT = toWrite.savedAt || LAST_SAVED_AT; } catch {}
+        // v2.5.11 — FUSION AVANT L'ÉCRITURE LOCALE FINALE, même principe que la fusion avant écriture
+        // cloud ci-dessus : ce callback est déclenché par un setTimeout debounced (1500ms) qui peut
+        // rester "en vol" pendant plusieurs centaines de ms (2 fetch réseau successifs). Si une AUTRE
+        // action (ex: ajouter une tâche) a sauvegardé une version plus fraîche dans localStorage PENDANT
+        // ce vol, `clearTimeout` ne peut plus annuler ce callback déjà démarré — sans cette fusion, le
+        // `toWrite` (bâti sur une fermeture plus vieille) écrasait purement et simplement cette version
+        // plus fraîche, faisant "disparaître" ce qui venait d'être ajouté. Bug signalé par Antoine
+        // (« ajout de quête, ça dit que c'est ajouté, mais ça apparaît pas »), le 2026-07-25.
+        try {
+          let finalWrite = toWrite;
+          try { const cur = localStorage.getItem(STORE_KEY); if (cur) { const curData = JSON.parse(cur); if (curData?.config) finalWrite = mergeFamily(toWrite, curData); } } catch {}
+          localStorage.setItem(STORE_KEY, JSON.stringify(finalWrite));
+          LAST_SAVED_AT = finalWrite.savedAt || LAST_SAVED_AT;
+        } catch {}
         markSynced();
       } else if (supaEnabled()) {
         let toWrite = data;
@@ -771,7 +787,13 @@ const remotePush = (data) => {
           headers: { ...supaHeaders(), Prefer: "resolution=merge-duplicates" },
           body: JSON.stringify({ id: FAMILY_ID, data: toWrite, saved_at: toWrite.savedAt || new Date().toISOString() }),
         });
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(toWrite)); LAST_SAVED_AT = toWrite.savedAt || LAST_SAVED_AT; } catch {}
+        // v2.5.11 — même fusion défensive que la branche apiAvailable() ci-dessus (voir son commentaire).
+        try {
+          let finalWrite = toWrite;
+          try { const cur = localStorage.getItem(STORE_KEY); if (cur) { const curData = JSON.parse(cur); if (curData?.config) finalWrite = mergeFamily(toWrite, curData); } } catch {}
+          localStorage.setItem(STORE_KEY, JSON.stringify(finalWrite));
+          LAST_SAVED_AT = finalWrite.savedAt || LAST_SAVED_AT;
+        } catch {}
         markSynced();
       }
     } catch (e) { console.warn("Sync: push échoué (mode local conservé)", e); }
