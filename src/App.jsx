@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.7";
+const APP_VERSION = "2.5.8";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.8", date:"2026-07-25", features:[
+    "👁️ Correctif technique (portail parent) : les onglets par enfant s'appellent maintenant « 👁️ Voir [prénom] » pour rappeler que c'est un aperçu, pas un panneau de gestion (les ajustements XP/pièces restent dans Actions).",
+  ]},
   { version:"2.5.7", date:"2026-07-25", features:[
     "🏷️ Dans le portail parent, l'onglet pour ajouter un événement au calendrier s'appelle maintenant « Ajouter au calendrier » — pour ne plus le confondre avec l'onglet « Calendriers » (qui sert juste à consulter).",
   ]},
@@ -5929,11 +5932,14 @@ export default function App() {
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           ⏱ Minuterie
         </button>
-        {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde. */}
+        {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde.
+            v2.5.8 (Backlog UX item 3) — préfixe "👁️" en mode parent : ces onglets affichent la
+            page de l'enfant EN LECTURE (même écran que lui), pas un panneau de gestion — ajuster
+            XP/pièces se fait dans le tiroir MODE PARENT → Actions. */}
         {(config.players||[]).map((pl,i)=>({pl,i})).filter(({i})=> parentMode || sessionPlayer===null || sessionPlayer===i).map(({pl,i})=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
-            {displayName(pl)}
+            {parentMode?"👁️ Voir ":""}{displayName(pl)}
           </button>
         ))}
       </div>}
