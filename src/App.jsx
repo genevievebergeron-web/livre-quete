@@ -5,7 +5,7 @@ import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEM
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
 import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
-import { Countdown, HeaderClock, TimeTimerDisc } from "./timers.jsx";
+import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.15";
+const APP_VERSION = "2.5.16";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.16", date:"2026-07-25", features:[
+    "⏱ Un petit bouton minuteur apparaît maintenant sur chaque tâche — pour te chronométrer sur UNE tâche précise sans avoir à aller dans l'onglet Minuterie.",
+    "🐛 Correctif : le défi de la semaine pouvait se décocher tout seul après une synchro entre appareils, obligeant à le cocher encore et encore.",
+  ]},
   { version:"2.5.15", date:"2026-07-25", features:[
     "🎯 Ton écran « Aujourd'hui » commence maintenant direct par tes quêtes du jour — le Défi de la semaine et les Objectifs du jour sont rangés dans un tiroir replié juste en dessous, à ouvrir si tu veux.",
     "✏️ Le bouton « créer ma propre tâche » apparaît aussi en haut de la liste de quêtes, pas juste tout en bas.",
@@ -1027,6 +1031,34 @@ const mergeFamily = (base, incoming) => {
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
     // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
     announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    // Bug live signalé par Gen (2026-07-25) : « défi de la semaine peut être coché à l'infini ».
+    // Cause : weeklyChallenge n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}`
+    // ci-dessus — iC (incoming) écrasait TOUJOURS bC en entier, sans égard à la fraîcheur (contrairement
+    // au reste de cette fonction), et sans fusionner les checkins. Résultat : une simple relecture cloud
+    // (poll périodique, autre appareil) pouvait ramener une copie sans la coche du jour et effacer la
+    // coche qui venait d'être faite → le bouton réapparaissait, cochable encore et encore. Fix : fusion
+    // explicite par playerId + UNION des checkins (checkins ne fait qu'ajouter des jours "true", jamais
+    // les retirer — aucune UI ne décoche — donc l'union est increvable, même patron que `owned`/`badges`).
+    weeklyChallenge: (() => {
+      const bWC = bC.weeklyChallenge, iWC = iC.weeklyChallenge;
+      if (!bWC) return iWC || null;
+      if (!iWC) return bWC;
+      const weekKey = (iWC.weekKey||"") >= (bWC.weekKey||"") ? (iWC.weekKey||bWC.weekKey) : bWC.weekKey;
+      const cm = new Map();
+      (bWC.challenges||[]).forEach(c => { if (c && c.playerId != null) cm.set(c.playerId, {...c}); });
+      (iWC.challenges||[]).forEach(c => {
+        if (!c || c.playerId == null) return;
+        const ex = cm.get(c.playerId);
+        if (!ex) { cm.set(c.playerId, {...c}); return; }
+        cm.set(c.playerId, {
+          ...ex, ...c,
+          text: preferIncoming ? (c.text ?? ex.text) : (ex.text ?? c.text),
+          emoji: preferIncoming ? (c.emoji ?? ex.emoji) : (ex.emoji ?? c.emoji),
+          checkins: {...(ex.checkins||{}), ...(c.checkins||{})},
+        });
+      });
+      return { weekKey, challenges:[...cm.values()] };
+    })(),
   };
   return { ...newer, config, gameStates, savedAt: isNewer(incoming.savedAt, base.savedAt) ? incoming.savedAt : base.savedAt };
 };
@@ -1501,6 +1533,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [chooserOpen, setChooserOpen] = useState(false);
   const [laterOpen, setLaterOpen] = useState(false); // v1.63.0 — accordéon « tâches planifiées » (replié par défaut)
   const [dailyGoalsOpen, setDailyGoalsOpen] = useState(false); // Backlog UX #13 — accordéon « Défi + Objectifs » (replié par défaut, sous la liste de quêtes)
+  const [taskTimerFor, setTaskTimerFor] = useState(null); // Backlog UX #11 — {emoji,label} de la tâche en cours de minutage, ou null
   // v1.57.0 — évolution du familier équipé en attente d'un choix?
   const _eqPetId = pState.equipped?.pet;
   const _eqPetLv = petLevel((pState.petXp||{})[_eqPetId]||0);
@@ -2199,12 +2232,20 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
               {task.cat && (()=>{ const m=catMeta(task.cat); return <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:m.color,background:`${m.color}1A`,border:`1px solid ${m.color}55`,padding:"1px 4px"}}>{m.label}</span>; })()}
             </div>
-            {!done&&!pending&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
-              style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
-                color:"#0d0d0d",background:player.color,border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",
-                boxShadow:"2px 2px 0 #0d0d0d",transition:"all 0.08s"}}>
-              ✔ J'AI FAIT ÇA!
-            </button>}
+            {!done&&!pending&&<div style={{display:"flex",gap:6}}>
+              <button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
+                style={{flex:1,padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
+                  color:"#0d0d0d",background:player.color,border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",
+                  boxShadow:"2px 2px 0 #0d0d0d",transition:"all 0.08s"}}>
+                ✔ J'AI FAIT ÇA!
+              </button>
+              {/* Backlog UX #11 — minuteur pour CETTE tâche précise (outil de concentration, ne complète pas la tâche) */}
+              <button onClick={()=>{SFX.click();setTaskTimerFor({emoji:task.emoji,label:task.label});}}
+                title="Lancer un minuteur pour cette tâche"
+                style={{padding:"9px 11px",fontSize:16,background:"rgba(0,0,0,0.4)",border:`3px solid ${player.color}`,borderRadius:3,cursor:"pointer"}}>
+                ⏱
+              </button>
+            </div>}
             {/* v1.83.0 (Lot 1 #B6) — l'enfant peut demander à retirer une tâche qu'il ne veut plus (le parent approuve) */}
             {!done&&!pending&&(()=>{
               const reqPending=(config.removalRequests||[]).some(r=>r.instanceId===ass.instanceId && r.playerId===player.id);
@@ -2354,6 +2395,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {addTaskOpen && <CustomTaskModal title="➕ Ma nouvelle quête" confirmLabel="Ajouter à ma journée" th={th} scopeOptions
         onClose={()=>setAddTaskOpen(false)}
         onCreate={(data)=>{ onChildAddTask&&onChildAddTask(data); setAddTaskOpen(false); }}/>}
+      {taskTimerFor && <TaskTimerModal task={taskTimerFor} accent={th.accent||player.color} onClose={()=>setTaskTimerFor(null)}/>}
 
       </>)}
       {homeTab==="sem" && (<>

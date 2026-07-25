@@ -47,6 +47,48 @@ export function HeaderClock({ style }) {
   return <div style={style}>{H}:{M}</div>;
 }
 
+// Backlog UX #11 — minuteur pour UNE tâche précise, lancé depuis sa carte (dashboard "Aujourd'hui").
+// Outil de concentration seulement : ne complète PAS la tâche (contrairement à TimerView/onComplete
+// qui accorde de l'XP pour un rituel) — la validation reste le bouton "✔ J'AI FAIT ÇA!" de la carte,
+// donc zéro nouveau chemin d'XP/approbation parent à maintenir.
+export function TaskTimerModal({ task, accent, onClose }) {
+  const [targetMin, setTargetMin] = useState(10);
+  const [startTs, setStartTs] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(()=>{ if(!startTs) return; const i=setInterval(()=>setNow(Date.now()),250); return()=>clearInterval(i); },[startTs]);
+  const elapsed = startTs ? now-startTs : 0;
+  const totalMs = targetMin*60000;
+  const remaining = Math.max(0, totalMs-elapsed);
+  const timeUp = !!startTs && remaining<=0;
+  const mm=Math.floor(remaining/60000), ss=Math.floor((remaining%60000)/1000);
+  const lowTime = !!startTs && !timeUp && remaining<=60000;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2700,display:"flex",alignItems:"center",justifyContent:"safe center",padding:12}}>
+      <div style={{background:"#1a1a2e",border:`3px solid ${accent}`,borderRadius:10,padding:20,width:"min(360px,92vw)",display:"flex",flexDirection:"column",gap:12,alignItems:"center"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accent}}>⏱ {task.emoji} {task.label}</div>
+          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
+        </div>
+        {!startTs && (<>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Combien de minutes? <b style={{color:accent}}>{targetMin} min</b></div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+            {[5,10,15,20].map(v=>(
+              <button key={v} onClick={()=>setTargetMin(v)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 11px",background:targetMin===v?accent:"#1a1a1a",color:targetMin===v?"#0d0d0d":accent,border:`2px solid ${accent}`,borderRadius:5,cursor:"pointer"}}>{v}</button>
+            ))}
+          </div>
+          <button onClick={()=>setStartTs(Date.now())} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:11,padding:14,background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>▶️ Partir ({targetMin} min)</button>
+        </>)}
+        {startTs && (<>
+          <TimeTimerDisc progress={remaining/totalMs} color={accent} urgent={lowTime}/>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(30px,7vw,48px)",color:lowTime?"#D98C8C":"#fff",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{timeUp?"⏰":`${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`}</div>
+          {timeUp && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:accent,textAlign:"center",lineHeight:1.4}}>Temps écoulé! Appuie sur « ✔ J'AI FAIT ÇA! » sur ta carte quand c'est prêt.</div>}
+          <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:12,background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>✕ Fermer</button>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
 // Disque Time Timer (anneau qui rétrécit) — SVG pur, aucune dépendance au-delà de ses props.
 export function TimeTimerDisc({ progress, size=110, color="#85CDD1", urgentColor="#D98C8C", urgent=false }) {
   const r = size/2 - 8;
