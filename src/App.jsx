@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 
-const APP_VERSION = "2.5.14";
+const APP_VERSION = "2.5.15";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.15", date:"2026-07-25", features:[
+    "🎯 Ton écran « Aujourd'hui » commence maintenant direct par tes quêtes du jour — le Défi de la semaine et les Objectifs du jour sont rangés dans un tiroir replié juste en dessous, à ouvrir si tu veux.",
+    "✏️ Le bouton « créer ma propre tâche » apparaît aussi en haut de la liste de quêtes, pas juste tout en bas.",
+  ]},
   { version:"2.5.14", date:"2026-07-25", features:[
     "🧢 Le popup « Mon Perso » (avatar/familier) garde maintenant ton nom et le bouton ✕ visibles même quand tu défiles dans ton inventaire.",
     "🏷️ Ton nom reste affiché en haut de l'écran sur Famille, Calendrier et Minuterie.",
@@ -1496,6 +1500,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [laterOpen, setLaterOpen] = useState(false); // v1.63.0 — accordéon « tâches planifiées » (replié par défaut)
+  const [dailyGoalsOpen, setDailyGoalsOpen] = useState(false); // Backlog UX #13 — accordéon « Défi + Objectifs » (replié par défaut, sous la liste de quêtes)
   // v1.57.0 — évolution du familier équipé en attente d'un choix?
   const _eqPetId = pState.equipped?.pet;
   const _eqPetLv = petLevel((pState.petXp||{})[_eqPetId]||0);
@@ -1988,25 +1993,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
       </>)}
       {homeTab==="jour" && (<>
-      {/* Lot 7C — bannière défi personnel hebdomadaire */}
-      {weeklyChallenge && (()=>{
-        const myChallenge = weeklyChallenge.challenges?.find(c=>c.playerId===player.id);
-        if(!myChallenge) return null;
-        const today = new Date().toISOString().slice(0,10);
-        const done = myChallenge.checkins?.[today];
-        return (
-          <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${done?"#5CAD68":"#D9BC5C"}`,borderRadius:6,padding:"11px 13px",marginBottom:4}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#D9BC5C",marginBottom:6}}>⭐ DÉFI DE LA SEMAINE</div>
-            <div style={{fontSize:"clamp(13px,1.6vw,16px)",color:"#FFF",lineHeight:1.4,marginBottom:8}}>{myChallenge.emoji||"⭐"} {myChallenge.text||"Défi à venir…"}</div>
-            {done
-              ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5CAD68"}}>✅ Défi relevé aujourd'hui!</div>
-              : onChallengeCheckin && <button className="btn-press" onClick={()=>{SFX.click();onChallengeCheckin(today,true);}}
-                  style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#D9BC5C",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
-                  ✅ J'ai réussi aujourd'hui!
-                </button>}
-          </div>
-        );
-      })()}
       {/* Lot 7A — bannière semaine de pause */}
       {!isCustodyWeek() && (()=>{
         const now2=new Date();
@@ -2047,39 +2033,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           );
         });
       })()}
-      {/* 🎯 Objectifs du jour — bonus à réclamer */}
-      {(()=>{
-        const stamp="#"+todayStamp();
-        const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));
-        const countToday=doneToday.length;
-        const axp={}; assignments.forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
-        const xpToday=doneToday.reduce((s,k)=>{const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); return s+(axp[inst]||0);},0);
-        const OBJ=[
-          {id:"o3",  label:"Faire 3 quêtes",  prog:Math.min(countToday,3), goal:3,  xp:10, coins:5},
-          {id:"o6",  label:"Faire 6 quêtes",  prog:Math.min(countToday,6), goal:6,  xp:15, coins:10},
-          {id:"oxp", label:"Gagner 60 XP",    prog:Math.min(xpToday,60),   goal:60, xp:0,  coins:10},
-        ];
-        const claimed=(pState.dailyClaimed&&pState.dailyClaimed.day===todayStamp())?pState.dailyClaimed.ids:[];
-        return (
-          <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${(th.accent||player.color)}44`,borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent||player.color,marginBottom:6}}>🎯 OBJECTIFS DU JOUR</div>
-            {OBJ.map(o=>{ const done=o.prog>=o.goal; const isClaimed=claimed.includes(o.id);
-              return (
-                <div key={o.id} style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#5CAD68":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#85CDD1"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
-                    {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#5CAD68",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
-                  </div>
-                  <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.round(o.prog/o.goal*100)+"%",background:isClaimed?"#5CAD68":`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.5s"}}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
       {/* ── NAVIGATION CLAIRE À 2 NIVEAUX ──
           1) Gros choix : Semaine (accueil) vs Rituels.  2) Si Rituels : quel rituel. */}
       {(()=>{
@@ -2327,6 +2280,66 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           );
         }
         return cards;
+      })()}
+
+      {/* Backlog UX #13 — Défi de la semaine + Objectifs du jour, repliés par défaut SOUS la liste de
+          quêtes (avant : ces 2 blocs poussaient le bouton "J'AI FAIT ÇA!" sous 2 écrans de défilement,
+          le constat 🔴 le plus important de l'audit UX). Accordéon même patron visuel que « Tâches planifiées ». */}
+      {(()=>{
+        const myChallenge = weeklyChallenge?.challenges?.find(c=>c.playerId===player.id);
+        const todayC = new Date().toISOString().slice(0,10);
+        const challengeDone = myChallenge && myChallenge.checkins?.[todayC];
+        const stamp="#"+todayStamp();
+        const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));
+        const countToday=doneToday.length;
+        const axp={}; assignments.forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
+        const xpToday=doneToday.reduce((s,k)=>{const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); return s+(axp[inst]||0);},0);
+        const OBJ=[
+          {id:"o3",  label:"Faire 3 quêtes",  prog:Math.min(countToday,3), goal:3,  xp:10, coins:5},
+          {id:"o6",  label:"Faire 6 quêtes",  prog:Math.min(countToday,6), goal:6,  xp:15, coins:10},
+          {id:"oxp", label:"Gagner 60 XP",    prog:Math.min(xpToday,60),   goal:60, xp:0,  coins:10},
+        ];
+        const claimed=(pState.dailyClaimed&&pState.dailyClaimed.day===todayStamp())?pState.dailyClaimed.ids:[];
+        const readyToClaim = OBJ.filter(o=>o.prog>=o.goal && !claimed.includes(o.id)).length;
+        return (
+          <div style={{marginTop:6}}>
+            <button onClick={()=>{ if(SFX.click)SFX.click(); setDailyGoalsOpen(o=>!o); }}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
+              <span>{dailyGoalsOpen?"▼":"▶"} 🎯 Défi &amp; objectifs du jour</span>
+              {readyToClaim>0 && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#5CAD68"}}>🎁 {readyToClaim}</span>}
+            </button>
+            {dailyGoalsOpen && <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}>
+              {myChallenge && (
+                <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${challengeDone?"#5CAD68":"#D9BC5C"}`,borderRadius:6,padding:"11px 13px"}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#D9BC5C",marginBottom:6}}>⭐ DÉFI DE LA SEMAINE</div>
+                  <div style={{fontSize:"clamp(13px,1.6vw,16px)",color:"#FFF",lineHeight:1.4,marginBottom:8}}>{myChallenge.emoji||"⭐"} {myChallenge.text||"Défi à venir…"}</div>
+                  {challengeDone
+                    ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#5CAD68"}}>✅ Défi relevé aujourd'hui!</div>
+                    : onChallengeCheckin && <button className="btn-press" onClick={()=>{SFX.click();onChallengeCheckin(todayC,true);}}
+                        style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#D9BC5C",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
+                        ✅ J'ai réussi aujourd'hui!
+                      </button>}
+                </div>
+              )}
+              <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${(th.accent||player.color)}44`,borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent||player.color,marginBottom:6}}>🎯 OBJECTIFS DU JOUR</div>
+                {OBJ.map(o=>{ const done=o.prog>=o.goal; const isClaimed=claimed.includes(o.id);
+                  return (
+                    <div key={o.id} style={{marginBottom:14}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:isClaimed?"#5CAD68":"#ccc"}}>{isClaimed?"✅ ":""}{o.label} <span style={{color:"#85CDD1"}}>+{o.xp} XP{o.coins?` +${o.coins}🪙`:""}</span></span>
+                        {done&&!isClaimed&&<button onClick={()=>{SFX.click();onClaimDaily&&onClaimDaily(o);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",background:"#5CAD68",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:3,cursor:"pointer"}}>Réclamer</button>}
+                      </div>
+                      <div style={{height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:Math.round(o.prog/o.goal*100)+"%",background:isClaimed?"#5CAD68":`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.5s"}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>}
+          </div>
+        );
       })()}
 
       {/* Enfant : ajouter une quête — CHOISIR dans la grille (anti-doublons), repli = créer la sienne */}

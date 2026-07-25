@@ -19,6 +19,8 @@ export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc}}>➕ Choisis une quête</div>
         <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
       </div>
+      {/* Backlog UX #9 — dupliqué en haut : évite de faire défiler toutes les catégories juste pour créer sa propre tâche */}
+      <button onClick={onCreateOwn} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"10px",marginBottom:14,background:"rgba(0,0,0,0.4)",border:`2px dashed ${acc}`,color:acc,borderRadius:6,cursor:"pointer"}}>✏️ Je ne trouve pas — créer ma propre tâche</button>
       {cats.map(c=>{ const m=catMeta(c); return (
         <div key={c} style={{marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
