@@ -63,6 +63,10 @@ export const TASK_CATALOG = [
 
 export const CAT_LABELS = { cuisine:"🍳 Cuisine", menage:"🏠 Ménage", routine:"⏰ Rituel", defi:"🎯 Défis", outdoor:"🌳 Dehors" };
 export const DIFF_COLOR = d => ({ easy:"#5CAD68", medium:"#D9BC5C", hard:"#FF6B35", boss:"#FF2222" }[d] || "#aaa");
+// Backlog UX #12 — temps approximatif par tâche, dérivé du palier de difficulté (pas au cas par cas,
+// pour rester cohérent entre les 47 tâches du catalogue) — même patron que DIFF_COLOR ci-dessus.
+export const DIFF_EST_MIN = { easy:8, medium:18, hard:25, boss:30 };
+export const estMinOf = d => DIFF_EST_MIN[d] || 15;
 
 // ─── REWARD CATALOG ──────────────────────────────────────────
 // (emoji = placeholder temporaire — remplacé par du pixel-art dans le milestone art)
