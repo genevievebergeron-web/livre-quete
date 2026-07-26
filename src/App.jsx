@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.21";
+const APP_VERSION = "2.5.22";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.22", date:"2026-07-25", features:[
+    "🐛 Portail parent — « À valider » signale maintenant clairement une demande dont la tâche a été supprimée entretemps (au lieu d'un « Tâche » vide trompeur), pour que tu saches qu'aucun XP ne sera donné avant de cliquer.",
+  ]},
   { version:"2.5.21", date:"2026-07-25", features:[
     "🐾 Correctif : un familier gagné en récompense pouvait sembler disparaître (« pas de familier équipé ») si tu changeais de thème après l'avoir équipé — il ne l'était pas vraiment, juste mal affiché. Réglé!",
   ]},
@@ -3146,7 +3149,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             const pl=players[i];
             (gs.pending||[]).forEach(k=>{
               const instanceId=k.slice(0,k.lastIndexOf("_"));
-              let emoji="📋", label="Tâche", xp=null, coins=null;
+              let emoji="📋", label="Tâche", xp=null, coins=null, orphaned=false;
               if(instanceId.startsWith("cal_")){
                 const entry=(gs.calendar||[]).find(e=>"cal_"+e.id===instanceId);
                 const exam=entry?.type==="examen";
@@ -3158,8 +3161,15 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 const ass=_allAss.find(a=>a.instanceId===instanceId);
                 const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
                 if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;}
+                // Bug signalé par Gen (25 juillet) : assignation ou tâche personnalisée supprimée
+                // ENTRE le moment où l'enfant a demandé la validation et maintenant (ex: tâche perso
+                // effacée, ou semaine de garde régénérée entretemps) — le contenu original est
+                // irrécupérable (tombstone = juste un id). Marqué distinctement : valider ceci ne
+                // donne AUCUNE récompense (voir approvePending), donc le parent doit le savoir avant
+                // de cliquer, pas après.
+                else orphaned=true;
               }
-              items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins});
+              items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins,orphaned});
             });
           });
           // Regrouper les demandes PAR ENFANT
@@ -3177,19 +3187,20 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                       style={{marginLeft:"auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:"#1a3a1a",color:"#5CAD68",border:"1px solid #5CAD6855",borderRadius:3,cursor:"pointer"}}>✅ Tout valider</button>
                   </div>
                   {its.map(it=>(
-                <div key={it.doneKey} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${it.pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
+                <div key={it.doneKey} style={{background:it.orphaned?"rgba(180,120,0,0.12)":"rgba(0,0,0,0.4)",border:`2px solid ${it.orphaned?"#C8942A":(it.pl?.color||"#444")}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <span style={{fontSize:18}}>{it.emoji}</span>
+                    <span style={{fontSize:18}}>{it.orphaned?"⚠️":it.emoji}</span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{it.label}</div>
+                      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:it.orphaned?"#FFB300":"#ddd",lineHeight:1.2}}>{it.orphaned?"Tâche supprimée entretemps":it.label}</div>
                       <div style={{display:"flex",gap:8,marginTop:2}}>
                         {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{it.xp}</span>}
                         {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙{it.coins}</span>}
                       </div>
                     </div>
                   </div>
+                  {it.orphaned && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#C8942A",lineHeight:1.4,marginBottom:8}}>Le contenu original est perdu (tâche ou assignation supprimée depuis la demande). « Valider » ne donnera AUCUN XP/pièce — si tu sais que {it.pl?displayName(it.pl):"l'enfant"} a vraiment fait quelque chose, ajoute une récompense manuelle depuis son profil avant de nettoyer cette demande.</div>}
                   <div style={{display:"flex",gap:6}}>
-                    <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>✅ Valider</PBtn>
+                    <PBtn onClick={()=>onApprovePending(it.playerIdx,it.doneKey)} color="#1a3a1a" textColor="#5CAD68" style={{flex:1}}>{it.orphaned?"🧹 Nettoyer (0 récompense)":"✅ Valider"}</PBtn>
                     <PBtn onClick={()=>onRefusePending(it.playerIdx,it.doneKey)} color="#3a1a1a" textColor="#FF6464" style={{flex:1}}>✗ Refuser</PBtn>
                   </div>
                 </div>
