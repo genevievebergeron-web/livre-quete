@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.22";
+const APP_VERSION = "2.5.23";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.23", date:"2026-07-25", features:[
+    "🛍️ Correctif : si tu appuyais très vite deux fois sur « Acheter » puis « J'ai changé d'idée » dans la Boutique, la récompense restait invisible-mais-coincée dans ton inventaire (aucun effet gênant, mais réglé proprement).",
+  ]},
   { version:"2.5.22", date:"2026-07-25", features:[
     "🐛 Portail parent — « À valider » signale maintenant clairement une demande dont la tâche a été supprimée entretemps (au lieu d'un « Tâche » vide trompeur), pour que tu saches qu'aucun XP ne sera donné avant de cliquer.",
   ]},
@@ -5965,11 +5968,12 @@ export default function App() {
       if(!(p.boughtRewards||[]).includes(reward.id)) return gs; // pas réclamée → rien
       if((p.refundedRewards||[]).includes(key)){
         // déjà remboursée cette semaine (revenue via une synchro) → on retire juste le bouton, AUCUNE pièce
-        n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id)}; persist(config,n); return n;
+        n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), owned:(p.owned||[]).filter(id=>id!==reward.id)}; persist(config,n); return n;
       }
       did=true;
       n[idx]={...p,
         boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id),
+        owned:(p.owned||[]).filter(id=>id!==reward.id),              // v2.5.23 — sinon un double-tap Acheter→"J'ai changé d'idée" laisse l'id orphelin dans owned[] pour toujours
         coins:(p.coins||0)+priceOf(reward),                         // rembourse ce qui a été payé (×PRICE_MULT)
         refundedRewards:[...new Set([...(p.refundedRewards||[]), key])].slice(-200) };
       persist(config,n); return n; });
