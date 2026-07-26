@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.20";
+const APP_VERSION = "2.5.21";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.21", date:"2026-07-25", features:[
+    "🐾 Correctif : un familier gagné en récompense pouvait sembler disparaître (« pas de familier équipé ») si tu changeais de thème après l'avoir équipé — il ne l'était pas vraiment, juste mal affiché. Réglé!",
+  ]},
   { version:"2.5.20", date:"2026-07-25", features:[
     "🧼 Nouvelle tâche « Pipi, mains, dents » disponible dans les tâches de base.",
     "💊 Rappel automatique quotidien pour prendre ses pilules (matin/soir selon l'enfant).",
@@ -1810,7 +1813,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {(()=>{
         const acc=pt.accent||player.color;
         const streak=streakOf(pState.activeDays);
-        const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet);
+        // v2.5.21 — fallback sur le catalogue complet (pas seulement le thème courant) : un familier gagné
+        // en récompense de boss (pickUltraLegendary, toutes thèmes confondus) ou équipé avant un changement
+        // de thème hebdomadaire n'était plus trouvé dans allShopItemsFlat (scopé au thème actuel) → la carte
+        // familier retombait sur "Pas de familier équipé" malgré owned[]/equipped.pet valides (perte purement
+        // visuelle, aucune donnée perdue).
+        const eqPet=allShopItemsFlat.find(i=>i.id===eq.pet) || shopItemById(eq.pet);
         const cur=currentEnergy(pState);
         const fedToday=pState.lastFedDay===todayStamp();
         const eColor=cur>=60?"#5CAD68":cur>=30?"#D9BC5C":"#D98C8C";
