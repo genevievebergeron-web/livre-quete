@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.27";
+const APP_VERSION = "2.5.28";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.28", date:"2026-07-26", features:[
+    "🍖 Ton familier te fait maintenant savoir quand il a faim! Si tu termines une quête et qu'il n'a pas mangé aujourd'hui, un petit message te le rappelle — nourris-le et il gagnera de l'XP avec tes quêtes.",
+  ]},
   { version:"2.5.27", date:"2026-07-26", features:[
     "👑 Nouveau réglage : « Titres au féminin »! Active-le dans tes réglages (menu ☰) pour devenir Héroïne, Championne, Chevalière ou Reine au lieu de Héros, Champion, Chevalier, Roi. Chacun choisit pour soi.",
   ]},
@@ -5340,7 +5343,13 @@ export default function App() {
     const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
-    showToast("📨 Envoyée à tes parents pour validation!","#85CDD1",3500);
+    // v2.5.28 (item #6 analyse game design) — l'info « familier pas nourri = pas d'XP » existait mais
+    // n'était montrée nulle part au bon moment. L'XP familier est accordée à la VALIDATION parent
+    // (petFedToday, ~5385), donc nourrir plus tard aujourd'hui compte encore — le message est une
+    // invitation douce, pas une punition (un seul toast à la fois, d'où le message combiné).
+    const petHungry = !!gs.equipped?.pet && gs.lastFedDay !== todayStamp();
+    if(petHungry) showToast("📨 Envoyée à tes parents! 🍖 Psst : ton familier a faim — nourris-le aujourd'hui pour qu'il gagne de l'XP avec tes quêtes!","#85CDD1",5500);
+    else showToast("📨 Envoyée à tes parents pour validation!","#85CDD1",3500);
   },[config,gameStates,persist,showToast]);
 
   // Retrouve la tâche (catalogue, perso ou calendrier) derrière un doneKey
