@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.18";
+const APP_VERSION = "2.5.19";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.19", date:"2026-07-25", features:[
+    "🎨 Petit ajustement visuel dans le portail parent : les bugs signalés et les logs techniques affichent maintenant la date bien alignée à droite pour un coup d'œil plus rapide.",
+  ]},
   { version:"2.5.18", date:"2026-07-25", features:[
     "📌 Une tâche récurrente de la semaine de garde qu'on a oubliée revient automatiquement dans ta liste du jour, du lundi au jeudi, pour ne rien perdre en cours de route.",
   ]},
@@ -3636,7 +3639,10 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               {(config.bugs||[]).map(b=>(
                 <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #D9924822"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.3}}>{b.text}</div>
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888",marginTop:3}}>— {b.who} · {new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>{b.who}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666"}}>{new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -3652,7 +3658,10 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               {errLogsOpen && (config.errorLogs||[]).map(e=>(
                 <div key={e.id} style={{marginTop:8,paddingBottom:6,borderBottom:"1px solid #333"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",lineHeight:1.3,wordBreak:"break-word"}}>{e.message}</div>
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#777",marginTop:3}}>— {e.who} · v{e.appVersion} · {new Date(e.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#777"}}>{e.who} · v{e.appVersion}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666"}}>{new Date(e.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                  </div>
                 </div>
               ))}
             </div>
