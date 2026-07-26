@@ -37,6 +37,9 @@ export const TASK_CATALOG = [
   { id:"tr05", emoji:"🛁",  label:"Bain",                                    xp:20, coins:10, diff:"easy",   cat:"routine" },
   { id:"tr06", emoji:"📚",  label:"Faire ses devoirs + études",              xp:40, coins:20, diff:"hard",   cat:"routine" },
   { id:"tr07", emoji:"🌙",  label:"Routine du soir complète",                xp:25, coins:12, diff:"medium", cat:"routine" },
+  { id:"tr08", emoji:"🧼",  label:"Pipi, mains, dents",                      xp:10, coins:5,  diff:"easy",   cat:"routine" },
+  { id:"tr09", emoji:"💊",  label:"Prendre ma pilule (matin)",               xp:20, coins:10, diff:"easy",   cat:"routine" },
+  { id:"tr10", emoji:"💊",  label:"Prendre ma pilule (soir)",                xp:20, coins:10, diff:"easy",   cat:"routine" },
   // Défis
   { id:"td01", emoji:"😴",  label:"Laisser la tribu dormir le matin",        xp:50, coins:25, diff:"boss",   cat:"defi"    },
   { id:"td02", emoji:"🍜",  label:"Être calme au souper",                    xp:35, coins:18, diff:"hard",   cat:"defi"    },
@@ -47,6 +50,7 @@ export const TASK_CATALOG = [
   { id:"td07", emoji:"📖",  label:"Lire calmement dans mon lit avant bonne nuit", xp:30, coins:15, diff:"medium", cat:"defi" },
   { id:"td08", emoji:"💤",  label:"M'endormir seul",                         xp:70, coins:35, diff:"boss",   cat:"defi"    },
   { id:"td09", emoji:"🐇",  label:"Cueillir des verdures pour Boulette",     xp:20, coins:10, diff:"easy",   cat:"defi"    },
+  { id:"td10", emoji:"👫",  label:"Jouer 45 minutes calmement avec mon frère", xp:40, coins:20, diff:"hard", cat:"defi"    },
   // Quêtes récurrentes de la semaine de garde (rc_*) — auto-générées, ne pas modifier manuellement
   { id:"rc_brassee",        emoji:"🧺", label:"Faire une brassée avec mon frère",      xp:35, coins:18, diff:"hard",  cat:"menage"  },
   { id:"rc_lavabo_cuisine", emoji:"🚰", label:"Nettoyer le lavabo de la cuisine",       xp:15, coins:8,  diff:"easy",  cat:"menage"  },

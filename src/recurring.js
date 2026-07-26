@@ -78,6 +78,11 @@ export function generateCustodyWeekAssignments(players, weekKey) {
   const pair1 = [elli?.id, antoinou?.id].filter(Boolean);
   const pair2 = [oli?.id,  antoine?.id ].filter(Boolean);
 
+  // Pilules quotidiennes (personnel, PAS de rotation) — demande de Gen, 25 juillet.
+  // Recherche par `name` (pas `pseudo`, changé souvent par les enfants) pour rester fiable.
+  const elliPlayer = players.find(p => (p.name || "").toLowerCase().includes("elli"));
+  const antoineEmeryPlayer = players.find(p => (p.name || "").toLowerCase().includes("emery"));
+
   // ── TÂCHES HEBDOMADAIRES ─────────────────────────────────────────────────
   // Brassée de lavage : chaque paire fait la sienne un jour de la semaine
   // (rotation du jour par semaine pour varier)
@@ -125,6 +130,17 @@ export function generateCustodyWeekAssignments(players, weekKey) {
     // Remplir le lave-vaisselle → enfant D du jour, chaque jour (demande de Gen, 25 juillet)
     const remplirLV = shuffled[(ci + 3) % N]?.id;
     if (remplirLV) assignments.push({ instanceId: wqId(weekKey, "tc03", remplirLV, `d${ci}`), taskId: "tc03", playerIds: [remplirLV], days: [appDay], time: "soir", isRecurring: true });
+
+    // Pilules quotidiennes (personnel, PAS de rotation) — Elli matin, Antoine Emery matin+soir
+    if (elliPlayer) assignments.push({ instanceId: wqId(weekKey, "tr09", elliPlayer.id, `d${ci}m`), taskId: "tr09", playerIds: [elliPlayer.id], days: [appDay], time: "matin", isRecurring: true });
+    if (antoineEmeryPlayer) {
+      assignments.push({ instanceId: wqId(weekKey, "tr09", antoineEmeryPlayer.id, `d${ci}m`), taskId: "tr09", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "matin", isRecurring: true });
+      assignments.push({ instanceId: wqId(weekKey, "tr10", antoineEmeryPlayer.id, `d${ci}s`), taskId: "tr10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "soir", isRecurring: true });
+    }
+
+    // Jouer 45 min calmement avec son frère (Elli + Antoine Emery, personnel, pas de rotation) — demande de Gen, 25 juillet
+    if (elliPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", elliPlayer.id, `d${ci}`), taskId: "td10", playerIds: [elliPlayer.id], days: [appDay], time: "", isRecurring: true });
+    if (antoineEmeryPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", antoineEmeryPlayer.id, `d${ci}`), taskId: "td10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "", isRecurring: true });
 
     // Plancher → enfant C du jour
     const plancher = shuffled[(ci + 2) % N]?.id;

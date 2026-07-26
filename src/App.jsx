@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.19";
+const APP_VERSION = "2.5.20";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.20", date:"2026-07-25", features:[
+    "🧼 Nouvelle tâche « Pipi, mains, dents » disponible dans les tâches de base.",
+    "💊 Rappel automatique quotidien pour prendre ses pilules (matin/soir selon l'enfant).",
+    "👫 Nouveau défi quotidien « Jouer 45 minutes calmement avec mon frère ».",
+  ]},
   { version:"2.5.19", date:"2026-07-25", features:[
     "🎨 Petit ajustement visuel dans le portail parent : les bugs signalés et les logs techniques affichent maintenant la date bien alignée à droite pour un coup d'œil plus rapide.",
   ]},
