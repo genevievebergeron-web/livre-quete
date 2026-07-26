@@ -122,6 +122,10 @@ export function generateCustodyWeekAssignments(players, weekKey) {
     const vSoir = shuffled[(ci + 1) % N]?.id;
     if (vSoir && vSoir !== vMatin) assignments.push({ instanceId: wqId(weekKey, "tc02", vSoir, `d${ci}s`), taskId: "tc02", playerIds: [vSoir], days: [appDay], time: "soir", isRecurring: true });
 
+    // Remplir le lave-vaisselle → enfant D du jour, chaque jour (demande de Gen, 25 juillet)
+    const remplirLV = shuffled[(ci + 3) % N]?.id;
+    if (remplirLV) assignments.push({ instanceId: wqId(weekKey, "tc03", remplirLV, `d${ci}`), taskId: "tc03", playerIds: [remplirLV], days: [appDay], time: "soir", isRecurring: true });
+
     // Plancher → enfant C du jour
     const plancher = shuffled[(ci + 2) % N]?.id;
     if (plancher) assignments.push({ instanceId: wqId(weekKey, "tm07", plancher, `d${ci}`), taskId: "tm07", playerIds: [plancher], days: [appDay], time: "", isRecurring: true });
@@ -172,6 +176,39 @@ export function generateCustodyWeekAssignments(players, weekKey) {
   }
 
   return assignments;
+}
+
+// ── Report des tâches récurrentes non faites (carry-over, approuvé par Gen le 2026-07-25) ──
+// Position chronologique (0=ven..6=jeu) d'un jour App (Mon=0..Sun=6) dans la semaine de garde.
+function custodyOrder(appDayIdx) {
+  return CUSTODY_DAY_IDX.indexOf(appDayIdx);
+}
+
+// Ajoute todayDayIdx aux assignments récurrents dont TOUS les jours assignés sont déjà passés
+// cette semaine de garde et qu'aucun joueur assigné ne l'a complétée (aucune clé "instanceId_playerId#"
+// dans son gameState.completed, peu importe la date). N'agit que Lun-Jeu (todayDayIdx 0-3) — le
+// vendredi vide toute la semaine de garde de toute façon (voir useEffect Lot 7A), donc pas de report ce jour-là.
+export function carryOverUnfinishedTasks(assignments, gameStates, players, todayDayIdx) {
+  if (todayDayIdx > 3) return { assignments, changed: false };
+  const todayOrder = custodyOrder(todayDayIdx);
+  let changed = false;
+  const next = assignments.map(a => {
+    if (!a.isRecurring) return a;
+    if (!Array.isArray(a.days) || a.days.length === 0) return a;
+    if (a.days.includes(todayDayIdx)) return a; // déjà assignée aujourd'hui
+    const allPast = a.days.every(d => custodyOrder(d) < todayOrder);
+    if (!allPast) return a;
+    const anyDone = (a.playerIds || []).some(pid => {
+      const playerIdx = players.findIndex(p => p.id === pid);
+      if (playerIdx < 0) return false;
+      const completed = gameStates[playerIdx]?.completed || [];
+      return completed.some(k => k.startsWith(a.instanceId + "_" + pid + "#"));
+    });
+    if (anyDone) return a;
+    changed = true;
+    return { ...a, days: [...a.days, todayDayIdx] };
+  });
+  return { assignments: next, changed };
 }
 
 // ── Helpers publics ──────────────────────────────────────────────────────────

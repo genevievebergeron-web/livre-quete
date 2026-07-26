@@ -18,9 +18,9 @@ import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
 import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
-import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
+import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.17";
+const APP_VERSION = "2.5.18";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.18", date:"2026-07-25", features:[
+    "📌 Une tâche récurrente de la semaine de garde qu'on a oubliée revient automatiquement dans ta liste du jour, du lundi au jeudi, pour ne rien perdre en cours de route.",
+  ]},
   { version:"2.5.17", date:"2026-07-25", features:[
     "⏱️ Chaque quête affiche maintenant un temps approximatif (~8 à 30 min selon la difficulté) pour t'aider à planifier ton temps.",
   ]},
@@ -5247,6 +5250,17 @@ export default function App() {
   },[]);
 
   const todayDayIdx = (now.getDay()+6)%7; // Mon=0
+
+  // Report des tâches récurrentes non faites (carry-over, approuvé par Gen le 2026-07-25) — Lun-Jeu seulement.
+  useEffect(()=>{
+    if(!isCustodyWeek()) return;
+    if(!config?.weeklyQuests?.assignments?.length) return;
+    const { assignments: nextAss, changed } = carryOverUnfinishedTasks(config.weeklyQuests.assignments, gameStates, config.players, todayDayIdx);
+    if(!changed) return;
+    const n = {...config, weeklyQuests:{...config.weeklyQuests, assignments: nextAss}};
+    setConfig(n); persist(n, gameStates);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[config?.weeklyQuests?.assignments, todayDayIdx]);
 
   // Handle setup complete
   const handleSetupDone = useCallback((cfg) => {
