@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.23";
+const APP_VERSION = "2.5.24";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.24", date:"2026-07-25", features:[
+    "💰 GROS correctif : tes pièces se faisaient effacer par erreur chaque soir après 20h (bug de fuseau horaire) — c'est réglé! Le vrai reset des pièces n'arrive QUE le vendredi, comme annoncé. Maman peut redonner ce qui a été perdu.",
+  ]},
   { version:"2.5.23", date:"2026-07-25", features:[
     "🛍️ Correctif : si tu appuyais très vite deux fois sur « Acheter » puis « J'ai changé d'idée » dans la Boutique, la récompense restait invisible-mais-coincée dans ton inventaire (aucun effet gênant, mais réglé proprement).",
   ]},
@@ -2358,7 +2361,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           le constat 🔴 le plus important de l'audit UX). Accordéon même patron visuel que « Tâches planifiées ». */}
       {(()=>{
         const myChallenge = weeklyChallenge?.challenges?.find(c=>c.playerId===player.id);
-        const todayC = new Date().toISOString().slice(0,10);
+        const todayC = todayStamp(); // date LOCALE — l'ancien toISOString (UTC) marquait le check-in au LENDEMAIN après 20h
         const challengeDone = myChallenge && myChallenge.checkins?.[todayC];
         const stamp="#"+todayStamp();
         const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));

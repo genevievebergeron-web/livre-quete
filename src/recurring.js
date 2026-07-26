@@ -14,11 +14,14 @@ export function isCustodyWeek(now = new Date()) {
 }
 
 // Clé de la semaine de garde (vendredi-ancre de la semaine courante, format YYYY-MM-DD)
+// ⚠️ Date LOCALE obligatoire : toISOString() (UTC) faisait basculer la clé au lendemain
+// après 20h (Québec = UTC-4) — la clé oscillait matin/soir chaque jour, déclenchant le
+// reset des pièces en boucle et la régénération de la semaine avec un shuffle différent.
 export function custodyWeekKey(now = new Date()) {
   const d = new Date(now);
   const dow = d.getDay(); // 0=dim...6=sam
   d.setDate(d.getDate() - ((dow + 2) % 7)); // recule au vendredi précédent
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 // ── PRNG déterministe (mulberry32) ──────────────────────────────────────────

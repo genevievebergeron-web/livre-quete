@@ -31,7 +31,7 @@ export const COLOR_DESATURATE_MAP = {
   "#FF69B4":"#C4789E",
 };
 
-export const weekKey = (dd=new Date()) => { const d=new Date(dd); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return mon.toISOString().slice(0,10); };
+export const weekKey = (dd=new Date()) => { const d=new Date(dd); const day=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((day+6)%7)); return `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`; }; // date LOCALE (toISOString/UTC basculait après 20h, même bug que custodyWeekKey)
 
 // Returns 2 random non-secret theme IDs for a brand-new player
 export const pickStarterThemes = () => {
