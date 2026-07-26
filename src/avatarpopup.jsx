@@ -46,7 +46,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
           </div>
           <div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:player.color,marginBottom:6}}>{displayName(player)}</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#D9BC5C",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId).title}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#D9BC5C",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId,pState.settings?.femTitles).title}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {pState.xp} XP</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.values(eq).filter(Boolean).length}</div>

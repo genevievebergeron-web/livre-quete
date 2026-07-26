@@ -18,7 +18,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
   const meIdx = meId && meId!=="parent" ? config.players.findIndex(p=>p.id===meId) : -1;
   const myCoins = meIdx>=0 ? (gameStates[meIdx]?.coins||0) : 0;
   const canTrade = meIdx>=0 && meId!==player.id; // un enfant connecté regarde un FRÈRE
-  const lt = getLevelTitle(gs.xp||0, player.themeId);
+  const lt = getLevelTitle(gs.xp||0, player.themeId, gs.settings?.femTitles);
   const bar = xpBar(gs.xp||0);
   const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
   const myBadges = (gs.badges||[]).map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).slice(-6);

@@ -19,11 +19,15 @@ export const LEVELS = [
   { level:10, xpNeeded:2600, title:"SUPRÊME",    titleF:"SUPRÊME"     },
 ];
 export const getLevel = xp => { let c = LEVELS[0]; for (const l of LEVELS) if (xp >= l.xpNeeded) c = l; return c; };
-export const getLevelTitle = (xp, themeId) => {
+export const getLevelTitle = (xp, themeId, fem = false) => {
   const lv = getLevel(xp);
   const pt = getPlayerTheme(themeId);
   // Niv. 1–5 : titre du thème. Niv. 6+ (prestige) : titre générique MYTHIQUE/DIVIN/SUPRÊME.
-  const title = lv.level <= 5 ? (pt.levels[Math.min(lv.level - 1, 4)] || pt.levels[0]) : lv.title;
+  // v2.5.27 — `fem` (réglage par enfant `settings.femTitles`) branche enfin titleF/levelsF.
+  const themeLevels = (fem && pt.levelsF) ? pt.levelsF : pt.levels;
+  const title = lv.level <= 5
+    ? (themeLevels[Math.min(lv.level - 1, 4)] || themeLevels[0])
+    : (fem ? (lv.titleF || lv.title) : lv.title);
   return { level: lv.level, title };
 };
 export const xpBar = xp => { for (let i=0;i<LEVELS.length-1;i++) if (xp<LEVELS[i+1].xpNeeded) return { cur: xp-LEVELS[i].xpNeeded, needed: LEVELS[i+1].xpNeeded-LEVELS[i].xpNeeded }; return {cur:1,needed:1}; };

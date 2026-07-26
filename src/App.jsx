@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.26";
+const APP_VERSION = "2.5.27";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.27", date:"2026-07-26", features:[
+    "👑 Nouveau réglage : « Titres au féminin »! Active-le dans tes réglages (menu ☰) pour devenir Héroïne, Championne, Chevalière ou Reine au lieu de Héros, Champion, Chevalier, Roi. Chacun choisit pour soi.",
+  ]},
   { version:"2.5.26", date:"2026-07-26", features:[
     "💰 Encore un correctif sur les pièces effacées : une tablette pas encore à jour avait laissé une mauvaise date dans la sauvegarde, et ça re-vidait les porte-monnaie à chaque ouverture de l'app. C'est colmaté des deux côtés (app ET serveur) — le reset des pièces n'arrive que le vendredi, promis juré.",
   ]},
@@ -1165,7 +1168,7 @@ const migrateGameState = (gs) => {
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
-    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12)
+    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, femTitles:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12; femTitles: v2.5.27)
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
@@ -1604,7 +1607,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const pt = getPlayerTheme(resolvedThemeId);
   const isRandomUnrevealed = player.themeId==="random" && !themeRevealed;
   const lv = getLevel(pState.xp);
-  const lvTitle = getLevelTitle(pState.xp, player.themeId);
+  const lvTitle = getLevelTitle(pState.xp, player.themeId, settings.femTitles);
   const xbr = xpBar(pState.xp);
   const xpPct = Math.min(100, (xbr.cur/xbr.needed)*100);
   const pMode = playerMode || config.mode || "routine";
@@ -1959,6 +1962,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             ["calmCountdown","⏱ Décompte calme","Le minuteur sans rouge ni « dépêche-toi »"],
             ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
             ["readableFont","🔤 Police plus lisible","Remplace les lettres « jeu vidéo » par une police plus simple à lire"], // v1.87.0 (Lot 3 #12)
+            ["femTitles","👑 Titres au féminin","Héroïne, Championne, Chevalière… au lieu de Héros, Champion, Chevalier"], // v2.5.27 — branche titleF/levelsF (item #5 analyse game design)
           ].map(([key,label,desc])=>{
             // v1.82.0 (Lot 1 #4) — "humor" retiré : c'était un réglage sans effet (aucun texte
             // humoristique n'existe dans le code), ça promettait une fonction inexistante à l'enfant.
@@ -2943,7 +2947,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   style={{border:`3px solid ${player.color}`,borderRadius:5}}/>
                 <div>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:player.color}}>{displayName(player)}</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Niv.{getLevelTitle(ps.xp,player.themeId).level} — {getLevelTitle(ps.xp,player.themeId).title}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Niv.{getLevelTitle(ps.xp,player.themeId).level} — {getLevelTitle(ps.xp,player.themeId,ps.settings?.femTitles).title}</div>
                 </div>
               </div>
               {/* Progress */}
