@@ -106,4 +106,26 @@ Boutique (achats, double-clic rapide sur "Acheter"), popup avatar/familier (head
 ### Non couvert cette passe (pour la prochaine)
 Boutique (achats, double-clic), popup avatar/familier (header sticky), onglets Défis/Annonces/Sauvegarde du tiroir parent, calendrier à 22 événements (vue "MON CALENDRIER" pas encore ouverte visuellement), la modale ÉVOLUTION! Feu/Ombre/Légendaire (cliquer un choix pour de vrai, en solo cette fois), ajustement XP/pièces à 0 ou négatif dans l'onglet Actions.
 
+---
+
+## Tests approfondis du 2026-07-25 (3e passage)
+
+Mini-check bugs (lecture `GET /api/famille`) fait en premier — aucun nouveau bug/signalement depuis le passage précédent (mêmes 5 `config.bugs` et 3 messages `feed` déjà documentés, tous déjà traités ou déjà notés comme décision de conception).
+
+### Zones couvertes (celles explicitement laissées non-couvertes par les 2 passages précédents)
+- **Modale ÉVOLUTION! Feu/Ombre/Légendaire, en solo** — familier seedé juste au-dessus du seuil niveau 4, `petEvo` vide. Modale affichée correctement, choix tier 1 (Feu) cliqué → toast "Ton familier a évolué!", persisté dans `petEvo`. **Découverte en cours de route** : mon seed avait omis le drapeau `petMigV2` (migration one-shot ancienne-courbe→nouvelle-courbe), ce qui a fait remonter le petXp de test de 260 à 1160 (plancher du niveau 8) — pas un bug, la migration a fonctionné exactement comme prévu sur des données qui ressemblaient à de l'« ancien format ». Ça a eu l'avantage de tester aussi le tier 2 (Glace/Foudre) dans la foulée : choix cliqué, modale fermée proprement, sprite recoloré confirmé visuellement, zéro erreur console. **Les deux tiers d'évolution fonctionnent correctement de bout en bout.**
+- **Boutique — achats et double-clic rapide sur "Acheter"** — voir bug trouvé et corrigé ci-dessous.
+
+### 🐛 Bug trouvé et corrigé
+- **Récompense refusée reste coincée dans `owned[]`** — ✅ **corrigé en v2.5.23**. En testant un double-clic rapide sur "Acheter" (récompense boutique), le 1er clic achète correctement (coins déduits, `boughtRewards`+id) et le bouton devient "↩️ J'ai changé d'idée" au même endroit — le 2e clic du double-clic atterrit dessus et annule l'achat (coins remboursés, `boughtRewards`-id). Root cause : `handleUnclaimReward` (`App.jsx` ~5955) ne retirait jamais l'id de `owned[]`, seulement de `boughtRewards` — l'id restait coincé pour toujours dans l'inventaire "possédé" même après remboursement complet. **Impact réel nul pour les enfants** (vérifié par grep exhaustif : `owned[]` n'est lu nulle part pour l'affichage ou la logique des récompenses — seul `boughtRewards` compte pour ça — ni par aucun badge) mais corrigé proprement puisque la cause était claire et le correctif petit et sûr. Vérifié en build de production (`vite preview`, hors StrictMode) : après achat+refus, `owned` redevient bien `[]`. `npm run build` propre, zéro erreur console.
+
+### 🔍 Fausse piste écartée (documentée pour ne pas la re-creuser)
+En testant l'achat sur le serveur de DEV (`vite dev`, avec React StrictMode), un achat semblait ne PAS mettre à jour `boughtRewards` (restait vide) malgré `owned[]` et `coins` corrects. Reproduit deux fois, puis testé sur le **build de production** (`vite preview`, sans StrictMode) où l'achat fonctionne correctement du premier coup. Cause confirmée : `handleBuy` appelle des effets de bord (`persist()`, `SFX.buy()`, `showToast()`, `spawnParticles()`) **à l'intérieur** de l'updater `setGameStates(gs=>{...})`, ce que React StrictMode invoque deux fois exprès en développement pour détecter les impuretés — comportement dev-only, invisible en production. **Pas un bug pour les enfants** (ils n'utilisent jamais le mode dev), mais une fragilité de code à garder en tête : un futur refactor qui déplacerait ces effets de bord hors de l'updater serait plus robuste, sans urgence.
+
+### ⚠️ Collision concurrente rencontrée et gérée
+Une autre session travaillait en direct sur `App.jsx` pendant ce passage (HMR visible dans les logs dev, `v2.5.22`→commit `8ca75e7` poussé pendant que ce passage était en cours). Suivi le protocole habituel : lecture fraîche du fichier avant chaque edit, `npm run build` sur l'état réel du disque avant de committer — aucune collision réelle, le commit de l'autre session et celui de ce passage se sont enchaînés proprement sur `main`.
+
+### Non couvert cette passe (pour la prochaine)
+Popup avatar/familier (header sticky avec 20+ items), onglets Défis/Annonces/Sauvegarde du tiroir parent, calendrier à 22 événements (vue "MON CALENDRIER" pas encore ouverte visuellement), ajustement XP/pièces à 0 ou négatif dans l'onglet Actions, achats de Chapeaux/Armures/Familiers (seule la Boutique onglet Récompenses a été testée cette passe), les 3 coffres (Commun/Rare/Légendaire).
+
 ### `config.errorLogs` — vide, rien à investiguer cette passe.
