@@ -48,3 +48,23 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ### 💡 Suggestions en attente
 - [x] **Pouvoir renommer son familier** — implémenté en v2.5.3 (2026-07-25). Bouton ✏️ à côté du nom dans la carte familier du dashboard ; `pState.petNickname[petId]` stocké dans gameState, affiché à la place du nom catalogue dans le dashboard et dans la popup Mon Perso.
+
+---
+
+## Mini-check bugs du 2026-07-25 (soir/nuit) — nouvelle ÉTAPE 0.5 de la routine
+
+Gen a demandé que la routine fasse ce mini-check à CHAQUE passage (pas seulement en mode maintenance) — voir SKILL.md. Lecture `GET /api/famille` (lecture seule), comparaison de `config.bugs`/`config.feed` (type `chat`) avec ce qui est déjà documenté ici et dans `PROJET-ETAT.md`.
+
+### 🐛 Bugs passés en revue (5 dans `config.bugs`)
+- **`bug_74klxs1`** (24 juillet 23:51) « jai cree une tache est elle est nule part, et pipi main dent est disparu de la liste » — ✅ déjà corrigé, c'est le rapport qui a déclenché le correctif v2.5.11 (fusion avant écriture locale dans `remotePush`).
+- **`bug_hf01ozi`** (25 juillet 12:59 EDT) « quêtes disparues / ajout de quête, ça dit que c'est ajouté, mais ça apparaît pas » — ✅ même bug, c'est littéralement le rapport cité dans l'entrée PROJET-ETAT.md v2.5.11 (« un rapport d'Antoine Emery à 12:59 »), corrigé par le même fix.
+- **`bug_h8r93zu`** (25 juillet 12:13 EDT) « le coffre se recharge trop vite parfois » — ✅ déjà corrigé en v2.5.9 (correctif `mergeGS`, changelog in-app : « les coffres ne se rechargent plus aussi vite »).
+- **`bug_k1gqpz6`** (17 juin, ancien) « Je peut pas ajouter d'autre tâche » — déjà suivi 2 fois (21 et 25 juillet ci-dessus), toujours sans cause de code confirmée, hypothèses inchangées. Pas de nouvelle piste trouvée cette passe non plus.
+- **`bug_lyr5812`** (25 juillet 08:34 EDT) « familier peut jouer à l'infini après petit temps d'attente » — 🆕 **nouveau, pas encore documenté.** Diagnostic (`handlePlayPet`/`currentEnergy`, `App.jsx` ~68-93, ~6012) : jouer coûte 20 énergie (`PLAY_ENERGY`), l'énergie se régénère en continu (`ENERGY_REGEN_PER_MIN`, pleine en 3h) — **aucun plafond quotidien codé sur "jouer"**, contrairement à "nourrir" qui a un vrai gate `lastFedDay===today` (1×/jour). Donc un enfant PEUT effectivement rejouer dès que l'énergie regagne 20 points (~36 min), plusieurs fois par jour — ce n'est pas un bug de code, c'est le comportement voulu du système d'énergie tel que conçu (commentaire existant `App.jsx` ~73-78 explique délibérément pourquoi certaines activités sont gatées par l'énergie et d'autres non). **Non corrigé** : ambigu si Gen veut un plafond quotidien additionnel sur "jouer" (comme "nourrir") ou si le rythme actuel (limité par l'énergie, pas par jour) est voulu — décision de balance produit, pas une cause de bug à deviner. À trancher avec Gen si elle confirme que c'est un problème plutôt qu'un choix de design.
+
+### 💬 Fil de famille (type `chat`, 3 messages)
+- « Il y a un bug! Ma quête de la journée de participer plus aux activités se reset à l'infini » (25 juillet 10:45 EDT) — ✅ déjà corrigé, c'est le rapport qui a déclenché le fix v2.5.16 (fusion explicite + union des checkins sur `weeklyChallenge`).
+- « on pourrait mettre un truc qui fait qu'on peux renommer notre familier » (17 juillet) — ✅ déjà implémenté (v2.5.3), déjà coché ci-dessus.
+- « LETS GOOOOOO » (12 juillet) — pas une suggestion/bug, aucune action.
+
+### `config.errorLogs` — vide, rien à investiguer cette passe.
