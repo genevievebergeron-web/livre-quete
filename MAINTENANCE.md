@@ -67,4 +67,26 @@ Gen a demandé que la routine fasse ce mini-check à CHAQUE passage (pas seuleme
 - « on pourrait mettre un truc qui fait qu'on peux renommer notre familier » (17 juillet) — ✅ déjà implémenté (v2.5.3), déjà coché ci-dessus.
 - « LETS GOOOOOO » (12 juillet) — pas une suggestion/bug, aucune action.
 
+---
+
+## Tests approfondis du 2026-07-25
+
+File d'implémentation du chantier du 24 juillet vidée à 100% (v2.5.19) — première passe de la section tests approfondis (chasse aux bugs exploratoire demandée par Gen).
+
+### Zones couvertes
+- Seed de données de test volontairement extrêmes dans `localStorage` (4 joueurs de test, jamais la prod) : un enfant à 0 pièces/0 XP/aucun familier équipé, un enfant niveau 10 SUPRÊME (xp 3200, 9999 pièces, familier proche du seuil légendaire petXp 2700), un enfant avec assignation orpheline + libellé de tâche très long + emoji inhabituels, un enfant avec calendrier à 22 événements. Boss actif à PV pleins (80/80).
+- Onboarding neuf (thème → avatar → pseudo → PIN) testé 2× (joueurs "OrphanTest" et "MaxN") : pseudo vidé puis soumis → géré sans crash (fallback silencieux) ; PIN de confirmation différent du premier → rejeté correctement (reset visuel rouge, retour à l'étape PIN) ; PIN identique (0000 puis 1234) → accepté, dashboard chargé.
+- Dashboard "Aujourd'hui" : confirmé que la quête du jour est bien le premier contenu (réordonnancement v2.5.15 tient en conditions réelles). Double-clic rapide sur "✔ J'AI FAIT ÇA!" → le bouton disparaît immédiatement au 1er clic (élément retiré du DOM avant qu'un 2e clic puisse l'atteindre) : aucune double-soumission possible par ce chemin.
+- Vue "Semaine" : accordéon "Tâches planifiées" testé avec un enfant en semaine de garde active — affiche correctement les tâches rotatives auto-générées.
+- Écran BOSS + bouton "COMBAT FINAL" : reconfirmé sans restriction d'accès même à PV pleins/0 jeton — c'est le bug boss #2 déjà documenté et volontairement non corrigé (décision de conception à trancher avec Gen), rien de nouveau trouvé ici.
+- Portail parent : vérification visuelle de l'alignement 2-colonnes du v2.5.19 (bugs signalés / logs techniques).
+
+### 🐛 Bugs trouvés
+Aucun nouveau bug de code confirmé cette passe. Deux observations à noter :
+- **Assignation orpheline non testée pour de vrai** : mon seed de test avait omis les drapeaux de migration ponctuelle (`rotativeCleanupV1`, `orphanAssignCleanupV1`, `colorToneDownV1`), ce qui a fait retourner ces migrations une fois "à neuf" et vidé `config.assignments`/`config.customTasks` avant que je puisse observer le rendu de la tâche orpheline. **Ce n'est pas un bug** — ça confirme au contraire que ces migrations ponctuelles fonctionnent exactement comme prévu (idempotentes, drapeau unique). Pour retester ce scénario précis à la prochaine passe : seed `config.rotativeCleanupV1=true` et `config.orphanAssignCleanupV1=true` pour éviter que ces migrations historiques ne s'exécutent à nouveau sur des données de test fraîches.
+- **Modale d'évolution de familier (légendaire) non cliquable pendant le test** : en testant le joueur "MaxN" (familier proche du seuil légendaire, petXp 2700), la modale ÉVOLUTION! (choix Feu/Ombre) s'est affichée correctement, mais mes clics sur les boutons n'ont pas réagi. Cause identifiée dans la console : une AUTRE session travaillait en direct sur `App.jsx`/`popups.jsx`/etc. au même moment (rechargements HMR Vite visibles dans les logs), le serveur dev a même perdu puis repris sa connexion pendant le test — confondu avec l'environnement de test partagé, **pas attribuable au code de l'app**. Cette autre session a fini par committer proprement (`v2.5.20`, aucun conflit). **À revérifier dans une prochaine passe, en solo** (pas de collision concurrente) : ouvrir la modale ÉVOLUTION! avec un familier proche d'un seuil d'évolution et confirmer que le choix Feu/Ombre/Légendaire fonctionne bien.
+
+### Non couvert cette passe (pour la prochaine)
+Boutique (achats, double-clic rapide sur "Acheter"), popup avatar/familier (header sticky avec 20+ items), onglets du tiroir parent autres que Journal (À valider, Tâches, Défis, Actions, Annonces, Code, Sauvegarde), PIN parent incorrect plusieurs fois de suite, calendrier à 22 événements (pas encore ouvert visuellement), formulaires vides côté parent (ex. ajustement XP/pièces à 0 ou négatif).
+
 ### `config.errorLogs` — vide, rien à investiguer cette passe.
