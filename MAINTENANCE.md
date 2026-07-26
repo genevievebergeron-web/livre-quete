@@ -89,4 +89,21 @@ Aucun nouveau bug de code confirmé cette passe. Deux observations à noter :
 ### Non couvert cette passe (pour la prochaine)
 Boutique (achats, double-clic rapide sur "Acheter"), popup avatar/familier (header sticky avec 20+ items), onglets du tiroir parent autres que Journal (À valider, Tâches, Défis, Actions, Annonces, Code, Sauvegarde), PIN parent incorrect plusieurs fois de suite, calendrier à 22 événements (pas encore ouvert visuellement), formulaires vides côté parent (ex. ajustement XP/pièces à 0 ou négatif).
 
+---
+
+## Tests approfondis du 2026-07-25 (2e passage, session solo)
+
+### Zones couvertes
+- Re-seed avec les drapeaux de migration correctement posés (`rotativeCleanupV1`, `orphanAssignCleanupV1`, `colorToneDownV1`) pour éviter la fausse piste du passage précédent.
+- Portail parent, PIN incorrect 8 fois de suite → aucun verrouillage, aucun crash, PIN correct accepté normalement ensuite.
+- Onglet "✅ À valider" : affichage correct de "Rien à valider" (mes 2 items de test avaient un id de joueur avec underscore, cassant le parsing du `doneKey` — artefact de mon seed, pas un bug : les vrais ids (`uid()`) ne contiennent jamais de underscore).
+- Onglet "📋 Tâches" : soumission du formulaire "Ajouter" sans tâche choisie → correctement bloqué (bouton no-op), aucune assignation fantôme créée.
+- Onglet "🔐 Code" : soumission du champ PIN vide, puis à 2 chiffres → les deux rejetés silencieusement, PIN réel inchangé en `localStorage`.
+
+### 🐛 Bug trouvé et corrigé
+- **Familier équipé affiché comme "Pas de familier équipé" après un changement de thème** — ✅ **corrigé en v2.5.21**. Cause : la carte familier (`PlayerDashboard`, `App.jsx` ~1813) résout l'item équipé via `allShopItemsFlat`, qui ne contient QUE les items de base + le thème *actuel* du joueur — pas le catalogue complet. Un familier gagné en récompense de victoire de boss (`pickUltraLegendary`, toutes thèmes confondus) ou simplement équipé avant un changement de thème hebdomadaire devenait introuvable dans cette liste réduite, faisant retomber toute la carte (nourrir/jouer/XP/évolution) sur le message "Pas de familier équipé" — alors que `owned[]`/`equipped.pet` étaient parfaitement valides. Aucune perte de données, bug purement visuel/fonctionnel (le familier redevenait invisible et non-nourrissable). Fix : fallback sur `shopItemById` (catalogue complet, déjà importé de `themes.js`) quand l'item n'est pas trouvé dans le sous-ensemble scopé au thème. Vérifié en Chrome : la carte affiche maintenant "Licorne bonus — Niv.12, Légendaire" avec les boutons Nourrir/Jouer fonctionnels. `npm run build` propre.
+
+### Non couvert cette passe (pour la prochaine)
+Boutique (achats, double-clic), popup avatar/familier (header sticky), onglets Défis/Annonces/Sauvegarde du tiroir parent, calendrier à 22 événements (vue "MON CALENDRIER" pas encore ouverte visuellement), la modale ÉVOLUTION! Feu/Ombre/Légendaire (cliquer un choix pour de vrai, en solo cette fois), ajustement XP/pièces à 0 ou négatif dans l'onglet Actions.
+
 ### `config.errorLogs` — vide, rien à investiguer cette passe.
