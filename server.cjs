@@ -91,6 +91,10 @@ const mergeGS = (a, b, preferIncoming) => {
     ...a, ...b,
     xp: Math.max(a.xp||0, b.xp||0),
     coins: preferIncoming ? (b.coins ?? a.coins ?? 0) : (a.coins ?? b.coins ?? 0),
+    coinsLifetime: Math.max(a.coinsLifetime || 0, b.coinsLifetime || 0), // v2.5.26 — miroir du merge client (jamais décrémenté)
+    // v2.5.26 — miroir du fix client v2.5.3 : sans ça, le spread ...b laissait n'importe quel client
+    // (même un vieux, pas à jour) écraser coinsWeek côté serveur. On garde la semaine la plus récente.
+    coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées

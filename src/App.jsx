@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.25";
+const APP_VERSION = "2.5.26";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.26", date:"2026-07-26", features:[
+    "💰 Encore un correctif sur les pièces effacées : une tablette pas encore à jour avait laissé une mauvaise date dans la sauvegarde, et ça re-vidait les porte-monnaie à chaque ouverture de l'app. C'est colmaté des deux côtés (app ET serveur) — le reset des pièces n'arrive que le vendredi, promis juré.",
+  ]},
   { version:"2.5.25", date:"2026-07-26", features:[
     "🐉 Correctif discret : dans de rares cas (deux attaques presque en même temps), la victoire d'un boss aurait pu accorder deux fois la récompense. Impossible maintenant.",
     "📅 Le badge « Machine à Habitudes » s'appelle maintenant « Journée Marathon » — ça décrit mieux ce qu'il récompense (6 quêtes dans la même journée).",
@@ -1141,7 +1144,12 @@ const migrateGameState = (gs) => {
   // Si coinsWeek n'existe pas encore (premier chargement post-déploiement), on SEED sans reset immédiat :
   // le solde actuel des 4 enfants est préservé, seul le prochain changement de semaine déclenchera un reset.
   const cwk = custodyWeekKey();
-  const coinsWeekReset = gs.coinsWeek && gs.coinsWeek.week !== cwk;
+  // v2.5.26 — reset SEULEMENT si le stamp stocké est PLUS VIEUX que la clé calculée (`<`, pas `!==`).
+  // Un stamp "futur" (ex. 2026-07-25 écrit par un vieux client UTC pas encore mis à jour) restait en
+  // prod via le merge max — avec `!==`, chaque client À JOUR (clé 2026-07-24) re-effaçait les pièces
+  // à CHAQUE chargement jusqu'au vendredi suivant. Comparaison lexicographique sûre (format YYYY-MM-DD).
+  const storedWeek = gs.coinsWeek?.week || "";
+  const coinsWeekReset = !!gs.coinsWeek && storedWeek < cwk;
   return {
     xp: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
     ...gs,
@@ -1152,7 +1160,7 @@ const migrateGameState = (gs) => {
     rotativeCleanupV1: true, // v1.108.0 — drapeau : ménage de transition Lot 7 appliqué (xp/coins/badges/completed/routines intacts)
     coinsLifetime: gs.coinsLifetime ?? (gs.coins || 0), // v2.5.0 — jamais réinitialisé ni décrémenté (badges Petit Trésor/Oncle Picsou), seedé depuis le solde actuel au premier déploiement
     coins: coinsWeekReset ? 0 : (gs.coins || 0), // v2.5.0 — remis à 0 au changement de semaine de garde (vendredi minuit)
-    coinsWeek: { week: cwk }, // v2.5.0 — stamp de la semaine de garde déjà appliquée à `coins`
+    coinsWeek: { week: storedWeek > cwk ? storedWeek : cwk }, // v2.5.26 — garde le stamp max (cohérent avec le merge v2.5.3) pour ne pas relancer la guerre de stamps avec un vieux client
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
