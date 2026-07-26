@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.28";
+const APP_VERSION = "2.5.29";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.29", date:"2026-07-26", features:[
+    "🚀 L'app est plus légère et se synchronise plus vite entre vos appareils.",
+  ]},
   { version:"2.5.28", date:"2026-07-26", features:[
     "🍖 Ton familier te fait maintenant savoir quand il a faim! Si tu termines une quête et qu'il n'a pas mangé aujourd'hui, un petit message te le rappelle — nourris-le et il gagnera de l'XP avec tes quêtes.",
   ]},
@@ -1199,6 +1202,18 @@ const migrateGameState = (gs) => {
   };
 };
 
+// v2.5.29 — garde une seule entrée changelog par version (la plus récente), plafonnée aux 30
+// dernières, en préservant l'ordre. Utilisé au chargement (migrateSavedData) ET à l'ajout (~5127).
+const dedupeUpdateFeed = (list) => {
+  const seen = new Set(); const out = [];
+  for (let i = (list || []).length - 1; i >= 0; i--) {
+    const e = list[i];
+    if (!e || !e.version || seen.has(e.version)) continue;
+    seen.add(e.version); out.unshift(e);
+  }
+  return out.slice(-30);
+};
+
 const migrateSavedData = (data) => {
   if (!data) return null;
   const seenVersions = data.seenVersions || [];
@@ -1233,6 +1248,10 @@ const migrateSavedData = (data) => {
     mergedConfig.orphanAssignCleanupV1 = true;
   }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
+  // v2.5.29 — updateFeedEntries s'accumulait SANS plafond ni dédoublonnage (~5127) : chaque appareil
+  // ré-ajoutait ses entrées changelog → 2,35 Mo observés en prod, poussés à CHAQUE sync par chaque
+  // appareil (et payload familial > MAX_BODY 2 Mo du serveur). Nettoyage au chargement + à l'ajout.
+  mergedConfig.updateFeedEntries = dedupeUpdateFeed(mergedConfig.updateFeedEntries);
   return {
     ...data,
     config: mergedConfig,
@@ -5124,7 +5143,7 @@ export default function App() {
             .map(v=>CHANGELOG.find(c=>c.version===v))
             .filter(Boolean)
             .map(c=>({ type:"update", version:c.version, features:c.features, ts:new Date().toISOString() }));
-          setConfig(cfg=>({...cfg, updateFeedEntries:[...(cfg.updateFeedEntries||[]),...newEntries]}));
+          setConfig(cfg=>({...cfg, updateFeedEntries: dedupeUpdateFeed([...(cfg.updateFeedEntries||[]),...newEntries])})); // v2.5.29 — fini l'accumulation sans plafond (2,35 Mo en prod)
         }
         // Les tâches en attente d'hier restent simplement dans la file
         // "À valider" du portail parent (plus de modal en libre-service).
