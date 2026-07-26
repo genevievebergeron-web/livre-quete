@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.24";
+const APP_VERSION = "2.5.25";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -187,6 +187,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.5.25", date:"2026-07-26", features:[
+    "🐉 Correctif discret : dans de rares cas (deux attaques presque en même temps), la victoire d'un boss aurait pu accorder deux fois la récompense. Impossible maintenant.",
+    "📅 Le badge « Machine à Habitudes » s'appelle maintenant « Journée Marathon » — ça décrit mieux ce qu'il récompense (6 quêtes dans la même journée).",
+  ]},
   { version:"2.5.24", date:"2026-07-25", features:[
     "💰 GROS correctif : tes pièces se faisaient effacer par erreur chaque soir après 20h (bug de fuseau horaire) — c'est réglé! Le vrai reset des pièces n'arrive QUE le vendredi, comme annoncé. Maman peut redonner ce qui a été perdu.",
   ]},
@@ -5225,12 +5229,15 @@ export default function App() {
     const totalDmg = bossDamageTotal(gameStates, boss.startedAt);
     if(totalDmg < HPMAX) return;
     if(!bossQuestsAllDone(cfgRef.current, gameStates)) return;
+    const bid = boss.startedAt;
+    if(gameStates.some(g=>g.bossClaimed===bid)) return; // v2.5.25 — idempotence : un autre chemin (clic attaque/familier) a déjà accordé la victoire pour ce boss
     const now = new Date().toISOString();
     const n = gameStates.map(g=>{
       const _it = pickUltraLegendary();
       return {...g, coins:(g.coins||0)+40, coinsLifetime:(g.coinsLifetime||0)+40, xp:(g.xp||0)+50,
         owned:[...new Set([...(g.owned||[]), _it.id])],
         badges:[...new Set([...(g.badges||[]),"b_boss"])],
+        bossClaimed: bid,
         pendingCelebrations:[...(g.pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]};
     });
     const nb = {...boss, defeatedAt:now};
@@ -5615,12 +5622,14 @@ export default function App() {
       if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
-      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
-      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
+      const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou le familier a peut-être déjà accordé la victoire
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
+      const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#D98C8C",locked?3600:2200); },60); }
+      if(defeated && !alreadyClaimed){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
+      else if(!defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):atk.emoji); SFX.task&&SFX.task(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:(dmg>0?`${atk.emoji} −${dmg} PV au boss!`:`🛡️ La carapace bloque — vise plus gros!`),"#D98C8C",locked?3600:2200); },60); }
       return n;
     });
   },[persist,showToast]);
@@ -5647,12 +5656,14 @@ export default function App() {
       if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
-      if(defeated){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
-      const fe = defeated ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
+      const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou une attaque de joueur a peut-être déjà accordé la victoire
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
+      const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
       setConfig(ncfg); persist(ncfg, n);
-      if(defeated){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
-      else { setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#D9BC5C",locked?3600:2800); },60); }
+      if(defeated && !alreadyClaimed){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
+      else if(!defeated){ setTimeout(()=>{ try{ if(!CALM) spawnParticles(locked?(boss.emoji||"🐉"):"🐾"); SFX.epic&&SFX.epic(); }catch{} showToast(locked?`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`:`🐾 Ton familier frappe! −${dmg} PV${legend?" — Légendaire! 👑":""}`,"#D9BC5C",locked?3600:2800); },60); }
       return n;
     });
   },[gameStates,persist,showToast]);

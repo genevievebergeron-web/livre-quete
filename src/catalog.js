@@ -172,7 +172,7 @@ export const BADGES = [
   { id:"b_coins150", emoji:"🤑", name:"Oncle Picsou",         desc:"Gagne 300 pièces au total",            type:"general", check:(ps)=>(ps.coinsLifetime||0)>=300 }, // v2.5.0 — idem
   { id:"b_buy1",     emoji:"🛒", name:"Première Récompense",  desc:"Achète une récompense",               type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=1 },
   { id:"b_buy5",     emoji:"🛍️", name:"Problème de Shopping", desc:"Achète 10 récompenses",                type:"general", check:(ps)=>(ps.boughtRewards?.length||0)>=10 },
-  { id:"b_streak3",  emoji:"📅", name:"Machine à Habitudes",  desc:"6 quêtes dans la même journée",        type:"general", check:(ps,c)=>c>=6 },
+  { id:"b_streak3",  emoji:"📅", name:"Journée Marathon",     desc:"6 quêtes dans la même journée",        type:"general", check:(ps,c)=>c>=6 }, // v2.5.25 — nom renommé (l'ancien "Machine à Habitudes" laissait croire à une série de jours, alors que c'est 6 quêtes en UNE journée — id/desc/check inchangés pour ne pas orpheliner les badges déjà gagnés
   { id:"b_level2",   emoji:"🆙", name:"Ya du Progrès",        desc:"Atteins le niveau 2",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=2 },
   { id:"b_level3",   emoji:"🚀", name:"Spationaute du Ménage",desc:"Atteins le niveau 3",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=3 },
   { id:"b_level4",   emoji:"👑", name:"Royauté de la Patate", desc:"Atteins le niveau 4",                  type:"general", check:(ps)=>getLevel(ps.xp||0).level>=4 },
