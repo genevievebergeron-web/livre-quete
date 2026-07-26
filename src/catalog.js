@@ -126,7 +126,18 @@ export const CAT_META = {
   outdoor:{label:"Dehors",color:"#5CAD68"},
   defi:{label:"Défi",color:"#FF2D6F"},
   custom:{label:"Mes tâches",color:"#FFD24D"},
+  reparation:{label:"Réparation",color:"#7FD6E0"}, // v2.6.0 — quêtes de réparation 🕊️ (teal doux, jamais de rouge)
 };
+
+// v2.6.0 — Quêtes de réparation 🕊️ (chantier approuvé par Gen le 25 juillet).
+// Modèles proposés au PARENT (jamais dans TASK_CATALOG ni le TaskChooser enfant — création
+// parent uniquement). Cadrage TOP/AuDHD non négociable : texte symétrique, aucun fautif,
+// jamais les mots « conflit / dispute / faute » dans l'UI enfant ni le fil.
+export const REPAIR_PRESETS = [
+  { emoji:"🤝", label:"Faire la paix", steps:["Écouter l'autre","Trouver une solution ensemble","Se serrer la main"] },
+  { emoji:"💬", label:"S'excuser et réparer", steps:["Dire ce qui s'est passé avec ses mots","S'excuser sincèrement","Réparer ou remplacer ce qui a été abîmé"] },
+  { emoji:"🤲", label:"Aider l'autre à finir", steps:["Demander ce qui reste à faire","Faire sa part côte à côte","Célébrer le travail fini ensemble"] },
+];
 export const catMeta = (c) => CAT_META[c] || { label:"Autre", color:"#9AA0A6" };
 export const normLabel = (s) => (s||"").toLowerCase().trim().replace(/\s+/g," ");
 

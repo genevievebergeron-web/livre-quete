@@ -4,7 +4,7 @@ import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, ALL_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
-import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
+import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.5.29";
+const APP_VERSION = "2.6.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -110,7 +110,10 @@ const familyHp = (boss, enraged=false) => {
   return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * drain)));
 };
 const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
-const bossDamageTotal = (gameStates, bossId) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0);
+// v2.6.0 — 3e param optionnel : les quêtes de réparation 🕊️ (config.repairEvents) ajoutent leurs
+// dégâts au total du boss visé. Les events portent un dmg DÉJÀ plafonné à l'écriture (cap HPMAX-1).
+const repairDamageFor = (repairEvents, bossId) => (repairEvents || []).reduce((s, e) => s + ((e && e.bossStartedAt === bossId) ? (e.dmg || 0) : 0), 0);
+const bossDamageTotal = (gameStates, bossId, repairEvents) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0) + repairDamageFor(repairEvents, bossId);
 const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
 // v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
 // v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
@@ -187,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.0", date:"2026-07-26", features:[
+    "🕊️ NOUVEAU : les quêtes de réparation! Après un moment difficile entre vous, un parent peut proposer une quête commune (faire la paix, s'entraider…). Quand CHACUN l'a faite, quelque chose de spécial arrive : le boss recule de 50 PV — ou toute l'équipe reçoit +10 🪙 s'il n'y a pas de boss. Parce que réparer ensemble, c'est la plus grande force d'une famille.",
+  ]},
   { version:"2.5.29", date:"2026-07-26", features:[
     "🚀 L'app est plus légère et se synchronise plus vite entre vos appareils.",
   ]},
@@ -1073,6 +1079,9 @@ const mergeFamily = (base, incoming) => {
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
     // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
     announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    // v2.6.0 — quêtes de réparation 🕊️ : union-by-id (id = instanceId de l'assignation) = effet
+    // collectif exactly-once même après fusion multi-appareils. ⚠️ JAMAIS sur config.boss (merge shallow).
+    repairEvents: (() => { const m = new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
     // Bug live signalé par Gen (2026-07-25) : « défi de la semaine peut être coché à l'infini ».
     // Cause : weeklyChallenge n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}`
     // ci-dessus — iC (incoming) écrasait TOUJOURS bC en entier, sans égard à la fraîcheur (contrairement
@@ -1679,9 +1688,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // - mode semaine → tâches d'aujourd'hui
   // - routine ciblée → seulement les tâches choisies pour cette routine
   // - mode routine sans routine ciblée → toutes les tâches de routine
-  const myAssignments = pMode==="week"
+  // v2.6.0 — les quêtes de réparation 🕊️ sont TOUJOURS visibles, peu importe le mode (semaine/rituel)
+  // ou le rituel actif : elles concernent la journée et tous les enfants sélectionnés doivent les voir.
+  const repairMine = allMine.filter(a=>a.repair);
+  const myAssignments = [...repairMine, ...(pMode==="week"
     ? todayWeek
-    : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine);
+    : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine)
+  ).filter(a=>!a.repair)];
   const themedCat = pt.shopCategory;
   const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
@@ -2295,6 +2308,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
+            {/* v2.6.0 — quête de réparation 🕊️ : les 3 petites étapes descriptives (texte simple, pas de cases) */}
+            {Array.isArray(task.steps)&&task.steps.length>0&&<div style={{marginBottom:6}}>
+              {task.steps.map((s,si)=>(
+                <div key={si} style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9ED8DE",lineHeight:1.35,paddingLeft:6}}>· {s}</div>
+              ))}
+            </div>}
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
@@ -2353,9 +2372,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           }).filter(g=>g.items.length>0);
           const orphans=routineMine.filter(a=>!used.has(a.instanceId));
           if(orphans.length) groups.push({id:"__autres", label:"🗂️ Autres tâches", items:orphans});
-          if(groups.length===0) return null;
+          // v2.6.0 — les quêtes de réparation 🕊️ s'affichent TOUJOURS, en tête, hors des groupes
+          // repliés (cette branche « Tout » lit routineMine directement et ignorait myAssignments).
+          const repairCards = repairMine.map(renderCard);
+          if(groups.length===0 && repairCards.length===0) return null;
           const acc=th.accent||player.color;
-          return groups.map(g=>{
+          return [...repairCards, ...groups.map(g=>{
             const open=!!openRoutineGroups[g.id];
             const doneN=g.items.filter(a=>pState.completed?.includes(dk(a))).length;
             const allDone=doneN===g.items.length;
@@ -2372,7 +2394,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 {open && <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,marginBottom:4}}>{g.items.map(renderCard)}</div>}
               </div>
             );
-          });
+          })];
         }
         const _done=a=>pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp());
         const undoneAll = myAssignments.filter(a=>!_done(a)); // v1.88.0 — nommé pour réutilisation (D'abord→Ensuite)
@@ -2748,7 +2770,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {/* ── ONGLET BOSS : combat familial (jetons d'attaque gagnés en faisant des quêtes) ── */}
       {homeTab==="boss" && config.boss && (()=>{
         const boss=config.boss; const bid=boss.startedAt; const hpMax=boss.hpMax||80;
-        const total=bossDamageTotal(allStates||[], bid); const hpLeft=Math.max(0,hpMax-total); const hpPct=Math.round(hpLeft/hpMax*100);
+        const total=bossDamageTotal(allStates||[], bid, config.repairEvents); const hpLeft=Math.max(0,hpMax-total); const hpPct=Math.round(hpLeft/hpMax*100);
         const won=!!boss.defeatedAt; const enraged=!won && hpPct<=30; const fhp=familyHp(boss, enraged); const myJetons=bossJetons(pState,bid);
         const mod=bossModifierOfDay(bid);
         const _petId=pState.equipped?.pet; const _petLv=petLevel((pState.petXp||{})[_petId]||0); const _petReady=!!_petId && pState.lastFedDay===todayStamp() && _petLv>=4;
@@ -2934,7 +2956,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
       {/* ⚔️ Boss de famille — PV du boss (attaqué via les jetons gagnés en quêtes) */}
       {config.boss && (()=>{
         const b=config.boss; const hpMax=b.hpMax||80;
-        const total=bossDamageTotal(gameStates, b.startedAt); const hpLeft=Math.max(0,hpMax-total);
+        const total=bossDamageTotal(gameStates, b.startedAt, config.repairEvents); const hpLeft=Math.max(0,hpMax-total);
         const pct=Math.min(100,Math.round(hpLeft/hpMax*100));
         const won=!!b.defeatedAt; const fhp=familyHp(b);
         return (
@@ -3074,7 +3096,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
             const liked=(f.likes||[]).includes(meId);
             // Lot 6 #28 — accent de couleur par type d'événement (même sémantique que le reste de l'app :
             // vert=quête, cyan=niveau/XP, or=badge, rouge=boss, orange=rituel) pour distinguer d'un coup d'œil.
-            const TYPE_ACCENT={task:"#5CAD68",level:"#85CDD1",badge:"#D9BC5C",boss:"#D98C8C",ritual:"#D99248"};
+            const TYPE_ACCENT={task:"#5CAD68",level:"#85CDD1",badge:"#D9BC5C",boss:"#D98C8C",ritual:"#D99248",repair:"#7FD6E0"}; // v2.6.0 — 🕊️
             const accent=f.type==="chat"?feedColor(f.playerId):(TYPE_ACCENT[f.type]||"#2a2a2a");
             return (
               <div key={f.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderLeft:`3px solid ${accent}`,borderRadius:6}}>
@@ -3108,7 +3130,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
-  onCreateAnnouncement, onDeleteAnnouncement }) {
+  onCreateAnnouncement, onDeleteAnnouncement, onCreateRepairQuest }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
@@ -3119,6 +3141,10 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [pinVal, setPinVal] = useState("");
   const [addTaskId, setAddTaskId] = useState("");
   const [addPlayerIds, setAddPlayerIds] = useState(players.map(p=>p.id));
+  // v2.6.0 — quête de réparation 🕊️ : sélection d'enfants (min 2) + modèle (ou texte libre = -1)
+  const [repPlayerIds, setRepPlayerIds] = useState([]);
+  const [repPresetIdx, setRepPresetIdx] = useState(0);
+  const [repCustomText, setRepCustomText] = useState("");
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
@@ -3515,6 +3541,45 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     <PBtn key={k} onClick={()=>{ onLaunchBoss&&onLaunchBoss(k); }} color="#8F72CC" textColor="#fff" style={{flex:1}}>{l}</PBtn>
                   ))}
                 </div>}
+          </div>
+          {/* v2.6.0 — Quête de réparation 🕊️ : après un moment difficile entre enfants, une quête
+              commune; quand TOUS l'ont faite et que c'est validé, effet collectif (boss −50 PV, ou
+              +10 🪙 chacun sans boss). Texte volontairement sans « conflit/dispute/faute ». */}
+          <div style={{background:"rgba(18,45,50,0.4)",border:"2px solid #7FD6E0",borderRadius:6,padding:"10px",marginBottom:12}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#7FD6E0",marginBottom:5}}>🕊️ QUÊTE DE RÉPARATION</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#999",marginBottom:8}}>Après un moment difficile, propose une quête commune. Quand chacun l'a complétée et que tu as validé, la famille retrouve son équilibre : le boss recule de 50 PV (ou +10 🪙 chacun s'il n'y a pas de boss).</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+              {players.map(pl=>{
+                const sel=repPlayerIds.includes(pl.id);
+                return <div key={pl.id} onClick={()=>setRepPlayerIds(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])}
+                  style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  {displayName(pl)}
+                </div>;
+              })}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
+              {REPAIR_PRESETS.map((pr,i)=>(
+                <div key={i} onClick={()=>{setRepPresetIdx(i);SFX.click();}}
+                  style={{padding:"7px 10px",background:repPresetIdx===i?"rgba(127,214,224,0.15)":"rgba(0,0,0,0.3)",border:`2px solid ${repPresetIdx===i?"#7FD6E0":"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:repPresetIdx===i?"#7FD6E0":"#999"}}>{pr.emoji} {pr.label}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:2}}>{pr.steps.join(" · ")}</div>
+                </div>
+              ))}
+              <div onClick={()=>{setRepPresetIdx(-1);SFX.click();}}
+                style={{padding:"7px 10px",background:repPresetIdx===-1?"rgba(127,214,224,0.15)":"rgba(0,0,0,0.3)",border:`2px solid ${repPresetIdx===-1?"#7FD6E0":"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:repPresetIdx===-1?"#7FD6E0":"#999"}}>✏️ Autre chose…</div>
+                {repPresetIdx===-1 && <input value={repCustomText} onChange={e=>setRepCustomText(e.target.value)} placeholder="Ex: Refaire la tour de blocs ensemble"
+                  style={{width:"100%",marginTop:6,fontFamily:"'VT323',monospace",fontSize:16,padding:"7px 9px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",boxSizing:"border-box"}}/>}
+              </div>
+            </div>
+            {(()=>{ const ok = repPlayerIds.length>=2 && (repPresetIdx>=0 || repCustomText.trim().length>=3);
+              return <PBtn onClick={()=>{ if(!ok) return;
+                  const preset = repPresetIdx>=0 ? REPAIR_PRESETS[repPresetIdx] : {emoji:"🕊️", label:repCustomText.trim(), steps:[]};
+                  onCreateRepairQuest&&onCreateRepairQuest(preset, repPlayerIds);
+                  setRepCustomText(""); setRepPresetIdx(0); }}
+                color={ok?"#7FD6E0":"#333"} textColor="#0d0d0d" style={{width:"100%",opacity:ok?1:0.5}}>
+                🕊️ Créer la quête ({repPlayerIds.length>=2?repPlayerIds.length+" enfants":"choisis au moins 2 enfants"})
+              </PBtn>; })()}
           </div>
           <Row>
             {undoStack.length>0
@@ -5260,7 +5325,7 @@ export default function App() {
     const boss = cfgRef.current?.boss;
     if(!boss || boss.defeatedAt) return;
     const HPMAX = boss.hpMax||80;
-    const totalDmg = bossDamageTotal(gameStates, boss.startedAt);
+    const totalDmg = bossDamageTotal(gameStates, boss.startedAt, cfgRef.current?.repairEvents); // v2.6.0 — inclut les réparations 🕊️
     if(totalDmg < HPMAX) return;
     if(!bossQuestsAllDone(cfgRef.current, gameStates)) return;
     const bid = boss.startedAt;
@@ -5278,7 +5343,50 @@ export default function App() {
     const fe = {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`};
     const ncfg = {...cfgRef.current, boss:nb, feed:[fe,...(cfgRef.current.feed||[])].slice(0,60)};
     setConfig(ncfg); setGameStates(n); persist(ncfg, n);
-  },[gameStates, config?.boss]);
+  },[gameStates, config?.boss, config?.repairEvents]); // v2.6.0 — re-évalue aussi quand une réparation 🕊️ ajoute des dégâts
+
+  // v2.6.0 — 🕊️ Effet collectif des quêtes de réparation. Exactly-once : config.repairEvents
+  // (union-by-id des deux côtés du merge, id = instanceId de l'assignation) — un event existe ⇒
+  // l'effet a déjà été accordé, même après fusion multi-appareils. Actif SEULEMENT en mode parent :
+  // le portail est ouvert au moment de la DERNIÈRE validation (approvePending), donc un seul
+  // appareil détecteur en pratique — fenêtre de course quasi nulle, et l'union-by-id couvre le reste.
+  // ⚠️ Ne JAMAIS stocker sur config.boss (merge shallow last-write-wins).
+  useEffect(()=>{
+    if(!parentMode) return;
+    const cfg = cfgRef.current; if(!cfg?.players?.length) return;
+    const granted = new Set((cfg.repairEvents||[]).map(e=>e.id));
+    const ready = (cfg.assignments||[]).filter(a =>
+      a.repair && Array.isArray(a.playerIds) && a.playerIds.length>=2 && !granted.has(a.instanceId) &&
+      a.playerIds.every(pid=>{
+        const idx=(cfg.players||[]).findIndex(p=>p.id===pid); if(idx<0) return false;
+        const key=a.instanceId+"_"+pid+"#"+(a.oneDay||todayStamp());
+        return (gameStates[idx]?.completed||[]).includes(key);
+      }));
+    if(!ready.length) return;
+    const boss = (cfg.boss && !cfg.boss.defeatedAt) ? cfg.boss : null;
+    let n = gameStates; let feed = [...(cfg.feed||[])]; const events = [...(cfg.repairEvents||[])];
+    const nameOf = pid => { const pl=(cfg.players||[]).find(p=>p.id===pid); return pl ? displayName(pl) : null; };
+    for(const a of ready){
+      const names = a.playerIds.map(nameOf).filter(Boolean);
+      const listTxt = names.length>1 ? names.slice(0,-1).join(", ")+" et "+names[names.length-1] : (names[0]||"");
+      if(boss){
+        const bid=boss.startedAt, HPMAX=boss.hpMax||80;
+        const cur = bossDamageTotal(n, bid, events);
+        // Cap HPMAX-1 si le verrou des corvées du boss est actif (même règle que les attaques)
+        const room = bossQuestsAllDone(cfg, n) ? 50 : Math.max(0,(HPMAX-1)-cur);
+        const dmg = Math.min(50, room);
+        events.push({ id:a.instanceId, bossStartedAt:bid, dmg, bonusCoins:0, ts:Date.now() });
+        feed.unshift({ id:"f_"+uid(), ts:Date.now(), likes:[], type:"repair", playerId:"parent", emoji:"🕊️", text:`🕊️ ${listTxt} ont réparé quelque chose ensemble — le boss recule de ${dmg} PV!` });
+      } else {
+        events.push({ id:a.instanceId, bossStartedAt:null, dmg:0, bonusCoins:10, ts:Date.now() });
+        n = n.map((g,i)=> a.playerIds.includes((cfg.players||[])[i]?.id) ? {...g, coins:(g.coins||0)+10, coinsLifetime:(g.coinsLifetime||0)+10} : g);
+        feed.unshift({ id:"f_"+uid(), ts:Date.now(), likes:[], type:"repair", playerId:"parent", emoji:"🕊️", text:`🕊️ ${listTxt} ont réparé quelque chose ensemble — la famille a retrouvé son équilibre! +10 🪙 chacun` });
+      }
+    }
+    const ncfg = {...cfg, repairEvents:events, feed:feed.slice(0,60)};
+    setConfig(ncfg); if(n!==gameStates) setGameStates(n); persist(ncfg, n);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[gameStates, parentMode]);
 
   // Lot 7A — génération auto des quêtes récurrentes au début de chaque semaine de garde
   useEffect(()=>{
@@ -5630,6 +5738,23 @@ export default function App() {
     showToast("➕ Tâche ajoutée!","#5CAD68");
   },[config,gameStates,persist,logAction,showToast]);
 
+  // v2.6.0 — Quête de réparation 🕊️ (chantier approuvé le 25 juillet) : le PARENT crée une tâche
+  // à la volée (cat "reparation", champs figés après création — le merge union-by-id ne fusionne
+  // pas champ par champ) + UNE assignation multi-enfants (patron rc_brassee — PAS handleAddAssignment
+  // qui splitte en une assignation par enfant). oneDay = aujourd'hui (auto-nettoyée demain, ~5121).
+  // Cadrage TOP/AuDHD : texte symétrique, récompenses égales (20 XP / 10 🪙 via approvePending normal).
+  const handleCreateRepairQuest = useCallback((preset, playerIds)=>{
+    if(!preset?.label || !Array.isArray(playerIds) || playerIds.length<2) return;
+    const taskId = "cust_rep_"+uid();
+    const task = { id:taskId, emoji:preset.emoji||"🕊️", label:preset.label, xp:20, coins:10, diff:"medium", cat:"reparation", repair:true, steps:Array.isArray(preset.steps)?preset.steps.slice(0,3):[] };
+    const todayIdx=(new Date().getDay()+6)%7;
+    const ass = { instanceId:uid(), taskId, playerIds:[...playerIds], days:[todayIdx], time:"", oneDay:todayStamp(), repair:true, createdAt:Date.now() };
+    const newCfg = {...config, customTasks:[...(config.customTasks||[]), task], assignments:[...(config.assignments||[]), ass]};
+    setConfig(newCfg); persist(newCfg, gameStates);
+    logAction(`🕊️ Quête de réparation créée: ${task.label} (${playerIds.length} enfants)`,"#7FD6E0");
+    showToast("🕊️ Quête de réparation créée — chacun la verra dans sa journée.","#7FD6E0",4000);
+  },[config,gameStates,persist,logAction,showToast]);
+
   // Lance un boss de famille — le parent choisit la difficulté (PV du boss)
   const handleLaunchBoss = useCallback((difficulty="moyen")=>{
     const nPlayers = Math.max(1,(config.players||[]).length);
@@ -5656,7 +5781,7 @@ export default function App() {
       const mod = bossModifierOfDay(bid); const dmg = bossAtkDamage(type, mod); // v1.58.0 — modificateur du jour
       const newBB={...bb, spent:bb.spent+atk.cost, dmg:bb.dmg+dmg};
       n[playerIdx]={...p, bossBattle:newBB};
-      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0) + repairDamageFor(cfgRef.current?.repairEvents, bid); // v2.6.0 — inclut les réparations 🕊️ dans le cap et le seuil de victoire
       let nb = {...boss, lastHitTs:new Date().toISOString()};
       const HPMAX=(boss.hpMax||80), questsDone=bossQuestsAllDone(cfgRef.current, n);
       if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
@@ -5690,7 +5815,7 @@ export default function App() {
       const dmg = petAttackDamage(petLv, legend, mod);
       const newBB={...bb, spent:bb.spent+PET_ATTACK_COST, dmg:bb.dmg+dmg};
       n[playerIdx]={...p, bossBattle:newBB};
-      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0);
+      let totalDmg = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0) + repairDamageFor(cfgRef.current?.repairEvents, bid); // v2.6.0 — inclut les réparations 🕊️ dans le cap et le seuil de victoire
       let nb = {...boss, lastHitTs:new Date().toISOString()};
       const HPMAX=(boss.hpMax||80), questsDone=bossQuestsAllDone(cfgRef.current, n);
       if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
@@ -6559,6 +6684,7 @@ export default function App() {
           onAddAssignment={handleAddAssignment}
           onAssignRoutine={handleAssignRoutine}
           onLaunchBoss={handleLaunchBoss}
+          onCreateRepairQuest={handleCreateRepairQuest}
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onAddCalendarEvent={handleAddCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
