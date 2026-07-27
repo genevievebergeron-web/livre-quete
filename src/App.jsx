@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.6";
+const APP_VERSION = "2.6.7";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.7", date:"2026-07-27", features:[
+    "🎨 Tes cartes de quêtes ont un nouveau look : un liseré de couleur à gauche te montre la difficulté d'un coup d'œil (vert facile, jaune moyen, orange difficile) — plus besoin de chercher!",
+  ]},
   { version:"2.6.6", date:"2026-07-27", features:[
     "🧹 Grand ménage : ~125 anciennes tâches fantômes (jamais complétables) qui réapparaissaient sans cesse dans la file « à valider » du parent sont enfin retirées pour de bon.",
     "📊 Correction : le graphique « Progrès de la semaine » et le compteur « quêtes accomplies ensemble » oubliaient de compter les quêtes de la semaine de garde — ils affichent maintenant les vrais chiffres.",
@@ -2338,7 +2341,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {homeTab==="jour" && (<>
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
       {/* v1.85.0 (Lot 2 #7) — état vide orientant : si l'AUTRE mode a des tâches, on le dit plutôt
           que de laisser croire qu'il n'y a rien du tout ("on sait jamais où chercher") */}
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16,lineHeight:1.4}}>
@@ -2370,7 +2373,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const done=pState.completed?.includes(doneKey);
         const pending=pState.pending?.includes(doneKey);
         return (
-          <div key={ass.instanceId} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"#333"}`,borderRadius:5,padding:"9px 11px",position:"relative",transition:"border 0.2s"}}>
+          // Refonte visuelle Phase 3 — bordure neutre .card-n1 (patron Phase 1) au repos, la
+          // difficulté quitte la bordure pour un liseré gauche 4px DIFF_COLOR (info conservée,
+          // bruit réduit) ; done/pending gardent leur bordure pleine couleur (état, pas décor).
+          <div key={ass.instanceId} style={{background:done||pending?"rgba(0,0,0,0.55)":"linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.35))",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"var(--b-soft)"}`,borderLeft:`4px solid ${DIFF_COLOR(task.diff)}`,boxShadow:done||pending?undefined:"var(--elev1)",borderRadius:5,padding:"10px 12px",position:"relative",transition:"border 0.2s"}}>
             {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
