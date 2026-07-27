@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.7";
+const APP_VERSION = "2.6.9";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.9", date:"2026-07-27", features:[
+    "📅 Calendrier refondu : un seul calendrier (menu du bas), séparé des tâches — sections Déjeuner/Avant-midi/Dîner/Après-midi/Souper/Soir, heure optionnelle, et tu peux maintenant modifier tes événements (pas juste les supprimer)!",
+  ]},
+  { version:"2.6.8", date:"2026-07-27", features:[
+    "✨ Petits préparatifs sous le capot pour ton personnage — rien ne change encore, mais de belles surprises s'en viennent!",
+  ]},
   { version:"2.6.7", date:"2026-07-27", features:[
     "🎨 Tes cartes de quêtes ont un nouveau look : un liseré de couleur à gauche te montre la difficulté d'un coup d'œil (vert facile, jaune moyen, orange difficile) — plus besoin de chercher!",
   ]},
@@ -1659,7 +1665,7 @@ function AnnouncementCountdown({ target }) {
 
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
-const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onUpdateCalendar, onCalendarAdd, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -1686,6 +1692,17 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
+  // Refonte visuelle Phase 5 — avatar vivant : humeur temporaire (non persistée), revient à
+  // "neutral" après `ms`. "tired" est calculé en continu (pas un minuteur) : ≥19h ET plus aucune
+  // quête restante aujourd'hui — pas de sprite sheet, juste une surcharge canvas (avatar.jsx).
+  const [avatarMood, setAvatarMood] = useState("neutral");
+  const moodTimerRef = useRef(null);
+  const setMoodFor = (mood, ms)=>{
+    clearTimeout(moodTimerRef.current);
+    setAvatarMood(mood);
+    moodTimerRef.current = setTimeout(()=>setAvatarMood("neutral"), ms);
+  };
+  useEffect(()=>()=>clearTimeout(moodTimerRef.current),[]);
   // v1.84.0 (Lot 1 #B3) — ouvrir le personnalisateur coûte de l'énergie (frein "plaisir")
   const openAvatar = ()=>{
     if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
@@ -1695,8 +1712,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [themeRevealed, setThemeRevealed] = useState(false);
   const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
   const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
-  const [calOpen, setCalOpen] = useState(false);
-  const [calForm, setCalForm] = useState({type:"devoir", label:"", date:""});
   const [petNickEditing, setPetNickEditing] = useState(false);
   const [petNickDraft, setPetNickDraft] = useState("");
   const T = th;
@@ -1764,6 +1779,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     ? todayWeek
     : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine)
   ).filter(a=>!a.repair)];
+  // Refonte visuelle Phase 5 — humeur affichée sur l'avatar du header : un événement (happy au
+  // tap, voir requestComplete plus bas) est prioritaire ; sinon "tired" si ≥19h ET plus aucune
+  // quête restante aujourd'hui (fin de journée paisible, pas un reproche — jamais si 0 quête).
+  const _todayDoneKey = a=>a.instanceId+"_"+player.id+"#"+todayStamp();
+  const _allDoneToday = myAssignments.length>0 && myAssignments.every(a=>pState.completed?.includes(_todayDoneKey(a)));
+  const dashboardMood = avatarMood!=="neutral" ? avatarMood : (new Date().getHours()>=19 && _allDoneToday ? "tired" : "neutral");
   const themedCat = pt.shopCategory;
   const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
@@ -1893,7 +1914,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid #2a2a2a`,borderTop:`3px solid ${player.color}`,borderRadius:8,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         {/* Avatar — clickable → opens creator/inventory */}
         <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={openAvatar} title="Personnaliser mon perso">
-          <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72}
+          <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72} mood={dashboardMood}
             style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
           {/* v1.81.0 — ancré sur la vraie géométrie du corps (EquippedGear), voir plus haut */}
           <EquippedGear eq={eq} items={allShopItemsFlat} size={72}/>
@@ -2395,7 +2416,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               {task.cat && (()=>{ const m=catMeta(task.cat); return <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:m.color,background:`${m.color}1A`,border:`1px solid ${m.color}55`,padding:"1px 4px"}}>{m.label}</span>; })()}
             </div>
             {!done&&!pending&&<div style={{display:"flex",gap:6}}>
-              <button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(ass,player.id,e);}}
+              <button className="btn-press" onClick={e=>{SFX.click();setMoodFor("happy",5000);onRequestComplete(ass,player.id,e);}}
                 style={{flex:1,padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",
                   color:"#0d0d0d",background:player.color,border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",
                   boxShadow:"2px 2px 0 #0d0d0d",transition:"all 0.08s"}}>
@@ -2592,15 +2613,17 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             const stamp=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
             const dIdx=(dt.getDay()+6)%7;
             const dayTasks=weekMine.filter(a=>Array.isArray(a.days)&&a.days.includes(dIdx)&&(!a.oneDay||a.oneDay===stamp));
-            const dayEvents=(pState.calendar||[]).filter(e=> e.recur?.freq==="daily" ? true : e.recur?.freq==="weekly" ? e.recur.day===dIdx : e.date===stamp);
             const isToday=k===0;
             const acc=th.accent||player.color;
-            const MAXT=5, MAXE=4;
+            const MAXT=5;
             return (
               <div key={stamp} style={{flex:"0 0 auto",width:138,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${acc}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                 {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
-                {dayTasks.length===0 && dayEvents.length===0 && (
+                {/* v2.6.6 — les événements de calendrier ne s'affichent plus ici (demande de Gen :
+                    "Ma semaine" = tâches seulement, le calendrier vit désormais uniquement dans
+                    l'onglet 📅 du menu du bas). */}
+                {dayTasks.length===0 && (
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:4}}>🌿 Libre</div>
                 )}
                 {dayTasks.slice(0,MAXT).map(a=>{
@@ -2615,13 +2638,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   );
                 })}
                 {dayTasks.length>MAXT && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:3}}>+{dayTasks.length-MAXT} autres quêtes</div>}
-                {dayEvents.slice(0,MAXE).map(e=>(
-                  <div key={e.id} style={{display:"flex",alignItems:"flex-start",gap:4,marginTop:4,paddingTop:4,borderTop:dayTasks.length?"1px dashed #2a2a2a":"none"}}>
-                    <span style={{fontSize:12,lineHeight:"14px"}}>{calEventIcon(e)}</span>
-                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,lineHeight:"14px",color:"#85CDD1",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical"}}>{e.label}</span>
-                  </div>
-                ))}
-                {dayEvents.length>MAXE && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:3}}>+{dayEvents.length-MAXE} autres</div>}
               </div>
             );
           })}
@@ -2685,63 +2701,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
 
       </>)}
-      {homeTab==="sem" && (<>
-      {/* Calendar CRUD */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#85CDD1",marginTop:10,paddingBottom:3,borderBottom:"2px solid #85CDD140"}}>📅 MON CALENDRIER</div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:4}}>Note tes devoirs et examens — un rappel avec du XP bonus apparaîtra avant la date!</div>
-      <button onClick={()=>{setCalOpen(o=>!o);SFX.click();}}
-        style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"12px",
-          background:calOpen?"#1a1a1a":"#85CDD1",color:calOpen?"#85CDD1":"#0d0d0d",
-          border:`3px solid ${calOpen?"#85CDD1":"#0d0d0d"}`,borderRadius:5,cursor:"pointer",
-          boxShadow:calOpen?"none":"4px 4px 0 #0d0d0d",transition:"all 0.12s"}}>
-        {calOpen?"✕ Fermer":"➕ Ajouter un devoir ou un examen"}
-      </button>
-      {calOpen && (
-        <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #85CDD1",borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
-          <div style={{display:"flex",gap:6}}>
-            {[["devoir","📚 Devoir"],["examen","📝 Examen"]].map(([v,l])=>(
-              <button key={v} onClick={()=>{setCalForm(f=>({...f,type:v}));SFX.click();}}
-                style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px",background:calForm.type===v?"#85CDD1":"#1a1a1a",color:calForm.type===v?"#0d0d0d":"#888",border:`2px solid ${calForm.type===v?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>
-                {l}
-              </button>
-            ))}
-          </div>
-          <input value={calForm.label} onChange={e=>setCalForm(f=>({...f,label:e.target.value}))} placeholder={calForm.type==="examen"?"Maths, Français...":"Devoir de sciences..."} maxLength={40}
-            style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
-          <input type="date" value={calForm.date} onChange={e=>setCalForm(f=>({...f,date:e.target.value}))}
-            style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
-          <button onClick={()=>{
-            if(!calForm.label.trim()||!calForm.date) return;
-            const newEntry={id:`cal_${Date.now()}`,type:calForm.type,label:calForm.label.trim(),date:calForm.date};
-            const newCal=[...(pState.calendar||[]),newEntry];
-            onUpdateCalendar&&onUpdateCalendar(newCal);
-            onCalendarAdd&&onCalendarAdd(calForm.type);
-            setCalForm({type:"devoir",label:"",date:""});
-            SFX.click();
-          }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:"#85CDD1",color:"#0d0d0d",border:"none",borderRadius:3,cursor:"pointer"}}>
-            ✓ Enregistrer
-          </button>
-        </div>
-      )}
-      {(pState.calendar||[]).length>0 && (
-        <div style={{display:"flex",flexDirection:"column",gap:4}}>
-          {[...(pState.calendar||[])].sort((a,b)=>a.date.localeCompare(b.date)).map(entry=>(
-            <div key={entry.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"rgba(0,0,0,0.4)",border:"1px solid #222",borderRadius:3}}>
-              <span style={{fontSize:14}}>{calEventIcon(entry)}</span>
-              <div style={{flex:1}}>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{entry.label}</div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666"}}>{fmtDateShort(entry.date)}</div>
-              </div>
-              {(parentMode||true)&&<button onClick={()=>{
-                const newCal=(pState.calendar||[]).filter(e=>e.id!==entry.id);
-                onUpdateCalendar&&onUpdateCalendar(newCal); SFX.click();
-              }} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      </>)}
       {homeTab==="shop" && (<>
       {/* Shop */}
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
@@ -2775,7 +2734,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2700,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:14,padding:20,textAlign:"center",overflowY:"auto",boxSizing:"border-box"}}>
             <ChestSprite open={true} size={110}/>
-            <div style={{fontSize:48}}>{it.emoji}</div>
+            {/* Refonte visuelle Phase 6 — rayons + popIn (pur CSS, tués par .calm-mode) ; la lueur
+                statique (box-shadow) reste visible même figée — la récompense reste "spéciale". */}
+            <div style={{position:"relative",width:80,height:80,display:"flex",alignItems:"center",justifyContent:"center",animation:"popIn 0.5s cubic-bezier(0.34,1.56,0.64,1)"}}>
+              <div className="rays-bg" style={{color:rar.color}}/>
+              <div style={{fontSize:48,position:"relative",zIndex:1,borderRadius:"50%",boxShadow:`0 0 40px ${rar.color}`}}>{it.emoji}</div>
+            </div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff"}}>{it.name}</div>
             {chestReveal.dup
@@ -2875,6 +2839,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       </>)}
       {homeTab==="accueil" && (<>
       {/* ── MENU : accès aux autres écrans (remplace les onglets du haut) ── */}
+      {/* v2.6.6 — c'est en fait le SEUL accès enfant à l'écran Calendrier (le footer n'est qu'un
+          bouton retour "🏠 Accueil", pas une barre de nav — la nav du haut avec l'onglet 📅 est
+          cachée en session enfant). Le point d'accès en double que Gen voulait retirer était
+          "Mon calendrier" intégré dans l'onglet Ma semaine, pas celui-ci — retiré séparément. */}
       {(onGoFamily||onGoCalendars||onGoTimer) && (
       <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
         {onGoFamily && (
@@ -3290,7 +3258,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
@@ -3322,6 +3290,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
   const [cePlayers,setCePlayers]=useState((players||[]).map(p=>p.id));
+  const [ceTime,setCeTime]=useState(""); // v2.6.6 — heure optionnelle
+  const [ceEditKey,setCeEditKey]=useState(null); // {id,playerName} de l'événement en cours de modification, sinon null
   const [rChildIdx, setRChildIdx] = useState(0); // assignation de routine: enfant ciblé
   const [rName, setRName] = useState("");
   const [rTaskIds, setRTaskIds] = useState([]);
@@ -3815,12 +3785,20 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           const allEntries = (gameStates||[]).flatMap((gs,i)=>{
             const pl = config.players[i];
             return (gs.calendar||[]).map(e=>({...e, playerName: pl?.name||"?", playerColor: pl?.color||"#888"}));
-          }).sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999"));
+          }).sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.time||"").localeCompare(b.time||""));
           const today = new Date().toISOString().split("T")[0];
           const recurLbl=(e)=> e.recur?.freq==="daily"?"Chaque jour":e.recur?.freq==="weekly"?("Chaque "+(DAYS[e.recur.day]||"")):(e.date||"");
+          const resetForm=()=>{ setCeEditKey(null); setCeLabel(""); setCeType("evenement"); setCeRecur("none"); setCeDate(""); setCeDay(0); setCeTime(""); setCePlayers((players||[]).map(p=>p.id)); };
+          const startEdit=(e)=>{
+            setCeEditKey({id:e.id,playerName:e.playerName});
+            setCeLabel(e.label); setCeType(e.type||"evenement");
+            setCeRecur(e.recur?e.recur.freq:"none"); setCeDate(e.date||""); setCeDay(e.recur?.day??0); setCeTime(e.time||"");
+            setCePlayers([]); // pas pertinent en édition (un seul enfant, déjà fixé)
+          };
+          const dayPartLabel = (t) => dayPartOf(t)?.label || "Toute la journée";
           return (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>➕ AJOUTER UN ÉVÉNEMENT</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>{ceEditKey?"✏️ MODIFIER L'ÉVÉNEMENT":"➕ AJOUTER UN ÉVÉNEMENT"}</div>
               <input value={ceLabel} onChange={e=>setCeLabel(e.target.value.slice(0,50))} placeholder="Ex: Cours de natation, Rendez-vous dentiste…"
                 style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #85CDD1",borderRadius:4,marginBottom:8,outline:"none"}}/>
               <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
@@ -3836,27 +3814,47 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               </div>
               {ceRecur==="none" && <input type="date" value={ceDate} onChange={e=>setCeDate(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none",display:"block"}}/>}
               {ceRecur==="weekly" && <select value={ceDay} onChange={e=>setCeDay(+e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8}}>{DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>}
-              <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-                {players.map(pl=>{ const sel=cePlayers.includes(pl.id); return (
-                  <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
-                ); })}
+              <div style={{marginBottom:8}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Heure (optionnel)</div>
+                <input type="time" value={ceTime} onChange={e=>setCeTime(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
               </div>
-              <PBtn onClick={()=>{ if(ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)){ onAddCalendarEvent&&onAddCalendarEvent(cePlayers,{type:ceType,label:ceLabel.trim(),date:ceRecur==="none"?ceDate:null,recur:ceRecur==="none"?null:(ceRecur==="weekly"?{freq:"weekly",day:ceDay}:{freq:"daily"})}); setCeLabel("");setCeDate(""); } }}
-                color={ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?"#85CDD1":"#333"} textColor="#0d0d0d" style={{width:"100%",marginBottom:14,opacity:ceLabel.trim()&&cePlayers.length&&(ceRecur!=="none"||ceDate)?1:0.5}}>➕ Ajouter au calendrier</PBtn>
+              {!ceEditKey && <>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                  {players.map(pl=>{ const sel=cePlayers.includes(pl.id); return (
+                    <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                  ); })}
+                </div>
+              </>}
+              <div style={{display:"flex",gap:6}}>
+                <PBtn onClick={()=>{
+                  if(!ceLabel.trim()||(ceRecur!=="none"?false:!ceDate)) return;
+                  const payload={type:ceType,label:ceLabel.trim(),date:ceRecur==="none"?ceDate:null,time:ceTime||null,recur:ceRecur==="none"?null:(ceRecur==="weekly"?{freq:"weekly",day:ceDay}:{freq:"daily"})};
+                  if(ceEditKey){ onUpdateCalendarEvent&&onUpdateCalendarEvent(ceEditKey.playerName,{...payload,id:ceEditKey.id}); }
+                  else if(cePlayers.length){ onAddCalendarEvent&&onAddCalendarEvent(cePlayers,payload); }
+                  else return;
+                  resetForm();
+                }} color={ceLabel.trim()&&(ceEditKey||cePlayers.length)&&(ceRecur!=="none"||ceDate)?"#85CDD1":"#333"} textColor="#0d0d0d" style={{flex:1,opacity:ceLabel.trim()&&(ceEditKey||cePlayers.length)&&(ceRecur!=="none"||ceDate)?1:0.5}}>
+                  {ceEditKey?"✓ Enregistrer les modifications":"➕ Ajouter au calendrier"}
+                </PBtn>
+                {ceEditKey && <PBtn onClick={resetForm} color="#333" textColor="#888" style={{flex:"0 0 auto"}}>✕ Annuler</PBtn>}
+              </div>
 
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>CALENDRIER COMMUN</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"14px 0 10px"}}>CALENDRIER COMMUN</div>
               {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun événement.</div>}
               {allEntries.map(e=>(
                 <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#D9BC5C":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
                   <span style={{fontSize:16}}>{calEventIcon(e)}</span>
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
-                    <div style={{display:"flex",gap:6,marginTop:2}}>
+                    <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.playerColor}}>{e.playerName}</span>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#D9BC5C":"#666"}}>{recurLbl(e)}</span>
+                      {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>{e.time} · {dayPartLabel(e.time)}</span>}
                     </div>
                   </div>
+                  <button onClick={()=>startEdit(e)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:14,lineHeight:1}}>✏️</button>
+                  <button onClick={()=>onDeleteCalendarEvent&&onDeleteCalendarEvent(e.playerName,e.id)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:15,lineHeight:1}}>✕</button>
                 </div>
               ))}
             </div>
@@ -4695,6 +4693,25 @@ const recurLabel = (e) => {
   if (e?.recur?.freq==="weekly") return "Chaque "+(DAYS[e.recur.day]||"?");
   return e?.date||"";
 };
+// v2.6.6 — refonte calendrier (demande de Gen) : sections par moment de journée + heure optionnelle.
+// `time` ("HH:MM") est un champ optionnel sur les entrées de calendrier — sans heure, l'événement
+// tombe dans la section "Toute la journée" (comportement historique des devoirs/examens, inchangé).
+const DAY_PARTS = [
+  { key:"dejeuner",  label:"🌅 Déjeuner",    from:6*60,        to:10*60 },
+  { key:"avantmidi", label:"☀️ Avant-midi",  from:10*60,       to:11*60+30 },
+  { key:"diner",     label:"🍽️ Dîner",       from:11*60+30,    to:13*60+30 },
+  { key:"apresmidi", label:"🌤️ Après-midi",  from:13*60+30,    to:17*60 },
+  { key:"souper",    label:"🌆 Souper",      from:17*60,       to:19*60+30 },
+  { key:"soir",      label:"🌙 Soir",        from:19*60+30,    to:30*60 }, // >24h = avant 6h le lendemain
+];
+const dayPartOf = (time) => {
+  if (!time) return null; // pas d'heure → section "Toute la journée"
+  const [h,m] = time.split(":").map(Number);
+  if (Number.isNaN(h)) return null;
+  let mins = h*60+(m||0);
+  if (mins < 6*60) mins += 24*60; // avant 6h du matin = fin de la section "Soir" de la veille
+  return DAY_PARTS.find(p => mins>=p.from && mins<p.to) || DAY_PARTS[DAY_PARTS.length-1];
+};
 // Prochaines dates (ISO) d'un événement sur N jours (gère récurrence)
 const upcomingOccurrences = (e, days=14) => {
   const out=[]; const today=new Date(); today.setHours(0,0,0,0);
@@ -5349,6 +5366,9 @@ export default function App() {
   const [parentPanel, setParentPanel] = useState(false); // slide-out panel
   const [hamOpen, setHamOpen] = useState(false); // menu ☰ enfant (piloté depuis le header)
   const [timerRitual, setTimerRitual] = useState(null); // rituel pré-sélectionné en ouvrant la minuterie
+  // v2.6.6 — calendrier consolidé (menu du bas) : formulaire d'ajout/modification pour l'enfant connecté.
+  const [myCalOpen, setMyCalOpen] = useState(false);
+  const [myCalForm, setMyCalForm] = useState({ editId:null, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 });
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
   const [pinChangeMode, setPinChangeMode] = useState(false);
@@ -6448,12 +6468,27 @@ export default function App() {
     if(!playerIds?.length || !entry?.label?.trim())return;
     setGameStates(gs=>{ const n=[...gs];
       playerIds.forEach(pid=>{ const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
-        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, recur:entry.recur||null };
+        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, time:entry.time||null, recur:entry.recur||null };
         n[i]={...n[i], calendar:[...(n[i].calendar||[]), e]};
       });
       persist(config,n); return n; });
     showToast("📅 Événement ajouté au calendrier!","#85CDD1");
   },[config,persist,showToast]);
+  // v2.6.6 — modifier/supprimer un événement depuis l'onglet Calendrier parent (retrouvé par
+  // playerName car allEntries est agrégé cross-enfants ; le nom est stable, fixé à la création du profil).
+  const handleUpdateCalendarEvent = useCallback((playerName, entry)=>{
+    const i=config.players.findIndex(p=>(p.name||"")===playerName); if(i<0)return;
+    setGameStates(gs=>{ const n=[...gs];
+      n[i]={...n[i], calendar:(n[i].calendar||[]).map(e=>e.id===entry.id?entry:e)};
+      persist(config,n); return n; });
+    showToast("📅 Événement modifié!","#85CDD1");
+  },[config,persist,showToast]);
+  const handleDeleteCalendarEvent = useCallback((playerName, entryId)=>{
+    const i=config.players.findIndex(p=>(p.name||"")===playerName); if(i<0)return;
+    setGameStates(gs=>{ const n=[...gs];
+      n[i]={...n[i], calendar:(n[i].calendar||[]).filter(e=>e.id!==entryId)};
+      persist(config,n); return n; });
+  },[config,persist]);
 
   // Objectif du jour réclamé → bonus XP/pièces (une fois par jour)
   const handleClaimDaily = useCallback((playerIdx, obj)=>{
@@ -6674,16 +6709,15 @@ export default function App() {
     setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
     showToast("🎨 Nouveau thème activé pour la semaine!","#D9BC5C",3000);
   }, [view, config, gameStates, persist, showToast]);
-  const onDashUpdateCalendar = useCallback((newCal)=>{
+  // v2.6.6 — calendrier consolidé : met à jour le calendrier d'un enfant précis par INDEX (pas
+  // forcément `view`, puisque l'écran "calendars" n'est pas un dashboard numéroté). Remplace
+  // onDashUpdateCalendar/onDashCalendarAdd (retirés avec l'ancien "Mon calendrier" par enfant).
+  const onCalendarUpdate = useCallback((playerIdx, newCal)=>{
     const gs=[...gameStates];
-    gs[view]={...gs[view],calendar:newCal};
+    gs[playerIdx]={...gs[playerIdx],calendar:newCal};
     setGameStates(gs);
     save({config,gameStates:gs,savedAt:new Date().toISOString()});
-  }, [gameStates, view, config]);
-  const onDashCalendarAdd = useCallback((type)=>{
-    const label=type==="examen"?"📝 Examen noté au calendrier!":"📚 Devoir noté au calendrier!";
-    showToast(`${label} Un rappel apparaîtra avant la date.`,"#85CDD1",3000);
-  }, [showToast]);
+  }, [gameStates, config]);
 
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}
@@ -6825,23 +6859,123 @@ export default function App() {
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
       <div style={{position:"relative",maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="calendars"&&(()=>{
+          // v2.6.6 — calendrier consolidé (demande de Gen) : seul point d'accès (menu du bas),
+          // événements uniquement (les tâches restent dans "Ma semaine"), sections par moment de
+          // journée, heure optionnelle, modification. L'enfant connecté peut ajouter/modifier/
+          // supprimer SES entrées (devoir/examen/événement) ; les calendriers des autres restent
+          // en lecture seule (les types santé/sport/intervenant/camp restent gérés par le parent).
           const order=(config.players||[]).map((p,i)=>i).sort((a,b)=> (a===sessionPlayer?-1:b===sessionPlayer?1:0));
+          const resetForm=()=>{ setMyCalForm({editId:null,type:"evenement",label:"",date:"",time:"",recur:"none",day:0}); setMyCalOpen(false); };
+          const startEdit=(e)=>{
+            setMyCalForm({editId:e.id,type:e.type||"evenement",label:e.label,date:e.date||"",time:e.time||"",recur:e.recur?e.recur.freq:"none",day:e.recur?.day??0});
+            setMyCalOpen(true);
+          };
+          const saveForm=()=>{
+            if(!myCalForm.label.trim()||(myCalForm.recur==="none"&&!myCalForm.date)) return;
+            const entry={
+              id: myCalForm.editId || `cal_${Date.now()}`,
+              type: myCalForm.type,
+              label: myCalForm.label.trim(),
+              date: myCalForm.recur==="none" ? myCalForm.date : null,
+              time: myCalForm.time || null,
+              recur: myCalForm.recur==="none" ? null : (myCalForm.recur==="weekly" ? {freq:"weekly",day:myCalForm.day} : {freq:"daily"}),
+            };
+            const cal=(gameStates[sessionPlayer]?.calendar)||[];
+            const newCal = myCalForm.editId ? cal.map(x=>x.id===entry.id?entry:x) : [...cal, entry];
+            onCalendarUpdate(sessionPlayer, newCal);
+            SFX.click();
+            resetForm();
+          };
+          const deleteEntry=(id)=>{
+            const cal=(gameStates[sessionPlayer]?.calendar)||[];
+            onCalendarUpdate(sessionPlayer, cal.filter(e=>e.id!==id));
+            SFX.click();
+          };
           return (
             <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent}}>📅 CALENDRIERS</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent}}>📅 CALENDRIER</div>
+              {sessionPlayer!=null && (
+                <div>
+                  <button onClick={()=>{ if(myCalOpen) resetForm(); else { setMyCalForm({editId:null,type:"evenement",label:"",date:"",time:"",recur:"none",day:0}); setMyCalOpen(true); } SFX.click(); }}
+                    style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"12px",
+                      background:myCalOpen?"#1a1a1a":th.accent,color:myCalOpen?th.accent:"#0d0d0d",
+                      border:`3px solid ${myCalOpen?th.accent:"#0d0d0d"}`,borderRadius:5,cursor:"pointer",
+                      boxShadow:myCalOpen?"none":"4px 4px 0 #0d0d0d",transition:"all 0.12s"}}>
+                    {myCalOpen?"✕ Fermer":"➕ Ajouter un événement"}
+                  </button>
+                  {myCalOpen && (
+                    <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${th.accent}`,borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {[["devoir","📚 Devoir"],["examen","📝 Examen"],["evenement","📅 Événement"]].map(([v,l])=>(
+                          <button key={v} onClick={()=>{setMyCalForm(f=>({...f,type:v}));SFX.click();}}
+                            style={{flex:"1 0 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 8px",background:myCalForm.type===v?th.accent:"#1a1a1a",color:myCalForm.type===v?"#0d0d0d":"#888",border:`2px solid ${myCalForm.type===v?th.accent:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                            {l}
+                          </button>
+                        ))}
+                      </div>
+                      <input value={myCalForm.label} onChange={e=>setMyCalForm(f=>({...f,label:e.target.value.slice(0,50)}))} placeholder={myCalForm.type==="examen"?"Maths, Français...":myCalForm.type==="devoir"?"Devoir de sciences...":"Cours de natation, rendez-vous..."}
+                        style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                        {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
+                          <button key={v} onClick={()=>{setMyCalForm(f=>({...f,recur:v}));SFX.click();}}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:myCalForm.recur===v?"#D99248":"#1a1a1a",color:myCalForm.recur===v?"#0d0d0d":"#888",border:`2px solid ${myCalForm.recur===v?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                        ))}
+                      </div>
+                      {myCalForm.recur==="none" && <input type="date" value={myCalForm.date} onChange={e=>setMyCalForm(f=>({...f,date:e.target.value}))}
+                        style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>}
+                      {myCalForm.recur==="weekly" && <select value={myCalForm.day} onChange={e=>setMyCalForm(f=>({...f,day:+e.target.value}))}
+                        style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4}}>{DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>}
+                      <div>
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>Heure (optionnel)</div>
+                        <input type="time" value={myCalForm.time} onChange={e=>setMyCalForm(f=>({...f,time:e.target.value}))}
+                          style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none"}}/>
+                      </div>
+                      <button onClick={saveForm}
+                        style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:th.accent,color:"#0d0d0d",border:"none",borderRadius:3,cursor:"pointer"}}>
+                        ✓ {myCalForm.editId?"Modifier":"Enregistrer"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               {order.map(i=>{ const p=config.players[i]; const cal=(gameStates[i]?.calendar)||[];
-                const items=cal.flatMap(e=>upcomingOccurrences(e,14).map(d=>({d,e}))).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,12);
+                const mine=i===sessionPlayer;
+                const items=cal.flatMap(e=>upcomingOccurrences(e,14).map(d=>({d,e}))).sort((a,b)=>a.d.localeCompare(b.d)||(a.e.time||"").localeCompare(b.e.time||"")).slice(0,20);
+                // Regroupement par date, puis par section de moment de journée à l'intérieur de chaque date.
+                const byDate=new Map(); for(const it of items){ if(!byDate.has(it.d)) byDate.set(it.d,[]); byDate.get(it.d).push(it.e); }
                 return (
                   <div key={p.id} style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${p.color}99`,borderRadius:8,padding:12}}>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:p.color,marginBottom:6}}>{displayName(p)}{i===sessionPlayer?" (toi)":""}</div>
-                    {items.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
-                    {items.map(({d,e},k)=>(
-                      <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #222"}}>
-                        <span style={{fontSize:14}}>{calEventIcon(e)}</span>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:84}}>{fmtDateShort(d)}</span>
-                        <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
-                      </div>
-                    ))}
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:p.color,marginBottom:6}}>{displayName(p)}{mine?" (toi)":""}</div>
+                    {byDate.size===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
+                    {[...byDate.entries()].map(([d,evs])=>{
+                      const noTime=evs.filter(e=>!e.time);
+                      const withTime=evs.filter(e=>e.time);
+                      const sections=[{label:"Toute la journée",evs:noTime}, ...DAY_PARTS.map(p2=>({label:p2.label,evs:withTime.filter(e=>dayPartOf(e.time)?.key===p2.key)}))].filter(s=>s.evs.length>0);
+                      return (
+                        <div key={d} style={{marginBottom:6}}>
+                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",marginBottom:2}}>{fmtDateShort(d)}</div>
+                          {sections.map(sec=>(
+                            <div key={sec.label} style={{marginLeft:4,marginBottom:2}}>
+                              <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{sec.label}</div>
+                              {sec.evs.map((e,k)=>{
+                                const editable=mine && ["devoir","examen","evenement"].includes(e.type||"evenement");
+                                return (
+                                <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"4px 0",borderBottom:"1px solid #222"}}>
+                                  <span style={{fontSize:14}}>{calEventIcon(e)}</span>
+                                  {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:34}}>{e.time}</span>}
+                                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
+                                  {editable && <>
+                                    <button onClick={()=>startEdit(e)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:13,lineHeight:1}}>✏️</button>
+                                    <button onClick={()=>deleteEntry(e.id)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
+                                  </>}
+                                </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -6933,8 +7067,6 @@ export default function App() {
             onChangeTheme={onDashChangeTheme}
             onDeComplete={handleDeComplete}
             onForceComplete={handleForceComplete}
-            onUpdateCalendar={onDashUpdateCalendar}
-            onCalendarAdd={onDashCalendarAdd}
             th={th}
           />
         )}
@@ -6957,6 +7089,8 @@ export default function App() {
           onMarkMomentDone={handleMarkMomentDone}
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onAddCalendarEvent={handleAddCalendarEvent}
+          onUpdateCalendarEvent={handleUpdateCalendarEvent}
+          onDeleteCalendarEvent={handleDeleteCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
           onApproveRemoval={handleApproveRemoval}
           onRefuseRemoval={handleRefuseRemoval}
@@ -6987,8 +7121,13 @@ export default function App() {
       {bossWin&&(
         <div onClick={()=>{setBossWin(null);SFX.click&&SFX.click();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:3200,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto",cursor:"pointer"}}>
           <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#1a2e1a,#0c220c)",border:`5px solid ${bossWin.color||"#D9BC5C"}`,borderRadius:16,padding:"28px 26px",maxWidth:380,width:"100%",maxHeight:"90vh",overflowY:"auto",textAlign:"center",boxShadow:`0 0 50px ${bossWin.color||"#D9BC5C"}70`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
-            <div style={{fontSize:64,lineHeight:1,marginBottom:6}}>{bossWin.emoji||"🐲"}</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#D9BC5C",marginBottom:8}}>🏆 VICTOIRE!</div>
+            {/* Refonte visuelle Phase 6 — rayons derrière l'emoji du boss vaincu + glowPulse sur
+                "VICTOIRE!" (pur CSS, tués par .calm-mode/prefers-reduced-motion). */}
+            <div style={{position:"relative",width:90,height:90,margin:"0 auto 6px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div className="rays-bg" style={{color:bossWin.color||"#D9BC5C"}}/>
+              <div style={{fontSize:64,lineHeight:1,position:"relative",zIndex:1}}>{bossWin.emoji||"🐲"}</div>
+            </div>
+            <div className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#D9BC5C",marginBottom:8}}>🏆 VICTOIRE!</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:19,color:"#fff",marginBottom:8,lineHeight:1.3}}>Vous avez vaincu<br/><b style={{color:bossWin.color||"#D9BC5C"}}>{bossWin.name}</b> en équipe! 💪</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#5CAD68",margin:"12px 0 8px",lineHeight:1.6}}>+40 🪙 · +50 ⚡<br/>🐲 Badge « Tombeur de Boss »!</div>
             {bossWin.items && bossWin.items.length>0 && (
