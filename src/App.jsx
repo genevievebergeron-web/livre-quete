@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.12.0";
+const APP_VERSION = "2.12.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.12.1", date:"2026-07-27", features:[
+    "🎾 Correction : jouer avec ton familier disait toujours « gagne de l'XP », même quand il avait déjà atteint son max du jour — le message est maintenant honnête!",
+  ]},
   { version:"2.12.0", date:"2026-07-27", features:[
     "🎨 TON HÉROS FAIT PEAU NEUVE : nouveau personnage détaillé en pixel art — ta peau, tes cheveux, tes ailes (plumées ou de dragon!), ta cape et tes souliers en vrai style jeu vidéo. Choisis Ado ou Enfant dans Mon Perso!",
     "😈 Nouvel onglet EXTRAS dans Mon Perso : cornes de démon avec queue, tentacules…",
