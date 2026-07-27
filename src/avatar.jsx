@@ -1,8 +1,14 @@
-// ─── AVATAR : CATALOGUE DE PARTIES + RENDU CANVAS ───────────────
+// ─── AVATAR : CATALOGUE DE PARTIES + MOTEUR DE RENDU EN COUCHES ──────────────
 // Extrait de App.jsx (Lot 5 #24, découpage progressif). Débloqué par le refactor CALM
-// (src/calm.js, patron sfx.js/setSfxMuted) — AvatarCanvas lisait le `let CALM` mutable
-// de App.jsx, ce qu'un import ES ne permet pas depuis un autre module. Zéro changement
-// de comportement.
+// (src/calm.js, patron sfx.js/setSfxMuted).
+//
+// Refonte 2026-07-27 (session interactive avec Gen) : moteur de COUCHES HYBRIDES.
+// Chaque pièce est une couche indépendante qui peut être un PNG registré
+// (/sprites/avatar/<partId>.png, trame pleine 72×72 ou multiple exact, pièce déjà
+// positionnée anatomiquement) OU le dessin procédural ci-dessous en repli — même
+// esprit que le repli 3 niveaux d'ItemSprite (sprites.jsx). Aujourd'hui aucun PNG
+// n'existe : le rendu est identique pixel pour pixel à l'ancien code.
+// JAMAIS de sprite sheet de combos (2 304 identités) — uniquement des PNG par pièce.
 import { useState, useEffect, useRef } from "react";
 import { CALM } from "./calm.js";
 
@@ -43,34 +49,52 @@ export const AVATAR_PARTS = {
 
 export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
 
-// Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`
-// ci-dessous (lignes ~70-72), jamais de sprite sheet (2 304 combos d'identité rendraient ça
-// impossible). L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
+// Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`,
+// jamais de sprite sheet. L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
 export const AVATAR_MOODS = ["neutral","happy","proud","tired","levelup","equipped"];
 
-// Render avatar to canvas (used both in-panel and in popup)
-export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false, mood="neutral") {
-  const av = {...DEFAULT_AVATAR, ...avatarDef};
-  const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
-  const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
-  const mouthPart= AVATAR_PARTS.mouth.find(m=>m.id===av.mouth) || AVATAR_PARTS.mouth[0];
-  const hairPart = AVATAR_PARTS.hair.find(h=>h.id===av.hair) || AVATAR_PARTS.hair[0];
-  const sc = W/72; // scale factor
-  const s = (v) => Math.round(v*sc);
+// ─── Cache PNG per-part : /sprites/avatar/<partId>.png ───────────────────────
+// 100 % synchrone au moment du rendu (renderAvatarToCtx DOIT rester synchrone —
+// la rasterisation dataURL du Combat Hydre dans App.jsx en dépend). Une seule
+// tentative réseau par id et par session : onerror fige "fail", plus jamais retenté.
+const _pngCache = new Map();            // partId -> {status:"loading"|"ok"|"fail", img}
+const _pngListeners = new Set();
+function getAvatarPng(partId){
+  if(!partId || partId.endsWith("0")) return null; // option "Aucun" (bk0/hd0/sh0) : jamais de fetch
+  let e = _pngCache.get(partId);
+  if(!e){
+    const img = new Image();
+    e = { status:"loading", img };
+    img.onload  = ()=>{ e.status="ok";   _pngListeners.forEach(f=>f()); };
+    img.onerror = ()=>{ e.status="fail"; }; // repli procédural déjà dessiné, rien à notifier
+    img.src = `/sprites/avatar/${partId}.png`;
+    _pngCache.set(partId, e);
+  }
+  return e.status==="ok" ? e.img : null;  // null = dessine le procédural
+}
+// Les canvases s'abonnent pour se redessiner quand un PNG finit de charger
+// (événement ponctuel de chargement, pas une animation — conforme au mode calme).
+export function onAvatarPngLoaded(cb){ _pngListeners.add(cb); return ()=>_pngListeners.delete(cb); }
 
-  ctx.clearRect(0,0,W,H);
-  // Hair (back)
+// ─── Fonctions de tracé procédural (repli) — repère natif 72 unités ──────────
+// Géométrie = CONTRAT partagé avec AVATAR_EQUIP_ANCHORS (sprites.jsx) :
+// tête x3-33 y2-24 (centre x18), corps x2-34 y26-50, bras x-2..38, jambes y50-64.
+function drawHairBack(ctx, s, { hairPart }){
   ctx.fillStyle = hairPart.color;
   ctx.fillRect(s(3),s(0),s(30),s(8));
   ctx.fillRect(s(0),s(4),s(4),s(18));
   ctx.fillRect(s(29),s(4),s(4),s(18));
-  // Head
+}
+function drawHead(ctx, s, { skinPart }){
   ctx.fillStyle = skinPart.color;
   ctx.fillRect(s(3),s(2),s(30),s(22));
-  // Hair top
+}
+function drawHairTop(ctx, s, { hairPart }){
   ctx.fillStyle = hairPart.color;
   ctx.fillRect(s(3),s(2),s(30),s(5));
-  // Eyes — blink (réflexe involontaire) gagne toujours ; sinon l'humeur (Phase 5) surcharge la
+}
+function drawEyes(ctx, s, { eyePart, blink, mood }){
+  // blink (réflexe involontaire) gagne toujours ; sinon l'humeur (Phase 5) surcharge la
   // forme choisie par l'enfant ; sinon la forme choisie s'affiche normalement.
   ctx.fillStyle = eyePart.eyeColor;
   if(blink){ // yeux fermés (clignement) — petites lignes plates
@@ -93,7 +117,9 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
   else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#0d0d0d";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
   else{ctx.fillRect(s(9),s(9),s(5),s(5));ctx.fillRect(s(21),s(9),s(5),s(5));}
-  // Mouth — même patron : l'humeur surcharge le choix de l'enfant, sinon rendu normal.
+}
+function drawMouth(ctx, s, { av, mouthPart, mood }){
+  // Même patron : l'humeur surcharge le choix de l'enfant, sinon rendu normal.
   ctx.fillStyle = mouthPart.color;
   if(mood==="happy"||mood==="proud"||mood==="equipped"){ // grand sourire
     ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));
@@ -108,24 +134,68 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   else if(av.mouth==="mo4"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillStyle="#FF88AA";ctx.fillRect(s(14),s(21),s(8),s(4));}
   else if(av.mouth==="mo6"){ctx.fillRect(s(10),s(18),s(16),s(2));ctx.fillRect(s(10),s(18),s(2),s(5));ctx.fillRect(s(24),s(18),s(2),s(5));}
   else{ctx.fillRect(s(11),s(18),s(14),s(3));}
-  // Body
+}
+function drawBody(ctx, s, { bodyColor }){
   ctx.fillStyle = bodyColor || "#4A90D9";
   ctx.fillRect(s(2),s(26),s(32),s(24));
-  // Outline
   ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
   ctx.strokeRect(s(2),s(26),s(32),s(24));
-  // Arms
+}
+function drawArms(ctx, s, { skinPart }){
   ctx.fillStyle = skinPart.color;
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
   ctx.fillRect(s(-2),s(28),s(6),s(14));
   ctx.fillRect(s(32),s(28),s(6),s(14));
   ctx.strokeRect(s(-2),s(28),s(6),s(14));
   ctx.strokeRect(s(32),s(28),s(6),s(14));
-  // Legs
+}
+function drawLegs(ctx, s){
   ctx.fillStyle="#1A3A8A";
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
   ctx.fillRect(s(6),s(50),s(12),s(14));
   ctx.fillRect(s(20),s(50),s(12),s(14));
   ctx.strokeRect(s(6),s(50),s(12),s(14));
   ctx.strokeRect(s(20),s(50),s(12),s(14));
+}
+
+// ─── Registre de couches, ordonné par plan z (arrière → avant) ───────────────
+// png:true = couche hybride (PNG /sprites/avatar/<partId>.png si chargé, sinon draw).
+// eyes/mouth/skin/body : JAMAIS de PNG — les humeurs/blink sont des surcharges
+// procédurales (des PNG par humeur × forme seraient des combos, interdit), et
+// peau/corps sont teintés dynamiquement (couleur choisie / thème joueur).
+// Cas cheveux : un PNG haN.png couvre arrière + dessus en une pièce, dessiné APRÈS
+// la tête ; la passe hairBack est alors sautée (géré dans la boucle).
+const AVATAR_LAYERS = [
+  { key:"hairBack", slot:"hair",  png:false, draw:drawHairBack },
+  { key:"head",     slot:"skin",  png:false, draw:drawHead },
+  { key:"hairTop",  slot:"hair",  png:true,  draw:drawHairTop },
+  { key:"eyes",     slot:"eyes",  png:false, draw:drawEyes },
+  { key:"mouth",    slot:"mouth", png:false, draw:drawMouth },
+  { key:"body",     slot:null,    png:false, draw:drawBody },
+  { key:"arms",     slot:"skin",  png:false, draw:drawArms },
+  { key:"legs",     slot:null,    png:false, draw:drawLegs },
+];
+
+// Render avatar to canvas (used both in-panel and in popup). SYNCHRONE — voir cache PNG.
+export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false, mood="neutral") {
+  const av = {...DEFAULT_AVATAR, ...avatarDef};
+  const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
+  const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
+  const mouthPart= AVATAR_PARTS.mouth.find(m=>m.id===av.mouth) || AVATAR_PARTS.mouth[0];
+  const hairPart = AVATAR_PARTS.hair.find(h=>h.id===av.hair) || AVATAR_PARTS.hair[0];
+  const sc = W/72; // scale factor
+  const s = (v) => Math.round(v*sc);
+  const layerCtx = { av, skinPart, eyePart, mouthPart, hairPart, bodyColor, blink, mood };
+
+  ctx.clearRect(0,0,W,H);
+  ctx.imageSmoothingEnabled = false; // pixel art net à toute échelle
+  const hairImg = getAvatarPng(av.hair);
+  for (const L of AVATAR_LAYERS) {
+    if (L.key==="hairBack" && hairImg) continue; // le PNG cheveux couvre les deux passes
+    const img = L.png ? getAvatarPng(av[L.slot]) : null;
+    if (img) ctx.drawImage(img, 0, 0, W, H);     // trame registrée 72 → échelle W
+    else L.draw(ctx, s, layerCtx);
+  }
 }
 
 // Inline avatar component (renders canvas) — clignement subtil des yeux (sauf mode calme)
@@ -134,10 +204,12 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
 export function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true, mood="neutral" }) {
   const canvasRef = useRef(null);
   const [blink, setBlink] = useState(false);
+  const [pngTick, setPngTick] = useState(0); // redessin ponctuel quand un PNG de pièce arrive
+  useEffect(()=> onAvatarPngLoaded(()=>setPngTick(t=>t+1)), []);
   useEffect(()=>{
     const c=canvasRef.current; if(!c)return;
     renderAvatarToCtx(c.getContext("2d"), avatarDef||DEFAULT_AVATAR, bodyColor, size, size, blink, mood);
-  },[avatarDef, bodyColor, size, blink, mood]);
+  },[avatarDef, bodyColor, size, blink, mood, pngTick]);
   useEffect(()=>{
     if(!animate || CALM) return; // pas de clignement en mode calme
     let t, stop=false;
