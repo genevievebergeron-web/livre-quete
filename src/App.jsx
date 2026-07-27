@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.6.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.1", date:"2026-07-26", features:[
+    "🗓️ La vue Semaine s'affiche maintenant en COLONNES, comme un vrai calendrier — un jour par colonne avec tes quêtes et tes événements! Glisse de gauche à droite pour voir les 7 prochains jours. Tu préfères l'ancienne liste? Le bouton 📋 Liste est juste à côté, et ton choix est retenu.",
+  ]},
   { version:"2.6.0", date:"2026-07-26", features:[
     "🕊️ NOUVEAU : les quêtes de réparation! Après un moment difficile entre vous, un parent peut proposer une quête commune (faire la paix, s'entraider…). Quand CHACUN l'a faite, quelque chose de spécial arrive : le boss recule de 50 PV — ou toute l'équipe reçoit +10 🪙 s'il n'y a pas de boss. Parce que réparer ensemble, c'est la plus grande force d'une famille.",
   ]},
@@ -2492,8 +2495,65 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
       </>)}
       {homeTab==="sem" && (<>
-      {/* Tâches planifiées (pas aujourd'hui) — accordéon replié par défaut (vue Semaine) */}
-      {pMode==="week" && laterWeek.length>0 && (
+      {/* v2.6.1 — Vue Semaine en colonnes (comme un calendrier papier), demandée par Gen.
+          Toggle 🗓️/📋 persisté PAR ENFANT (settings.weekCols, défaut colonnes) — repères stables :
+          l'ancienne liste reste à un tap. 7 colonnes = les 7 prochains jours à partir d'AUJOURD'HUI,
+          défilement horizontal avec snap (téléphone), aujourd'hui encadré à l'accent du thème. */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#85CDD1"}}>📅 MA SEMAINE</div>
+        <div style={{display:"flex",gap:4}}>
+          {[["cols","🗓️ Colonnes"],["liste","📋 Liste"]].map(([v,l])=>{
+            const active = (settings.weekCols!==false) === (v==="cols");
+            return <button key={v} onClick={()=>{ SFX.click&&SFX.click(); onPatchState&&onPatchState({settings:{...settings, weekCols:v==="cols"}}); }}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"#777",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
+          })}
+        </div>
+      </div>
+      {settings.weekCols!==false && (
+        <div style={{display:"flex",gap:6,overflowX:"auto",scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",paddingBottom:6,marginTop:4}}>
+          {Array.from({length:7},(_,k)=>{
+            const dt=new Date(); dt.setDate(dt.getDate()+k);
+            // stamp en date LOCALE (jamais toISOString — leçon v2.5.24)
+            const stamp=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+            const dIdx=(dt.getDay()+6)%7;
+            const dayTasks=weekMine.filter(a=>Array.isArray(a.days)&&a.days.includes(dIdx)&&(!a.oneDay||a.oneDay===stamp));
+            const dayEvents=(pState.calendar||[]).filter(e=> e.recur?.freq==="daily" ? true : e.recur?.freq==="weekly" ? e.recur.day===dIdx : e.date===stamp);
+            const isToday=k===0;
+            const acc=th.accent||player.color;
+            const MAXT=5, MAXE=4;
+            return (
+              <div key={stamp} style={{flex:"0 0 auto",width:138,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${acc}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
+                {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
+                {dayTasks.length===0 && dayEvents.length===0 && (
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:4}}>🌿 Libre</div>
+                )}
+                {dayTasks.slice(0,MAXT).map(a=>{
+                  const t=allTasks.find(x=>x.id===a.taskId); if(!t) return null;
+                  const doneKey=a.instanceId+"_"+player.id+"#"+stamp;
+                  const done=isToday && ((pState.completed||[]).includes(doneKey)||(pState.pending||[]).includes(doneKey));
+                  return (
+                    <div key={a.instanceId} style={{display:"flex",alignItems:"flex-start",gap:4,marginTop:4,opacity:done?0.45:1}}>
+                      <span style={{fontSize:12,lineHeight:"14px"}}>{done?"✓":t.emoji}</span>
+                      <span style={{fontFamily:"'VT323',monospace",fontSize:14,lineHeight:"14px",color:"#ccc",textDecoration:done?"line-through":"none",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{t.label}</span>
+                    </div>
+                  );
+                })}
+                {dayTasks.length>MAXT && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:3}}>+{dayTasks.length-MAXT} autres quêtes</div>}
+                {dayEvents.slice(0,MAXE).map(e=>(
+                  <div key={e.id} style={{display:"flex",alignItems:"flex-start",gap:4,marginTop:4,paddingTop:4,borderTop:dayTasks.length?"1px dashed #2a2a2a":"none"}}>
+                    <span style={{fontSize:12,lineHeight:"14px"}}>{calEventIcon(e)}</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,lineHeight:"14px",color:"#85CDD1",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical"}}>{e.label}</span>
+                  </div>
+                ))}
+                {dayEvents.length>MAXE && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:3}}>+{dayEvents.length-MAXE} autres</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {/* Tâches planifiées (pas aujourd'hui) — accordéon replié par défaut (vue Semaine, mode Liste) */}
+      {settings.weekCols===false && pMode==="week" && laterWeek.length>0 && (
         <div style={{marginTop:6}}>
           <button onClick={()=>{ if(SFX.click)SFX.click(); setLaterOpen(o=>!o); }}
             style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
