@@ -166,5 +166,17 @@ def main():
         layer = diff_layer(load(f"{src}.png"), base, region=(30, 100, 115, 144))  # zone pieds
         save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
 
+def faces_extra():
+    """Choix d'yeux (ey2-ey6) et de bouches (mo2-mo6) — retour des enfants : « les yeux
+    et les bouches ne changent pas » en mode détaillé. ey1/mo1 = visage neutre de la base."""
+    base = load("base.png")
+    for i in range(2, 7):
+        layer = diff_layer(load(f"eye_ey{i}.png"), base, region=(40, 16, 104, 44))
+        save(layer, f"ey{i}.png"); save(kidify(layer), f"ey{i}_e.png")
+    for i in range(2, 7):
+        layer = diff_layer(load(f"mouth_mo{i}.png"), base, region=(40, 38, 104, 60))
+        save(layer, f"mo{i}.png"); save(kidify(layer), f"mo{i}_e.png")
+
 if __name__ == "__main__":
     main()
+    faces_extra()

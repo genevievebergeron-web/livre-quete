@@ -77,13 +77,17 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
           </div>
           {partTab==="skin" && (
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-              {AVATAR_PARTS.skin.map(s=>(
-                <div key={s.id} onClick={()=>update("skin",s.id)}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.skin===s.id?s.color:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:avatarDef.skin===s.id?`0 0 10px ${s.color}80`:"none"}}>
-                  <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #0d0d0d"}}/>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{s.label}</span>
+              {AVATAR_PARTS.skin.map(s=>{
+                // Peaux à débloquer : verrouillées tant que l'item usk* n'est pas acheté en Boutique.
+                const locked = s.unlock && !pState.owned?.includes(s.unlock);
+                return (
+                <div key={s.id} onClick={()=>{ if(locked) return; update("skin",s.id); }}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.skin===s.id?s.color:"#333"}`,borderRadius:5,cursor:locked?"default":"pointer",opacity:locked?0.45:1,boxShadow:avatarDef.skin===s.id?`0 0 10px ${s.color}80`:"none"}}>
+                  <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #0d0d0d",filter:locked?"grayscale(0.6)":"none"}}/>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{locked?"🔒 ":""}{s.label}</span>
+                  {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#777"}}>Boutique ✨</span>}
                 </div>
-              ))}
+              );})}
             </div>
           )}
           {partTab==="eyes" && (

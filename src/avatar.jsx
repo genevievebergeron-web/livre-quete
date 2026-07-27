@@ -18,6 +18,12 @@ export const AVATAR_PARTS = {
     {id:"sk3",label:"Brun",   color:"#C07840"}, {id:"sk4",label:"Foncé",  color:"#7B4A20"},
     {id:"sk5",label:"Azur",   color:"#99CCFF"}, {id:"sk6",label:"Vert",   color:"#88CC88"},
     {id:"sk7",label:"Rose",   color:"#FFAACC"}, {id:"sk8",label:"Violet", color:"#CC88FF"},
+    // Peaux à DÉBLOQUER (suggestion des enfants 2026-07-27) : achetables en Boutique
+    // (item `unlock` dans owned[]). Zéro asset requis — la re-teinte runtime fait tout.
+    {id:"sk9", label:"Or",     color:"#E8C34A", unlock:"usk9"},
+    {id:"sk10",label:"Zombie", color:"#8FAE7B", unlock:"usk10"},
+    {id:"sk11",label:"Lave",   color:"#E85A30", unlock:"usk11"},
+    {id:"sk12",label:"Glace",  color:"#BFE8F5", unlock:"usk12"},
   ],
   eyes: [
     {id:"ey1",emoji:"👀",label:"Normal",    eyeColor:"#333",  eyeShape:"round"},
@@ -334,6 +340,10 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
       ctx.drawImage(body, 0, 0, W, H);                                 // corps re-teint
       if (av.extra && !av.extra.endsWith("0")) draw(av.extra + sfx);  // cornes/tentacules
       if (av.hair)                             draw(av.hair + sfx);   // chevelure
+      // Choix d'yeux/bouche (retour des enfants : « ils ne changent pas ») — surcouches
+      // v2 ; ey1/mo1 = visage neutre de la base. L'humeur garde le dernier mot.
+      if (av.eyes  && av.eyes  !== "ey1")      draw(av.eyes + sfx);
+      if (av.mouth && av.mouth !== "mo1")      draw(av.mouth + sfx);
       if (mood && mood !== "neutral")          draw(`face_${mood}${sfx}`); // humeur
       if (av.shoes && !av.shoes.endsWith("0")) draw(av.shoes + sfx);  // souliers
       return;

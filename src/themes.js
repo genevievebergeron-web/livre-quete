@@ -742,8 +742,14 @@ export const BASE_SHOP_ITEMS = {
   armors:[{id:"a1",emoji:"🛡️",name:"Bouclier",cost:15,slot:"armor"},{id:"a2",emoji:"⚔️",name:"Épée",cost:20,slot:"armor"},{id:"a3",emoji:"🏹",name:"Arc en or",cost:35,slot:"armor"},{id:"a4",emoji:"💎",name:"Armure diamant",cost:50,slot:"armor"},{id:"a5",emoji:"🪄",name:"Bâton magique",cost:30,slot:"armor"},{id:"a6",emoji:"🧻",name:"Armure de papier de toilette",cost:25,slot:"armor"},{id:"a7",emoji:"🗒️",name:"Armure de post-it",cost:20,slot:"armor"},{id:"a8",emoji:"🛡️",name:"Armure de chevalier",cost:45,slot:"armor"},{id:"a9",emoji:"🥇",name:"Armure royale dorée",cost:60,slot:"armor"}],
   pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"},{id:"pet_duck",emoji:"🦆",name:"Canard jaune",cost:20,slot:"pet"},{id:"pet_worm",emoji:"🪱",name:"Ver de terre",cost:15,slot:"pet"},{id:"pet_capy",emoji:"🦫",name:"Capybara",cost:40,slot:"pet"},{id:"pet_bee",emoji:"🐝",name:"Abeille",cost:25,slot:"pet"},{id:"pet_spider",emoji:"🕷️",name:"Araignée",cost:30,slot:"pet"}],
 };
+BASE_SHOP_ITEMS.skins=[
+  {id:"usk9", emoji:"✨",name:"Peau d'or",     cost:50,slot:"skin"},
+  {id:"usk10",emoji:"🧟",name:"Peau de zombie",cost:35,slot:"skin"},
+  {id:"usk11",emoji:"🌋",name:"Peau de lave",  cost:60,slot:"skin"},
+  {id:"usk12",emoji:"🧊",name:"Peau de glace", cost:45,slot:"skin"},
+];
 export const ALL_SHOP_ITEMS = [
-  ...BASE_SHOP_ITEMS.hats, ...BASE_SHOP_ITEMS.armors, ...BASE_SHOP_ITEMS.pets,
+  ...BASE_SHOP_ITEMS.hats, ...BASE_SHOP_ITEMS.armors, ...BASE_SHOP_ITEMS.pets, ...BASE_SHOP_ITEMS.skins,
   ...PT_LIST.flatMap(t => t.shopCategory?.items || []),
 ];
 export const shopItemById = (id) => ALL_SHOP_ITEMS.find(i => i.id === id);

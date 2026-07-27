@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx } from "./pets.js";
 import { rarityOf } from "./catalog.js";
-import { renderAvatarToCtx, isDetailedReady } from "./avatar.jsx";
+import { renderAvatarToCtx, isDetailedReady, onAvatarPngLoaded } from "./avatar.jsx";
 
 // v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
 export function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary=false, style={} }) {
@@ -84,6 +84,11 @@ function FullFrameArmor({ id, sfx, size }){
 // `avatarDef` (optionnel) : active les ancres v2 + les armures pleine-trame quand le
 // personnage détaillé est chargé pour cette silhouette. Sans lui : comportement v1.
 export function EquippedGear({ eq, items, size, avatarDef=null }) {
+  // Bug prod (Antoinou, casque décalé) : au premier rendu le corps détaillé n'est pas
+  // encore chargé → ancres v1 sur un corps v2 sans repositionnement. On se réabonne au
+  // chargement des PNG pour recalculer les ancres dès que le mode détaillé est prêt.
+  const [, setTick] = useState(0);
+  useEffect(()=> onAvatarPngLoaded(()=>setTick(t=>t+1)), []);
   if (!eq) return null;
   const find = id => items.find(i=>i.id===id);
   const det = avatarDef ? isDetailedReady(avatarDef) : false;

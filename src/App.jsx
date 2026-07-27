@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.12.2";
+const APP_VERSION = "2.13.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.13.0", date:"2026-07-27", features:[
+    "👀 Tes YEUX et ta BOUCHE changent maintenant sur ton nouveau perso : lunettes fumées, yeux étoiles, yeux de chat, yeux d'alien, sourire, langue, bouche zippée…",
+    "✨ Nouvelles PEAUX à débloquer dans la Boutique (onglet Peaux) : Or, Zombie, Lave et Glace!",
+    "🔧 Réparations : le casque n'est plus décalé de la tête, le familier n'est plus géant dans ta maison, et ton héros est plus grand dans sa chambre.",
+  ]},
   { version:"2.12.2", date:"2026-07-27", features:[
     "🎉 Correction : la notification « bravo, quête complétée! » pouvait revenir sans arrêt pour un même enfant — c'est réglé, elle ne repasse plus une fois vue.",
   ]},
@@ -1874,7 +1879,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const _allDoneToday = myAssignments.length>0 && myAssignments.every(a=>pState.completed?.includes(_todayDoneKey(a)));
   const dashboardMood = avatarMood!=="neutral" ? avatarMood : (new Date().getHours()>=19 && _allDoneToday ? "tired" : "neutral");
   const themedCat = pt.shopCategory;
-  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", skins:"✨ Peaux", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
   // Ma maison (2026-07-27) — items déco visibles : génériques + ceux du thème ACTIF seulement
   const decoItems = decoForTheme(player.themeId||"none");
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
@@ -2924,7 +2929,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
             {(SHOP_ITEMS[shopTab] || (shopTab==="deco" ? decoItems : shopTab===themedCat.id ? themedCat.items : []) || []).map(item=>{
               const owned=pState.owned?.includes(item.id);
-              const isDeco=item.slot==="deco"; // Ma maison : jamais "équipé", se place dans Mon Perso
+              const isDeco=item.slot==="deco"||item.slot==="skin"; // déco + déblocage de peau : jamais « équipé », se gère dans Mon Perso
               const equipped=!isDeco && eq[item.slot]===item.id;
               const iPrice=priceOf(item);
               const canAfford=pState.coins>=iPrice;
@@ -2940,7 +2945,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
                     : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?(isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
                 </div>
               );
             })}

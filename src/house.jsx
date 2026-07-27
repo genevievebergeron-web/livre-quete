@@ -119,7 +119,9 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) 
       })}
       {/* L'enfant, debout sur le plancher, avec son familier. Taille bornée par la HAUTEUR
           de la scène (sinon l'avatar déborde en format bannière large). */}
-      {(()=>{ const avSz = Math.round(Math.min(width*0.30, H*0.62)); return (<>
+      {/* Échelles retours Gen (prod 2026-07-27) : perso plus présent (« humain rétréci »),
+          familier ~1/3 du perso (« immense »). */}
+      {(()=>{ const avSz = Math.round(Math.min(width*0.38, H*0.80)); return (<>
       <div style={{position:"absolute",left:"50%",bottom:Math.round(floorH*0.12),transform:"translateX(-50%)"}}>
         <div style={{position:"relative"}}>
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={avSz}/>
@@ -128,7 +130,7 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) 
       </div>
       {(pState.equipped?.pet && petSpriteKey(pState.equipped.pet)) &&
         <div style={{position:"absolute",left:"64%",bottom:Math.round(floorH*0.10),pointerEvents:"none"}}>
-          <PetSprite itemId={pState.equipped.pet} size={Math.round(avSz*0.48)}/>
+          <PetSprite itemId={pState.equipped.pet} size={Math.round(avSz*0.30)}/>
         </div>}
       </>);})()}
     </div>
