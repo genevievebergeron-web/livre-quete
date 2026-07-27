@@ -55,8 +55,9 @@ const SCOPES=[
   ["reusable","🔁 Juste pour moi, à chaque fois","Elle reste dispo pour toi seulement"],
   ["propose","🧑‍🤝‍🧑 Proposer à toute la famille","Un parent doit l'approuver d'abord"],
 ];
+const TIMES_OF_DAY=[["","🕐 N'importe quand"],["matin","🌅 Matin"],["après-midi","☀️ Après-midi"],["soir","🌙 Soir"]];
 export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer", onCreate, onClose, th, scopeOptions=false }){
-  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium"); const [scope,setScope]=useState("once");
+  const [label,setLabel]=useState(""); const [emoji,setEmoji]=useState("⭐"); const [diff,setDiff]=useState("medium"); const [scope,setScope]=useState("once"); const [timeOfDay,setTimeOfDay]=useState("");
   const acc=th?.accent||"#D9BC5C";
   const DIFFS=[["easy","🟢 Facile","+10 XP · 5 🪙"],["medium","🟡 Moyen","+20 XP · 10 🪙"],["hard","🔴 Difficile","+40 XP · 20 🪙"]];
   return (
@@ -85,6 +86,17 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
         ))}
       </div>
       {scopeOptions && (<>
+        {/* v2.11.2 — moment de la journée, seulement affiché côté enfant (les définitions créées
+            côté parent n'ont pas encore d'assignation, donc pas de moment pertinent à ce stade). */}
+        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>À quel moment?</div>
+        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+          {TIMES_OF_DAY.map(([k,l])=>(
+            <button key={k||"any"} onClick={()=>{SFX.click();setTimeOfDay(k);}}
+              style={{flex:"1 1 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 6px",background:timeOfDay===k?acc:"#1a1a1a",color:timeOfDay===k?"#0d0d0d":"#999",border:`2px solid ${timeOfDay===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+              {l}
+            </button>
+          ))}
+        </div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>C'est pour qui?</div>
         <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
           {SCOPES.map(([k,l,sub])=>(
@@ -97,7 +109,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
       </>)}
       <div style={{display:"flex",gap:8}}>
         <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
-        <button className="btn-press" disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff,...(scopeOptions?{scope}:{})}); } }}
+        <button className="btn-press" disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff,...(scopeOptions?{scope,timeOfDay}:{})}); } }}
           style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>
           ✅ {confirmLabel}
         </button>

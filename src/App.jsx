@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.11.1";
+const APP_VERSION = "2.11.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.11.2", date:"2026-07-27", features:[
+    "☀️ « Ma journée » (mode Semaine) trie maintenant tes quêtes par moment : 🌅 Matin, ☀️ Après-midi, 🌙 Soir — plus facile de voir quoi faire quand!",
+    "🕐 Quand tu crées ta propre quête, tu peux maintenant choisir à quel moment de la journée elle se fait.",
+  ]},
   { version:"2.11.1", date:"2026-07-27", features:[
     "🍱 Nouvelles tâches : défaire sa boîte à lunch et en préparer une vide, du lundi au jeudi.",
     "🔧 Correction : certains rituels restaient vides (une tâche qu'ils contenaient avait changé) — ils se nettoient maintenant tout seuls automatiquement.",
@@ -2568,7 +2572,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const undoneAll = myAssignments.filter(a=>!_done(a)); // v1.88.0 — nommé pour réutilisation (D'abord→Ensuite)
         const list = settings.focus ? undoneAll.slice(0,1) : undoneAll; // v1.60.0 — les quêtes validées quittent la liste → Archives
         if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#5CAD68",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
-        const cards = list.map(renderCard);
+        // v2.11.2 — « Ma journée » sectionnée Matin/Après-midi/Soir en mode Semaine (pas en mode
+        // Rituel : les rituels ont déjà leurs propres noms temporels, ni en mode focus : 1 seule
+        // carte, rien à sectionner). Réparation reste hors sections, toujours en tête (patron v2.6.0).
+        const cards = (pMode==="week" && !settings.focus) ? (()=>{
+          const repairCards = list.filter(a=>a.repair).map(renderCard);
+          const rest = list.filter(a=>!a.repair);
+          const sections = [
+            {key:"matin", label:"🌅 Matin", items:rest.filter(a=>a.time==="matin")},
+            {key:"apm", label:"☀️ Après-midi", items:rest.filter(a=>a.time==="après-midi")},
+            {key:"soir", label:"🌙 Soir", items:rest.filter(a=>a.time==="soir")},
+            {key:"autres", label:"🕐 Autres moments", items:rest.filter(a=>a.time!=="matin"&&a.time!=="après-midi"&&a.time!=="soir")},
+          ].filter(s=>s.items.length>0);
+          const out=[...repairCards];
+          sections.forEach(s=>{
+            out.push(<div key={"sec-"+s.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:th.accent||"#888",marginTop:10,marginBottom:2}}>{s.label}</div>);
+            out.push(...s.items.map(renderCard));
+          });
+          return out;
+        })() : list.map(renderCard);
         // v1.88.0 (Lot 3 #14) — "D'abord → Ensuite" : en mode focus (une tâche à la fois), montre
         // ce qui vient après — prévisibilité utile pour TSA/TDAH (savoir à quoi s'attendre).
         if(settings.focus && undoneAll.length>1){
@@ -3371,6 +3393,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [momentDates, setMomentDates] = useState({}); // v2.6.2 — {momentId: "YYYY-MM-DD"} brouillon de date avant "Prévu pour…"
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
+  const [addTime, setAddTime] = useState(""); // v2.11.2 — moment de la journée (sectionnement "Ma journée")
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
@@ -3607,7 +3630,17 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 </div>
               </div>
             ); })()}
-            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)){ onAddAssignment(addTaskId,addPlayerIds,addType,addDays); setAddTaskId(""); } }}
+            {/* v2.11.2 — moment de la journée (sectionnement "Ma journée" côté enfant) */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>MOMENT DE LA JOURNÉE?</div>
+            <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
+              {[["","🕐 N'importe quand"],["matin","🌅 Matin"],["après-midi","☀️ Après-midi"],["soir","🌙 Soir"]].map(([k,l])=>(
+                <button key={k||"any"} onClick={()=>{SFX.click();setAddTime(k);}}
+                  style={{flex:"1 1 auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"7px 5px",background:addTime===k?"#D99248":"#1a1a1a",color:addTime===k?"#0d0d0d":"#888",border:`2px solid ${addTime===k?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <PBtn onClick={()=>{ if(addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)){ onAddAssignment(addTaskId,addPlayerIds,addType,addDays,addTime); setAddTaskId(""); } }}
               color={addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?"#D99248":"#333"} textColor="#0d0d0d" style={{width:"100%",opacity:addTaskId&&addPlayerIds.length&&(addType!=="week"||addDays.length)?1:0.5,marginBottom:8}}>
               ➕ Ajouter {addType==="week"?`(${addDays.length} jour${addDays.length>1?"s":""}/sem.)`:"(rituel)"}
             </PBtn>
@@ -6076,11 +6109,11 @@ export default function App() {
 
   // ── Gestion des tâches depuis le portail parent ──────────
   // Ajoute une tâche pour chaque joueur coché (copies indépendantes, comme le wizard)
-  const handleAddAssignment = useCallback((taskId, playerIds, assType, customDays)=>{
+  const handleAddAssignment = useCallback((taskId, playerIds, assType, customDays, time)=>{
     if(!taskId||!playerIds?.length)return;
     // assType: "week" → tâche planifiée (jours choisis = récurrence hebდo par jour); sinon → routine (sans jour)
     const days = assType==="week" ? ((Array.isArray(customDays)&&customDays.length)?[...customDays].sort((a,b)=>a-b):[0,1,2,3,4]) : [];
-    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:"",createdAt:Date.now()}));
+    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:time||"",createdAt:Date.now()}));
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
@@ -6320,7 +6353,7 @@ export default function App() {
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",createdAt:Date.now(),
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:data.timeOfDay||"",createdAt:Date.now(),
       ...(scope==="reusable"?{}:{oneDay:todayStamp()})}; // v2.5.10 — portée A seulement : à usage unique (nettoyée après aujourd'hui)
     const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
     const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
