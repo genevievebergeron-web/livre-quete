@@ -56,8 +56,27 @@ def align(variant, base):
         return out
     return variant
 
-def diff_layer(variant, base, region=None):
-    """Pixels de `variant` qui diffèrent de `base` → couche transparente."""
+def despeckle(layer):
+    """Retire les pixels isolés (résidus de dérive des éditions) : un pixel opaque
+    doit avoir ≥2 voisins opaques pour survivre."""
+    px = layer.load(); w, h = layer.size
+    kill = []
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] > 40:
+                n = sum(1 for dx, dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1),(1,-1),(-1,1))
+                        if 0 <= x+dx < w and 0 <= y+dy < h and px[x+dx, y+dy][3] > 40)
+                if n < 2: kill.append((x, y))
+    for x, y in kill: px[x, y] = (0, 0, 0, 0)
+    return layer
+
+FACE_BOX = (46, 12, 100, 54)  # zone visage/tête de la base ado — exclue des pièces non-visage
+
+def diff_layer(variant, base, region=None, exclude_face=False):
+    """Pixels de `variant` qui diffèrent de `base` → couche transparente.
+    exclude_face : les éditions dérivent subtilement quelques pixels du visage →
+    « visage fantôme » dans les couches armure/dos/extras (bug confirmé par Gen sur
+    la pile enfant). On exclut la boîte visage de ces couches-là."""
     variant = align(variant, base)
     out = Image.new("RGBA", base.size, (0, 0, 0, 0))
     bp, vp, op = base.load(), variant.load(), out.load()
@@ -65,11 +84,13 @@ def diff_layer(variant, base, region=None):
     x0, y0, x1, y1 = region or (0, 0, w, h)
     for y in range(y0, y1):
         for x in range(x0, x1):
+            if exclude_face and FACE_BOX[0] <= x < FACE_BOX[2] and FACE_BOX[1] <= y < FACE_BOX[3]:
+                continue
             b, v = bp[x, y], vp[x, y]
             if abs(b[0]-v[0]) + abs(b[1]-v[1]) + abs(b[2]-v[2]) + abs(b[3]-v[3]) > TOL:
                 if v[3] > 40:  # on ne copie que les pixels PRÉSENTS dans la variante
                     op[x, y] = v
-    return out
+    return despeckle(out)
 
 def recolor(layer, target):
     """Recolore une couche (cheveux) vers `target` en préservant la luminance relative."""
@@ -126,19 +147,19 @@ def main():
     # bk1 = ailes PLUMÉES (Gen a remplacé les ailes de fée, 2026-07-27 — 4 garçons) ;
     # bk2 = ailes de dragon/chauve-souris ; bk3 = cape. back_fairy.png reste en _raw (archive).
     for src, out in [("back_feather","bk1"),("back_dragon","bk2"),("back_cape","bk3")]:
-        layer = diff_layer(load(f"{src}.png"), base)
+        layer = diff_layer(load(f"{src}.png"), base, exclude_face=True)
         save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
 
     # Extras (nouveau slot d'identité xt, demande Gen) : cornes de démon + queue, tentacules.
     # (bras supplémentaires : génération échouée, à reprendre)
     for src, out in [("extra_horns","xt1"),("extra_tentacles","xt2")]:
-        layer = diff_layer(load(f"{src}.png"), base)
+        layer = diff_layer(load(f"{src}.png"), base, exclude_face=True)
         save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
 
     # Armures ÉQUIPÉES (items de boutique a6-a9) : couche portée en mode détaillé,
     # repli emoji à l'ancre "armor" pour le moteur v1.
     for src, out in [("armor_tp","a6"),("armor_postit","a7"),("armor_knight","a8"),("armor_gold","a9")]:
-        layer = diff_layer(load(f"{src}.png"), base)
+        layer = diff_layer(load(f"{src}.png"), base, exclude_face=True)
         save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
 
     for src, out in [("shoes_sneakers","sh1"),("shoes_boots","sh2"),("shoes_dress","sh3"),("shoes_slippers","sh4")]:
