@@ -123,7 +123,21 @@ def main():
         h = hair if ha == "ha1" else recolor(hair, col)
         save(h, f"{ha}.png"); save(kidify(h), f"{ha}_e.png")
 
-    for src, out in [("back_fairy","bk1"),("back_dragon","bk2"),("back_cape","bk3")]:
+    # bk1 = ailes PLUMÉES (Gen a remplacé les ailes de fée, 2026-07-27 — 4 garçons) ;
+    # bk2 = ailes de dragon/chauve-souris ; bk3 = cape. back_fairy.png reste en _raw (archive).
+    for src, out in [("back_feather","bk1"),("back_dragon","bk2"),("back_cape","bk3")]:
+        layer = diff_layer(load(f"{src}.png"), base)
+        save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
+
+    # Extras (nouveau slot d'identité xt, demande Gen) : cornes de démon + queue, tentacules.
+    # (bras supplémentaires : génération échouée, à reprendre)
+    for src, out in [("extra_horns","xt1"),("extra_tentacles","xt2")]:
+        layer = diff_layer(load(f"{src}.png"), base)
+        save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
+
+    # Armures ÉQUIPÉES (items de boutique a6-a9) : couche portée en mode détaillé,
+    # repli emoji à l'ancre "armor" pour le moteur v1.
+    for src, out in [("armor_tp","a6"),("armor_postit","a7"),("armor_knight","a8"),("armor_gold","a9")]:
         layer = diff_layer(load(f"{src}.png"), base)
         save(layer, f"{out}.png"); save(kidify(layer), f"{out}_e.png")
 
