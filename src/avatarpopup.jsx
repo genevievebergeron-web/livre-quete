@@ -20,7 +20,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
   const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id));
   const eq = pState.equipped || {};
 
-  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux"};
+  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers"};
 
   const update = (part, id) => { SFX.click(); onUpdateAvatar({...avatarDef,[part]:id}); };
 
@@ -115,6 +115,22 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                   <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc"}}>{h.label}</span>
                 </div>
               ))}
+            </div>
+          )}
+          {/* Refonte avatar 2026-07-27 — nouveaux slots gratuits (option "Aucun" en premier) */}
+          {(partTab==="back"||partTab==="shoes") && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+              {AVATAR_PARTS[partTab].map(p=>{
+                const sel = avatarDef[partTab]===p.id || (!avatarDef[partTab] && p.id.endsWith("0"));
+                const col = p.color || "#888";
+                return (
+                  <div key={p.id} onClick={()=>update(partTab,p.id)}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:sel?`${col}30`:"rgba(0,0,0,0.4)",border:`3px solid ${sel?col:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:sel&&p.color?`0 0 10px ${col}60`:"none"}}>
+                    <span style={{fontSize:26}}>{p.emoji}</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{p.label}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </>}

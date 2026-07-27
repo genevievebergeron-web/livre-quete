@@ -45,9 +45,25 @@ export const AVATAR_PARTS = {
     {id:"ha7",emoji:"🔵",label:"Bleu",         color:"#2244AA",style:"short"},
     {id:"ha8",emoji:"🩷",label:"Rose",         color:"#FF69B4",style:"short"},
   ],
+  // Refonte avatar 2026-07-27 (validé avec Gen) — nouveaux slots d'identité gratuits.
+  // Id *0 = "Aucun" (défaut, aucune couche dessinée, jamais de fetch PNG).
+  // Pas de slot "accessoires de tête" : les chapeaux/visages ÉQUIPÉS couvrent déjà ça.
+  back: [ // couche ARRIÈRE, derrière tout le personnage
+    {id:"bk0",emoji:"🚫",label:"Aucun"},
+    {id:"bk1",emoji:"🦋",label:"Ailes de fée",    color:"#B48CD9"},
+    {id:"bk2",emoji:"🦇",label:"Ailes de dragon", color:"#7A4A9E"},
+    {id:"bk3",emoji:"🧣",label:"Cape",            color:"#B0413E"},
+  ],
+  shoes: [ // par-dessus le bas des jambes (y59-64)
+    {id:"sh0",emoji:"🚫",label:"Aucun"},
+    {id:"sh1",emoji:"👟",label:"Baskets",   color:"#C8524A"},
+    {id:"sh2",emoji:"🥾",label:"Bottes",    color:"#7B5230"},
+    {id:"sh3",emoji:"👞",label:"Souliers",  color:"#3A6EA5"},
+    {id:"sh4",emoji:"🩰",label:"Pantoufles",color:"#E8A0C8"},
+  ],
 };
 
-export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
+export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1", back:"bk0", shoes:"sh0" };
 
 // Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`,
 // jamais de sprite sheet. L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
@@ -79,6 +95,40 @@ export function onAvatarPngLoaded(cb){ _pngListeners.add(cb); return ()=>_pngLis
 // ─── Fonctions de tracé procédural (repli) — repère natif 72 unités ──────────
 // Géométrie = CONTRAT partagé avec AVATAR_EQUIP_ANCHORS (sprites.jsx) :
 // tête x3-33 y2-24 (centre x18), corps x2-34 y26-50, bras x-2..38, jambes y50-64.
+function drawBack(ctx, s, { backPart }){
+  // Couche arrière. ⚠️ La silhouette (tête x3-33, corps x2-34, bras x-2..38, jambes
+  // x6-32 y50-64) recouvre presque tout — les zones qui restent VISIBLES derrière sont :
+  // pointes hautes à droite (x33-40 y10-26), fines colonnes latérales (x0-2 / x34-40),
+  // et les évasements du bas de chaque côté des jambes (x0-6 / x32-40, y50-58).
+  ctx.fillStyle = backPart.color;
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
+  if(backPart.id==="bk3"){ // cape : pan derrière le corps qui dépasse sur les côtés et en bas
+    ctx.fillRect(s(0),s(24),s(40),s(32));
+    ctx.strokeRect(s(0),s(24),s(40),s(32));
+  } else { // ailes : colonnes latérales + évasements bas visibles des deux côtés
+    ctx.fillRect(s(0),s(28),s(2),s(24));   // colonne gauche (sliver)
+    ctx.fillRect(s(34),s(24),s(6),s(28));  // colonne droite
+    ctx.fillRect(s(0),s(50),s(6),s(7));    // évasement bas gauche
+    ctx.fillRect(s(32),s(50),s(8),s(7));   // évasement bas droit
+    if(backPart.id==="bk1"){ // fée : pointe haute arrondie côté droit + nub gauche
+      ctx.fillRect(s(34),s(14),s(5),s(10)); ctx.fillRect(s(0),s(22),s(3),s(6));
+    } else { // dragon : pointes basses anguleuses
+      ctx.fillRect(s(36),s(54),s(4),s(5)); ctx.fillRect(s(0),s(55),s(4),s(4));
+    }
+    ctx.strokeRect(s(34),s(24),s(6),s(28));
+    ctx.strokeRect(s(0),s(50),s(6),s(7));
+    ctx.strokeRect(s(32),s(50),s(8),s(7));
+  }
+}
+function drawShoes(ctx, s, { shoesPart }){
+  // Par-dessus le bas des jambes (jambes x6-18 / x20-32, y50-64) + bout de pied.
+  ctx.fillStyle = shoesPart.color;
+  ctx.strokeStyle="#0d0d0d"; ctx.lineWidth=1;
+  ctx.fillRect(s(4),s(59),s(14),s(5));
+  ctx.fillRect(s(20),s(59),s(14),s(5));
+  ctx.strokeRect(s(4),s(59),s(14),s(5));
+  ctx.strokeRect(s(20),s(59),s(14),s(5));
+}
 function drawHairBack(ctx, s, { hairPart }){
   ctx.fillStyle = hairPart.color;
   ctx.fillRect(s(3),s(0),s(30),s(8));
@@ -166,6 +216,7 @@ function drawLegs(ctx, s){
 // Cas cheveux : un PNG haN.png couvre arrière + dessus en une pièce, dessiné APRÈS
 // la tête ; la passe hairBack est alors sautée (géré dans la boucle).
 const AVATAR_LAYERS = [
+  { key:"back",     slot:"back",  png:true,  draw:drawBack },
   { key:"hairBack", slot:"hair",  png:false, draw:drawHairBack },
   { key:"head",     slot:"skin",  png:false, draw:drawHead },
   { key:"hairTop",  slot:"hair",  png:true,  draw:drawHairTop },
@@ -174,6 +225,7 @@ const AVATAR_LAYERS = [
   { key:"body",     slot:null,    png:false, draw:drawBody },
   { key:"arms",     slot:"skin",  png:false, draw:drawArms },
   { key:"legs",     slot:null,    png:false, draw:drawLegs },
+  { key:"shoes",    slot:"shoes", png:true,  draw:drawShoes },
 ];
 
 // Render avatar to canvas (used both in-panel and in popup). SYNCHRONE — voir cache PNG.
@@ -183,15 +235,18 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
   const mouthPart= AVATAR_PARTS.mouth.find(m=>m.id===av.mouth) || AVATAR_PARTS.mouth[0];
   const hairPart = AVATAR_PARTS.hair.find(h=>h.id===av.hair) || AVATAR_PARTS.hair[0];
+  const backPart = AVATAR_PARTS.back.find(b=>b.id===av.back) || AVATAR_PARTS.back[0];
+  const shoesPart= AVATAR_PARTS.shoes.find(b=>b.id===av.shoes)|| AVATAR_PARTS.shoes[0];
   const sc = W/72; // scale factor
   const s = (v) => Math.round(v*sc);
-  const layerCtx = { av, skinPart, eyePart, mouthPart, hairPart, bodyColor, blink, mood };
+  const layerCtx = { av, skinPart, eyePart, mouthPart, hairPart, backPart, shoesPart, bodyColor, blink, mood };
 
   ctx.clearRect(0,0,W,H);
   ctx.imageSmoothingEnabled = false; // pixel art net à toute échelle
   const hairImg = getAvatarPng(av.hair);
   for (const L of AVATAR_LAYERS) {
     if (L.key==="hairBack" && hairImg) continue; // le PNG cheveux couvre les deux passes
+    if (L.slot && String(av[L.slot]||"").endsWith("0")) continue; // option "Aucun" (bk0/sh0)
     const img = L.png ? getAvatarPng(av[L.slot]) : null;
     if (img) ctx.drawImage(img, 0, 0, W, H);     // trame registrée 72 → échelle W
     else L.draw(ctx, s, layerCtx);
