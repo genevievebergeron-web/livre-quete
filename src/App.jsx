@@ -6,7 +6,7 @@ import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, merg
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
 import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
-import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
+import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, renderAvatarSprite, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.9.0", date:"2026-07-27", features:[
+    "⚔️ Dans le Combat Final, ton héros porte maintenant son équipement (chapeau, épée, bouclier…) — c'est vraiment TOI qui combats!",
+    "👨‍👩‍👧‍👦 Dans l'Espace Famille, les avatars sourient quand leur héros a complété une quête aujourd'hui!",
+  ]},
   { version:"2.8.0", date:"2026-07-27", features:[
     "🏠 MA MAISON! Ton héros a maintenant sa propre chambre dans Mon Perso — achète des meubles, tapisseries et planchers dans la Boutique (onglet 🏠 Maison) et décore-la comme tu veux. Chaque thème a même son trophée unique!",
   ]},
@@ -1614,9 +1618,10 @@ function HydraFinalGame({ player, pState, color, onClose }){
   const data = useMemo(()=>{
     const dk=(h)=>{ try{ let c=(h||"#FFD23F").replace("#",""); if(c.length===3)c=c.split("").map(x=>x+x).join(""); const f=v=>Math.max(0,Math.round(parseInt(v,16)*0.6)).toString(16).padStart(2,"0"); return "#"+f(c.slice(0,2))+f(c.slice(2,4))+f(c.slice(4,6)); }catch(e){ return "#7a5a12"; } };
     let hero="", pet="";
-    try{ const hc=document.createElement("canvas"); hc.width=hc.height=96;
-      renderAvatarToCtx(hc.getContext("2d"), pState.avatar||DEFAULT_AVATAR, getPlayerTheme(player.themeId).charBodyColor||player.color, 96,96,false);
-      hero=hc.toDataURL("image/png"); }catch(e){}
+    // Chantier F (2026-07-27) — le héros porte maintenant son équipement dans le jeu
+    // (renderAvatarSprite compose couches + items équipés, toujours synchrone).
+    try{ hero=renderAvatarSprite(pState.avatar||DEFAULT_AVATAR, getPlayerTheme(player.themeId).charBodyColor||player.color,
+      { size:96, equipped:pState.equipped, items:ALL_SHOP_ITEMS }).toDataURL("image/png"); }catch(e){}
     try{ const pid=pState.equipped&&pState.equipped.pet; const key=petSpriteKey(pid);
       if(key){ const pc=document.createElement("canvas"); pc.width=pc.height=96;
         const evo=(pState.petEvo||{})[pid]; const lv=petLevel((pState.petXp||{})[pid]||0);
@@ -3072,12 +3077,16 @@ function FamilySpace({ config, gameStates, meId, onOpenProfile, th }) {
         const gs = gameStates[i] || {};
         const x = positions[p.id] ?? 50;
         const isMe = p.id===meId;
+        // Chantier F (2026-07-27) — humeur réelle dans l'Espace Famille : sourire si le joueur
+        // a complété ≥1 quête aujourd'hui (image statique, aucune animation — mode calme ok).
+        // (date LOCALE via new Date(ts), pas slice(0,10) qui comparerait la date UTC — piège v2.5.24)
+        const _did = Object.values(gs.completedAt||{}).some(ts=>{ const d=ts&&new Date(ts); return d&&!isNaN(d) && `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`===todayStamp(); });
         return (
           <div key={p.id}
             onClick={(e)=>{ e.stopPropagation(); SFX.click(); onOpenProfile(i); }}
             className="float-y"
             style={{position:"absolute",bottom:12,left:`${x}%`,transform:"translateX(-50%)",transition:"left 3.5s ease-in-out",cursor:"pointer",textAlign:"center",zIndex:isMe?2:1}}>
-            <AvatarCanvas avatarDef={gs.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(p.themeId).charBodyColor||p.color} size={44}
+            <AvatarCanvas avatarDef={gs.avatar||DEFAULT_AVATAR} bodyColor={getPlayerTheme(p.themeId).charBodyColor||p.color} size={44} mood={_did?"happy":"neutral"}
               style={{border:`2px solid ${p.color}`,borderRadius:6,boxShadow:isMe?`0 0 10px ${p.color}80`:"none"}}/>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color,marginTop:2,textShadow:"1px 1px 0 #0d0d0d"}}>{displayName(p)}</div>
           </div>

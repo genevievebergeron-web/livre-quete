@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx } from "./pets.js";
 import { rarityOf } from "./catalog.js";
+import { renderAvatarToCtx } from "./avatar.jsx";
 
 // v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
 export function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary=false, style={} }) {
@@ -71,6 +72,60 @@ export function EquippedGear({ eq, items, size }) {
     {eq.armor  && <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size).width}   style={equipAnchorStyle(armorAnchor,size)}/>}
     {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size).width}      style={equipAnchorStyle("themed",size)}/>}
   </>);
+}
+
+// ─── EXPORT SPRITE JOUABLE (refonte avatar 2026-07-27, chantier F) ────────────
+// Rasterise l'avatar COMPLET (couches + items équipés PORTÉS) en un canvas, pour
+// les mini-jeux (Combat Hydre : dataURL → postMessage vers l'iframe) et toute
+// future interaction famille. 100 % SYNCHRONE : les PNG d'items déjà en cache
+// navigateur sont composés ; sinon repli grille ITEM_SPRITES (canvas synchrone),
+// sinon emoji via fillText — le héros n'est jamais vide.
+const _itemPngCache = new Map(); // itemId -> {status, img} (même patron que le cache avatar)
+function getItemPng(itemId){
+  if(!itemId) return null;
+  let e = _itemPngCache.get(itemId);
+  if(!e){
+    const img = new Image();
+    e = { status:"loading", img };
+    img.onload = ()=>{ e.status="ok"; };
+    img.onerror = ()=>{ e.status="fail"; };
+    img.src = `/sprites/items/${itemId}.png`;
+    _itemPngCache.set(itemId, e);
+  }
+  return e.status==="ok" ? e.img : null;
+}
+export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutral", equipped=null, items=[] } = {}){
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  renderAvatarToCtx(ctx, avatarDef, bodyColor, size, size, false, mood);
+  const eq = equipped || {};
+  const drawGear = (id, anchorKey) => {
+    if(!id) return;
+    const A = AVATAR_EQUIP_ANCHORS[anchorKey];
+    const w = Math.round(size*A.wRatio);
+    const cx = A.cx/72*size, cy = A.cy/72*size;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if(A.rotate) ctx.rotate(A.rotate*Math.PI/180);
+    const img = getItemPng(id);
+    if(img) ctx.drawImage(img, -w/2, -w/2, w, w);
+    else if(ITEM_SPRITES[id]){
+      const t = document.createElement("canvas"); t.width=t.height=w;
+      renderItemToCtx(t.getContext("2d"), id, w);
+      ctx.drawImage(t, -w/2, -w/2);
+    } else {
+      const emoji = items.find(i=>i.id===id)?.emoji;
+      if(emoji){ ctx.font = `${Math.round(w*0.9)}px serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(emoji, 0, 0); }
+    }
+    ctx.restore();
+  };
+  drawGear(eq.hat, "hat");
+  drawGear(eq.face, "face");
+  if(eq.armor) drawGear(eq.armor, HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor");
+  drawGear(eq.themed, "themed");
+  return c; // canvas — .toDataURL("image/png") pour les iframes
 }
 
 // ─── BADGES PIXEL-ART (médaillon + symbole représentatif, sans emoji) ─────────
