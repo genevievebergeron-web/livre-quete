@@ -1,0 +1,30 @@
+[
+  {
+    "out": "public/sprites/avatar/_raw/ha1.png",
+    "description": "short brown pixel art hair wig for a square-headed blocky 8-bit character, front view, hair only, transparent background",
+    "view": "front",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "out": "public/sprites/avatar/_raw/bk1.png",
+    "description": "small pastel purple fairy wings pair seen from behind, pixel art, symmetric, transparent background",
+    "view": "front",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "out": "public/sprites/avatar/_raw/bk3.png",
+    "description": "brick red hero cape seen from behind, pixel art, transparent background",
+    "view": "front",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "out": "public/sprites/avatar/_raw/sh1.png",
+    "description": "tiny red pixel art sneakers pair side by side, front view, transparent background",
+    "view": "front",
+    "width": 64,
+    "height": 32
+  }
+]
