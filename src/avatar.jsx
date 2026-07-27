@@ -43,8 +43,13 @@ export const AVATAR_PARTS = {
 
 export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1" };
 
+// Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`
+// ci-dessous (lignes ~70-72), jamais de sprite sheet (2 304 combos d'identité rendraient ça
+// impossible). L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
+export const AVATAR_MOODS = ["neutral","happy","proud","tired","levelup","equipped"];
+
 // Render avatar to canvas (used both in-panel and in popup)
-export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false) {
+export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=false, mood="neutral") {
   const av = {...DEFAULT_AVATAR, ...avatarDef};
   const skinPart = AVATAR_PARTS.skin.find(s=>s.id===av.skin) || AVATAR_PARTS.skin[0];
   const eyePart  = AVATAR_PARTS.eyes.find(e=>e.id===av.eyes) || AVATAR_PARTS.eyes[0];
@@ -65,10 +70,22 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   // Hair top
   ctx.fillStyle = hairPart.color;
   ctx.fillRect(s(3),s(2),s(30),s(5));
-  // Eyes
+  // Eyes — blink (réflexe involontaire) gagne toujours ; sinon l'humeur (Phase 5) surcharge la
+  // forme choisie par l'enfant ; sinon la forme choisie s'affiche normalement.
   ctx.fillStyle = eyePart.eyeColor;
   if(blink){ // yeux fermés (clignement) — petites lignes plates
     ctx.fillStyle="#0d0d0d"; ctx.fillRect(s(9),s(12),s(6),s(2)); ctx.fillRect(s(21),s(12),s(6),s(2));
+  }
+  else if(mood==="tired"){ // paupières mi-closes, plus basses qu'un clignement normal
+    ctx.fillStyle="#0d0d0d"; ctx.fillRect(s(9),s(13),s(6),s(2)); ctx.fillRect(s(21),s(13),s(6),s(2));
+  }
+  else if(mood==="proud"||mood==="levelup"){ // étincelles — fierté / jalon
+    ctx.fillStyle="#D9BC5C"; ctx.font=`${s(10)}px serif`; ctx.textAlign="center";
+    ctx.fillText("★",s(12),s(15)); ctx.fillText("★",s(24),s(15));
+  }
+  else if(mood==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
+  else if(mood==="equipped"){ // clin d'œil : un œil fermé, l'autre normal
+    ctx.fillRect(s(21),s(9),s(5),s(5)); ctx.fillStyle="#0d0d0d"; ctx.fillRect(s(9),s(12),s(6),s(2));
   }
   else if(eyePart.eyeShape==="happy"){ctx.fillRect(s(9),s(11),s(5),s(3));ctx.fillRect(s(21),s(11),s(5),s(3));}
   else if(eyePart.eyeShape==="cat"){ctx.fillRect(s(9),s(10),s(6),s(2));ctx.fillRect(s(21),s(10),s(6),s(2));ctx.fillStyle="#0d0d0d";ctx.fillRect(s(11),s(10),s(2),s(4));ctx.fillRect(s(23),s(10),s(2),s(4));}
@@ -76,9 +93,18 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
   else if(eyePart.eyeShape==="cool"){ctx.fillStyle="#111";ctx.fillRect(s(8),s(10),s(8),s(4));ctx.fillRect(s(20),s(10),s(8),s(4));}
   else if(eyePart.eyeShape==="alien"){ctx.fillStyle=eyePart.eyeColor;ctx.fillRect(s(8),s(9),s(8),s(6));ctx.fillRect(s(20),s(9),s(8),s(6));ctx.fillStyle="#0d0d0d";ctx.fillRect(s(10),s(11),s(4),s(3));ctx.fillRect(s(22),s(11),s(4),s(3));}
   else{ctx.fillRect(s(9),s(9),s(5),s(5));ctx.fillRect(s(21),s(9),s(5),s(5));}
-  // Mouth
+  // Mouth — même patron : l'humeur surcharge le choix de l'enfant, sinon rendu normal.
   ctx.fillStyle = mouthPart.color;
-  if(av.mouth==="mo2"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));}
+  if(mood==="happy"||mood==="proud"||mood==="equipped"){ // grand sourire
+    ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));
+  }
+  else if(mood==="levelup"){ // bouche grande ouverte — "wow"
+    ctx.fillRect(s(12),s(17),s(12),s(7));
+  }
+  else if(mood==="tired"){ // petite bouche plate, légèrement affaissée
+    ctx.fillRect(s(12),s(19),s(12),s(2));
+  }
+  else if(av.mouth==="mo2"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));}
   else if(av.mouth==="mo4"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillStyle="#FF88AA";ctx.fillRect(s(14),s(21),s(8),s(4));}
   else if(av.mouth==="mo6"){ctx.fillRect(s(10),s(18),s(16),s(2));ctx.fillRect(s(10),s(18),s(2),s(5));ctx.fillRect(s(24),s(18),s(2),s(5));}
   else{ctx.fillRect(s(11),s(18),s(14),s(3));}
@@ -103,13 +129,15 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
 }
 
 // Inline avatar component (renders canvas) — clignement subtil des yeux (sauf mode calme)
-export function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true }) {
+// `mood` (Phase 5, défaut "neutral" = rétrocompatible) vient d'une machine à états dans App.jsx,
+// branchée aux événements existants (validation, level-up, victoire boss…), non persistée.
+export function AvatarCanvas({ avatarDef, bodyColor, size=72, style={}, animate=true, mood="neutral" }) {
   const canvasRef = useRef(null);
   const [blink, setBlink] = useState(false);
   useEffect(()=>{
     const c=canvasRef.current; if(!c)return;
-    renderAvatarToCtx(c.getContext("2d"), avatarDef||DEFAULT_AVATAR, bodyColor, size, size, blink);
-  },[avatarDef, bodyColor, size, blink]);
+    renderAvatarToCtx(c.getContext("2d"), avatarDef||DEFAULT_AVATAR, bodyColor, size, size, blink, mood);
+  },[avatarDef, bodyColor, size, blink, mood]);
   useEffect(()=>{
     if(!animate || CALM) return; // pas de clignement en mode calme
     let t, stop=false;
