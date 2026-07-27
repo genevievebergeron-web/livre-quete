@@ -122,6 +122,15 @@ export function generateCustodyWeekAssignments(players, weekKey) {
   }
 
   // ── TÂCHES QUOTIDIENNES ──────────────────────────────────────────────────
+  // Rotation vaisselle (tc01 haut / tc02 bas / tc03 remplir) + plancher (tm07) : exactement 1
+  // des 4 enfants a "plancher" (pas-vaisselle) chaque jour, les 3 autres font une tâche de
+  // vaisselle. Bug signalé par Gen (Elli 3 jours de suite) — vérifié par recherche exhaustive
+  // (toutes les combinaisons de rotation possibles) : avec seulement 1 créneau "pas-vaisselle"
+  // sur 4 par jour, un enfant est TOUJOURS forcé à 3 jours de vaisselle de suite au moins une
+  // fois par semaine de garde de 7 jours — c'est le minimum mathématique, pas un défaut de CETTE
+  // rotation précise (aucun réarrangement, même exhaustif, ne fait mieux). Un vrai correctif
+  // demande de libérer un 2e créneau non-vaisselle par jour (fusionner haut+bas en une seule
+  // tâche) — présenté à Gen comme option A, en attente de sa décision.
   for (let ci = 0; ci < 7; ci++) {
     const appDay = CUSTODY_DAY_IDX[ci]; // index App (Mon=0..Sun=6)
 
@@ -226,6 +235,22 @@ export function carryOverUnfinishedTasks(assignments, gameStates, players, today
       return completed.some(k => k.startsWith(a.instanceId + "_" + pid + "#"));
     });
     if (anyDone) return a;
+    // v2.6.6 — bug signalé par Gen : « des tâches en double, on dirait que tout revient ».
+    // generateCustodyWeekAssignments crée UNE entrée séparée PAR JOUR pour les tâches récurrentes —
+    // certaines reviennent 1×/semaine (brassée, lavabos — DOIVENT être reportées si manquées, sinon
+    // perdues pour la semaine), d'autres 3-4×/semaine (ménage cocon) ou 1-2×/semaine (rotation
+    // vaisselle/plancher/etc.), et 3 sont FIXES CHAQUE JOUR sans rotation pour un enfant précis
+    // (pilules, jeu avec le frère). Sans cette vérification, une pilule manquée vendredi se reportait
+    // EN PLUS de celle — déjà distincte — de lundi : 2 cartes "Prendre ma pilule" le même jour. Règle
+    // générale (pas de liste par tâche) : ne reporter que si AUCUNE autre occurrence de ce taskId
+    // n'est déjà prévue aujourd'hui ou plus tard cette semaine pour le(s) même(s) enfant(s) — sinon la
+    // tâche revient de toute façon bientôt, inutile (et trompeur) de reporter l'ancienne en plus.
+    const hasUpcomingOccurrence = assignments.some(b =>
+      b !== a && b.taskId === a.taskId &&
+      (b.playerIds || []).some(pid => (a.playerIds || []).includes(pid)) &&
+      (b.days || []).some(d => custodyOrder(d) >= todayOrder)
+    );
+    if (hasUpcomingOccurrence) return a;
     changed = true;
     return { ...a, days: [...a.days, todayDayIdx] };
   });

@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.5";
+const APP_VERSION = "2.6.6";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.6", date:"2026-07-27", features:[
+    "🧹 Grand ménage : ~125 anciennes tâches fantômes (jamais complétables) qui réapparaissaient sans cesse dans la file « à valider » du parent sont enfin retirées pour de bon.",
+    "📊 Correction : le graphique « Progrès de la semaine » et le compteur « quêtes accomplies ensemble » oubliaient de compter les quêtes de la semaine de garde — ils affichent maintenant les vrais chiffres.",
+    "🔁 Les tâches manquées ne se reportent plus en double quand la même tâche revient de toute façon bientôt (ex. les pilules quotidiennes) — seules celles qui seraient sinon perdues pour la semaine sont reportées.",
+  ]},
   { version:"2.6.5", date:"2026-07-27", features:[
     "🛍️ La Boutique range maintenant les récompenses par Petite/Moyenne/Épique — plus facile de voir ce que tu peux te payer d'un coup d'œil!",
   ]},
@@ -1287,15 +1292,45 @@ const migrateSavedData = (data) => {
     mergedConfig.assignments = (mergedConfig.assignments||[]).filter(a => knownTaskIds.has(a.taskId));
     mergedConfig.orphanAssignCleanupV1 = true;
   }
+  let orphanPendingInstanceIds = null; // v2.6.6 — voir ci-dessous, utilisé pour purger `pending` chez tous les enfants
+  if (!mergedConfig.orphanAssignCleanupV2) { // v2.6.6 — bug signalé par Gen : tâches fantômes (cust_camp_*
+    // et consorts, 125 en prod le 27 juillet) réapparaissent sans cesse dans la file « à valider » — leurs
+    // tâches personnalisées ont été supprimées après le passage de V1, mais pas leurs assignations
+    // récurrentes (jamais renettoyées depuis, elles régénèrent une entrée `pending` chaque jour). Même
+    // purge que V1, réappliquée + weeklyQuests par précaution + nettoyage des `pending` déjà accumulées
+    // (voir plus bas, approvePending tombstone maintenant aussi pour éviter que ça ne revienne).
+    const knownTaskIds2 = new Set([...TASK_CATALOG.map(t=>t.id), ...(mergedConfig.customTasks||[]).map(t=>t.id)]);
+    const before = mergedConfig.assignments || [];
+    mergedConfig.assignments = before.filter(a => knownTaskIds2.has(a.taskId));
+    const purgedFromStatic = before.filter(a => !knownTaskIds2.has(a.taskId)).map(a => a.instanceId);
+    if (mergedConfig.weeklyQuests) {
+      const beforeWq = mergedConfig.weeklyQuests.assignments || [];
+      mergedConfig.weeklyQuests = { ...mergedConfig.weeklyQuests, assignments: beforeWq.filter(a => knownTaskIds2.has(a.taskId)) };
+    }
+    orphanPendingInstanceIds = new Set(purgedFromStatic);
+    mergedConfig.orphanAssignCleanupV2 = true;
+  }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   // v2.5.29 — updateFeedEntries s'accumulait SANS plafond ni dédoublonnage (~5127) : chaque appareil
   // ré-ajoutait ses entrées changelog → 2,35 Mo observés en prod, poussés à CHAQUE sync par chaque
   // appareil (et payload familial > MAX_BODY 2 Mo du serveur). Nettoyage au chargement + à l'ajout.
   mergedConfig.updateFeedEntries = dedupeUpdateFeed(mergedConfig.updateFeedEntries);
+  const migratedGameStates = (data.gameStates || []).map(migrateGameState).map(gs => {
+    if (!orphanPendingInstanceIds || !orphanPendingInstanceIds.size || !(gs.pending || []).length) return gs;
+    // v2.6.6 — purge les entrées `pending` déjà accumulées qui pointent sur une assignation
+    // orpheline qu'on vient de retirer ci-dessus (sinon la file "à valider" reste polluée
+    // jusqu'à ce que le parent clique sur chacune manuellement — le vrai symptôme signalé).
+    const filtered = (gs.pending || []).filter(k => {
+      const base = k.split("#")[0];
+      const inst = base.slice(0, base.lastIndexOf("_"));
+      return !orphanPendingInstanceIds.has(inst);
+    });
+    return filtered.length === (gs.pending || []).length ? gs : { ...gs, pending: filtered };
+  });
   return {
     ...data,
     config: mergedConfig,
-    gameStates: (data.gameStates || []).map(migrateGameState),
+    gameStates: migratedGameStates,
     seenVersions: [...seenVersions, ...newVersions],
     newChangelogVersions: newVersions,
   };
@@ -3141,7 +3176,11 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         const monday = new Date(); monday.setHours(0,0,0,0); monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
         const weekDates = [...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return ds(d); });
         const todayDs = ds(new Date());
-        const assXp = {}; (config.assignments||[]).forEach(a=>{ const t=(allTasks||[]).find(x=>x.id===a.taskId); assXp[a.instanceId]= t?(t.xp||0):0; });
+        // v2.6.6 — bug signalé par Gen : « pas encore d'XP » alors que des dizaines de quêtes rotatives
+        // étaient validées — assXp ne lisait que config.assignments (l'ancien système statique), jamais
+        // config.weeklyQuests.assignments (le système rotatif de garde depuis le 24 juillet), qui porte
+        // désormais quasi toute l'activité réelle.
+        const assXp = {}; [...(config.assignments||[]), ...(config.weeklyQuests?.assignments||[])].forEach(a=>{ const t=(allTasks||[]).find(x=>x.id===a.taskId); assXp[a.instanceId]= t?(t.xp||0):0; });
         const xpFor = (ps,dateStr)=> (ps.completed||[]).reduce((sum,k)=>{ if(!k.endsWith("#"+dateStr)) return sum; const inst=k.split("#")[0].slice(0,k.split("#")[0].lastIndexOf("_")); return sum + (assXp[inst]||0); },0);
         const players=config.players||[];
         const perPlayer = players.map((p,i)=>{ const ps=gameStates[i]||{completed:[]}; const days=weekDates.map(d=>xpFor(ps,d)); return {p, days, total:days.reduce((a,b)=>a+b,0)}; });
@@ -5666,7 +5705,14 @@ export default function App() {
     const task=resolvePendingTask(playerIdx,doneKey);
     const player=config.players[playerIdx];
     if(!task){ // assignation disparue → on nettoie sans récompense
-      setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:(n[playerIdx].pending||[]).filter(k=>k!==doneKey)}; persist(config,n); return n; });
+      // v2.6.6 — bug signalé par Gen : approuver une tâche fantôme ne l'empêchait PAS de revenir
+      // (contrairement à refuser, qui tombstone via refusedKeys) — une assignation récurrente
+      // orpheline régénérait donc la même fausse demande chaque jour malgré l'approbation répétée.
+      setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+        n[playerIdx]={...p,
+          pending:(p.pending||[]).filter(k=>k!==doneKey),
+          refusedKeys:[...new Set([...(p.refusedKeys||[]), doneKey])].slice(-400)};
+        persist(config,n); return n; });
       return;
     }
     setGameStates(gs=>{
@@ -6801,7 +6847,9 @@ export default function App() {
         )}
         {view==="family"&&(()=>{
           // v1.60.0 — stats familiales : quêtes accomplies par étiquette, agrégées sur tous les enfants
-          const catByInst={}; (config.assignments||[]).forEach(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(t) catByInst[a.instanceId]=t.cat; });
+          // v2.6.6 — même bug que le graphique XP : ignorait config.weeklyQuests.assignments, donc
+          // sous-comptait "quêtes accomplies ensemble" pour tout ce qui passe par le système rotatif.
+          const catByInst={}; [...(config.assignments||[]), ...(config.weeklyQuests?.assignments||[])].forEach(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(t) catByInst[a.instanceId]=t.cat; });
           const counts={}; let total=0;
           (gameStates||[]).forEach(gs=>{ (gs.completed||[]).forEach(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const cat=catByInst[inst]; if(cat){ counts[cat]=(counts[cat]||0)+1; total++; } }); });
           if(total===0) return null;
