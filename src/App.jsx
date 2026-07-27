@@ -16,12 +16,12 @@ import { SetupWizard } from "./setupwizard.jsx";
 import { AVATAR_PARTS, DEFAULT_AVATAR, renderAvatarToCtx, AvatarCanvas } from "./avatar.jsx";
 import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
-import { DECO_CATALOG, decoForTheme, DecoSprite } from "./house.jsx";
+import { DECO_CATALOG, decoForTheme, DecoSprite, HouseScene } from "./house.jsx";
 import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.10.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.10.0", date:"2026-07-27", features:[
+    "🏠 Ta maison est devenue MAGNIFIQUE : vrais meubles en pixel art (lit, fauteuil, coffre à jouets, fenêtre ensoleillée…), tapisseries et planchers dessinés comme dans un jeu vidéo rétro!",
+    "🖼️ Ta chambre s'affiche maintenant en grande bannière sur ton écran d'accueil, avec ton héros dedans — touche-la pour la décorer!",
+  ]},
   { version:"2.9.0", date:"2026-07-27", features:[
     "⚔️ Dans le Combat Final, ton héros porte maintenant son équipement (chapeau, épée, bouclier…) — c'est vraiment TOI qui combats!",
     "👨‍👩‍👧‍👦 Dans l'Espace Famille, les avatars sourient quand leur héros a complété une quête aujourd'hui!",
@@ -1344,22 +1348,50 @@ const migrateSavedData = (data) => {
     orphanPendingInstanceIds = new Set(purgedFromStatic);
     mergedConfig.orphanAssignCleanupV2 = true;
   }
+  // v2.9.1 — bug signalé par Gen : « plusieurs de ses rituels sont vides » + « demandes de retrait
+  // fantômes ». Les rituels (routines[].taskIds) et les demandes de retrait (removalRequests)
+  // référencent tous deux des instanceId d'assignation — quand une assignation disparaît (rotation
+  // hebdomadaire, purge d'orphelins ci-dessus), la référence reste une carte morte pour toujours
+  // dans le rituel de l'enfant, ou une ligne fantôme dans « à valider » côté parent. Ménage ponctuel :
+  // ne retire QUE les références mortes, jamais une tâche encore valide. Calculé une seule fois ici
+  // (flag), réutilisé pour les deux nettoyages ci-dessous.
+  const doRoutineCleanupV1 = !mergedConfig.routineOrphanCleanupV1;
+  if (doRoutineCleanupV1) mergedConfig.routineOrphanCleanupV1 = true;
+  const validInstanceIdsForCleanup = doRoutineCleanupV1
+    ? new Set([...(mergedConfig.assignments||[]), ...((mergedConfig.weeklyQuests||{}).assignments||[])].map(a=>a.instanceId))
+    : null;
+  if (doRoutineCleanupV1 && Array.isArray(mergedConfig.removalRequests)) {
+    mergedConfig.removalRequests = mergedConfig.removalRequests.filter(r => validInstanceIdsForCleanup.has(r.instanceId));
+  }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
   // v2.5.29 — updateFeedEntries s'accumulait SANS plafond ni dédoublonnage (~5127) : chaque appareil
   // ré-ajoutait ses entrées changelog → 2,35 Mo observés en prod, poussés à CHAQUE sync par chaque
   // appareil (et payload familial > MAX_BODY 2 Mo du serveur). Nettoyage au chargement + à l'ajout.
   mergedConfig.updateFeedEntries = dedupeUpdateFeed(mergedConfig.updateFeedEntries);
   const migratedGameStates = (data.gameStates || []).map(migrateGameState).map(gs => {
-    if (!orphanPendingInstanceIds || !orphanPendingInstanceIds.size || !(gs.pending || []).length) return gs;
-    // v2.6.6 — purge les entrées `pending` déjà accumulées qui pointent sur une assignation
-    // orpheline qu'on vient de retirer ci-dessus (sinon la file "à valider" reste polluée
-    // jusqu'à ce que le parent clique sur chacune manuellement — le vrai symptôme signalé).
-    const filtered = (gs.pending || []).filter(k => {
-      const base = k.split("#")[0];
-      const inst = base.slice(0, base.lastIndexOf("_"));
-      return !orphanPendingInstanceIds.has(inst);
-    });
-    return filtered.length === (gs.pending || []).length ? gs : { ...gs, pending: filtered };
+    let next = gs;
+    if (orphanPendingInstanceIds && orphanPendingInstanceIds.size && (next.pending || []).length) {
+      // v2.6.6 — purge les entrées `pending` déjà accumulées qui pointent sur une assignation
+      // orpheline qu'on vient de retirer ci-dessus (sinon la file "à valider" reste polluée
+      // jusqu'à ce que le parent clique sur chacune manuellement — le vrai symptôme signalé).
+      const filtered = (next.pending || []).filter(k => {
+        const base = k.split("#")[0];
+        const inst = base.slice(0, base.lastIndexOf("_"));
+        return !orphanPendingInstanceIds.has(inst);
+      });
+      if (filtered.length !== (next.pending || []).length) next = { ...next, pending: filtered };
+    }
+    if (doRoutineCleanupV1 && Array.isArray(next.routines) && next.routines.length) {
+      // v2.9.1 — retire les taskIds morts de chaque rituel ; un rituel qui devient vide après ce
+      // nettoyage est retiré (une carte "rituel vide" n'aide personne) — activeRoutineId remis à
+      // null s'il pointait dessus, pour ne jamais laisser l'app référencer un rituel qui n'existe plus.
+      const cleaned = next.routines
+        .map(r => ({ ...r, taskIds: (r.taskIds || []).filter(id => validInstanceIdsForCleanup.has(id)) }))
+        .filter(r => r.taskIds.length > 0);
+      const activeStillThere = cleaned.some(r => r.id === next.activeRoutineId);
+      next = { ...next, routines: cleaned, activeRoutineId: activeStillThere ? next.activeRoutineId : null };
+    }
+    return next;
   });
   return {
     ...data,
@@ -1735,6 +1767,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
   };
+  // Largeur de la bannière « Ma maison » (accueil) — pleine largeur du contenu, plafonnée.
+  const bannerW = Math.min(680, (typeof window!=="undefined"?window.innerWidth:360)-16);
   const [themeRevealed, setThemeRevealed] = useState(false);
   const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
   const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
@@ -2869,6 +2903,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       </div>
       </>)}
       {homeTab==="accueil" && (<>
+      {/* ── BANNIÈRE « Ma maison » (demande Gen 2026-07-27) : la chambre de l'enfant en large,
+          avec son avatar dedans, sur l'écran d'accueil. Tap → Mon Perso (même gate énergie). ── */}
+      <div onClick={openAvatar} style={{marginTop:8,cursor:"pointer"}} title="Ma maison — touche pour personnaliser">
+        <HouseScene player={player} pState={pState} width={bannerW} ratio={0.36}/>
+      </div>
       {/* ── MENU : accès aux autres écrans (remplace les onglets du haut) ── */}
       {/* v2.6.6 — c'est en fait le SEUL accès enfant à l'écran Calendrier (le footer n'est qu'un
           bouton retour "🏠 Accueil", pas une barre de nav — la nav du haut avec l'onglet 📅 est
@@ -3183,8 +3222,17 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
       {/* 📊 Progrès de la semaine — XP par jour par membre (calculé depuis les quêtes validées) */}
       {(()=>{
         const ds = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-        const monday = new Date(); monday.setHours(0,0,0,0); monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
-        const weekDates = [...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return ds(d); });
+        // v2.9.1 — bug signalé par Gen : « toutes les stats de la semaine à 0 » pour 3 enfants sur 4
+        // le lundi matin. Ce graphique calculait la semaine en ISO (lundi→dimanche) via
+        // `(monday.getDay()+6)%7` — un lundi, "cette semaine" ne couvrait alors QUE lundi→dimanche
+        // À VENIR, excluant tout le vendredi/samedi/dimanche déjà fait (la vraie semaine de garde,
+        // vendredi→jeudi). Rien n'était perdu (vérifié : xp/coins/completed/badges intacts en prod)
+        // — seul ce graphique regardait la mauvaise fenêtre. Même patron que custodyWeekKey
+        // (recurring.js) utilisé partout ailleurs dans l'app pour "cette semaine".
+        const custodyStart = new Date(); custodyStart.setHours(0,0,0,0);
+        custodyStart.setDate(custodyStart.getDate() - ((custodyStart.getDay() + 2) % 7)); // recule au vendredi précédent
+        const weekDates = [...Array(7)].map((_,i)=>{ const d=new Date(custodyStart); d.setDate(custodyStart.getDate()+i); return ds(d); });
+        const custodyDayLabels = [...DAYS_SHORT.slice(4), ...DAYS_SHORT.slice(0,4)]; // Ven Sam Dim Lun Mar Mer Jeu — aligné sur weekDates
         const todayDs = ds(new Date());
         // v2.6.6 — bug signalé par Gen : « pas encore d'XP » alors que des dizaines de quêtes rotatives
         // étaient validées — assXp ne lisait que config.assignments (l'ancien système statique), jamais
@@ -3211,7 +3259,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   {days.map((v,di)=>(
                     <div key={di} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%"}}>
                       <div style={{width:"100%",height:`${Math.max(3,(v/maxDay)*38)}px`,background:weekDates[di]===todayDs?p.color:`${p.color}99`,borderRadius:"2px 2px 0 0",border:weekDates[di]===todayDs?`1px solid #fff`:"none"}} title={`${v} XP`}/>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:weekDates[di]===todayDs?th.accent:"#666",marginTop:2}}>{DAYS_SHORT[di]}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:weekDates[di]===todayDs?th.accent:"#666",marginTop:2}}>{custodyDayLabels[di]}</span>
                     </div>
                   ))}
                 </div>

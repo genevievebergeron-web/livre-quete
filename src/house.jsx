@@ -6,9 +6,9 @@
 // Chaque élément : PNG /sprites/deco/<id>.png si présent, sinon emoji (patron ItemSprite).
 // Aucune animation — conforme au mode calme d'office.
 import { useState } from "react";
-import { PT_LIST, getPlayerTheme } from "./themes.js";
+import { PT_LIST, getPlayerTheme, ALL_SHOP_ITEMS } from "./themes.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
-import { PetSprite } from "./sprites.jsx";
+import { PetSprite, EquippedGear } from "./sprites.jsx";
 import { petSpriteKey } from "./pets.js";
 
 export const DEFAULT_HOUSE = { wallpaper:null, floor:null, placed:{} };
@@ -57,8 +57,8 @@ export const decoForTheme = (themeId) => DECO_CATALOG.filter(d=>!d.themeId || d.
 export function DecoSprite({ decoId, emoji, size=32, style={} }) {
   const [imgFail, setImgFail] = useState(false);
   if (!imgFail && decoId)
-    return <img src={`/sprites/deco/${decoId}.png`} alt="" width={size} height={size}
-      onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",display:"block",...style}}/>;
+    return <img src={`/sprites/deco/${decoId}.png`} alt="" width={size}
+      onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",display:"block",width:size,height:"auto",...style}}/>;
   return <span style={{fontSize:Math.round(size*0.82),lineHeight:1,display:"block",...style}}>{emoji}</span>;
 }
 
@@ -75,19 +75,37 @@ const floorStyle = (id, pt) => {
   return { background:`linear-gradient(180deg, ${pt.primary||"#222"}44, #111)` }; // défaut : teinte du thème
 };
 
+// Pièce PixelLab par défaut (perspective, /sprites/deco/room.png) — masquée si le PNG
+// manque (onError), la base CSS en dessous reste alors visible (repli garanti).
+function RoomImg(){
+  const [fail, setFail] = useState(false);
+  if(fail) return null;
+  return <img src="/sprites/deco/room.png" alt="" onError={()=>setFail(true)}
+    style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",imageRendering:"pixelated"}}/>;
+}
+
 // La scène. `pState.house` = { wallpaper, floor, placed:{anchorId:itemId} }.
 // Les items d'un AUTRE thème que celui du joueur restent possédés mais ne s'affichent pas.
-export function HouseScene({ player, pState, width=320, style={} }) {
+// `ratio` : hauteur/largeur — 0.78 pour la pièce du popup, ~0.36 pour la BANNIÈRE d'accueil.
+// Fond : /sprites/deco/room.png (pièce PixelLab en perspective) en priorité, dégradés CSS en
+// repli natif (background multiple : si l'URL 404, le dégradé en dessous reste visible).
+// Tapisserie/plancher achetés = textures tuilées /sprites/deco/<id>.png par-dessus leurs zones.
+export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) {
   const pt = getPlayerTheme(player.themeId);
   const house = { ...DEFAULT_HOUSE, ...(pState.house||{}) };
-  const H = Math.round(width*0.78), floorH = Math.round(H*0.34);
+  const H = Math.round(width*ratio), floorH = Math.round(H*0.34);
   const visible = (d) => d && (!d.themeId || d.themeId===(player.themeId||"none"));
   const wp = visible(decoById(house.wallpaper)) ? house.wallpaper : null;
   const fl = visible(decoById(house.floor)) ? house.floor : null;
   return (
     <div style={{position:"relative",width,height:H,borderRadius:10,overflow:"hidden",border:`3px solid ${pt.accent||"#D9BC5C"}66`,...style}}>
-      <div style={{position:"absolute",inset:0,...wallpaperStyle(wp,pt)}}/>
-      <div style={{position:"absolute",left:0,right:0,bottom:0,height:floorH,borderTop:`2px solid #0d0d0d`,...floorStyle(fl,pt)}}/>
+      {/* Base garantie (repli) : mur dégradé + bande de plancher CSS */}
+      <div style={{position:"absolute",inset:0,...wallpaperStyle(wp,pt),imageRendering:"pixelated",
+        ...(wp?{background:`url(/sprites/deco/${wp}.png) repeat, ${wallpaperStyle(wp,pt).background}`}:null)}}/>
+      <div style={{position:"absolute",left:0,right:0,bottom:0,height:floorH,borderTop:`2px solid #0d0d0d`,imageRendering:"pixelated",
+        background:fl?`url(/sprites/deco/${fl}.png) repeat, ${floorStyle(fl,pt).background}`:floorStyle(null,pt).background}}/>
+      {/* Pièce PixelLab complète (perspective) quand aucune surface achetée n'est placée */}
+      {!wp && !fl && <RoomImg/>}
       {Object.entries(HOUSE_ANCHORS).map(([aid,a])=>{
         const d = decoById(house.placed?.[aid]);
         if(!visible(d)) return null;
@@ -99,14 +117,20 @@ export function HouseScene({ player, pState, width=320, style={} }) {
           <DecoSprite decoId={d.id} emoji={d.emoji} size={sz}/>
         </div>;
       })}
-      {/* L'enfant, debout sur le plancher, avec son familier */}
+      {/* L'enfant, debout sur le plancher, avec son familier. Taille bornée par la HAUTEUR
+          de la scène (sinon l'avatar déborde en format bannière large). */}
+      {(()=>{ const avSz = Math.round(Math.min(width*0.30, H*0.62)); return (<>
       <div style={{position:"absolute",left:"50%",bottom:Math.round(floorH*0.12),transform:"translateX(-50%)"}}>
-        <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={Math.round(width*0.30)}/>
+        <div style={{position:"relative"}}>
+          <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={avSz}/>
+          <EquippedGear eq={pState.equipped} items={ALL_SHOP_ITEMS} size={avSz}/>
+        </div>
       </div>
       {(pState.equipped?.pet && petSpriteKey(pState.equipped.pet)) &&
-        <div style={{position:"absolute",left:"66%",bottom:Math.round(floorH*0.10),pointerEvents:"none"}}>
-          <PetSprite itemId={pState.equipped.pet} size={Math.round(width*0.14)}/>
+        <div style={{position:"absolute",left:"64%",bottom:Math.round(floorH*0.10),pointerEvents:"none"}}>
+          <PetSprite itemId={pState.equipped.pet} size={Math.round(avSz*0.48)}/>
         </div>}
+      </>);})()}
     </div>
   );
 }
