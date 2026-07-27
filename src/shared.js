@@ -86,7 +86,11 @@ export const GLOBAL_CSS = `
   @keyframes glowPulse{0%,100%{text-shadow:3px 3px 0 #0d0d0d,0 0 12px currentColor}60%{text-shadow:3px 3px 0 #0d0d0d,0 0 32px currentColor,0 0 54px currentColor}}
   @keyframes blink{0%,100%{opacity:1}49%{opacity:1}50%,99%{opacity:0}}
   @keyframes xpFill{from{width:0}to{width:var(--xp-target)}}
-  :root{--hp:#ff4444;--mp:#4488ff;--gold:#D9BC5C;--xp-clr:#4ade80;--xp-bg:#0d2010;}
+  :root{--hp:#ff4444;--mp:#4488ff;--gold:#D9BC5C;--xp-clr:#4ade80;--xp-bg:#0d2010;
+    --b-soft:#3a3a48; --b-mid:#565668;
+    --elev1:0 2px 0 #0d0d0d, inset 0 1px 0 rgba(255,255,255,0.06);
+    --elev2:0 4px 0 #0d0d0d, 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
   .float-y{animation:floatY 2.4s ease-in-out infinite}
   .float-y-slow{animation:floatY 3.2s ease-in-out infinite}
   .glow-pulse{animation:glowPulse 2.8s ease-in-out infinite}
@@ -97,6 +101,22 @@ export const GLOBAL_CSS = `
   .calm-mode *{animation:none!important;transition:none!important}
   .calm-mode .blink{opacity:1!important}
   .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #0d0d0d,0 0 28px #D9BC5C45,4px 4px 0 #0d0d0d!important;border-radius:4px!important}
+  /* Refonte visuelle Phase 1 (26-07) — fondations : tokens + classes utilitaires, patron
+     ".readable-font" (classe + !important bat l'inline). NO-OP tant qu'aucun className n'est
+     posé sur un élément — les phases 2-4 migrent les bordures dorées vers ces classes. */
+  .card-n1{border:2px solid var(--b-soft)!important;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.35))!important;box-shadow:var(--elev1)!important;border-radius:5px!important}
+  .card-n2{border:2px solid var(--b-mid)!important;box-shadow:var(--elev2)!important;border-radius:5px!important}
+  .card-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #0d0d0d,0 0 28px #D9BC5C45,4px 4px 0 #0d0d0d!important;border-radius:5px!important}
+  /* Raretés cosmétiques factorisées — mêmes couleurs que RARITIES (catalog.js), pour dédupliquer
+     le style inline déjà utilisé pour les items de boutique (rarityOf). */
+  .rarity-commun{border:2px solid #9AA0A644!important;background:linear-gradient(180deg,#9AA0A614,rgba(0,0,0,0.45))!important}
+  .rarity-rare{border:2px solid #4FA3FF!important;background:linear-gradient(180deg,#4FA3FF14,rgba(0,0,0,0.45))!important}
+  .rarity-ultra{border:2px solid #B06BFF!important;background:linear-gradient(180deg,#B06BFF14,rgba(0,0,0,0.45))!important}
+  .rarity-legendaire{border:2px solid #FFB02E!important;background:linear-gradient(180deg,#FFB02E14,rgba(0,0,0,0.45))!important;box-shadow:0 0 10px #FFB02E55!important}
+  .rarity-unique{border:2px solid #FF5BAE!important;background:linear-gradient(180deg,#FF5BAE14,rgba(0,0,0,0.45))!important;box-shadow:0 0 10px #FF5BAE55!important}
+  /* Plancher de lisibilité (Phase 1) : VT323 jamais <15px, Press Start 2P jamais <7px pour du
+     texte porteur de sens (pas les micro-libellés décoratifs). */
+  .body-txt{font-family:'VT323',monospace!important;font-size:17px!important;line-height:1.35!important}
   .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#0d0d0d;border:3px solid #0d0d0d;box-shadow:4px 4px 0 #0d0d0d;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
   .btn-pixel-primary:hover{box-shadow:2px 2px 0 #0d0d0d;transform:translate(2px,2px)}
   /* Lot 6 #26 — retour tactile "bouton pixel enfoncé" générique, indépendant de la couleur du
