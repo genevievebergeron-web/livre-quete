@@ -84,6 +84,11 @@ export const GLOBAL_CSS = `
   @keyframes slideIn{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
   @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
   @keyframes glowPulse{0%,100%{text-shadow:3px 3px 0 #0d0d0d,0 0 12px currentColor}60%{text-shadow:3px 3px 0 #0d0d0d,0 0 32px currentColor,0 0 54px currentColor}}
+  /* Refonte visuelle Phase 6 (27-07) — wow-moments : pur CSS, tués gratuitement par .calm-mode et
+     prefers-reduced-motion (règles déjà en place ci-dessus). raysSpin = rotation lente d'un
+     conic-gradient de rayons derrière un élément ; popIn = léger dépassement à l'arrivée. */
+  @keyframes raysSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  @keyframes popIn{0%{transform:scale(0.6);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
   @keyframes blink{0%,100%{opacity:1}49%{opacity:1}50%,99%{opacity:0}}
   @keyframes xpFill{from{width:0}to{width:var(--xp-target)}}
   :root{--hp:#ff4444;--mp:#4488ff;--gold:#D9BC5C;--xp-clr:#4ade80;--xp-bg:#0d2010;
@@ -117,6 +122,13 @@ export const GLOBAL_CSS = `
   /* Plancher de lisibilité (Phase 1) : VT323 jamais <15px, Press Start 2P jamais <7px pour du
      texte porteur de sens (pas les micro-libellés décoratifs). */
   .body-txt{font-family:'VT323',monospace!important;font-size:17px!important;line-height:1.35!important}
+  /* Refonte visuelle Phase 6 — rayons décoratifs derrière un élément "wow" (RewardPopup, coffre,
+     victoire boss). currentColor = hérite la couleur posée par le composant appelant (rar.color,
+     accent du thème…). animation seule = tuée gratuitement par .calm-mode/prefers-reduced-motion,
+     le halo statique (box-shadow posé par l'appelant) reste visible même figé. */
+  .rays-bg{position:absolute;width:180%;height:180%;left:-40%;top:-40%;border-radius:50%;
+    background:conic-gradient(currentColor 0deg,transparent 8deg 32deg,currentColor 40deg,transparent 48deg 72deg,currentColor 80deg,transparent 88deg 112deg,currentColor 120deg,transparent 128deg 152deg,currentColor 160deg,transparent 168deg 192deg,currentColor 200deg,transparent 208deg 232deg,currentColor 240deg,transparent 248deg 272deg,currentColor 280deg,transparent 288deg 312deg,currentColor 320deg,transparent 328deg 352deg,currentColor 360deg);
+    opacity:0.18;animation:raysSpin 14s linear infinite;pointer-events:none;z-index:0}
   .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#0d0d0d;border:3px solid #0d0d0d;box-shadow:4px 4px 0 #0d0d0d;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
   .btn-pixel-primary:hover{box-shadow:2px 2px 0 #0d0d0d;transform:translate(2px,2px)}
   /* Lot 6 #26 — retour tactile "bouton pixel enfoncé" générique, indépendant de la couleur du

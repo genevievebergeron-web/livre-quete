@@ -135,9 +135,14 @@ export function RewardPopup({ task, player, newBadges, onClose, th }) {
   const T = th || THEMES.minecraft;
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto"}}>
-      <div style={{background:T.bg,border:`6px solid ${T.accent}`,borderRadius:10,padding:"clamp(18px,4vw,30px) clamp(20px,5vw,40px)",textAlign:"center",maxWidth:440,width:"90%",maxHeight:"90vh",overflowY:"auto",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
-        <div style={{fontSize:60,marginBottom:10}}>{task.emoji}</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:T.accent,marginBottom:8}}>⚡ QUÊTE {(getPlayerTheme(player?.themeId)?.taskVerb||"validée").toUpperCase()}!</div>
+      <div style={{background:`radial-gradient(circle at 50% 28%, ${T.accent}22, ${T.bg} 70%)`,border:`6px solid ${T.accent}`,borderRadius:10,padding:"clamp(18px,4vw,30px) clamp(20px,5vw,40px)",textAlign:"center",maxWidth:440,width:"90%",maxHeight:"90vh",overflowY:"auto",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
+        {/* Refonte visuelle Phase 6 — rayons tournants derrière l'emoji (wow-moment), zéro bruit
+            ajouté : pur CSS, .rays-bg est tué gratuitement par .calm-mode/prefers-reduced-motion. */}
+        <div style={{position:"relative",width:80,height:80,margin:"0 auto 10px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div className="rays-bg" style={{color:T.accent}}/>
+          <div style={{fontSize:60,position:"relative",zIndex:1}}>{task.emoji}</div>
+        </div>
+        <div className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:T.accent,marginBottom:8}}>⚡ QUÊTE {(getPlayerTheme(player?.themeId)?.taskVerb||"validée").toUpperCase()}!</div>
         <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(16px,2.5vw,20px)",color:"#fff",marginBottom:16,lineHeight:1.4}}>{task.label}</div>
         <div style={{display:"flex",gap:20,justifyContent:"center",marginBottom:18}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#85CDD1"}}>+{task.xp} ⚡</div>
