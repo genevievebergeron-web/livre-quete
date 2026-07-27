@@ -70,14 +70,16 @@ export function generateCustodyWeekAssignments(players, weekKey) {
   const N = shuffled.length; // 4 enfants
   const assignments = [];
 
-  // ── Paires pour la brassée (fixées par pseudo, fallback si pseudo inconnu) ──
-  // Éli + Antoinou, Oli + Antoine
-  const findPlayer = (...pseudos) =>
-    players.find(p => pseudos.some(ps => (p.pseudo || "").toLowerCase().includes(ps.toLowerCase())));
-  const elli   = findPlayer("elli le goat", "elli");
-  const antoinou = findPlayer("antoinou le goat", "antoinou");
-  const oli    = findPlayer("oli le goat", "oli");
-  const antoine = findPlayer("antoine dumont", "antoine");
+  // ── Paires pour la brassée : Éli + Antoinou (Antoine Emery), Oli + Antoine (DR) ──
+  // v2.6.2 — fix : ces lookups cherchaient dans `.pseudo`, que les enfants changent souvent
+  // (ex: "je suis le gote", "D1TEXXY!!!", "URSUL LE GOAT", "LE FRERO" en prod — aucun ne
+  // matchait "elli"/"antoinou"/"oli"/"antoine dumont"), donc pair1/pair2 étaient TOUJOURS
+  // vides et rc_brassee/tm11 n'étaient assignés à personne. Bascule sur `.name` (stable,
+  // fixé à la création du profil), même pattern déjà utilisé plus bas pour elliPlayer/antoineEmeryPlayer.
+  const elli     = players.find(p => (p.name || "").toLowerCase().includes("elli"));
+  const antoinou = players.find(p => (p.name || "").toLowerCase().includes("emery"));
+  const oli      = players.find(p => (p.name || "").toLowerCase().includes("olivier"));
+  const antoine  = players.find(p => (p.name || "").toLowerCase().includes("antoine") && p.id !== antoinou?.id);
   const pair1 = [elli?.id, antoinou?.id].filter(Boolean);
   const pair2 = [oli?.id,  antoine?.id ].filter(Boolean);
 

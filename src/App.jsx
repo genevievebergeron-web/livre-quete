@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.2";
+const APP_VERSION = "2.6.3";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.3", date:"2026-07-26", features:[
+    "🧦 Correction : la brassée de lavage et le rangement des vêtements propres ne s'assignaient à PERSONNE depuis un moment (un changement de pseudo avait cassé la reconnaissance des paires) — c'est réparé, tout le monde va retrouver ces tâches dans sa rotation.",
+  ]},
   { version:"2.6.2", date:"2026-07-26", features:[
     "🌟 Ton défi de la semaine récompense maintenant CHAQUE étape : 3 jours réussis = +10 🪙, 5 jours = +15 🪙 de plus, et 7 sur 7 = +25 🪙 + le nouveau badge « Maître de soi » 🧘! Pas besoin de jours d'affilée — chaque jour coché compte, rien ne se perd.",
     "✨ Quand tu appuies sur « J'AI FAIT ÇA! », petite pluie d'étoiles immédiate et ta carte affiche tes gains RÉSERVÉS (+XP · +🪙) en attendant que ton parent valide — tu sais tout de suite ce qui s'en vient!",
