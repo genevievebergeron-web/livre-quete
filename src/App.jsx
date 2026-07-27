@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.3";
+const APP_VERSION = "2.6.4";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.4", date:"2026-07-26", features:[
+    "🗓️ NOUVEAU : les récompenses « moments » (sortie, souper spécial, temps privé avec un parent…) se planifient maintenant ENSEMBLE! À l'achat, ça atterrit dans « À planifier » du portail parent — le parent choisit une date (ajoutée à ton calendrier 🎁) et personne n'oublie. Aucune date limite : ça reste là jusqu'à ce que ce soit vécu.",
+  ]},
   { version:"2.6.3", date:"2026-07-26", features:[
     "🧦 Correction : la brassée de lavage et le rangement des vêtements propres ne s'assignaient à PERSONNE depuis un moment (un changement de pseudo avait cassé la reconnaissance des paires) — c'est réparé, tout le monde va retrouver ces tâches dans sa rotation.",
   ]},
@@ -1092,6 +1095,20 @@ const mergeFamily = (base, incoming) => {
     // v2.6.0 — quêtes de réparation 🕊️ : union-by-id (id = instanceId de l'assignation) = effet
     // collectif exactly-once même après fusion multi-appareils. ⚠️ JAMAIS sur config.boss (merge shallow).
     repairEvents: (() => { const m = new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
+    // v2.6.2 — récompenses "moment" à planifier avec le parent : union-by-id + progression MONOTONE
+    // du statut (attente < planifie < fait) — après fusion multi-appareils, un statut ne recule jamais
+    // (le parent a pu le marquer "Fait" sur un appareil pendant qu'un autre pousse encore "attente").
+    momentRequests: (() => {
+      const rank = { attente:0, planifie:1, fait:2 };
+      const m = new Map();
+      for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) {
+        if (!r || r.id == null) continue;
+        const prev = m.get(r.id);
+        if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id, r);
+        else if ((rank[r.status]||0) === (rank[prev.status]||0) && r.plannedDate && !prev.plannedDate) m.set(r.id, r);
+      }
+      return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60);
+    })(),
     // Bug live signalé par Gen (2026-07-25) : « défi de la semaine peut être coché à l'infini ».
     // Cause : weeklyChallenge n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}`
     // ci-dessus — iC (incoming) écrasait TOUJOURS bC en entier, sans égard à la fraîcheur (contrairement
@@ -2733,6 +2750,19 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         </div>
         {shopTab==="rewards" && (
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {/* v2.6.2 — récompenses "moment" achetées : à planifier avec un parent, aucune expiration */}
+            {(()=>{ const myMoments=(config.momentRequests||[]).filter(m=>m.playerId===player.id && m.status!=="fait");
+              if(!myMoments.length) return null;
+              return <div style={{background:"rgba(50,40,10,0.35)",border:"2px solid #D9BC5C55",borderRadius:5,padding:"7px 9px",marginBottom:4}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",marginBottom:5}}>🗓️ MES MOMENTS À VENIR</div>
+                {myMoments.map(m=>(
+                  <div key={m.id} style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                    <span style={{fontSize:14}}>{m.emoji}</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1}}>{m.label}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:m.status==="planifie"?"#5CAD68":"#D9BC5C"}}>{m.status==="planifie"?`📅 ${fmtDateShort(m.plannedDate)}`:"⏳ à planifier"}</span>
+                  </div>
+                ))}
+              </div>; })()}
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
             {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
             {myRewards.map(r=>{
@@ -3204,7 +3234,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
-  onCreateAnnouncement, onDeleteAnnouncement, onCreateRepairQuest }) {
+  onCreateAnnouncement, onDeleteAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
@@ -3219,6 +3249,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [repPlayerIds, setRepPlayerIds] = useState([]);
   const [repPresetIdx, setRepPresetIdx] = useState(0);
   const [repCustomText, setRepCustomText] = useState("");
+  const [momentDates, setMomentDates] = useState({}); // v2.6.2 — {momentId: "YYYY-MM-DD"} brouillon de date avant "Prévu pour…"
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
@@ -3655,6 +3686,34 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 🕊️ Créer la quête ({repPlayerIds.length>=2?repPlayerIds.length+" enfants":"choisis au moins 2 enfants"})
               </PBtn>; })()}
           </div>
+          {/* v2.6.2 — Récompenses "moment" à planifier ensemble (décision Gen). Aucune expiration :
+              une entrée reste ici jusqu'à "✔ Fait", peu importe le délai. */}
+          {(()=>{ const toPlan=(config.momentRequests||[]).filter(m=>m.status!=="fait");
+            if(!toPlan.length) return null;
+            return <div style={{background:"rgba(50,40,10,0.4)",border:"2px solid #D9BC5C",borderRadius:6,padding:"10px",marginBottom:12}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginBottom:5}}>🗓️ À PLANIFIER ENSEMBLE ({toPlan.length})</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {toPlan.map(m=>{
+                  const pl=players.find(p=>p.id===m.playerId);
+                  return <div key={m.id} style={{padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px solid #4a3a10",borderRadius:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:16}}>{m.emoji}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{m.label}</div>
+                        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:pl?.color||"#888"}}>{displayName(pl||{})}{m.plannedDate?` · prévu ${fmtDateShort(m.plannedDate)}`:""}</div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,marginTop:7}}>
+                      <input type="date" value={momentDates[m.id]||m.plannedDate||""} onChange={e=>setMomentDates(d=>({...d,[m.id]:e.target.value}))}
+                        style={{flex:1,fontFamily:"'VT323',monospace",fontSize:14,padding:"5px 7px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none"}}/>
+                      <PBtn onClick={()=>{ const d=momentDates[m.id]||m.plannedDate; if(d) onPlanMoment&&onPlanMoment(m.id,d); }}
+                        color="#D9BC5C" textColor="#0d0d0d" style={{fontSize:11,padding:"5px 9px"}}>📅 Prévu</PBtn>
+                      <PBtn onClick={()=>onMarkMomentDone&&onMarkMomentDone(m.id)} color="#1a3a1a" textColor="#5CAD68" style={{fontSize:11,padding:"5px 9px"}}>✔ Fait</PBtn>
+                    </div>
+                  </div>;
+                })}
+              </div>
+            </div>; })()}
           <Row>
             {undoStack.length>0
               ? <PBtn onClick={onUndo} color="#FF6464" textColor="#0d0d0d" style={{flex:1}}>↩️ Annuler dernière</PBtn>
@@ -5744,18 +5803,29 @@ export default function App() {
     // v1.84.0 (Lot 1 #B3) — magasiner coûte de l'énergie (frein "plaisir", jamais les corvées)
     const p0=gameStates[idx];
     if(currentEnergy(p0)<SHOP_ENERGY){ const m=minsToEnergy(p0,SHOP_ENERGY); showToast(`😴 Ton héros se repose… la boutique rouvre dans ~${m} min!`,"#85CDD1",3500); return; }
+    const isReward=!item.slot;
+    const price=priceOf(item); // items (.cost) ET récompenses (.coins), ×PRICE_MULT
+    if((p0.coins||0)<price) return; // pas assez de pièces — rien à faire (même garde qu'avant, remontée hors de l'updater)
+    // v2.6.2 — l'entrée "moment" (mr, uid() inclus) est construite ICI, dans le corps de handleBuy
+    // (appelé UNE FOIS par vrai clic) — jamais dans l'updater passé à setGameStates, que StrictMode
+    // double-invoque en dev : un uid()+setConfig générés à CHAQUE invocation créait 2 entrées
+    // dupliquées par achat (trouvé en test navigateur). Précédent apparenté : v2.5.23.
+    let newCfg = config;
+    if(isReward && item.moment){
+      const mr={ id:"mr_"+uid(), playerId, rewardId:item.id, emoji:item.emoji, label:item.label, coins:price, status:"attente", plannedDate:null, createdAt:new Date().toISOString() };
+      newCfg = {...config, momentRequests:[...(config.momentRequests||[]), mr]};
+      setConfig(newCfg);
+    }
+    SFX.buy();
     setGameStates(gs=>{
       const p=gs[idx];
-      const isReward=!item.slot;
-      const price=priceOf(item); // items (.cost) ET récompenses (.coins), ×PRICE_MULT
       if((p.coins||0)<price)return gs;
-      SFX.buy();
       const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
-      persist(config,n);
-      showToast(`🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#D9BC5C");
-      spawnParticles(item.emoji||"🎉");
+      persist(newCfg,n); // newCfg identique à chaque (double-)invocation → persist reste idempotent
       return n;
     });
+    showToast(item.moment ? `🎉 ${item.emoji} ${item.label} — à planifier avec ton parent! 🗓️` : `🎉 ${item.emoji} ${item.name||item.label} acheté!`,"#D9BC5C", item.moment?4200:3000);
+    spawnParticles(item.emoji||"🎉");
   },[config,gameStates,persist,showToast]);
 
   const handleUpdateAvatar = useCallback((avatarDef, playerId)=>{
@@ -5846,6 +5916,34 @@ export default function App() {
     logAction(`🕊️ Quête de réparation créée: ${task.label} (${playerIds.length} enfants)`,"#7FD6E0");
     showToast("🕊️ Quête de réparation créée — chacun la verra dans sa journée.","#7FD6E0",4000);
   },[config,gameStates,persist,logAction,showToast]);
+
+  // v2.6.2 — le parent choisit une date pour une récompense "moment" : ajoute un vrai événement
+  // calendrier (type "recompense" 🎁, visible enfant+parent) et fait avancer le statut vers "planifie".
+  const handlePlanMoment = useCallback((momentId, date)=>{
+    if(!date) return;
+    const cfg=cfgRef.current||config;
+    const mr=(cfg.momentRequests||[]).find(m=>m.id===momentId); if(!mr) return;
+    const idx=config.players.findIndex(p=>p.id===mr.playerId); if(idx<0) return;
+    const calId=Date.now()+"_"+Math.random().toString(36).slice(2,6);
+    setGameStates(gs=>{ const n=[...gs];
+      const e={ id:calId, type:"recompense", label:`${mr.emoji} ${mr.label}`, date, recur:null };
+      n[idx]={...n[idx], calendar:[...(n[idx].calendar||[]), e]};
+      const newCfg={...cfg, momentRequests:(cfg.momentRequests||[]).map(m=>m.id===momentId?{...m,status:"planifie",plannedDate:date,calId:"cal_"+calId}:m)};
+      setConfig(newCfg);
+      persist(newCfg,n);
+      return n;
+    });
+    showToast("🗓️ Moment planifié — ajouté au calendrier!","#85CDD1",3500);
+  },[config,persist,showToast]);
+
+  // v2.6.2 — le moment a été vécu → statut "fait" (retiré de la liste "à planifier", aucune
+  // pression temporelle : reste "à planifier" indéfiniment tant que ce bouton n'est pas cliqué).
+  const handleMarkMomentDone = useCallback((momentId)=>{
+    const cfg=cfgRef.current||config;
+    const newCfg={...cfg, momentRequests:(cfg.momentRequests||[]).map(m=>m.id===momentId?{...m,status:"fait"}:m)};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("✅ Moment vécu ensemble! 💛","#5CAD68",3500);
+  },[config,gameStates,persist,showToast]);
 
   // Lance un boss de famille — le parent choisit la difficulté (PV du boss)
   const handleLaunchBoss = useCallback((difficulty="moyen")=>{
@@ -6248,8 +6346,17 @@ export default function App() {
         coins:(p.coins||0)+priceOf(reward),                         // rembourse ce qui a été payé (×PRICE_MULT)
         refundedRewards:[...new Set([...(p.refundedRewards||[]), key])].slice(-200) };
       persist(config,n); return n; });
+    // v2.6.4 — même piège que v2.5.23 (owned[] orphelin) mais pour les moments : si le remboursement
+    // a eu lieu ET que la demande n'a pas encore été engagée par le parent (statut "attente"),
+    // on la retire — sinon un fantôme reste pour toujours dans "à planifier". Une demande déjà
+    // "planifie"/"fait" (le parent s'est déjà engagé) n'est JAMAIS effacée automatiquement.
+    if(did && reward.moment){
+      const cfg=cfgRef.current||config;
+      const newCfg={...cfg, momentRequests:(cfg.momentRequests||[]).filter(m=>!(m.playerId===playerId && m.rewardId===reward.id && m.status==="attente"))};
+      setConfig(newCfg); persist(newCfg,gameStates);
+    }
     if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#D99248");
-  },[config,persist,showToast]);
+  },[config,gameStates,persist,showToast]);
 
   // Minuterie : l'enfant a complété un rituel chronométré → bonus XP + entrée au fil
   const handleRitualTimerDone = useCallback((playerIdx, ritual, minutes)=>{
@@ -6777,6 +6884,8 @@ export default function App() {
           onAssignRoutine={handleAssignRoutine}
           onLaunchBoss={handleLaunchBoss}
           onCreateRepairQuest={handleCreateRepairQuest}
+          onPlanMoment={handlePlanMoment}
+          onMarkMomentDone={handleMarkMomentDone}
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
           onAddCalendarEvent={handleAddCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}

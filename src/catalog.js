@@ -77,24 +77,28 @@ export const estMinOf = d => DIFF_EST_MIN[d] || 15;
 // v1.92.0 (Lot 4 #19) — `cat` optionnel distingue les récompenses ÉCRAN des récompenses
 // CALME (temps calme/apaisant), pour que la boutique ne pousse pas que vers l'écran —
 // utile pour les enfants neuroatypiques qui bénéficient d'alternatives de régulation visibles.
+// v2.6.2 — champ `moment:true` (décision Gen 26 juillet) : récompenses qui demandent un CRÉNEAU
+// à deux (parent + enfant), donc à planifier ensemble plutôt qu'à consommer sur-le-champ (voir
+// handleBuy + section « 🗓️ À planifier ensemble » du portail parent). Les permissions instantanées
+// (2e dessert, servi au souper, écran, bonbon…) restent des achats simples, aucun changement.
 export const REWARD_CATALOG = [
   { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40, cat:"ecran" },
-  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35, cat:"calme" },
+  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35, cat:"calme", moment:true },
   { id:"rw_dessert", emoji:"🍰", label:"Permission de 2e dessert",           coins:30 },
   { id:"rw_dejsoup", emoji:"🥞", label:"Permission de déjeuner au souper",   coins:35 },
-  { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60 },
-  { id:"rw_depanneur",emoji:"🏪",label:"Choix d'un achat au dépanneur",      coins:70 },
-  { id:"rw_jeu",     emoji:"🎲", label:"Choix d'un jeu de société en famille",coins:35 },
-  { id:"rw_souper",  emoji:"🍽️", label:"Choix d'un souper pendant la semaine",coins:55 },
+  { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60, moment:true },
+  { id:"rw_depanneur",emoji:"🏪",label:"Choix d'un achat au dépanneur",      coins:70, moment:true },
+  { id:"rw_jeu",     emoji:"🎲", label:"Choix d'un jeu de société en famille",coins:35, moment:true },
+  { id:"rw_souper",  emoji:"🍽️", label:"Choix d'un souper pendant la semaine",coins:55, moment:true },
   { id:"rw_bonbon",  emoji:"🍬", label:"Manger un bonbon",                   coins:20 },
   { id:"rw_ricochet",emoji:"↪️", label:"1 ricochet de tâche sur quelqu'un d'autre",coins:80 },
   { id:"rw_debarrasse",emoji:"🧽",label:"On débarrasse ton repas",           coins:25 },
   { id:"rw_servi",   emoji:"🍴", label:"Tu te fais servir au souper",        coins:30 },
-  { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150 },
-  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45, cat:"calme" },
+  { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150, moment:true },
+  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45, cat:"calme", moment:true },
   { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25, cat:"calme" },
-  { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90 },
-  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme" },
+  { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90, moment:true },
+  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme", moment:true },
 ];
 export const REWARD_CAT_BADGE = { ecran:{label:"📱 Écran",color:"#FF8C6B"}, calme:{label:"🌙 Calme",color:"#7FD6E0"} };
 
@@ -150,6 +154,7 @@ export const CAL_TYPES = {
   sport:       { label:"⚽ Sport/activité",     icon:"⚽" },
   intervenant: { label:"🧑‍⚕️ Intervenant à la maison", icon:"🧑‍⚕️" },
   camp:        { label:"🏕️ Camp/sortie",        icon:"🏕️" },
+  recompense:  { label:"🎁 Moment récompense",  icon:"🎁" }, // v2.6.2 — moment planifié depuis une récompense "moment:true"
 };
 export const calEventIcon = (e) => {
   if (e.type==="examen") return "📝";
