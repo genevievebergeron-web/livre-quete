@@ -16,11 +16,12 @@ import { SetupWizard } from "./setupwizard.jsx";
 import { AVATAR_PARTS, DEFAULT_AVATAR, renderAvatarToCtx, AvatarCanvas } from "./avatar.jsx";
 import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
+import { DECO_CATALOG, decoForTheme, DecoSprite } from "./house.jsx";
 import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.8.0", date:"2026-07-27", features:[
+    "🏠 MA MAISON! Ton héros a maintenant sa propre chambre dans Mon Perso — achète des meubles, tapisseries et planchers dans la Boutique (onglet 🏠 Maison) et décore-la comme tu veux. Chaque thème a même son trophée unique!",
+  ]},
   { version:"2.7.0", date:"2026-07-27", features:[
     "🦋 Nouveau dans Mon Perso : ton héros peut maintenant avoir des ailes de fée, des ailes de dragon ou une cape, et choisir ses souliers (baskets, bottes, pantoufles…) — gratuit, va essayer!",
   ]},
@@ -935,13 +939,21 @@ const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant
 // au lieu d'écraser : l'XP ne peut que monter, rien n'est perdu. C'est ce qui
 // permet de réunir « l'ordi (2 modes) » et « le cell (1 mode) » sans tout casser.
 const _uniq = (arr) => [...new Set(arr || [])];
-const _mergeCalendar = (a, b) => {
-  const out = []; const seen = new Set();
+// v2.7.0 — dernière-écriture-gagne (par updatedAt) + tombstone (removedIds) au lieu d'un simple
+// « premier id vu gagne ». Avant : si un appareil modifiait/supprimait un événement pendant qu'un
+// autre pas encore synchronisé renvoyait l'ancienne version, le merge pouvait faire réapparaître
+// l'ancienne version modifiée, ou ressusciter un événement supprimé.
+const _mergeCalendar = (a, b, removedIds) => {
+  const rm = removedIds ? new Set(removedIds) : null;
+  const byId = new Map(); const noId = []; const seenRaw = new Set();
   for (const e of [...(a || []), ...(b || [])]) {
-    const k = e && e.id != null ? "id:" + e.id : JSON.stringify(e);
-    if (!seen.has(k)) { seen.add(k); out.push(e); }
+    if (!e) continue;
+    if (e.id == null) { const k = JSON.stringify(e); if (!seenRaw.has(k)) { seenRaw.add(k); noId.push(e); } continue; }
+    if (rm && rm.has(e.id)) continue; // suppression (tombstone) gagne sur une version pas encore synchronisée
+    const prev = byId.get(e.id);
+    if (!prev || (e.updatedAt || 0) >= (prev.updatedAt || 0)) byId.set(e.id, e);
   }
-  return out;
+  return [...byId.values(), ...noId];
 };
 // Fusion d'un état de joueur — non régressive (max XP/pièces, union des listes)
 const mergeGS = (a, b, preferIncoming) => {
@@ -949,6 +961,7 @@ const mergeGS = (a, b, preferIncoming) => {
   const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
   const refusedKeys = _uniq([...(a.refusedKeys || []), ...(b.refusedKeys || [])]).slice(-400); // v1.64.0 — tombstone des demandes refusées
   const _refusedSet = new Set(refusedKeys);
+  const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.7.0 — tombstone des événements calendrier supprimés
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
   return {
     ...a, ...b,
@@ -971,7 +984,8 @@ const mergeGS = (a, b, preferIncoming) => {
     refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé cette semaine » (union increvable → fin des pièces infinies)
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
     equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
-    calendar: _mergeCalendar(a.calendar, b.calendar),
+    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
+    removedCalendarIds,
     avatar: avatarConfigured,
     // PIN : dernière écriture gagne (permet de changer le code d'un enfant depuis un autre appareil)
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
@@ -1251,6 +1265,9 @@ const migrateGameState = (gs) => {
     activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
     bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
     calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
+    house: gs.house || { wallpaper:null, floor:null, placed:{} }, // v2.8.0 — Ma maison (décor).
+    // Fusion : transporté en bloc par le spread ...a,...b de mergeGS (dernière écriture gagne,
+    // comme boughtRewards) — AUCUN changement client/serveur requis, miroir server.cjs intouché.
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
       back:"bk0", shoes:"sh0",                    // v2.7.0 — nouveaux slots (défaut "Aucun")
@@ -1790,7 +1807,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const _allDoneToday = myAssignments.length>0 && myAssignments.every(a=>pState.completed?.includes(_todayDoneKey(a)));
   const dashboardMood = avatarMood!=="neutral" ? avatarMood : (new Date().getHours()>=19 && _allDoneToday ? "tired" : "neutral");
   const themedCat = pt.shopCategory;
-  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  // Ma maison (2026-07-27) — items déco visibles : génériques + ceux du thème ACTIF seulement
+  const decoItems = decoForTheme(player.themeId||"none");
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
   const eq = pState.equipped || {};
   // hat/armor/pet resolved via allShopItemsFlat after it's declared below
@@ -2818,22 +2837,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         )}
         {shopTab!=="rewards" && (
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
-            {(SHOP_ITEMS[shopTab] || (shopTab===themedCat.id ? themedCat.items : []) || []).map(item=>{
+            {(SHOP_ITEMS[shopTab] || (shopTab==="deco" ? decoItems : shopTab===themedCat.id ? themedCat.items : []) || []).map(item=>{
               const owned=pState.owned?.includes(item.id);
-              const equipped=eq[item.slot]===item.id;
+              const isDeco=item.slot==="deco"; // Ma maison : jamais "équipé", se place dans Mon Perso
+              const equipped=!isDeco && eq[item.slot]===item.id;
               const iPrice=priceOf(item);
               const canAfford=pState.coins>=iPrice;
               const rar=rarityOf(item.cost);
               return (
-                <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
+                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
                   className={equipped?"":rar.cls}
-                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
+                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
-                  {petSpriteKey(item.id)
+                  {isDeco
+                    ? <DecoSprite decoId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px"}}/>
+                    : petSpriteKey(item.id)
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
                     : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?"Équiper":iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?(isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
                 </div>
               );
             })}
@@ -2978,6 +3000,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     {/* Avatar popup */}
     {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
       onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
+      onUpdateHouse={(h)=>onPatchState({house:h})}
       allShopItems={allShopItemsFlat} th={th}/>}
     {finalBattle && <HydraFinalGame player={player} pState={pState} color={player.color} onClose={()=>setFinalBattle(false)}/>}
     </div>
@@ -6472,7 +6495,7 @@ export default function App() {
     if(!playerIds?.length || !entry?.label?.trim())return;
     setGameStates(gs=>{ const n=[...gs];
       playerIds.forEach(pid=>{ const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
-        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, time:entry.time||null, recur:entry.recur||null };
+        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, time:entry.time||null, recur:entry.recur||null, updatedAt:Date.now() };
         n[i]={...n[i], calendar:[...(n[i].calendar||[]), e]};
       });
       persist(config,n); return n; });
@@ -6482,15 +6505,17 @@ export default function App() {
   // playerName car allEntries est agrégé cross-enfants ; le nom est stable, fixé à la création du profil).
   const handleUpdateCalendarEvent = useCallback((playerName, entry)=>{
     const i=config.players.findIndex(p=>(p.name||"")===playerName); if(i<0)return;
+    const updated={...entry, updatedAt:Date.now()}; // v2.7.0 — pour que le merge multi-appareils garde la version la plus récente
     setGameStates(gs=>{ const n=[...gs];
-      n[i]={...n[i], calendar:(n[i].calendar||[]).map(e=>e.id===entry.id?entry:e)};
+      n[i]={...n[i], calendar:(n[i].calendar||[]).map(e=>e.id===entry.id?updated:e)};
       persist(config,n); return n; });
     showToast("📅 Événement modifié!","#85CDD1");
   },[config,persist,showToast]);
   const handleDeleteCalendarEvent = useCallback((playerName, entryId)=>{
     const i=config.players.findIndex(p=>(p.name||"")===playerName); if(i<0)return;
     setGameStates(gs=>{ const n=[...gs];
-      n[i]={...n[i], calendar:(n[i].calendar||[]).filter(e=>e.id!==entryId)};
+      // v2.7.0 — tombstone : empêche un appareil pas encore synchronisé de faire « ressusciter » l'événement au prochain merge
+      n[i]={...n[i], calendar:(n[i].calendar||[]).filter(e=>e.id!==entryId), removedCalendarIds:[...(n[i].removedCalendarIds||[]), entryId].slice(-400)};
       persist(config,n); return n; });
   },[config,persist]);
 

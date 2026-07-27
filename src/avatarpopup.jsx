@@ -10,14 +10,16 @@ import { PET_LEVELS, petLevel, petBar, petStage, petSpriteKey, petIsLegendary, p
 import { PetSprite, EquippedGear } from "./sprites.jsx";
 import { displayName } from "./shared.js";
 import { DEFAULT_AVATAR, AVATAR_PARTS, AvatarCanvas } from "./avatar.jsx";
+import { HouseScene, DECO_CATALOG, DEFAULT_HOUSE } from "./house.jsx";
 
-export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, allShopItems, th }) {
+export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, onUpdateHouse, allShopItems, th }) {
   const [tab, setTab] = useState("creator"); // creator | inventory
   const [partTab, setPartTab] = useState("skin");
   const avatarDef = pState.avatar || DEFAULT_AVATAR;
   const pt = getPlayerTheme(player.themeId);
 
-  const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id));
+  // Les items déco (slot "deco") vivent dans l'onglet Maison, pas dans l'inventaire porté.
+  const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id) && i.slot!=="deco");
   const eq = pState.equipped || {};
 
   const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers"};
@@ -49,13 +51,13 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#D9BC5C",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId,pState.settings?.femTitles).title}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {pState.xp} XP</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.values(eq).filter(Boolean).length}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.entries(eq).filter(([k,v])=>v&&k!=="deco").length}</div>
           </div>
         </div>
 
         {/* Main tabs */}
         <div style={{display:"flex",gap:6}}>
-          {[["creator","✏️ Créer"],["pet","🐾 Familier"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
+          {[["creator","✏️ Créer"],["house","🏠 Maison"],["pet","🐾 Familier"],["inventory","🎒 Inventaire"]].map(([k,l])=>(
             <button key={k} onClick={()=>{setTab(k);SFX.click();}}
               style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px",background:tab===k?(pt.accent||"#D9BC5C"):"#222",color:tab===k?"#0d0d0d":"#888",border:`2px solid ${tab===k?(pt.accent||"#D9BC5C"):"#444"}`,borderRadius:4,cursor:"pointer"}}>
               {l}
@@ -134,6 +136,62 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             </div>
           )}
         </>}
+
+        {/* MAISON TAB — décor modulable (refonte avatar 2026-07-27). Ancres fixes, pas de
+            drag-drop : toucher un item déco possédé le place/retire de la pièce. Les items
+            d'un autre thème restent possédés mais sont masqués tant que ce thème est inactif. */}
+        {tab==="house" && (()=>{
+          const house = { ...DEFAULT_HOUSE, ...(pState.house||{}) };
+          const acc = pt.accent||"#D9BC5C";
+          const myTheme = player.themeId||"none";
+          const ownedDeco = DECO_CATALOG.filter(d => pState.owned?.includes(d.id));
+          const usable = ownedDeco.filter(d => !d.themeId || d.themeId===myTheme);
+          const foreign = ownedDeco.length - usable.length;
+          const isPlaced = (d) => d.decoType==="wallpaper" ? house.wallpaper===d.id
+            : d.decoType==="floor" ? house.floor===d.id
+            : house.placed?.[d.anchor]===d.id;
+          const toggle = (d) => {
+            SFX.click();
+            const h = { ...house, placed:{...(house.placed||{})} };
+            if (d.decoType==="wallpaper") h.wallpaper = isPlaced(d) ? null : d.id;
+            else if (d.decoType==="floor") h.floor = isPlaced(d) ? null : d.id;
+            else { if (isPlaced(d)) delete h.placed[d.anchor]; else h.placed[d.anchor] = d.id; }
+            onUpdateHouse && onUpdateHouse(h);
+          };
+          return (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",justifyContent:"center"}}>
+                <HouseScene player={player} pState={pState} width={Math.min(360, typeof window!=="undefined"?window.innerWidth-90:360)}/>
+              </div>
+              {usable.length===0 && (
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:12,lineHeight:1.4}}>
+                  Ta chambre est aux couleurs de ton thème! 🏠<br/>Achète des meubles et des décorations dans la Boutique (onglet 🏠 Maison) pour la rendre unique.
+                </div>
+              )}
+              {usable.length>0 && <>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>MES DÉCORATIONS — touche pour placer/retirer</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                  {usable.map(d=>{
+                    const placed = isPlaced(d);
+                    return (
+                      <div key={d.id} onClick={()=>toggle(d)}
+                        style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 6px",background:placed?`${acc}20`:"rgba(0,0,0,0.4)",border:`2px solid ${placed?acc:"#333"}`,borderRadius:6,cursor:"pointer",boxShadow:placed?`0 0 10px ${pt.glow||acc}50`:"none"}}>
+                        <span style={{fontSize:24}}>{d.emoji}</span>
+                        <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",textAlign:"center",lineHeight:1.2}}>{d.name}</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:placed?"#5CAD68":"#777"}}>{placed?"✅ PLACÉ":"Placer"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>}
+              {foreign>0 && (
+                <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#667",textAlign:"center"}}>
+                  {foreign} décoration{foreign>1?"s":""} d'un autre thème t'attend{foreign>1?"ent":""} — reprends ce thème pour la{foreign>1?"les":""} revoir! ✨
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* INVENTORY TAB */}
         {tab==="inventory" && <>
