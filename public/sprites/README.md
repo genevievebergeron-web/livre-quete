@@ -34,3 +34,20 @@ x32-40, y50-58) · souliers = y59-64 par-dessus le bas des jambes.
 trame 72 est une étape manuelle (session avec Gen, jamais en autonome). Sorties brutes
 dans `avatar/_raw/`, seuls les PNG registrés vont dans `avatar/`.
 Jobs d'exemple : `scripts/jobs-avatar-exemple.json` (`node scripts/pixellab.mjs <jobs>`).
+
+## Personnage détaillé (chantier E) — spec de style validée avec Gen (2026-07-27)
+
+- **Deux silhouettes** : `bd_ado` (défaut — les 4 enfants) et `bd_enfant` (champ
+  `avatar.build`, choisi à l'onboarding et dans Mon Perso > Silhouette). Chaque pièce
+  PNG du personnage détaillé existe par silhouette.
+- **Style** : même langage que la chambre (`deco/room.png` + meubles) — pixels francs
+  16-bit, PAS de rendu lissé/anti-aliasé plus fin que le décor. L'échantillon ado
+  (proportions élancées, hoodie) est la référence approuvée, MAIS :
+  - **Échelle** : cohérente avec les meubles (personnage ≈ 1,6× la hauteur du lit),
+    pieds ANCRÉS au sol (pas de flottement) — vérifier en composition dans room.png
+    avant d'approuver chaque lot.
+  - **Fille/garçon neutres** : silhouettes NON sexualisées — pose neutre, vêtements
+    amples ; exigence explicite de Gen, non négociable.
+- Budget : essai PixelLab presque épuisé — lot complet (~40 pièces × 2 silhouettes)
+  après décision abonnement (12 $ US/mois, 1 mois suffit) ou validation de la chaîne
+  Gemini (voir scripts/gemini-pixel-cleanup.py à venir).

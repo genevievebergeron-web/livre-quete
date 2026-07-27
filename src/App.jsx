@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.11.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.11.0", date:"2026-07-27", features:[
+    "🧑 Ton héros peut maintenant être un ADO ou un ENFANT — choisis ta silhouette dans Mon Perso (onglet Silhouette). Le look détaillé s'en vient!",
+  ]},
   { version:"2.10.0", date:"2026-07-27", features:[
     "🏠 Ta maison est devenue MAGNIFIQUE : vrais meubles en pixel art (lit, fauteuil, coffre à jouets, fenêtre ensoleillée…), tapisseries et planchers dessinés comme dans un jeu vidéo rétro!",
     "🖼️ Ta chambre s'affiche maintenant en grande bannière sur ton écran d'accueil, avec ton héros dedans — touche-la pour la décorer!",
@@ -1279,6 +1282,7 @@ const migrateGameState = (gs) => {
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
       back:"bk0", shoes:"sh0",                    // v2.7.0 — nouveaux slots (défaut "Aucun")
+      build:"bd_ado",                             // v2.11.0 — silhouette (les 4 enfants sont ados)
       ...oldAvatar,
       configured: oldAvatar.configured ?? hasPin, // v1.6.0 — true = onboarding complété
     },
@@ -5287,6 +5291,16 @@ function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin, onSetP
               <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
                 <AvatarCanvas avatarDef={draftAvatar} bodyColor={getPlayerTheme(draftTheme||"none").charBodyColor||accentColor} size={80}
                   style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
+              </div>
+              {/* Silhouette (demande Gen 2026-07-27) — choix à la création de compte. Pas d'effet
+                  visuel sur le rendu procédural : sélectionnera le personnage détaillé (chantier E). */}
+              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}>
+                {AVATAR_PARTS.build.map(b=>(
+                  <button key={b.id} onClick={()=>{setDraftAvatar(d=>({...d,build:b.id}));SFX.click();}}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:(draftAvatar.build||"bd_ado")===b.id?accentColor:"#1a1a1a",color:(draftAvatar.build||"bd_ado")===b.id?"#0d0d0d":"#888",border:`2px solid ${(draftAvatar.build||"bd_ado")===b.id?accentColor:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                    {b.emoji} {b.label}
+                  </button>
+                ))}
               </div>
               <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:10,flexWrap:"wrap"}}>
                 {[["hair","Cheveux"],["skin","Peau"],["eyes","Yeux"],["mouth","Bouche"]].map(([k,l])=>(

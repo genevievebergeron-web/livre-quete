@@ -22,7 +22,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
   const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id) && i.slot!=="deco");
   const eq = pState.equipped || {};
 
-  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers"};
+  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers", build:"🧑 Silhouette"};
 
   const update = (part, id) => { SFX.click(); onUpdateAvatar({...avatarDef,[part]:id}); };
 
@@ -119,11 +119,13 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
               ))}
             </div>
           )}
-          {/* Refonte avatar 2026-07-27 — nouveaux slots gratuits (option "Aucun" en premier) */}
-          {(partTab==="back"||partTab==="shoes") && (
+          {/* Refonte avatar 2026-07-27 — nouveaux slots gratuits (option "Aucun" en premier).
+              build = silhouette (Ado/Enfant, défaut Ado) : aucun effet procédural, prépare le
+              personnage détaillé du chantier E. */}
+          {(partTab==="back"||partTab==="shoes"||partTab==="build") && (
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
               {AVATAR_PARTS[partTab].map(p=>{
-                const sel = avatarDef[partTab]===p.id || (!avatarDef[partTab] && p.id.endsWith("0"));
+                const sel = avatarDef[partTab]===p.id || (!avatarDef[partTab] && (p.id.endsWith("0")||p.id==="bd_ado"));
                 const col = p.color || "#888";
                 return (
                   <div key={p.id} onClick={()=>update(partTab,p.id)}

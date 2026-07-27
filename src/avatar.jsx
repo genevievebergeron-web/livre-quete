@@ -54,6 +54,13 @@ export const AVATAR_PARTS = {
     {id:"bk2",emoji:"🦇",label:"Ailes de dragon", color:"#7A4A9E"},
     {id:"bk3",emoji:"🧣",label:"Cape",            color:"#B0413E"},
   ],
+  // Silhouette (demande Gen 2026-07-27, choisie à la création de compte) — pas de couche
+  // dessinée : aucune différence dans le rendu procédural actuel. Sélectionnera le jeu de
+  // PNG du personnage détaillé (chantier E : pièces par silhouette). Extensible sans migration.
+  build: [
+    {id:"bd_ado",   emoji:"🧑",label:"Ado"},
+    {id:"bd_enfant",emoji:"🧒",label:"Enfant"},
+  ],
   shoes: [ // par-dessus le bas des jambes (y59-64)
     {id:"sh0",emoji:"🚫",label:"Aucun"},
     {id:"sh1",emoji:"👟",label:"Baskets",   color:"#C8524A"},
@@ -63,7 +70,7 @@ export const AVATAR_PARTS = {
   ],
 };
 
-export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1", back:"bk0", shoes:"sh0" };
+export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1", back:"bk0", shoes:"sh0", build:"bd_ado" };
 
 // Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`,
 // jamais de sprite sheet. L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
