@@ -50,9 +50,17 @@ export const AVATAR_PARTS = {
   // Pas de slot "accessoires de tête" : les chapeaux/visages ÉQUIPÉS couvrent déjà ça.
   back: [ // couche ARRIÈRE, derrière tout le personnage
     {id:"bk0",emoji:"🚫",label:"Aucun"},
-    {id:"bk1",emoji:"🦋",label:"Ailes de fée",    color:"#B48CD9"},
+    // bk1 : ailes de fée → ailes PLUMÉES (décision Gen 2026-07-27 — 4 garçons)
+    {id:"bk1",emoji:"🕊️",label:"Ailes plumées",   color:"#E8E0CC"},
     {id:"bk2",emoji:"🦇",label:"Ailes de dragon", color:"#7A4A9E"},
     {id:"bk3",emoji:"🧣",label:"Cape",            color:"#B0413E"},
+  ],
+  // Extras (demande Gen 2026-07-27) : cornes+queue, tentacules… (bras supp. à venir).
+  // Rendu UNIQUEMENT en mode détaillé v2 (aucun repli procédural — trop fin pour les blocs).
+  extra: [
+    {id:"xt0",emoji:"🚫",label:"Aucun"},
+    {id:"xt1",emoji:"😈",label:"Cornes de démon", color:"#8B2500"},
+    {id:"xt2",emoji:"🐙",label:"Tentacules",      color:"#9B59B6"},
   ],
   // Silhouette (demande Gen 2026-07-27, choisie à la création de compte) — pas de couche
   // dessinée : aucune différence dans le rendu procédural actuel. Sélectionnera le jeu de
@@ -70,7 +78,7 @@ export const AVATAR_PARTS = {
   ],
 };
 
-export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1", back:"bk0", shoes:"sh0", build:"bd_ado" };
+export const DEFAULT_AVATAR = { skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1", back:"bk0", shoes:"sh0", extra:"xt0", build:"bd_ado" };
 
 // Refonte visuelle Phase 5 — humeurs : surcharges locales yeux/bouche, même patron que `blink`,
 // jamais de sprite sheet. L'identité (peau/cheveux/couleurs) ne bouge JAMAIS, seule l'expression change.
@@ -98,6 +106,68 @@ function getAvatarPng(partId){
 // Les canvases s'abonnent pour se redessiner quand un PNG finit de charger
 // (événement ponctuel de chargement, pas une animation — conforme au mode calme).
 export function onAvatarPngLoaded(cb){ _pngListeners.add(cb); return ()=>_pngListeners.delete(cb); }
+
+// ─── MOTEUR DÉTAILLÉ v2 (chantier E, 2026-07-27) ─────────────────────────────
+// Pièces 144×144 registrées dans /sprites/avatar/v2/ (générées PixelLab, pipeline
+// scripts/avatar-lot.py). Le mode détaillé s'active dès que le CORPS de la silhouette
+// est chargé ; sinon le rendu procédural 72 sert de repli intégral (jamais de mélange
+// des deux anatomies). Suffixe _e = silhouette enfant.
+const _v2Cache = new Map();
+function getV2Png(name){
+  if(!name) return null;
+  let e = _v2Cache.get(name);
+  if(!e){
+    const img = new Image();
+    e = { status:"loading", img };
+    img.onload  = ()=>{ e.status="ok";   _pngListeners.forEach(f=>f()); };
+    img.onerror = ()=>{ e.status="fail"; };
+    img.src = `/sprites/avatar/v2/${name}.png`;
+    _v2Cache.set(name, e);
+  }
+  return e.status==="ok" ? e.img : null;
+}
+const v2Suffix = (av)=> (av.build==="bd_enfant" ? "_e" : "");
+const v2Body   = (av)=> (av.build==="bd_enfant" ? "body_enfant" : "body_ado");
+// Le mode détaillé est-il prêt pour cet avatar ? (utilisé aussi par EquippedGear)
+export function isDetailedReady(avatarDef){
+  const av = {...DEFAULT_AVATAR, ...avatarDef};
+  return !!getV2Png(v2Body(av));
+}
+
+// Corps re-teint (peau + chandail) — la base est générée avec une peau pêche et un
+// chandail gris VOULUS pour ça. Détection par heuristique de couleur, remap de
+// luminance vers la cible ; résultat mis en cache par (corps, peau, chandail).
+const _tintCache = new Map();
+function tintedBody(bodyName, skinColor, shirtColor){
+  const key = `${bodyName}|${skinColor}|${shirtColor}`;
+  const hit = _tintCache.get(key);
+  if(hit) return hit;
+  const img = getV2Png(bodyName);
+  if(!img) return null;
+  const c = document.createElement("canvas"); c.width = c.height = 144;
+  const x = c.getContext("2d");
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, 144, 144);
+  const px = d.data;
+  const hex = (h)=>{ h=h.replace("#",""); if(h.length===3) h=h.split("").map(v=>v+v).join(""); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
+  const skin = hex(skinColor||"#FFCC99"), shirt = hex(shirtColor||"#4A90D9");
+  for(let i=0;i<px.length;i+=4){
+    if(px[i+3] < 40) continue;
+    const r=px[i], g=px[i+1], b=px[i+2];
+    const mx=Math.max(r,g,b), mn=Math.min(r,g,b), lum=(r*3+g*6+b)/10;
+    const f = Math.min(1.7, Math.max(0.3, lum/170));
+    if(r>110 && r>g && g>b && (r-b)>28 && (r-b)<130 && mx>140){        // peau pêche
+      px[i]=Math.min(255,skin[0]*f); px[i+1]=Math.min(255,skin[1]*f); px[i+2]=Math.min(255,skin[2]*f);
+    } else if((mx-mn)<26 && lum>95 && lum<235){                        // gris du chandail
+      const g2 = Math.min(1.6, Math.max(0.35, lum/165));
+      px[i]=Math.min(255,shirt[0]*g2); px[i+1]=Math.min(255,shirt[1]*g2); px[i+2]=Math.min(255,shirt[2]*g2);
+    }
+  }
+  x.putImageData(d, 0, 0);
+  _tintCache.set(key, c);
+  return c;
+}
 
 // ─── Fonctions de tracé procédural (repli) — repère natif 72 unités ──────────
 // Géométrie = CONTRAT partagé avec AVATAR_EQUIP_ANCHORS (sprites.jsx) :
@@ -250,6 +320,26 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
 
   ctx.clearRect(0,0,W,H);
   ctx.imageSmoothingEnabled = false; // pixel art net à toute échelle
+
+  // ── MODE DÉTAILLÉ v2 : personnage PixelLab 144, activé dès que le corps est chargé.
+  // Tout-ou-rien : jamais de pièce 144 sur l'anatomie 72 (et vice-versa). Le clignement
+  // et les formes d'yeux/bouche choisies restent propres au mode procédural (le visage
+  // détaillé = neutre + surcouches d'humeur, décision documentée au README sprites).
+  {
+    const body = tintedBody(v2Body(av), skinPart.color, bodyColor || "#4A90D9");
+    if (body) {
+      const sfx = v2Suffix(av);
+      const draw = (name)=>{ const im = name && getV2Png(name); if(im) ctx.drawImage(im, 0, 0, W, H); };
+      if (av.back  && !av.back.endsWith("0"))  draw(av.back + sfx);   // ailes/cape (derrière)
+      ctx.drawImage(body, 0, 0, W, H);                                 // corps re-teint
+      if (av.extra && !av.extra.endsWith("0")) draw(av.extra + sfx);  // cornes/tentacules
+      if (av.hair)                             draw(av.hair + sfx);   // chevelure
+      if (mood && mood !== "neutral")          draw(`face_${mood}${sfx}`); // humeur
+      if (av.shoes && !av.shoes.endsWith("0")) draw(av.shoes + sfx);  // souliers
+      return;
+    }
+  }
+
   const hairImg = getAvatarPng(av.hair);
   for (const L of AVATAR_LAYERS) {
     if (L.key==="hairBack" && hairImg) continue; // le PNG cheveux couvre les deux passes

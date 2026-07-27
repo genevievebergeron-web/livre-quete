@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx } from "./pets.js";
 import { rarityOf } from "./catalog.js";
-import { renderAvatarToCtx } from "./avatar.jsx";
+import { renderAvatarToCtx, isDetailedReady } from "./avatar.jsx";
 
 // v1.56.0 — Familier en pixel-art (canvas). petKey direct OU itemId (mappé). palOverride = recolorage d'élément.
 export function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary=false, style={} }) {
@@ -49,28 +49,54 @@ export const AVATAR_EQUIP_ANCHORS = {
   weapon: { cx:37, cy:32, wRatio:0.36, rotate:22, shadow:true },    // tenue dans la main droite (bras natif x32-38 y28-42), légère inclinaison
   themed: { cx:29, cy:53, wRatio:0.22 },                           // accessoire secondaire, à la ceinture/jambe
 };
-export function equipAnchorStyle(key, size) {
-  const A = AVATAR_EQUIP_ANCHORS[key];
+// Ancres pour le PERSONNAGE DÉTAILLÉ v2 (trame 144, chantier E) — anatomie de la base :
+// tête x≈52-92 y≈12-52 (centre x72), torse y≈54-96, main droite x≈100 y≈80, pieds y≈135.
+export const AVATAR_EQUIP_ANCHORS_V2 = {
+  hat:    { cx:72,  cy:1,   wRatio:0.28, shadow:true, base:144 },
+  face:   { cx:72,  cy:33,  wRatio:0.20, base:144 },
+  armor:  { cx:72,  cy:76,  wRatio:0.30, shadow:true, base:144 },
+  weapon: { cx:103, cy:80,  wRatio:0.30, rotate:22, shadow:true, base:144 },
+  themed: { cx:93,  cy:110, wRatio:0.18, base:144 },
+};
+export function equipAnchorStyle(key, size, detailed=false) {
+  const A = detailed ? AVATAR_EQUIP_ANCHORS_V2[key] : AVATAR_EQUIP_ANCHORS[key];
+  const base = A.base || 72;
   const w = Math.round(size*A.wRatio);
   return {
-    position:"absolute", left:Math.round(A.cx/72*size), top:Math.round(A.cy/72*size),
+    position:"absolute", left:Math.round(A.cx/base*size), top:Math.round(A.cy/base*size),
     width:w, height:w,
     transform:`translate(-50%,-50%)${A.rotate?` rotate(${A.rotate}deg)`:""}`,
     filter:A.shadow?"drop-shadow(0 2px 0 #0d0d0d)":undefined,
     pointerEvents:"none",
   };
 }
+// Armures générées en couche PLEINE TRAME v2 (a6-a9) : portées exactement sur le corps
+// détaillé — jamais utilisées en mode procédural (repli = emoji à l'ancre armor).
+export const V2_FULLFRAME_ARMOR = new Set(["a6","a7","a8","a9"]);
+function FullFrameArmor({ id, sfx, size }){
+  const [fail, setFail] = useState(false);
+  if(fail) return null;
+  return <img src={`/sprites/avatar/v2/${id}${sfx}.png`} alt="" onError={()=>setFail(true)}
+    style={{position:"absolute",left:0,top:0,width:size,height:size,imageRendering:"pixelated",pointerEvents:"none"}}/>;
+}
 // Rendu commun des items équipés "portés" sur l'avatar (chapeau/visage/arme-ou-armure au bon endroit anatomique).
 // Le familier (eq.pet) reste géré séparément à chaque site d'appel (il est À CÔTÉ du perso, pas porté dessus).
-export function EquippedGear({ eq, items, size }) {
+// `avatarDef` (optionnel) : active les ancres v2 + les armures pleine-trame quand le
+// personnage détaillé est chargé pour cette silhouette. Sans lui : comportement v1.
+export function EquippedGear({ eq, items, size, avatarDef=null }) {
   if (!eq) return null;
   const find = id => items.find(i=>i.id===id);
+  const det = avatarDef ? isDetailedReady(avatarDef) : false;
+  const sfx = det && avatarDef?.build==="bd_enfant" ? "_e" : "";
   const armorAnchor = eq.armor && HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor";
+  const armorFull = det && eq.armor && V2_FULLFRAME_ARMOR.has(eq.armor);
   return (<>
-    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size).width}         style={equipAnchorStyle("hat",size)}/>}
-    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size).width}        style={equipAnchorStyle("face",size)}/>}
-    {eq.armor  && <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size).width}   style={equipAnchorStyle(armorAnchor,size)}/>}
-    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size).width}      style={equipAnchorStyle("themed",size)}/>}
+    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size,det).width}         style={equipAnchorStyle("hat",size,det)}/>}
+    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size,det).width}        style={equipAnchorStyle("face",size,det)}/>}
+    {eq.armor  && (armorFull
+      ? <FullFrameArmor id={eq.armor} sfx={sfx} size={size}/>
+      : <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size,det).width}   style={equipAnchorStyle(armorAnchor,size,det)}/>)}
+    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size,det).width}      style={equipAnchorStyle("themed",size,det)}/>}
   </>);
 }
 
@@ -80,20 +106,21 @@ export function EquippedGear({ eq, items, size }) {
 // future interaction famille. 100 % SYNCHRONE : les PNG d'items déjà en cache
 // navigateur sont composés ; sinon repli grille ITEM_SPRITES (canvas synchrone),
 // sinon emoji via fillText — le héros n'est jamais vide.
-const _itemPngCache = new Map(); // itemId -> {status, img} (même patron que le cache avatar)
-function getItemPng(itemId){
-  if(!itemId) return null;
-  let e = _itemPngCache.get(itemId);
+const _itemPngCache = new Map(); // clé src -> {status, img} (même patron que le cache avatar)
+function getPngBySrc(src){
+  if(!src) return null;
+  let e = _itemPngCache.get(src);
   if(!e){
     const img = new Image();
     e = { status:"loading", img };
     img.onload = ()=>{ e.status="ok"; };
     img.onerror = ()=>{ e.status="fail"; };
-    img.src = `/sprites/items/${itemId}.png`;
-    _itemPngCache.set(itemId, e);
+    img.src = src;
+    _itemPngCache.set(src, e);
   }
   return e.status==="ok" ? e.img : null;
 }
+const getItemPng = (itemId)=> itemId ? getPngBySrc(`/sprites/items/${itemId}.png`) : null;
 export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutral", equipped=null, items=[] } = {}){
   const c = document.createElement("canvas");
   c.width = c.height = size;
@@ -101,11 +128,19 @@ export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutra
   ctx.imageSmoothingEnabled = false;
   renderAvatarToCtx(ctx, avatarDef, bodyColor, size, size, false, mood);
   const eq = equipped || {};
+  const det = isDetailedReady(avatarDef||{});
+  const sfx = det && avatarDef?.build==="bd_enfant" ? "_e" : "";
   const drawGear = (id, anchorKey) => {
     if(!id) return;
-    const A = AVATAR_EQUIP_ANCHORS[anchorKey];
+    if(det && V2_FULLFRAME_ARMOR.has(id)){ // armure pleine-trame portée sur le corps détaillé
+      const im = getPngBySrc(`/sprites/avatar/v2/${id}${sfx}.png`);
+      if(im) ctx.drawImage(im, 0, 0, size, size);
+      return;
+    }
+    const A = det ? AVATAR_EQUIP_ANCHORS_V2[anchorKey] : AVATAR_EQUIP_ANCHORS[anchorKey];
+    const base = A.base || 72;
     const w = Math.round(size*A.wRatio);
-    const cx = A.cx/72*size, cy = A.cy/72*size;
+    const cx = A.cx/base*size, cy = A.cy/base*size;
     ctx.save();
     ctx.translate(cx, cy);
     if(A.rotate) ctx.rotate(A.rotate*Math.PI/180);

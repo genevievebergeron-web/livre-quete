@@ -22,7 +22,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
   const allOwned = allShopItems.filter(i => pState.owned?.includes(i.id) && i.slot!=="deco");
   const eq = pState.equipped || {};
 
-  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers", build:"🧑 Silhouette"};
+  const PART_TABS = {skin:"🎨 Peau", eyes:"👀 Yeux", mouth:"👄 Bouche", hair:"💇 Cheveux", back:"🦋 Dos", shoes:"👟 Souliers", extra:"🐙 Extras", build:"🧑 Silhouette"};
 
   const update = (part, id) => { SFX.click(); onUpdateAvatar({...avatarDef,[part]:id}); };
 
@@ -43,7 +43,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             <AvatarCanvas avatarDef={avatarDef} bodyColor={pt.charBodyColor||player.color} size={120}
               style={{border:`4px solid ${pt.accent||"#D9BC5C"}`,boxShadow:`0 0 20px ${pt.glow||"#D9BC5C"}50`}}/>
             {/* v1.81.0 — items équipés PORTÉS sur l'avatar, ancrés sur la vraie géométrie du corps (EquippedGear) */}
-            <EquippedGear eq={eq} items={allShopItems} size={120}/>
+            <EquippedGear eq={eq} items={allShopItems} size={120} avatarDef={avatarDef}/>
             {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-10,left:-14,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={48}/></div> : <span style={{position:"absolute",bottom:-12,left:-12,fontSize:28,pointerEvents:"none"}}>{allShopItems.find(i=>i.id===eq.pet)?.emoji}</span>)}
           </div>
           <div>
@@ -122,7 +122,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
           {/* Refonte avatar 2026-07-27 — nouveaux slots gratuits (option "Aucun" en premier).
               build = silhouette (Ado/Enfant, défaut Ado) : aucun effet procédural, prépare le
               personnage détaillé du chantier E. */}
-          {(partTab==="back"||partTab==="shoes"||partTab==="build") && (
+          {(partTab==="back"||partTab==="shoes"||partTab==="extra"||partTab==="build") && (
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
               {AVATAR_PARTS[partTab].map(p=>{
                 const sel = avatarDef[partTab]===p.id || (!avatarDef[partTab] && (p.id.endsWith("0")||p.id==="bd_ado"));

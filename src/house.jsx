@@ -18,7 +18,7 @@ export const DEFAULT_HOUSE = { wallpaper:null, floor:null, placed:{} };
 export const HOUSE_ANCHORS = {
   poster: { x:14, y:20,  wall:true,  size:0.14, label:"Mur gauche" },
   trophy: { x:36, y:16,  wall:true,  size:0.12, label:"Tablette" },
-  window: { x:80, y:22,  wall:true,  size:0.20, label:"Fenêtre" },
+  window: { x:50, y:18,  wall:true,  size:0.20, label:"Fenêtre" }, // centrée (V3 approuvée par Gen)
   lamp:   { x:8,  y:30,  wall:false, size:0.13, label:"Coin gauche" },
   bed:    { x:24, y:12,  wall:false, size:0.24, label:"Lit" },
   rug:    { x:52, y:2,   wall:false, size:0.26, label:"Tapis" },
@@ -81,7 +81,7 @@ function RoomImg(){
   const [fail, setFail] = useState(false);
   if(fail) return null;
   return <img src="/sprites/deco/room.png" alt="" onError={()=>setFail(true)}
-    style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",imageRendering:"pixelated"}}/>;
+    style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center 78%",imageRendering:"pixelated"}}/>;
 }
 
 // La scène. `pState.house` = { wallpaper, floor, placed:{anchorId:itemId} }.
@@ -123,7 +123,7 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) 
       <div style={{position:"absolute",left:"50%",bottom:Math.round(floorH*0.12),transform:"translateX(-50%)"}}>
         <div style={{position:"relative"}}>
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={avSz}/>
-          <EquippedGear eq={pState.equipped} items={ALL_SHOP_ITEMS} size={avSz}/>
+          <EquippedGear eq={pState.equipped} items={ALL_SHOP_ITEMS} size={avSz} avatarDef={pState.avatar}/>
         </div>
       </div>
       {(pState.equipped?.pet && petSpriteKey(pState.equipped.pet)) &&

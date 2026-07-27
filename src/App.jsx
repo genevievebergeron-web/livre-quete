@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.11.2";
+const APP_VERSION = "2.12.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.12.0", date:"2026-07-27", features:[
+    "🎨 TON HÉROS FAIT PEAU NEUVE : nouveau personnage détaillé en pixel art — ta peau, tes cheveux, tes ailes (plumées ou de dragon!), ta cape et tes souliers en vrai style jeu vidéo. Choisis Ado ou Enfant dans Mon Perso!",
+    "😈 Nouvel onglet EXTRAS dans Mon Perso : cornes de démon avec queue, tentacules…",
+    "🧻 Nouvelles armures dans la Boutique : armure de papier de toilette, armure de post-it, armure de chevalier et armure royale dorée — portées directement sur ton héros!",
+  ]},
   { version:"2.11.2", date:"2026-07-27", features:[
     "☀️ « Ma journée » (mode Semaine) trie maintenant tes quêtes par moment : 🌅 Matin, ☀️ Après-midi, 🌙 Soir — plus facile de voir quoi faire quand!",
     "🕐 Quand tu crées ta propre quête, tu peux maintenant choisir à quel moment de la journée elle se fait.",
@@ -1289,7 +1294,7 @@ const migrateGameState = (gs) => {
     // comme boughtRewards) — AUCUN changement client/serveur requis, miroir server.cjs intouché.
     avatar: {
       skin:"sk1", eyes:"ey1", mouth:"mo1", hair:"ha1",
-      back:"bk0", shoes:"sh0",                    // v2.7.0 — nouveaux slots (défaut "Aucun")
+      back:"bk0", shoes:"sh0", extra:"xt0",       // v2.7.0/v2.12.0 — slots (défaut "Aucun")
       build:"bd_ado",                             // v2.11.0 — silhouette (les 4 enfants sont ados)
       ...oldAvatar,
       configured: oldAvatar.configured ?? hasPin, // v1.6.0 — true = onboarding complété
@@ -1990,7 +1995,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={72} mood={dashboardMood}
             style={{border:`4px solid ${pt.accent||player.color}`,boxShadow:`0 0 14px ${pt.glow||player.color}50`,display:"block"}}/>
           {/* v1.81.0 — ancré sur la vraie géométrie du corps (EquippedGear), voir plus haut */}
-          <EquippedGear eq={eq} items={allShopItemsFlat} size={72}/>
+          <EquippedGear eq={eq} items={allShopItemsFlat} size={72} avatarDef={pState.avatar}/>
           {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-8,left:-10,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={30}/></div> : <span style={{position:"absolute",bottom:-8,left:-6,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>)}
           <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",whiteSpace:"nowrap"}}>✏️ Modifier</div>
         </div>
@@ -6662,17 +6667,26 @@ export default function App() {
   },[gameStates,config,persist,showToast]);
 
   // 🎾 Jouer avec le familier → coûte de l'énergie, donne de l'XP au familier
+  // v2.11.3 — bug_lyr5812 (signalé par un enfant : « familier peut jouer à l'infini ») : la vraie
+  // cause n'était pas l'absence de plafond quotidien (gainPet le respecte déjà, PET_DAILY_CAP=50)
+  // mais le toast qui affirmait « gagne de l'XP » à CHAQUE clic, même une fois le plafond atteint —
+  // l'enfant pouvait donc jouer sans fin en croyant progresser alors que 0 XP était accordé. Fix :
+  // toast honnête selon le gain réel, jeu (énergie, animation) toujours permis — pas de blocage dur,
+  // cohérent avec le principe directeur (mise en scène OUI, jamais de fausse récompense).
   const handlePlayPet = useCallback((playerIdx)=>{
     const p=gameStates[playerIdx]; if(!p) return;
     const eqPet=p.equipped?.pet;
     if(!eqPet){ showToast("Équipe d'abord un familier 🐾","#D99248",2500); return; }
     if(currentEnergy(p)<PLAY_ENERGY){ const m=minsToEnergy(p,PLAY_ENERGY); showToast(`💤 Ton familier fait une sieste… reviens dans ~${m} min!`,"#85CDD1",3500); return; }
+    const today=todayStamp();
+    const roomBefore=Math.max(0, PET_DAILY_CAP-((p.petDay&&p.petDay.day===today)?(p.petDay.xp||0):0));
+    const gained=Math.min(10,roomBefore)>0;
     setGameStates(gs=>{ const n=[...gs]; const q=n[playerIdx]; const _g=gainPet(q,eqPet,10);
       n[playerIdx]={...q, energy:Math.max(0, currentEnergy(q)-PLAY_ENERGY), energyTs:new Date().toISOString(),
         petXp:_g.petXp, petDay:_g.petDay };
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎾"); SFX.click&&SFX.click(); }catch{} },80);
-    showToast("🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟","#D9BC5C",2800);
+    showToast(gained ? "🎾 Vous vous êtes bien amusés! Ton familier gagne de l'XP 🌟" : "🎾 Vous vous êtes bien amusés! (Ton familier a atteint son max d'XP du jour — reviens demain 🌙)","#D9BC5C",2800);
   },[gameStates,config,persist,showToast]);
 
   // v2.4.2 — l'enfant donne un surnom à son familier équipé
