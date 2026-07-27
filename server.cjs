@@ -114,7 +114,11 @@ const mergeGS = (a, b, preferIncoming) => {
     hiddenRewards: _uniq([...(a.hiddenRewards||[]), ...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
     dailyClaimed: (() => { const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
-    pendingCelebrations: preferIncoming ? (b.pendingCelebrations||[]) : (a.pendingCelebrations||[]),
+    // v2.12.2 — miroir du fix client (bug "notification félicitation qui revient sans cesse") :
+    // dernière-écriture-gagne laissait une soeur/frère au savedAt plus récent ressusciter en bloc
+    // une file jamais vidée. Union + tombstone consumedCelebrationIds, même patron que refundedRewards.
+    consumedCelebrationIds: _uniq([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]).slice(-300),
+    pendingCelebrations: (() => { const consumed = new Set([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]); const seen = new Set(); const out = []; for (const c of [...(a.pendingCelebrations||[]), ...(b.pendingCelebrations||[])]) { if (!c || !c.id || consumed.has(c.id) || seen.has(c.id)) continue; seen.add(c.id); out.push(c); } return out; })(),
     petXp: mergePetXp(a.petXp, b.petXp),
     petDay: (() => { const A=a.petDay||{}, B=b.petDay||{}; if (A.day && A.day===B.day) return { day:A.day, xp:Math.max(A.xp||0,B.xp||0) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     petEvo: (() => { const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(),

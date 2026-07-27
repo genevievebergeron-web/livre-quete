@@ -129,3 +129,26 @@ Une autre session travaillait en direct sur `App.jsx` pendant ce passage (HMR vi
 Popup avatar/familier (header sticky avec 20+ items), onglets Défis/Annonces/Sauvegarde du tiroir parent, calendrier à 22 événements (vue "MON CALENDRIER" pas encore ouverte visuellement), ajustement XP/pièces à 0 ou négatif dans l'onglet Actions, achats de Chapeaux/Armures/Familiers (seule la Boutique onglet Récompenses a été testée cette passe), les 3 coffres (Commun/Rare/Légendaire).
 
 ### `config.errorLogs` — vide, rien à investiguer cette passe.
+
+---
+
+## Bug live signalé par Gen le 2026-07-27 — notification de célébration qui revient sans cesse (Antoine Emery)
+
+Gen : « Antoinou le goat a une notification félicitation de tâche complétée qui revient sans cesse. »
+
+### 🐛 Bug trouvé et corrigé — ✅ v2.12.2
+Lecture prod (lecture seule) : le gameState d'Antoine Emery (`q2ymbl8`) avait **29 entrées empilées** dans `pendingCelebrations` — la file de célébrations « à jouer à la prochaine connexion de l'enfant » (`consumeCelebrations`, `App.jsx` ~5988) était censée se vider dès qu'elle est montrée, mais ne s'est jamais vidée pour de bon.
+
+**Root cause** : `mergeGameState`/`mergeGS` (`App.jsx` + `server.cjs`) traitaient `pendingCelebrations` en dernière-écriture-gagne (commentaire d'origine : « l'union empêcherait l'enfant de la vider après l'avoir jouée »). Mais dernière-écriture-gagne est arbitré par le `savedAt` GLOBAL de la famille (un seul horodatage pour tout le blob), pas par appareil/enfant : dès qu'un AUTRE enfant (frère/sœur) sauvegardait quoi que ce soit avec un `savedAt` plus récent, sa copie locale — potentiellement une vieille copie du gameState d'Antoine, jamais synchronisée depuis le dernier vidage — gagnait la fusion en bloc et **ressuscitait toute l'ancienne file non vidée**. Chaque nouvelle quête validée pour Antoine s'ajoutait par-dessus sans jamais repartir de zéro, d'où l'accumulation à 29 et la notification qui « revient sans cesse ».
+
+**Fix** : même patron que le tombstone `refundedRewards` (déjà dans le code, v1.69.0) — nouveau champ `consumedCelebrationIds` (union, plafonné à 300), et `pendingCelebrations` fusionne maintenant par **union-par-id puis filtre les ids déjà consommés**, au lieu de « dernière écriture gagne ». `consumeCelebrations` ajoute les ids au tombstone en plus de vider la file. Miroir appliqué dans `server.cjs`. 3 sites de création de célébration (victoire de boss) qui n'avaient pas d'`id` stable en ont reçu un.
+
+**Vérifié** :
+- Script Node isolé reproduisant exactement la course (appareil A = vidé+tombstoné, appareil B = copie périmée non vidée, fusion dans les 2 sens) : ancien comportement ressuscitait bien 3 items, nouveau comportement reste à `[]` dans les 2 sens ; une nouvelle célébration légitime survit bien à la fusion (pas de sur-suppression).
+- Navigateur : célébration groupée « 2 quêtes validées pendant ton absence! » s'affiche et se ferme normalement (zéro régression sur le flux simple), `pendingCelebrations` vidé + `consumedCelebrationIds` peuplé après consommation.
+- `npm run build` propre.
+
+**Auto-guérison prod** : pas d'écriture directe en prod (jamais de PUT depuis cette session). La file de 29 items d'Antoine se videra proprement (célébration groupée unique « 29 quêtes validées pendant ton absence! ») dès que son appareil se synchronise avec le nouveau code — le tombstone empêchera ensuite toute résurrection future, peu importe quel appareil gagne la fusion.
+
+### ⚠️ Collision concurrente rencontrée et gérée
+Une autre session travaillait en direct sur `App.jsx`/`avatar.jsx`/`house.jsx`/`sprites.jsx`/`themes.js` pendant ce fix (chantier avatar détaillé, commits `2b0fb61`→`7572589` poussés pendant que ce fix était en cours). Un correctif précédent (v2.12.1, toast honnête du plafond XP familier) s'était même retrouvé inclus par erreur dans leur commit `7572589` en cours de route — documenté après coup dans une entrée dédiée. Pour ce fix-ci, commit scoping vérifié avant `git add` (`git diff --stat` limité à `server.cjs`+`src/App.jsx`, aucun fichier avatar touché).

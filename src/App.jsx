@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.12.1";
+const APP_VERSION = "2.12.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.12.2", date:"2026-07-27", features:[
+    "🎉 Correction : la notification « bravo, quête complétée! » pouvait revenir sans arrêt pour un même enfant — c'est réglé, elle ne repasse plus une fois vue.",
+  ]},
   { version:"2.12.1", date:"2026-07-27", features:[
     "🎾 Correction : jouer avec ton familier disait toujours « gagne de l'XP », même quand il avait déjà atteint son max du jour — le message est maintenant honnête!",
   ]},
@@ -1023,8 +1026,13 @@ const mergeGS = (a, b, preferIncoming) => {
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
     dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     ritualCelebrated: (()=>{ const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.68.0 (B5) — garde « rituel déjà fêté aujourd'hui »
-    // File « consommable » : dernière écriture gagne (l'union empêcherait l'enfant de la vider après l'avoir jouée)
-    pendingCelebrations: preferIncoming ? (b.pendingCelebrations || []) : (a.pendingCelebrations || []),
+    // v2.12.2 — bug signalé par Gen (« notification félicitation qui revient sans cesse ») : la file
+    // « consommable » utilisait dernière-écriture-gagne (l'union empêcherait l'enfant de la vider), mais
+    // ça laissait un appareil FRÈRE/SŒUR non lié (savedAt global plus récent, mais qui n'a jamais vu le
+    // vidage local) ressusciter en bloc l'ancienne file non vidée à chaque fusion — même patron que le
+    // tombstone refundedRewards ci-dessus (union increvable, jamais de résurrection après consommation).
+    consumedCelebrationIds: _uniq([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]).slice(-300),
+    pendingCelebrations: (()=>{ const consumed=new Set([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]); const seen=new Set(); const out=[]; for(const c of [...(a.pendingCelebrations||[]), ...(b.pendingCelebrations||[])]){ if(!c||!c.id||consumed.has(c.id)||seen.has(c.id))continue; seen.add(c.id); out.push(c); } return out; })(),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
     petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
@@ -1277,6 +1285,7 @@ const migrateGameState = (gs) => {
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés
     pendingCelebrations: gs.pendingCelebrations || [], // v1.31.0 — fêtes (popup/jeu) différées vers l'appareil de l'enfant
+    consumedCelebrationIds: gs.consumedCelebrationIds || [], // v2.12.2 — tombstone anti-résurrection (voir mergeGameState)
     petXp: gs.petMigV2 ? (gs.petXp || {}) : migratePetXpV2(gs.petXp), // v1.52.0 — migration anti-rétrogradation (une seule fois)
     petMigV2: true, // v1.52.0 — drapeau : migration de courbe des familiers appliquée
     petDay: gs.petDay || { day:null, xp:0 }, // v1.52.0 — plafond quotidien d'XP du familier
@@ -5692,7 +5701,7 @@ export default function App() {
         owned:[...new Set([...(g.owned||[]), _it.id])],
         badges:[...new Set([...(g.badges||[]),"b_boss"])],
         bossClaimed: bid,
-        pendingCelebrations:[...(g.pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]};
+        pendingCelebrations:[...(g.pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]};
     });
     const nb = {...boss, defeatedAt:now};
     const fe = {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`};
@@ -6002,8 +6011,10 @@ export default function App() {
     const forcedType=queue.map(c=>c.game).find(Boolean)||null; // jeu imposé (ex: cadeau Pac-Man)
     // Cadeau pur (0 XP / 0 pièce / aucun badge) → on ne montre pas de popup de récompense vide
     const pendingRwd=(totXp||totCoins||allBadges.length)?{ task:{emoji,label,xp:totXp,coins:totCoins}, player, newBadges:allBadges }:null;
-    // On vide la file tout de suite (persist avec savedAt récent → reste vide après fusion cloud)
-    setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],pendingCelebrations:[]}; persist(config,n); return n; });
+    // On vide la file tout de suite ET on marque ces ids comme consommés (tombstone v2.12.2 —
+    // le simple vidage à [] ne suffit plus à empêcher une résurrection par fusion, voir mergeGameState).
+    const consumedIds=queue.map(c=>c.id).filter(Boolean);
+    setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx], pendingCelebrations:[], consumedCelebrationIds:[...new Set([...(n[idx].consumedCelebrationIds||[]), ...consumedIds])].slice(-300)}; persist(config,n); return n; });
     setTimeout(()=>{
       // v1.88.0 (Lot 3 #11) — intensité réduite pour une célébration de tâche(s) ordinaire(s);
       // pleine intensité si un vrai jalon est dedans (level-up ou victoire de boss)
@@ -6207,7 +6218,7 @@ export default function App() {
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
       const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou le familier a peut-être déjà accordé la victoire
-      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
       const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
@@ -6241,7 +6252,7 @@ export default function App() {
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
       const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou une attaque de joueur a peut-être déjà accordé la victoire
-      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
       const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
