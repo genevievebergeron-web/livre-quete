@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.11.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.11.1", date:"2026-07-27", features:[
+    "🍱 Nouvelles tâches : défaire sa boîte à lunch et en préparer une vide, du lundi au jeudi.",
+    "🔧 Correction : certains rituels restaient vides (une tâche qu'ils contenaient avait changé) — ils se nettoient maintenant tout seuls automatiquement.",
+  ]},
   { version:"2.11.0", date:"2026-07-27", features:[
     "🧑 Ton héros peut maintenant être un ADO ou un ENFANT — choisis ta silhouette dans Mon Perso (onglet Silhouette). Le look détaillé s'en vient!",
   ]},
@@ -1352,19 +1356,17 @@ const migrateSavedData = (data) => {
     orphanPendingInstanceIds = new Set(purgedFromStatic);
     mergedConfig.orphanAssignCleanupV2 = true;
   }
-  // v2.9.1 — bug signalé par Gen : « plusieurs de ses rituels sont vides » + « demandes de retrait
-  // fantômes ». Les rituels (routines[].taskIds) et les demandes de retrait (removalRequests)
-  // référencent tous deux des instanceId d'assignation — quand une assignation disparaît (rotation
-  // hebdomadaire, purge d'orphelins ci-dessus), la référence reste une carte morte pour toujours
-  // dans le rituel de l'enfant, ou une ligne fantôme dans « à valider » côté parent. Ménage ponctuel :
-  // ne retire QUE les références mortes, jamais une tâche encore valide. Calculé une seule fois ici
-  // (flag), réutilisé pour les deux nettoyages ci-dessous.
-  const doRoutineCleanupV1 = !mergedConfig.routineOrphanCleanupV1;
-  if (doRoutineCleanupV1) mergedConfig.routineOrphanCleanupV1 = true;
-  const validInstanceIdsForCleanup = doRoutineCleanupV1
-    ? new Set([...(mergedConfig.assignments||[]), ...((mergedConfig.weeklyQuests||{}).assignments||[])].map(a=>a.instanceId))
-    : null;
-  if (doRoutineCleanupV1 && Array.isArray(mergedConfig.removalRequests)) {
+  // v2.9.1 (corrigé v2.11.1) — bug signalé par Gen : « plusieurs de ses rituels sont vides » +
+  // « demandes de retrait fantômes ». Les rituels (routines[].taskIds) et les demandes de retrait
+  // (removalRequests) référencent tous deux des instanceId d'assignation — or les assignations se
+  // RÉGÉNÈRENT à chaque semaine de garde (nouveaux instanceId à chaque fois, custodyWeekKey). Un
+  // ménage à DRAPEAU UNIQUE (comme les autres ci-dessus) était donc le mauvais patron ici : il ne
+  // nettoyait qu'une fois puis se taisait pour toujours, alors que de nouvelles orphelines
+  // apparaissent chaque semaine — Olivier/Antoine DR avaient encore des rituels 100% morts après
+  // son passage. Recalculé à CHAQUE chargement (peu coûteux, idempotent sur données déjà propres) —
+  // ne retire QUE les références mortes, jamais une tâche encore valide.
+  const validInstanceIdsForCleanup = new Set([...(mergedConfig.assignments||[]), ...((mergedConfig.weeklyQuests||{}).assignments||[])].map(a=>a.instanceId));
+  if (Array.isArray(mergedConfig.removalRequests)) {
     mergedConfig.removalRequests = mergedConfig.removalRequests.filter(r => validInstanceIdsForCleanup.has(r.instanceId));
   }
   if (!Array.isArray(mergedConfig.feed)) mergedConfig.feed = []; // v1.19.0 — fil de famille
@@ -1385,10 +1387,11 @@ const migrateSavedData = (data) => {
       });
       if (filtered.length !== (next.pending || []).length) next = { ...next, pending: filtered };
     }
-    if (doRoutineCleanupV1 && Array.isArray(next.routines) && next.routines.length) {
-      // v2.9.1 — retire les taskIds morts de chaque rituel ; un rituel qui devient vide après ce
-      // nettoyage est retiré (une carte "rituel vide" n'aide personne) — activeRoutineId remis à
-      // null s'il pointait dessus, pour ne jamais laisser l'app référencer un rituel qui n'existe plus.
+    if (Array.isArray(next.routines) && next.routines.length) {
+      // v2.9.1 (corrigé v2.11.1) — retire les taskIds morts de chaque rituel, À CHAQUE chargement
+      // (voir commentaire plus haut) ; un rituel qui devient vide après ce nettoyage est retiré
+      // (une carte "rituel vide" n'aide personne) — activeRoutineId remis à null s'il pointait
+      // dessus, pour ne jamais laisser l'app référencer un rituel qui n'existe plus.
       const cleaned = next.routines
         .map(r => ({ ...r, taskIds: (r.taskIds || []).filter(id => validInstanceIdsForCleanup.has(id)) }))
         .filter(r => r.taskIds.length > 0);

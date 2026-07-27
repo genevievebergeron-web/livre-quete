@@ -152,6 +152,19 @@ export function generateCustodyWeekAssignments(players, weekKey) {
       assignments.push({ instanceId: wqId(weekKey, "tr10", antoineEmeryPlayer.id, `d${ci}s`), taskId: "tr10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "soir", isRecurring: true });
     }
 
+    // Boîte à lunch (personnel, PAS de rotation) — Olivier + Antoine Emery, lundi-jeudi seulement
+    // (jours d'école, appDay 0-3) — demande de Gen, 27 juillet.
+    if (appDay <= 3) {
+      if (oli) {
+        assignments.push({ instanceId: wqId(weekKey, "tr11", oli.id, `d${ci}`), taskId: "tr11", playerIds: [oli.id], days: [appDay], time: "après-midi", isRecurring: true });
+        assignments.push({ instanceId: wqId(weekKey, "tr12", oli.id, `d${ci}`), taskId: "tr12", playerIds: [oli.id], days: [appDay], time: "après-midi", isRecurring: true });
+      }
+      if (antoineEmeryPlayer) {
+        assignments.push({ instanceId: wqId(weekKey, "tr11", antoineEmeryPlayer.id, `d${ci}`), taskId: "tr11", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "après-midi", isRecurring: true });
+        assignments.push({ instanceId: wqId(weekKey, "tr12", antoineEmeryPlayer.id, `d${ci}`), taskId: "tr12", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "après-midi", isRecurring: true });
+      }
+    }
+
     // Jouer 45 min calmement avec son frère (Elli + Antoine Emery, personnel, pas de rotation) — demande de Gen, 25 juillet
     if (elliPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", elliPlayer.id, `d${ci}`), taskId: "td10", playerIds: [elliPlayer.id], days: [appDay], time: "", isRecurring: true });
     if (antoineEmeryPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", antoineEmeryPlayer.id, `d${ci}`), taskId: "td10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "", isRecurring: true });

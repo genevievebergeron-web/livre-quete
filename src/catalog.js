@@ -40,6 +40,9 @@ export const TASK_CATALOG = [
   { id:"tr08", emoji:"🧼",  label:"Pipi, mains, dents",                      xp:10, coins:5,  diff:"easy",   cat:"routine" },
   { id:"tr09", emoji:"💊",  label:"Prendre ma pilule (matin)",               xp:20, coins:10, diff:"easy",   cat:"routine" },
   { id:"tr10", emoji:"💊",  label:"Prendre ma pilule (soir)",                xp:20, coins:10, diff:"easy",   cat:"routine" },
+  // v2.11.1 — boîte à lunch (demande de Gen) : Olivier + Antoine Emery, lundi-jeudi seulement (école)
+  { id:"tr11", emoji:"🍱",  label:"Défaire ma boîte à lunch (PM)",           xp:15, coins:8,  diff:"easy",   cat:"routine" },
+  { id:"tr12", emoji:"🥪",  label:"Préparer une boîte à lunch vide",         xp:15, coins:8,  diff:"easy",   cat:"routine" },
   // Défis
   { id:"td01", emoji:"😴",  label:"Laisser la tribu dormir le matin",        xp:50, coins:25, diff:"boss",   cat:"defi"    },
   { id:"td02", emoji:"🍜",  label:"Être calme au souper",                    xp:35, coins:18, diff:"hard",   cat:"defi"    },
