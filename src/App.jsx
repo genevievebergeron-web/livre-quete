@@ -18,9 +18,9 @@ import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
 import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
-import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, isCustodyThursday, hasPerfectChallengeWeek, CHALLENGE_PERFECTION_FRAME_ID, carryOverUnfinishedTasks } from "./recurring.js";
+import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.1";
+const APP_VERSION = "2.6.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,10 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.2", date:"2026-07-26", features:[
+    "🌟 Ton défi de la semaine récompense maintenant CHAQUE étape : 3 jours réussis = +10 🪙, 5 jours = +15 🪙 de plus, et 7 sur 7 = +25 🪙 + le nouveau badge « Maître de soi » 🧘! Pas besoin de jours d'affilée — chaque jour coché compte, rien ne se perd.",
+    "✨ Quand tu appuies sur « J'AI FAIT ÇA! », petite pluie d'étoiles immédiate et ta carte affiche tes gains RÉSERVÉS (+XP · +🪙) en attendant que ton parent valide — tu sais tout de suite ce qui s'en vient!",
+  ]},
   { version:"2.6.1", date:"2026-07-26", features:[
     "🗓️ La vue Semaine s'affiche maintenant en COLONNES, comme un vrai calendrier — un jour par colonne avec tes quêtes et tes événements! Glisse de gauche à droite pour voir les 7 prochains jours. Tu préfères l'ancienne liste? Le bouton 📋 Liste est juste à côté, et ton choix est retenu.",
   ]},
@@ -1175,6 +1179,7 @@ const migrateGameState = (gs) => {
     xp: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
     ...gs,
     badges: gs.badges || [],
+    owned: (gs.owned || []).filter(id => id !== CHALLENGE_PERFECTION_FRAME_ID), // v2.6.2 — retire l'item fantôme « cadre » accordé par l'ancien défi parfait (jamais défini, rendu vide)
     boughtRewards: gs.boughtRewards || [],
     refundedRewards: gs.refundedRewards || [], // v1.69.0 — tombstone anti-remboursement-infini
     pending: gs.rotativeCleanupV1 ? (gs.pending || []) : [], // v1.108.0 — ménage unique (Gen) : vide les tâches en suspens pour la bascule vers les quêtes rotatives
@@ -2359,7 +2364,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 color:"#D97070",background:"rgba(0,0,0,0.7)",border:"1px solid #D97070",borderRadius:2,cursor:"pointer",zIndex:10}}>
               ↩️ Annuler
             </button>}
-            {pending&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",textAlign:"center",marginTop:4}}>⏳ En attente de parent…</div>}
+            {/* v2.6.2 — gratification instantanée : la carte en attente montre les gains RÉSERVÉS
+                (grisés — l'octroi réel reste à la validation parent, libellé explicite pour éviter
+                tout « mais j'avais déjà mes points! », cadre TOP). bounceIn = tué par .calm-mode. */}
+            {pending&&<div style={{textAlign:"center",marginTop:4,animation:"bounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1)"}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>⏳ Bravo! En attente de validation…</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9a8c56",marginTop:2}}>+{task.xp} XP · +{task.coins} 🪙 réservés — ton parent valide et c'est à toi!</div>
+            </div>}
           </div>
         );
         };
@@ -5464,32 +5475,45 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[config?.players, config?.weeklyQuests?.generatedForWeek]);
 
-  // Lot 7C — vérification du défi parfait (jeudi de la semaine de garde → récompense immédiate)
+  // v2.6.2 — Défi hebdo GRADUÉ (décision Gen 26 juillet) : fini le tout-ou-rien du « défi parfait ».
+  // Paliers 3/5/7 jours cochés (NON consécutifs — rien ne se perd, aucun reproche sous 3 jours),
+  // payés dès qu'atteints : +10 🪙, +15 🪙, +25 🪙 + badge « Maître de soi » au 7/7.
+  // Remplace le cadre fantôme frame_maitre_de_soi (jamais défini dans aucun catalogue — bug #2
+  // de l'analyse game design) et l'écriture pendingCelebration au singulier que rien ne lisait
+  // (bug #1). Idempotence multi-appareils : payé UNIQUEMENT sur l'appareil de l'enfant connecté
+  // (sessionPlayer), marqueur semaine+paliers dans SON gameState (challengeTiers).
   useEffect(()=>{
-    if(!isCustodyThursday()) return;
+    if(parentMode || sessionPlayer==null) return;
     if(!config?.weeklyChallenge?.challenges?.length) return;
     const cwk = custodyWeekKey();
+    if(config.weeklyChallenge.weekKey && config.weeklyChallenge.weekKey!==cwk) return; // défi d'une autre semaine
+    const player=config.players[sessionPlayer]; if(!player) return;
+    const ch=config.weeklyChallenge.challenges.find(c=>c.playerId===player.id); if(!ch) return;
+    const nDays=challengeDaysCount(ch.checkins, cwk);
+    if(nDays<CHALLENGE_TIERS[0].days) return;
     setGameStates(gs=>{
-      let changed=false;
-      const next=gs.map((s,i)=>{
-        const player=config.players[i];
-        if(!player) return s;
-        const ch=config.weeklyChallenge.challenges.find(c=>c.playerId===player.id);
-        if(!ch) return s;
-        if(hasPerfectChallengeWeek(ch.checkins, cwk)){
-          if(!(s.owned||[]).includes(CHALLENGE_PERFECTION_FRAME_ID)){
-            changed=true;
-            return {...s, owned:[...(s.owned||[]),CHALLENGE_PERFECTION_FRAME_ID], pendingCelebration:{type:"frame",id:CHALLENGE_PERFECTION_FRAME_ID}};
-          }
-        }
-        return s;
-      });
-      if(!changed) return gs;
-      persist(config,next);
-      return next;
+      const s=gs[sessionPlayer]; if(!s) return gs;
+      const claimed=(s.challengeTiers&&s.challengeTiers.week===cwk)?(s.challengeTiers.tiers||[]):[];
+      const due=CHALLENGE_TIERS.filter(t=>nDays>=t.days && !claimed.includes(t.days));
+      if(!due.length) return gs;
+      const coins=due.reduce((a,t)=>a+t.coins,0);
+      const hit7=due.some(t=>t.days===7);
+      const newBadge=hit7 && !(s.badges||[]).includes("b_maitre");
+      const celeb={ id:"c_"+uid(), level:null, taskEmoji:ch.emoji||"🌟",
+        taskLabel:`Défi de la semaine : ${nDays} jour${nDays>1?"s":""} réussi${nDays>1?"s":""}!`,
+        xp:0, coins, themeId:player.themeId||"none",
+        badges:newBadge?[{id:"b_maitre",emoji:"🧘",name:"Maître de soi"}]:[] };
+      const n=[...gs];
+      n[sessionPlayer]={...s,
+        coins:(s.coins||0)+coins, coinsLifetime:(s.coinsLifetime||0)+coins,
+        badges:hit7?[...new Set([...(s.badges||[]),"b_maitre"])]:(s.badges||[]),
+        challengeTiers:{week:cwk, tiers:[...claimed, ...due.map(t=>t.days)]},
+        pendingCelebrations:[...(s.pendingCelebrations||[]), celeb]};
+      persist(config,n);
+      return n;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[config?.weeklyChallenge]);
+  },[config?.weeklyChallenge, sessionPlayer, parentMode]);
 
   const showToast = useCallback((msg,color="",dur=3000)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),dur); },[]);
   const logAction = useCallback((msg,color="#D99248")=>{
@@ -5530,6 +5554,11 @@ export default function App() {
     const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     if(gs.completed?.includes(doneKey)||gs.pending?.includes(doneKey))return;
     setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={...n[playerIdx],pending:[...new Set([...(n[playerIdx].pending||[]),doneKey])]}; persist(config,n); return n; });
+    // v2.6.2 — gratification instantanée (décision Gen 26 juillet) : le TAP lui-même est célébré
+    // (mini pluie d'étoiles, gardée par CALM à l'intérieur de spawnParticles + son léger), même si
+    // l'octroi réel d'XP/pièces reste 100 % à la validation parent. Modèle Joon : le cerveau TDAH a
+    // besoin d'un retour immédiat — sans tricher sur la supervision.
+    try{ const _t=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId); spawnParticles(_t?.emoji||"⭐", false); SFX.click&&SFX.click(); }catch{}
     // v2.5.28 (item #6 analyse game design) — l'info « familier pas nourri = pas d'XP » existait mais
     // n'était montrée nulle part au bon moment. L'XP familier est accordée à la VALIDATION parent
     // (petFedToday, ~5385), donc nourrir plus tard aujourd'hui compte encore — le message est une

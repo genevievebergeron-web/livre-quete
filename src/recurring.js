@@ -255,4 +255,25 @@ export function hasPerfectChallengeWeek(checkins, weekKey) {
 }
 
 // ID du cadre "Maître de soi" (item boutique — récompense défi parfait)
+// ⚠️ v2.6.2 : plus jamais accordé (item fantôme, jamais défini dans aucun catalogue) —
+// gardé uniquement pour le nettoyage des owned[] existants dans migrateGameState.
 export const CHALLENGE_PERFECTION_FRAME_ID = "frame_maitre_de_soi";
+
+// v2.6.2 — Défi hebdo GRADUÉ (décision Gen 26 juillet) : compte les jours cochés parmi les 7
+// jours de la garde (ven→jeu), NON consécutifs — rien ne se perd, aucun reproche sous 3 jours.
+export function challengeDaysCount(checkins, weekKey) {
+  if (!checkins) return 0;
+  let n = 0;
+  for (let ci = 0; ci < 7; ci++) {
+    const d = new Date(weekKey + "T12:00:00"); // midi local → toISOString reste le même jour (pas le piège v2.5.24)
+    d.setDate(d.getDate() + ci);
+    if (checkins[d.toISOString().slice(0, 10)]) n++;
+  }
+  return n;
+}
+// Paliers payés dès qu'atteints, chacun une seule fois par semaine (v1 du bonus de constance façon Finch)
+export const CHALLENGE_TIERS = [
+  { days: 3, coins: 10 },
+  { days: 5, coins: 15 },
+  { days: 7, coins: 25 }, // + badge « Maître de soi »
+];
