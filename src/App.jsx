@@ -4,7 +4,7 @@ import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, ALL_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
-import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
+import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
@@ -20,7 +20,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.6.4";
+const APP_VERSION = "2.6.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -190,6 +190,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.6.5", date:"2026-07-27", features:[
+    "🛍️ La Boutique range maintenant les récompenses par Petite/Moyenne/Épique — plus facile de voir ce que tu peux te payer d'un coup d'œil!",
+  ]},
   { version:"2.6.4", date:"2026-07-26", features:[
     "🗓️ NOUVEAU : les récompenses « moments » (sortie, souper spécial, temps privé avec un parent…) se planifient maintenant ENSEMBLE! À l'achat, ça atterrit dans « À planifier » du portail parent — le parent choisit une date (ajoutée à ton calendrier 🎁) et personne n'oublie. Aucune date limite : ça reste là jusqu'à ce que ce soit vécu.",
   ]},
@@ -2742,7 +2745,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         );
       })()}
 
-      <div style={{background:"rgba(0,0,0,0.45)",border:"3px solid #D9BC5C",borderRadius:5,padding:10}}>
+      <div className="card-n2" style={{background:"rgba(0,0,0,0.45)",padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>(
             <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#888",border:`2px solid ${shopTab===k?"#D9BC5C":"#555"}`,borderRadius:2,cursor:"pointer"}}>{l}</button>
@@ -2765,29 +2768,40 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               </div>; })()}
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
             {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
-            {myRewards.map(r=>{
-              const rPrice=priceOf(r);
-              const canBuy=pState.coins>=rPrice;
-              const bought=pState.boughtRewards?.includes(r.id);
+            {/* Refonte visuelle Phase 2 — sections Petite/Moyenne/Épique (planche de tiers) au lieu
+                d'une liste plate ; l'or ne reste que sur le prix 🪙 et le bouton Acheter. */}
+            {["petite","moyenne","epique"].map(tk=>{
+              const group=myRewards.filter(r=>tierOf(r)===tk); if(!group.length) return null;
+              const T2=REWARD_TIERS[tk];
               return (
-                <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)}
-                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${bought?"#5CAD68":canBuy?"#D9BC5C":"#333"}`,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
-                  <span style={{fontSize:22}}>{r.emoji}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#5CAD68":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      {r.label}
-                      {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
-                    </div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
-                  </div>
-                  {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
-                  {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
-                  {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
-                    <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
-                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#D99248",border:"1px solid #D99248",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
-                    <button onClick={(e)=>{e.stopPropagation();SFX.click();onHideReward&&onHideReward(r);}}
-                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#5CAD68",border:"1px solid #5CAD68",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Cacher</button>
-                  </div>}
+                <div key={tk}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:T2.color,margin:"6px 0 3px"}}>{T2.label.toUpperCase()}</div>
+                  {group.map(r=>{
+                    const rPrice=priceOf(r);
+                    const canBuy=pState.coins>=rPrice;
+                    const bought=pState.boughtRewards?.includes(r.id);
+                    return (
+                      <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)} className={bought?"":T2.cls}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(0,0,0,0.4)",border:bought?"2px solid #5CAD68":undefined,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
+                        <span style={{fontSize:22}}>{r.emoji}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#5CAD68":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            {r.label}
+                            {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
+                          </div>
+                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
+                        </div>
+                        {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
+                        {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
+                        {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
+                          <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#D99248",border:"1px solid #D99248",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
+                          <button onClick={(e)=>{e.stopPropagation();SFX.click();onHideReward&&onHideReward(r);}}
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#5CAD68",border:"1px solid #5CAD68",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Cacher</button>
+                        </div>}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -2803,7 +2817,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const rar=rarityOf(item.cost);
               return (
                 <div key={item.id} onClick={()=>{ if(equipped)return; if(owned&&item.slot)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
-                  style={{background:`linear-gradient(180deg,${rar.color}14,rgba(0,0,0,0.45))`,border:`2px solid ${equipped?"#5CAD68":rar.color}`,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,boxShadow:rar.min>=45?`0 0 10px ${rar.color}55`:"none",position:"relative"}}>
+                  className={equipped?"":rar.cls}
+                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   {petSpriteKey(item.id)
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>

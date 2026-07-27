@@ -81,34 +81,48 @@ export const estMinOf = d => DIFF_EST_MIN[d] || 15;
 // à deux (parent + enfant), donc à planifier ensemble plutôt qu'à consommer sur-le-champ (voir
 // handleBuy + section « 🗓️ À planifier ensemble » du portail parent). Les permissions instantanées
 // (2e dessert, servi au souper, écran, bonbon…) restent des achats simples, aucun changement.
+// Refonte visuelle Phase 2 (27-07) — `tier` explicite (≤30🪙 base = petite, 35-60 = moyenne,
+// ≥70 = épique) au lieu de réutiliser rarityOf(cost) : les seuils cosmétiques (Rare dès 20🪙)
+// classeraient un bonbon à 20🪙 comme "Rare", ce qui n'a pas de sens pour des récompenses réelles.
 export const REWARD_CATALOG = [
-  { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40, cat:"ecran" },
-  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35, cat:"calme", moment:true },
-  { id:"rw_dessert", emoji:"🍰", label:"Permission de 2e dessert",           coins:30 },
-  { id:"rw_dejsoup", emoji:"🥞", label:"Permission de déjeuner au souper",   coins:35 },
-  { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60, moment:true },
-  { id:"rw_depanneur",emoji:"🏪",label:"Choix d'un achat au dépanneur",      coins:70, moment:true },
-  { id:"rw_jeu",     emoji:"🎲", label:"Choix d'un jeu de société en famille",coins:35, moment:true },
-  { id:"rw_souper",  emoji:"🍽️", label:"Choix d'un souper pendant la semaine",coins:55, moment:true },
-  { id:"rw_bonbon",  emoji:"🍬", label:"Manger un bonbon",                   coins:20 },
-  { id:"rw_ricochet",emoji:"↪️", label:"1 ricochet de tâche sur quelqu'un d'autre",coins:80 },
-  { id:"rw_debarrasse",emoji:"🧽",label:"On débarrasse ton repas",           coins:25 },
-  { id:"rw_servi",   emoji:"🍴", label:"Tu te fais servir au souper",        coins:30 },
-  { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150, moment:true },
-  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45, cat:"calme", moment:true },
-  { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25, cat:"calme" },
-  { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90, moment:true },
-  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme", moment:true },
+  { id:"rw_ecran",   emoji:"📱", label:"15 minutes d'écran",                 coins:40, cat:"ecran", tier:"moyenne" },
+  { id:"rw_parent",  emoji:"💝", label:"10 minutes privées avec ton parent", coins:35, cat:"calme", moment:true, tier:"moyenne" },
+  { id:"rw_dessert", emoji:"🍰", label:"Permission de 2e dessert",           coins:30, tier:"petite" },
+  { id:"rw_dejsoup", emoji:"🥞", label:"Permission de déjeuner au souper",   coins:35, tier:"moyenne" },
+  { id:"rw_epicerie",emoji:"🛒", label:"Choix d'un achat à l'épicerie",      coins:60, moment:true, tier:"moyenne" },
+  { id:"rw_depanneur",emoji:"🏪",label:"Choix d'un achat au dépanneur",      coins:70, moment:true, tier:"epique" },
+  { id:"rw_jeu",     emoji:"🎲", label:"Choix d'un jeu de société en famille",coins:35, moment:true, tier:"moyenne" },
+  { id:"rw_souper",  emoji:"🍽️", label:"Choix d'un souper pendant la semaine",coins:55, moment:true, tier:"moyenne" },
+  { id:"rw_bonbon",  emoji:"🍬", label:"Manger un bonbon",                   coins:20, tier:"petite" },
+  { id:"rw_ricochet",emoji:"↪️", label:"1 ricochet de tâche sur quelqu'un d'autre",coins:80, tier:"epique" },
+  { id:"rw_debarrasse",emoji:"🧽",label:"On débarrasse ton repas",           coins:25, tier:"petite" },
+  { id:"rw_servi",   emoji:"🍴", label:"Tu te fais servir au souper",        coins:30, tier:"petite" },
+  { id:"rw_pasdetache",emoji:"🛌",label:"Pas de tâches aujourd'hui",         coins:150, moment:true, tier:"epique" },
+  { id:"rw_dejlit",  emoji:"🛏️", label:"Déjeuner au lit",                    coins:45, cat:"calme", moment:true, tier:"moyenne" },
+  { id:"rw_musique", emoji:"🎵", label:"Tu fais jouer ta musique dans la maison",coins:25, cat:"calme", tier:"petite" },
+  { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90, moment:true, tier:"epique" },
+  { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme", moment:true, tier:"moyenne" },
 ];
 export const REWARD_CAT_BADGE = { ecran:{label:"📱 Écran",color:"#FF8C6B"}, calme:{label:"🌙 Calme",color:"#7FD6E0"} };
+// Refonte visuelle Phase 2 — mapping "planche Petite/Moyenne/Épique" : couleur + classe utilitaire
+// (Phase 1, shared.js) pour la carte de récompense. tierOf() retombe sur les coins pour toute
+// récompense custom future qui n'aurait pas encore de `tier` explicite.
+export const REWARD_TIERS = {
+  petite:  { label:"Petite",  color:"#9AA0A6", cls:"card-n1" },
+  moyenne: { label:"Moyenne", color:"#4FA3FF", cls:"rarity-rare" },
+  epique:  { label:"Épique",  color:"#FFB02E", cls:"rarity-legendaire" },
+};
+export const tierOf = (r) => REWARD_TIERS[r?.tier] ? r.tier : ((r?.coins||0)>=70 ? "epique" : (r?.coins||0)>=35 ? "moyenne" : "petite");
 
 // ─── RARETÉS (incite à collectionner) ────────────────────────
+// Refonte visuelle Phase 2 — `cls` pointe vers les classes .rarity-* (shared.js, Phase 1) qui
+// factorisent le style inline déjà utilisé ici (bordure+dégradé+lueur), même rendu, dédupliqué.
 export const RARITIES = [
-  { min:0,  name:"Commun",     color:"#9AA0A6" },
-  { min:20, name:"Rare",       color:"#4FA3FF" },
-  { min:30, name:"Ultra Rare", color:"#B06BFF" },
-  { min:45, name:"Légendaire", color:"#FFB02E" },
-  { min:60, name:"Unique",     color:"#FF5BAE" },
+  { min:0,  name:"Commun",     color:"#9AA0A6", cls:"rarity-commun" },
+  { min:20, name:"Rare",       color:"#4FA3FF", cls:"rarity-rare" },
+  { min:30, name:"Ultra Rare", color:"#B06BFF", cls:"rarity-ultra" },
+  { min:45, name:"Légendaire", color:"#FFB02E", cls:"rarity-legendaire" },
+  { min:60, name:"Unique",     color:"#FF5BAE", cls:"rarity-unique" },
 ];
 export const rarityOf = (cost) => { let r=RARITIES[0]; for(const x of RARITIES) if((cost||0)>=x.min) r=x; return r; };
 
