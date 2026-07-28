@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.15.0";
+const APP_VERSION = "2.15.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.1", date:"2026-07-28", features:[
+    "🔄 Ton parent peut maintenant te renvoyer une annonce importante que tu as fermée trop vite — elle réapparaît sur ton accueil!",
+  ]},
   { version:"2.15.0", date:"2026-07-27", features:[
     "📅 Calendrier tout neuf : un seul endroit pour tes rendez-vous et activités (plus de doublon), organisé en Lever/Matin/Dîner/Après-midi/Souper/Soirée, et tu peux maintenant modifier tes événements après les avoir ajoutés!",
   ]},
@@ -3406,7 +3409,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
-  onCreateAnnouncement, onDeleteAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
+  onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
@@ -3958,17 +3961,27 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           {/* Annonces existantes */}
           {(config.announcements||[]).length===0
             ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#666",textAlign:"center",padding:"20px 0"}}>Aucune annonce active.</div>
-            : (config.announcements||[]).map(a=>(
+            : (config.announcements||[]).map(a=>{
+              // v2.15.1 — enfants ciblés qui ont fermé cette annonce (candidats au renvoi)
+              const closedBy=(players||[]).filter((p,i)=>{
+                const gs=gameStates[i];
+                if(!gs||!(gs.dismissedAnnouncements||[]).includes(a.id)) return false;
+                return a.targetAll || (a.targetPlayerIds||[]).includes(p.id);
+              });
+              return (
               <div key={a.id} style={{background:"rgba(180,120,0,0.12)",border:"2px solid #C8942A55",borderRadius:8,padding:"10px 12px"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD54F",marginBottom:4}}>{a.emoji} {a.title||a.text.slice(0,40)}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#aaa",marginBottom:6}}>{a.text.slice(0,80)}{a.text.length>80?"…":""}</div>
+                {closedBy.length>0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#C8942A",marginBottom:6}}>Fermée par : {closedBy.map(p=>p.name).join(", ")}</div>}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666"}}>Expire : {a.expiresAt||"—"}</span>
+                  {closedBy.length>0 && <button onClick={()=>onResendAnnouncement&&onResendAnnouncement(a.id)}
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#1a3a5a",color:"#6bb8ff",border:"2px solid #6bb8ff44",borderRadius:4,cursor:"pointer"}}>🔄 Renvoyer ({closedBy.length})</button>}
                   <button onClick={()=>onDeleteAnnouncement&&onDeleteAnnouncement(a.id)}
                     style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#5a1a1a",color:"#ff6b6b",border:"2px solid #ff6b6b44",borderRadius:4,cursor:"pointer"}}>🗑 Supprimer</button>
                 </div>
               </div>
-            ))
+            );})
           }
           {/* Formulaire nouvelle annonce */}
           <div style={{background:"rgba(0,0,0,0.4)",border:"2px solid #444",borderRadius:8,padding:"12px 14px",marginTop:4}}>
@@ -5900,6 +5913,22 @@ export default function App() {
     const newCfg={...config, announcements:(config.announcements||[]).filter(a=>a.id!==announcementId)};
     setConfig(newCfg); persist(newCfg, gameStates);
   },[config,gameStates,persist]);
+  // v2.15.1 — renvoyer une annonce aux enfants qui l'ont fermée (copie ciblée, nouvel id —
+  // seule façon fiable de la faire réapparaître : dismissedAnnouncements est une union entre appareils)
+  const handleResendAnnouncement = useCallback((announcementId)=>{
+    const orig=(config.announcements||[]).find(a=>a.id===announcementId);
+    if(!orig) return 0;
+    const dismissedBy=(config.players||[]).filter((p,i)=>{
+      const gs=gameStates[i];
+      if(!gs||!(gs.dismissedAnnouncements||[]).includes(announcementId)) return false;
+      return orig.targetAll || (orig.targetPlayerIds||[]).includes(p.id);
+    }).map(p=>p.id);
+    if(!dismissedBy.length) return 0;
+    const copy={...orig, id:uid(), targetAll:false, targetPlayerIds:dismissedBy, createdAt:todayStamp()};
+    const newCfg={...config, announcements:[...(config.announcements||[]), copy]};
+    setConfig(newCfg); persist(newCfg, gameStates);
+    return dismissedBy.length;
+  },[config,gameStates,persist]);
 
   // Refus parent : retire la demande sans XP
   const refusePending = useCallback((playerIdx, doneKey)=>{
@@ -7228,6 +7257,7 @@ export default function App() {
           onSetup={onParentPanelSetup}
           onUpdateChallenge={handleUpdateChallenge}
           onCreateAnnouncement={handleCreateAnnouncement}
+          onResendAnnouncement={handleResendAnnouncement}
           onDeleteAnnouncement={handleDeleteAnnouncement}
         />
       )}
