@@ -1,0 +1,14 @@
+[
+ { "out": "public/sprites/ui/badge_b_streak3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — calendar page glyph with visible day grid, one day marked, clearly a calendar, no circle frame",
+   "width": 48, "height": 48, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/badge_bt_dis1.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — fairy tale castle with three pointed towers, gold, simple bold glyph",
+   "width": 48, "height": 48, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/badge_b_maitre.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — bright gold lotus flower glyph, meditation calm, simple bold shape",
+   "width": 48, "height": 48, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/badge_bt_rb2.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — gold toy construction crane lifting a block, simple bold glyph",
+   "width": 48, "height": 48, "detail": "low detail", "shading": "flat shading" }
+]

@@ -1,0 +1,23 @@
+[
+ { "out": "public/sprites/ui/parent_eye.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — single wide open human eye with gold iris, almond shape, clearly an eye",
+   "width": 32, "height": 32, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/cal_sante.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — first aid kit box with bold cross symbol on it",
+   "width": 32, "height": 32, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/cat_defi.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — archery target with concentric rings and an arrow stuck in the bullseye",
+   "width": 32, "height": 32, "detail": "low detail", "shading": "flat shading" },
+ { "out": "public/sprites/ui/rw_debarrasse.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — empty dinner plate seen from above with sparkle stars, freshly cleaned",
+   "width": 48, "height": 48, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/ui/rw_parent.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — big warm gold heart held by two small hands from below",
+   "width": 48, "height": 48, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/ui/rw_pasdetache.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — hammock strung between two palm trees, relaxing day off",
+   "width": 48, "height": 48, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/ui/task_tr04.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — shower head spraying water drops with steam, bathroom",
+   "width": 48, "height": 48, "detail": "medium detail", "shading": "basic shading" }
+]

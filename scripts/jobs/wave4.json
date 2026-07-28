@@ -1,0 +1,370 @@
+[
+ {
+  "out": "public/sprites/ui/badge_b_first.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — single star glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_5tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — flame glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_20tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — flexed arm glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_50tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — trophy cup glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_xp100.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — lightning bolt glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_xp300.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — storm cloud with bolt glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_xp500.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — supernova starburst glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_coins50.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — money pouch glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_coins150.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — coins stack glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_buy1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — shopping cart glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_buy5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — shopping bags glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_streak3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — calendar page glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_level2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — arrow up glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_level3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — rocket glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_level4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — crown glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_level5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — rainbow arc glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_mc1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — pickaxe glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_mc2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — blue diamond glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_rb1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — game controller glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_rb2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — construction crane glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_hp1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — magic wand with sparks glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_hp2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — owl glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_gh1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — leaf sprout glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_hor1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — skull glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_hor2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — blood drop glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_mon1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — friendly monster eye glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_lic1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — unicorn horn glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_bf1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — boomerang glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_mar1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — hero mask glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_jap1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ramen bowl glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_sci1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — microscope glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_dis1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — magic castle glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_bt_pix1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — desk lamp glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_menage10.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — broom glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_menage30.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — sparkling soap glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_cuisine10.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — frying pan glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_cuisine30.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — chef hat glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_routine20.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — alarm clock glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_defi10.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — target glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_cat_outdoor10.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — tree glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_100tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — laurel wreath 100 glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_300tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — tower shield glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_xp2500.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — comet glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_day10.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — radiant star glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_boss.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — dragon head glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/badge_b_maitre.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — meditation lotus glyph, simple bold glyph on transparent background, no medal frame",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ }
+]

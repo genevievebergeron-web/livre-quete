@@ -1,0 +1,306 @@
+[
+ {
+  "out": "public/sprites/ui/parent_validate.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — checkmark on parchment scroll",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_tasks.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — clipboard with list",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_defis.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — glowing star",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_actions.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — lightning bolt over gear",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_annonces.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — megaphone",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_journal.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — clock with scroll",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_code.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — padlock with key",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_save.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — floppy disk",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/parent_eye.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — open eye",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_sante.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — hospital cross building",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_sport.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — soccer ball",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_intervenant.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — friendly health worker portrait",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_camp.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — camping tent with flag",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_recompense.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — gift box with sparkle",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_examen.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — quill writing on paper",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_devoir.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — stack of books",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_recur.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — two circular arrows loop",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cal_event.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — calendar page",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/boss_mod_carapace.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — heavy turtle shell shield",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/boss_mod_frenesie.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — double lightning bolts, red glow",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/boss_mod_familier.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — glowing animal paw print",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_ecran.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — handheld game console glowing screen",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_parent.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — two hands forming a heart",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_dessert.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — slice of layered cake with cherry",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_dejsoup.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — stack of pancakes with syrup",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_epicerie.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — grocery basket with fresh goods",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_depanneur.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — corner store snack bag and drink",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_jeu.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — board game with dice and meeples",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_souper.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — covered dinner plate, silver cloche",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_bonbon.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — wrapped candy",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_ricochet.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — curved bouncing arrow ricochet",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_debarrasse.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — sparkling clean empty plate",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_servi.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — served plate with fork and knife",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_pasdetache.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — hammock between two posts, day off",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_dejlit.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — breakfast tray on a bed",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_musique.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — music note with sound waves",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_esclave.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — magic lamp with genie smoke",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/ui/rw_bain.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — bathtub with bubbles and candles",
+  "width": 48,
+  "height": 48,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ }
+]

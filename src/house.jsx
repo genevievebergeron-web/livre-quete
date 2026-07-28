@@ -5,7 +5,7 @@
 // déco s'achètent en Boutique (nouveau puits de dépense de pièces, tiers Phase 2).
 // Chaque élément : PNG /sprites/deco/<id>.png si présent, sinon emoji (patron ItemSprite).
 // Aucune animation — conforme au mode calme d'office.
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { PT_LIST, getPlayerTheme, ALL_SHOP_ITEMS } from "./themes.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
 import { PetSprite, EquippedGear } from "./sprites.jsx";
@@ -21,7 +21,7 @@ export const HOUSE_ANCHORS = {
   window: { x:50, y:18,  wall:true,  size:0.20, label:"Fenêtre" }, // centrée (V3 approuvée par Gen)
   lamp:   { x:8,  y:30,  wall:false, size:0.13, label:"Coin gauche" },
   bed:    { x:24, y:12,  wall:false, size:0.24, label:"Lit" },
-  rug:    { x:52, y:2,   wall:false, size:0.26, label:"Tapis" },
+  rug:    { x:52, y:2,   wall:false, flat:true, size:0.26, label:"Tapis" }, // flat : posé à plat, confiné à la bande de plancher
   chest:  { x:72, y:10,  wall:false, size:0.15, label:"Coffre" },
   plant:  { x:92, y:26,  wall:false, size:0.13, label:"Coin droit" },
 };
@@ -41,6 +41,13 @@ export const DECO_CATALOG = [
   { id:"dl1", emoji:"🛋️", name:"Fauteuil moelleux",  cost:40, slot:"deco", decoType:"furniture", anchor:"lamp" },
   { id:"dc1", emoji:"🧸", name:"Coffre à jouets",    cost:40, slot:"deco", decoType:"furniture", anchor:"chest" },
   { id:"da1", emoji:"🖼️", name:"Cadre de héros",     cost:25, slot:"deco", decoType:"furniture", anchor:"poster" },
+  // Phase 7 (28-07, demande Gen) — déco ÉPIQUE inspirée de la vraie maison
+  { id:"df3", emoji:"◼️", name:"Plancher de la cuisine", cost:55, slot:"deco", decoType:"floor" },
+  { id:"dd1", emoji:"🚪", name:"Porte jaune",             cost:60, slot:"deco", decoType:"furniture", anchor:"poster" },
+  { id:"dg1", emoji:"🥕", name:"Bac à jardin",            cost:50, slot:"deco", decoType:"furniture", anchor:"plant" },
+  { id:"dpp1",emoji:"🪑", name:"Papasan",                 cost:55, slot:"deco", decoType:"furniture", anchor:"lamp" },
+  { id:"dpf1",emoji:"🟢", name:"Pouf vert pâle",          cost:50, slot:"deco", decoType:"furniture", anchor:"rug" },
+  { id:"dlg1",emoji:"🧱", name:"Tablette à constructions",cost:55, slot:"deco", decoType:"furniture", anchor:"trophy" },
   // Items uniques par thème — visibles en Boutique SEULEMENT quand ce thème est choisi
   // (patron du gating des shopCategory de thème). Achetés = possédés pour toujours,
   // affichés dans la pièce seulement quand leur thème est actif (cohérent avec `themed`).
@@ -54,11 +61,19 @@ export const decoById = (id) => DECO_CATALOG.find(d=>d.id===id);
 export const decoForTheme = (themeId) => DECO_CATALOG.filter(d=>!d.themeId || d.themeId===themeId);
 
 // Élément déco : PNG /sprites/deco/<id>.png → repli emoji (patron ItemSprite, sprites.jsx).
-export function DecoSprite({ decoId, emoji, size=32, style={} }) {
+// `maxH` (optionnel) : hauteur plafond en px — les PNG non carrés (dr1 128×64, db1 112×96,
+// dp1 64×80) rendus en `height:auto` pouvaient dépasser la bande de plancher (tapis « qui
+// flotte » sur le mur en bannière). On réduit alors la largeur en respectant le ratio
+// naturel de l'image (pas de déformation, pixel art intact).
+export function DecoSprite({ decoId, emoji, size=32, maxH=null, style={} }) {
   const [imgFail, setImgFail] = useState(false);
-  if (!imgFail && decoId)
-    return <img src={`/sprites/deco/${decoId}.png`} alt="" width={size}
-      onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",display:"block",width:size,height:"auto",...style}}/>;
+  const [ratio, setRatio] = useState(null); // naturalWidth/naturalHeight, connu au onLoad
+  if (!imgFail && decoId) {
+    const w = (maxH && ratio && size/ratio > maxH) ? Math.max(1, Math.floor(maxH*ratio)) : size;
+    return <img src={`/sprites/deco/${decoId}.png`} alt="" width={w}
+      onLoad={e=>setRatio(e.target.naturalWidth/e.target.naturalHeight)}
+      onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",display:"block",width:w,height:"auto",...style}}/>;
+  }
   return <span style={{fontSize:Math.round(size*0.82),lineHeight:1,display:"block",...style}}>{emoji}</span>;
 }
 
@@ -72,6 +87,7 @@ const wallpaperStyle = (id, pt) => {
 const floorStyle = (id, pt) => {
   if (id==="df1") return { background:`repeating-linear-gradient(0deg, #4a3220, #4a3220 7px, #3a2718 7px, #3a2718 8px)` };
   if (id==="df2") return { background:`conic-gradient(#2a2a3a 90deg, #383850 90deg 180deg, #2a2a3a 180deg 270deg, #383850 270deg) 0 0/26px 26px` };
+  if (id==="df3") return { background:`conic-gradient(#e8e8e2 90deg, #17171c 90deg 180deg, #e8e8e2 180deg 270deg, #17171c 270deg) 0 0/26px 26px` }; // Phase 7 — plancher de la cuisine (carrelé noir et blanc)
   return { background:`linear-gradient(180deg, ${pt.primary||"#222"}44, #111)` }; // défaut : teinte du thème
 };
 
@@ -99,10 +115,20 @@ function RoomImg(){
 // Fond : /sprites/deco/room.png (pièce PixelLab en perspective) en priorité, dégradés CSS en
 // repli natif (background multiple : si l'URL 404, le dégradé en dessous reste visible).
 // Tapisserie/plancher achetés = textures tuilées /sprites/deco/<id>.png par-dessus leurs zones.
-export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) {
+// `editable` + `onMoveDeco(aid,{x,y})` : glisser-déposer des meubles (popup Maison seulement).
+// Position personnalisée `house.pos[aid] = {x,y}` — mêmes unités que HOUSE_ANCHORS (x % de
+// la largeur ; y : sol = % de floorH depuis le bas, mur = % de H depuis le haut), donc la
+// position vaut pour TOUTES les échelles (popup et bannière). Sans `pos` : ancres par défaut.
+export function HouseScene({ player, pState, width=320, ratio=0.78, style={}, editable=false, onMoveDeco=null }) {
   const pt = getPlayerTheme(player.themeId);
   const house = { ...DEFAULT_HOUSE, ...(pState.house||{}) };
+  // innerWidth peut valoir 0 au 1er montage (volet caché/pré-rendu) → largeurs négatives en
+  // cascade (bannerW = innerWidth-16) jusqu'au crash du halo Légendaire. Plancher défensif.
+  width = Math.max(80, Math.round(width));
   const H = Math.round(width*ratio), floorH = Math.round(H*0.34);
+  const [drag, setDrag] = useState(null); // {aid, x, y} pendant un glissement
+  const dragRef = useRef(null);           // {aid, px, py, x0, y0, wall}
+  const dragLiveRef = useRef(null);       // miroir de `drag` (lecture synchrone au pointerup)
   const visible = (d) => d && (!d.themeId || d.themeId===(player.themeId||"none"));
   const wp = visible(decoById(house.wallpaper)) ? house.wallpaper : null;
   const fl = visible(decoById(house.floor)) ? house.floor : null;
@@ -119,11 +145,55 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) 
         const d = decoById(house.placed?.[aid]);
         if(!visible(d)) return null;
         const sz = Math.round(width*a.size);
+        // Position effective : glissement en cours > position personnalisée > ancre par défaut
+        const ov = (drag && drag.aid===aid) ? drag : house.pos?.[aid];
+        const ax = ov?.x ?? a.x, ay = ov?.y ?? a.y;
         const pos = a.wall
-          ? { left:`${a.x}%`, top:`${a.y}%`, transform:"translate(-50%,-50%)" }
-          : { left:`${a.x}%`, bottom:`${(a.y/100)*floorH}px`, transform:"translateX(-50%)" };
-        return <div key={aid} style={{position:"absolute",...pos,pointerEvents:"none"}}>
-          <DecoSprite decoId={d.id} emoji={d.emoji} size={sz}/>
+          ? { left:`${ax}%`, top:`${ay}%`, transform:"translate(-50%,-50%)" }
+          : { left:`${ax}%`, bottom:`${(ay/100)*floorH}px`, transform:"translateX(-50%)" };
+        // Plafond de hauteur : objets à plat confinés à la bande de plancher (depuis leur
+        // position EFFECTIVE), meubles debout tolérés un peu au-dessus de l'horizon.
+        const bottomPx = Math.round((ay/100)*floorH);
+        const maxH = a.wall ? null : (a.flat ? Math.max(8, floorH - bottomPx) : Math.round(floorH + H*0.25));
+        const startDrag = (e)=>{
+          if(!editable) return;
+          e.preventDefault();
+          dragRef.current = { aid, px:e.clientX, py:e.clientY, x0:ax, y0:ay, wall:!!a.wall };
+          dragLiveRef.current = { aid, x:ax, y:ay };
+          setDrag({ aid, x:ax, y:ay });
+          try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointeur synthétique */ }
+        };
+        const moveDrag = (e)=>{
+          const st = dragRef.current;
+          if(!st || st.aid!==aid) return;
+          const dx = (e.clientX - st.px)/width*100;
+          const clamp = (v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+          const x = clamp(st.x0 + dx, 6, 94);
+          const y = st.wall
+            ? clamp(st.y0 + (e.clientY - st.py)/H*100, 6, 62)          // mur : % de H depuis le haut
+            : clamp(st.y0 - (e.clientY - st.py)/floorH*100, 0, 60);    // sol : % de floorH depuis le bas
+          const next = { aid, x:Math.round(x*10)/10, y:Math.round(y*10)/10 };
+          dragLiveRef.current = next;
+          setDrag(next);
+        };
+        const endDrag = ()=>{
+          const st = dragRef.current;
+          if(!st || st.aid!==aid) return;
+          dragRef.current = null;
+          const cur = dragLiveRef.current;
+          dragLiveRef.current = null;
+          setDrag(null);
+          if(cur && cur.aid===aid && onMoveDeco) onMoveDeco(aid, { x:cur.x, y:cur.y });
+        };
+        const dragging = drag?.aid===aid;
+        return <div key={aid}
+          onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}
+          style={{position:"absolute",...pos,
+            pointerEvents:editable?"auto":"none", touchAction:editable?"none":undefined,
+            cursor:editable?(dragging?"grabbing":"grab"):undefined,
+            filter:dragging?`drop-shadow(0 0 6px ${pt.accent||"#D9BC5C"})`:undefined,
+            zIndex:dragging?5:undefined}}>
+          <DecoSprite decoId={d.id} emoji={d.emoji} size={sz} maxH={maxH}/>
         </div>;
       })}
       {/* L'enfant, debout sur le plancher, avec son familier. Taille bornée par la HAUTEUR

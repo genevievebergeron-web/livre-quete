@@ -95,6 +95,11 @@ export const GLOBAL_CSS = `
     --b-soft:#3a3a48; --b-mid:#565668;
     --elev1:0 2px 0 #0d0d0d, inset 0 1px 0 rgba(255,255,255,0.06);
     --elev2:0 4px 0 #0d0d0d, 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+    /* Refonte Phase 7 (28-07) — profondeur "maquette" : fond très sombre, tuiles en dégradé,
+       ombre portée profonde + liseré clair en haut (relief), cf. maquette de référence Gen. */
+    --bg-deep:#0b0b12;
+    --tile-bg:linear-gradient(160deg,#232330,#15151d);
+    --elev3:0 6px 0 #0d0d0d, 0 12px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.10);
   }
   .float-y{animation:floatY 2.4s ease-in-out infinite}
   .float-y-slow{animation:floatY 3.2s ease-in-out infinite}
@@ -129,6 +134,37 @@ export const GLOBAL_CSS = `
   .rays-bg{position:absolute;width:180%;height:180%;left:-40%;top:-40%;border-radius:50%;
     background:conic-gradient(currentColor 0deg,transparent 8deg 32deg,currentColor 40deg,transparent 48deg 72deg,currentColor 80deg,transparent 88deg 112deg,currentColor 120deg,transparent 128deg 152deg,currentColor 160deg,transparent 168deg 192deg,currentColor 200deg,transparent 208deg 232deg,currentColor 240deg,transparent 248deg 272deg,currentColor 280deg,transparent 288deg 312deg,currentColor 320deg,transparent 328deg 352deg,currentColor 360deg);
     opacity:0.18;animation:raysSpin 14s linear infinite;pointer-events:none;z-index:0}
+  /* ── Refonte Phase 7 (28-07) — "léché, assumé, moins IA" : composants du look maquette ── */
+  /* Tuile carrée arrondie pour le sprite à gauche des cartes (cœur visuel de la maquette). */
+  .icon-tile{display:flex!important;align-items:center!important;justify-content:center!important;
+    width:44px;height:44px;flex:0 0 44px;background:var(--tile-bg)!important;
+    border:2px solid var(--b-soft)!important;border-radius:8px!important;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -1px 0 rgba(255,255,255,0.05)!important}
+  /* Pastille de coût dorée compacte, à droite des cartes (ex. <Coin/> 40). */
+  .chip-cost{display:inline-flex!important;align-items:center!important;gap:4px!important;
+    font-family:'Press Start 2P',monospace!important;font-size:7px!important;color:var(--gold);
+    background:rgba(217,188,92,0.10);border:1px solid rgba(217,188,92,0.55);
+    border-radius:999px!important;padding:4px 8px!important;white-space:nowrap!important}
+  /* Fond d'ambiance : dégradé radial chaud + vignette (remplace les fonds plats). Statique. */
+  .vignette-bg{background:
+    radial-gradient(120% 90% at 50% 0%, #1a1626 0%, var(--bg-deep) 55%) fixed,
+    var(--bg-deep)!important;
+    box-shadow:inset 0 0 120px rgba(0,0,0,0.65)!important}
+  /* Grain statique très léger (data-URI 64px) — texture, zéro animation (calm-mode safe). */
+  .texture-grain{position:relative}
+  .texture-grain::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0.05;border-radius:inherit;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='64' height='64' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E")}
+  /* Carte de quête en relief : évolution de .card-n2 avec --elev3 + liseré haut clair. */
+  .card-quest{border:2px solid var(--b-soft)!important;border-top:2px solid rgba(255,255,255,0.14)!important;
+    background:var(--tile-bg)!important;box-shadow:var(--elev3)!important;border-radius:8px!important}
+  /* Barres de progression réutilisables (XP, boss, défi) — visibles, arrondies, liseré sombre. */
+  .progress-track{height:10px!important;background:#0a0a10!important;border:2px solid #0d0d0d!important;
+    border-radius:999px!important;overflow:hidden!important;box-shadow:inset 0 2px 4px rgba(0,0,0,0.6)!important}
+  .progress-fill{height:100%!important;border-radius:999px!important;transition:width 0.5s ease!important;
+    background:linear-gradient(180deg,rgba(255,255,255,0.25),rgba(255,255,255,0) 45%),currentColor!important}
+  /* Halo épique statique multi-couches (récompenses épiques, victoires). Seul .rays-bg anime —
+     déjà couvert par .calm-mode/prefers-reduced-motion. currentColor = couleur du wow. */
+  .epic-halo{box-shadow:0 0 0 2px #0d0d0d, 0 0 18px currentColor, 0 0 48px rgba(255,176,46,0.35), inset 0 0 14px rgba(255,255,255,0.12)!important}
   .btn-pixel-primary{font-family:'Press Start 2P',monospace;background:var(--gold);color:#0d0d0d;border:3px solid #0d0d0d;box-shadow:4px 4px 0 #0d0d0d;cursor:pointer;transition:box-shadow 0.08s,transform 0.08s}
   .btn-pixel-primary:hover{box-shadow:2px 2px 0 #0d0d0d;transform:translate(2px,2px)}
   /* Lot 6 #26 — retour tactile "bouton pixel enfoncé" générique, indépendant de la couleur du

@@ -1,0 +1,29 @@
+[
+ {
+  "out": "public/sprites/ui/checkbox_empty.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background \u2014 simple empty square checkbox, thick stone border, hollow dark center, no content inside",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading",
+  "force": true
+ },
+ {
+  "out": "public/sprites/ui/nav_today.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background \u2014 wooden quest board sign with a large bold green checkmark on it",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading",
+  "force": true
+ },
+ {
+  "out": "public/sprites/ui/nav_week.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background \u2014 calendar page with grid of days and gold folded corner, clearly a calendar",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading",
+  "force": true
+ }
+]

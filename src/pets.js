@@ -73,14 +73,17 @@ export const PET_SPRITES = {
 // Quel sprite pour un id d'item familier (sinon null → repli emoji)
 export const PET_SPRITE_KEY = { p1:"cat", p2:"dog", p3:"wolf", p4:"fox", p5:"dragon", p6:"parrot", hp4:"owl", pet_worm:"worm", pet_capy:"capybara", pet_bee:"bee", pet_spider:"spider", pet_duck:"duck",
   // familiers de thème (v1.13.0)
-  bs5:"unicorn", mx3:"dino", gh4:"totoro", si6:"gorilla", dk1:"goldduck", dk5:"chick", al1:"ufo", al5:"invader", pi1:"pirateparrot", su6:"fugu", di2:"fairy", px1:"walle", px2:"nemo" };
+  bs5:"unicorn", mx3:"dino", gh4:"totoro", si6:"gorilla", dk1:"goldduck", dk5:"chick", al1:"ufo", al5:"invader", pi1:"pirateparrot", su6:"fugu", di2:"fairy", px1:"walle", px2:"nemo",
+  // Phase 7 (28-07) — familiers épiques de la famille (PNG seulement, pas de grille 16×16 :
+  // PetSprite garde le PNG même évolué/légendaire quand la grille n'existe pas)
+  pet_boulette:"boulette", pet_phibi:"phibi", pet_chewy:"chewy", pet_angelo:"angelo", pet_crevettes:"crevettes" };
 export const petSpriteKey = (itemId) => PET_SPRITE_KEY[itemId] || null;
 // Dessine un familier pixel sur un canvas (key = clé PET_SPRITES, ou null)
 export const renderPetToCtx = (ctx, key, size=64, palOverride=null, halo=false) => {
   const sp = PET_SPRITES[key]; if (!ctx) return;
   ctx.clearRect(0,0,size,size);
   if (!sp) return;
-  if (halo){ // halo doré du Légendaire
+  if (halo && size>0){ // halo doré du Légendaire (size<=0 possible au 1er montage → ellipse(rayon négatif) lance IndexSizeError et blanchit tout l'écran)
     ctx.strokeStyle="#FFD45A"; ctx.lineWidth=Math.max(2,size*0.035);
     ctx.beginPath(); ctx.ellipse(size*0.5, size*0.10, size*0.27, size*0.075, 0, 0, Math.PI*2); ctx.stroke();
   }

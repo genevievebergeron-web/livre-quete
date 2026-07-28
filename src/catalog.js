@@ -179,6 +179,14 @@ export const calEventIcon = (e) => {
   if (CAL_TYPES[e.type]) return CAL_TYPES[e.type].icon; // nouvelles catégories : icône dédiée même récurrent
   return e.recur ? "🔁" : "📅"; // "evenement" générique — comportement historique inchangé
 };
+// Refonte Phase 7 — même arbre de décision, mais retourne le NOM de sprite UI (cal_*).
+// À utiliser au point de rendu : <UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)}/>.
+export const calEventIconName = (e) => {
+  if (e.type==="examen") return "cal_examen";
+  if (e.type==="devoir") return "cal_devoir";
+  if (CAL_TYPES[e.type]) return "cal_"+e.type;
+  return e.recur ? "cal_recur" : "cal_event";
+};
 // v1.64.0 — messages drôles de refus (déterministe par clé pour rester stable)
 export const REFUS_MSGS = [
   "😹 Bien tenté! Cette quête part au recyclage…",
@@ -253,6 +261,71 @@ export const completionCatCounts = (ps, config) => {
   (ps.completed||[]).forEach(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const cat=catByInst[inst]; if(cat) counts[cat]=(counts[cat]||0)+1; });
   return counts;
 };
+// ─── REGISTRE DES ICÔNES UI (Refonte Phase 7) ─────────────────
+// Source unique nom → { emoji (repli), desc (prompt PixelLab) } pour les icônes UI
+// FIXES de l'app (nav, monnaies, onglets, catégories, portail, calendrier, boss).
+// Les icônes dérivées d'un catalogue (task_<id>, rw_<id>, badge_<id>) ne sont PAS
+// dupliquées ici : le générateur de jobs lit TASK_CATALOG / REWARD_CATALOG / BADGES.
+export const UI_ICONS = {
+  // Navigation enfant (App.jsx, barre du bas)
+  nav_home:     { emoji:"🏠", desc:"small cozy house with warm windows" },
+  nav_today:    { emoji:"✅", desc:"green checkmark on a small wooden quest board" },
+  nav_boss:     { emoji:"⚔️", desc:"two crossed swords" },
+  nav_week:     { emoji:"📅", desc:"calendar page with gold corner" },
+  nav_shop:     { emoji:"🛒", desc:"small market cart full of goods" },
+  // Monnaies et états
+  coin:           { emoji:"🪙", desc:"single gold coin with star emboss" },
+  xp:             { emoji:"⚡", desc:"electric lightning bolt, teal glow" },
+  heart:          { emoji:"❤️", desc:"heart, ruby red" },
+  lock:           { emoji:"🔒", desc:"padlock, iron with gold keyhole" },
+  check:          { emoji:"✅", desc:"bold green checkmark" },
+  checkbox_empty: { emoji:"⬜", desc:"empty square checkbox slot, stone carved" },
+  hourglass:      { emoji:"⏳", desc:"hourglass with golden sand" },
+  gift:           { emoji:"🎁", desc:"wrapped gift box with ribbon" },
+  star:           { emoji:"⭐", desc:"golden star" },
+  gem:            { emoji:"💎", desc:"cut blue diamond gem" },
+  // Onglets boutique
+  shop_rewards:  { emoji:"🎁", desc:"treasure chest slightly open with glow" },
+  shop_hats:     { emoji:"🎩", desc:"magician top hat" },
+  shop_armors:   { emoji:"🛡️", desc:"knight shield with emblem" },
+  shop_pets:     { emoji:"🐾", desc:"animal paw print" },
+  shop_house:    { emoji:"🏠", desc:"small house with chimney" },
+  shop_special:  { emoji:"✨", desc:"sparkles, magic stars" },
+  shop_chest:    { emoji:"📦", desc:"mystery wooden crate with question mark" },
+  // Catégories de quêtes (CAT_LABELS)
+  cat_cuisine: { emoji:"🍳", desc:"frying pan with egg" },
+  cat_menage:  { emoji:"🏠", desc:"broom sweeping sparkle" },
+  cat_routine: { emoji:"⏰", desc:"alarm clock" },
+  cat_defi:    { emoji:"🎯", desc:"target with arrow in bullseye" },
+  cat_outdoor: { emoji:"🌳", desc:"leafy tree" },
+  // Portail parent
+  parent_validate: { emoji:"✅", desc:"checkmark on parchment scroll" },
+  parent_tasks:    { emoji:"📋", desc:"clipboard with list" },
+  parent_defis:    { emoji:"🌟", desc:"glowing star" },
+  parent_actions:  { emoji:"⚡", desc:"lightning bolt over gear" },
+  parent_annonces: { emoji:"📣", desc:"megaphone" },
+  parent_journal:  { emoji:"🕐", desc:"clock with scroll" },
+  parent_code:     { emoji:"🔐", desc:"padlock with key" },
+  parent_save:     { emoji:"💾", desc:"floppy disk" },
+  parent_eye:      { emoji:"👁️", desc:"open eye" },
+  // Calendrier (CAL_TYPES + calEventIcon)
+  cal_sante:       { emoji:"🏥", desc:"hospital cross building" },
+  cal_sport:       { emoji:"⚽", desc:"soccer ball" },
+  cal_intervenant: { emoji:"🧑‍⚕️", desc:"friendly health worker portrait" },
+  cal_camp:        { emoji:"🏕️", desc:"camping tent with flag" },
+  cal_recompense:  { emoji:"🎁", desc:"gift box with sparkle" },
+  cal_examen:      { emoji:"📝", desc:"quill writing on paper" },
+  cal_devoir:      { emoji:"📚", desc:"stack of books" },
+  cal_recur:       { emoji:"🔁", desc:"two circular arrows loop" },
+  cal_event:       { emoji:"📅", desc:"calendar page" },
+  // Modificateurs de boss (BOSS_MODIFIERS)
+  boss_mod_grosse:   { emoji:"💥", desc:"big explosion impact burst" },
+  boss_mod_petite:   { emoji:"🗡️", desc:"small dagger" },
+  boss_mod_carapace: { emoji:"🛡️", desc:"heavy turtle shell shield" },
+  boss_mod_frenesie: { emoji:"⚡", desc:"double lightning bolts, red glow" },
+  boss_mod_familier: { emoji:"🐾", desc:"glowing animal paw print" },
+};
+
 // Returns array of newly earned badge IDs
 export const checkBadges = (pState, player, dailyCount, catCounts={}) => {
   const themeId = player?.themeId || "none";

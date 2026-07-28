@@ -1,0 +1,218 @@
+[
+ {
+  "out": "public/sprites/ui/nav_home.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — small cozy house with warm windows",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/nav_today.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — green checkmark on a small wooden quest board",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/nav_boss.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — two crossed swords",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/nav_week.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — calendar page with gold corner",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/nav_shop.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — small market cart full of goods",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/coin.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — single gold coin with star emboss",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/xp.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — electric lightning bolt, teal glow",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/heart.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — heart, ruby red",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/lock.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — padlock, iron with gold keyhole",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/check.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — bold green checkmark",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/checkbox_empty.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — empty square checkbox slot, stone carved",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/hourglass.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — hourglass with golden sand",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/gift.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — wrapped gift box with ribbon",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/star.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — golden star",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/gem.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — cut blue diamond gem",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_rewards.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — treasure chest slightly open with glow",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_hats.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — magician top hat",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_armors.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — knight shield with emblem",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_pets.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — animal paw print",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_house.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — small house with chimney",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_special.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — sparkles, magic stars",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/shop_chest.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — mystery wooden crate with question mark",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cat_cuisine.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — frying pan with egg",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cat_menage.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — broom sweeping sparkle",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cat_routine.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — alarm clock",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cat_defi.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — target with arrow in bullseye",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/cat_outdoor.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — leafy tree",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ }
+]

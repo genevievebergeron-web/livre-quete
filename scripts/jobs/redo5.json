@@ -1,0 +1,17 @@
+[
+ { "out": "public/sprites/items/bs6.png", "force": true,
+   "description": "16-bit pixel art game icon, dark charcoal background style, crisp readable silhouette, centered, transparent background — big neon pink ribbon bow, bright pink, cute, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/mx4.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — rainbow arc with visible red orange yellow green blue bands over a small beaker, science experiment, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/mi2.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — glowing blue cell nucleus sphere inside a translucent cell membrane, microbiology, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/cu5.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — three shiny gold stars in a row above a chef hat, restaurant award, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/ho4.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — protective amulet necklace with dark beads and glowing gold pendant, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" }
+]

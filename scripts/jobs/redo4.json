@@ -1,0 +1,11 @@
+[
+ { "out": "public/sprites/items/lg5.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — yellow toy minifigure head with two different face expressions, happy and surprised, bright yellow, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/kp2.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — music album CD case with gold signature scribble on the cover, shiny disc visible, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/kp3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — concert lightstick wand with glowing star on top, bright glow, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" }
+]

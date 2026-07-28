@@ -4,7 +4,7 @@
 // (pets.js pour PET_SPRITES/ITEM_SPRITES, catalog.js pour rarityOf) — zéro état partagé
 // au niveau module, zéro changement de comportement.
 import { useState, useRef, useEffect } from "react";
-import { petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx } from "./pets.js";
+import { petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_SPRITES } from "./pets.js";
 import { rarityOf } from "./catalog.js";
 import { renderAvatarToCtx, isDetailedReady, onAvatarPngLoaded } from "./avatar.jsx";
 
@@ -14,12 +14,32 @@ export function PetSprite({ petKey, itemId, size=64, palOverride=null, legendary
   const [imgFail, setImgFail] = useState(false); // v1.75.0 — repli sur le canvas si pas de PNG
   const canvasRef = useRef(null);
   // PNG seulement pour la forme de base (pas évoluée) : `public/sprites/pets/<key>.png`. Évolué/Légendaire = canvas recoloré.
-  const usePng = !imgFail && !palOverride && !legendary && !!key;
+  // Phase 7 : les familiers PNG-seulement (pas de grille 16×16, ex. Boulette/Phibi/Chewy)
+  // gardent leur PNG même évolués — sinon canvas vide (renderPetToCtx est un no-op sans grille).
+  const usePng = !imgFail && !!key && (( !palOverride && !legendary ) || !PET_SPRITES[key]);
   useEffect(()=>{ if(usePng) return; const c=canvasRef.current; if(!c)return; renderPetToCtx(c.getContext("2d"), key, size, palOverride, legendary); },[usePng,key,size,palOverride,legendary]);
   if(!key) return null;
   if(usePng) return <img src={`/sprites/pets/${key}.png`} width={size} height={size} alt="" onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",objectFit:"contain",...style}}/>;
   return <canvas ref={canvasRef} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
 }
+
+// Refonte Phase 7 — icône UI en pixel-art. PNG (public/sprites/ui/<name>.png) → repli emoji.
+// Cache module UI_FAILED : App.jsx re-rend beaucoup — un seul 404 par nom et par session,
+// ensuite le repli emoji est rendu directement (pas de rafale de requêtes réseau).
+const UI_FAILED = new Set();
+export function UIIcon({ name, emoji, size=18, style={}, block=false }) {
+  const [, force] = useState(0);
+  if (!name || UI_FAILED.has(name))
+    return <span style={{fontSize:size, lineHeight:1, ...style}} aria-hidden>{emoji}</span>;
+  return <img src={`/sprites/ui/${name}.png`} width={size} height={size} alt=""
+    onError={()=>{ UI_FAILED.add(name); force(x=>x+1); }}
+    style={{imageRendering:"pixelated", objectFit:"contain",
+      display: block?"block":"inline-block", verticalAlign: block?undefined:"-0.18em", ...style}}/>;
+}
+// Raccourcis pour les deux glyphes les plus fréquents (monnaie et XP) — se comportent
+// comme un caractère dans du texte : `+5 <Coin/>`.
+export const Coin = (p)=><UIIcon name="coin" emoji="🪙" {...p}/>;
+export const Xp   = (p)=><UIIcon name="xp"   emoji="⚡" {...p}/>;
 
 // v1.13.0 — Item en pixel-art. PNG (public/sprites/items/<id>.png) → grille ITEM_SPRITES → repli emoji.
 export function ItemSprite({ itemId, emoji, size=48, style={} }) {
@@ -43,7 +63,7 @@ export function ItemSprite({ itemId, emoji, size=48, style={} }) {
 // donc l'alignement reste correct à N'IMPORTE QUELLE taille d'avatar (cx/cy en unités natives ÷72×size).
 // a1/a2/a3/a5 (bouclier/épée/arc/bâton) sont en fait des ARMES tenues en main, pas de l'armure de torse —
 // a4 (armure diamant) reste seule à utiliser l'ancre "armor" (centrée sur le torse).
-export const HELD_WEAPON_IDS = new Set(["a1","a2","a3","a5"]);
+export const HELD_WEAPON_IDS = new Set(["a1","a2","a3","a5","a10","a13"]); // a10 bouclier fromage, a13 bâton (Phase 7)
 export const AVATAR_EQUIP_ANCHORS = {
   hat:    { cx:18, cy:1,  wRatio:0.40, shadow:true },              // sommet de la tête (tête native x3-33 y2-24, centre x18)
   face:   { cx:18, cy:13, wRatio:0.235 },                          // niveau des yeux
@@ -51,17 +71,28 @@ export const AVATAR_EQUIP_ANCHORS = {
   weapon: { cx:37, cy:32, wRatio:0.36, rotate:22, shadow:true },    // tenue dans la main droite (bras natif x32-38 y28-42), légère inclinaison
   themed: { cx:29, cy:53, wRatio:0.22 },                           // accessoire secondaire, à la ceinture/jambe
 };
-// Ancres pour le PERSONNAGE DÉTAILLÉ v2 (trame 144, chantier E) — anatomie de la base :
-// tête x≈52-92 y≈12-52 (centre x72), torse y≈54-96, main droite x≈100 y≈80, pieds y≈135.
+// Ancres pour le PERSONNAGE DÉTAILLÉ v2 (trame 144, chantier E), PAR SILHOUETTE —
+// anatomie MESURÉE (bbox alpha>40 des PNG, pas les valeurs supposées d'origine qui
+// plaçaient la main à x100 hors du corps, bbox max x≈92) :
+//   body_ado    : tête centre (72,22) larg≈26 (x59-84, y8-36), torse (72,66), main droite ≈(88,89)
+//   body_enfant : tête centre (72,40) (y27-52), torse (72,80), main droite ≈(88,100)
 export const AVATAR_EQUIP_ANCHORS_V2 = {
-  hat:    { cx:72,  cy:7,   wRatio:0.28, shadow:true, base:144 },
-  face:   { cx:72,  cy:33,  wRatio:0.20, base:144 },
-  armor:  { cx:72,  cy:76,  wRatio:0.30, shadow:true, base:144 },
-  weapon: { cx:103, cy:80,  wRatio:0.30, rotate:22, shadow:true, base:144 },
-  themed: { cx:93,  cy:110, wRatio:0.18, base:144 },
+  hat:    { cx:72, cy:12,  wRatio:0.28, shadow:true, base:144 },
+  face:   { cx:72, cy:23,  wRatio:0.18, base:144 },
+  armor:  { cx:72, cy:66,  wRatio:0.30, shadow:true, base:144 },
+  weapon: { cx:88, cy:88,  wRatio:0.30, rotate:22, shadow:true, base:144 },
+  themed: { cx:84, cy:105, wRatio:0.18, base:144 },
 };
-export function equipAnchorStyle(key, size, detailed=false) {
-  const A = detailed ? AVATAR_EQUIP_ANCHORS_V2[key] : AVATAR_EQUIP_ANCHORS[key];
+export const AVATAR_EQUIP_ANCHORS_V2_ENFANT = {
+  hat:    { cx:72, cy:30,  wRatio:0.28, shadow:true, base:144 },
+  face:   { cx:72, cy:41,  wRatio:0.18, base:144 },
+  armor:  { cx:72, cy:80,  wRatio:0.30, shadow:true, base:144 },
+  weapon: { cx:88, cy:99,  wRatio:0.28, rotate:22, shadow:true, base:144 },
+  themed: { cx:84, cy:112, wRatio:0.18, base:144 },
+};
+export const v2AnchorsFor = (build) => build==="bd_enfant" ? AVATAR_EQUIP_ANCHORS_V2_ENFANT : AVATAR_EQUIP_ANCHORS_V2;
+export function equipAnchorStyle(key, size, detailed=false, build="bd_ado") {
+  const A = detailed ? v2AnchorsFor(build)[key] : AVATAR_EQUIP_ANCHORS[key];
   const base = A.base || 72;
   const w = Math.round(size*A.wRatio);
   return {
@@ -82,8 +113,14 @@ export const ITEM_CONTENT_OFFSET = {
   di1: { dy: -0.10 },
   sc1: { dy: -0.07 },
 };
-const withContentOffset = (style, itemId) => {
-  const o = ITEM_CONTENT_OFFSET[itemId];
+// En mode DÉTAILLÉ, FittedItemSprite recadre déjà sur la bbox opaque : les offsets v1
+// (qui compensent des marges) deviennent une DOUBLE correction (casque poussé haut-gauche).
+// Seule reste l'asymétrie de MASSE des items dont la bbox remplit le cadre (h3).
+export const ITEM_CONTENT_OFFSET_V2 = {
+  h3: { dx: 0.11, dy: 0.02 },
+};
+const withContentOffset = (style, itemId, detailed=false) => {
+  const o = (detailed ? ITEM_CONTENT_OFFSET_V2 : ITEM_CONTENT_OFFSET)[itemId];
   if (!o) return style;
   return { ...style,
     left: style.left + Math.round((o.dx||0)*style.width),
@@ -149,7 +186,7 @@ export function EquippedGear({ eq, items, size, avatarDef=null }) {
   // ⚠️ Les DEUX mécanismes sont nécessaires (régression v2.14.0, 4e signalement du heaume) :
   // le recadrage par contenu neutralise les MARGES, mais pas l'asymétrie de MASSE (h3 :
   // casque à gauche + panache à droite remplissent 97 % du cadre → bbox ≈ cadre).
-  const st = (key, id) => withContentOffset(equipAnchorStyle(key, size, det), id);
+  const st = (key, id) => withContentOffset(equipAnchorStyle(key, size, det, avatarDef?.build), id, det);
   return (<>
     {eq.hat    && <Spr itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={st("hat",eq.hat).width}         style={st("hat",eq.hat)}/>}
     {eq.face   && <Spr itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={st("face",eq.face).width}        style={st("face",eq.face)}/>}
@@ -198,10 +235,10 @@ export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutra
       if(im) ctx.drawImage(im, 0, 0, size, size);
       return;
     }
-    const A = det ? AVATAR_EQUIP_ANCHORS_V2[anchorKey] : AVATAR_EQUIP_ANCHORS[anchorKey];
+    const A = det ? v2AnchorsFor(avatarDef?.build)[anchorKey] : AVATAR_EQUIP_ANCHORS[anchorKey];
     const base = A.base || 72;
     const w = Math.round(size*A.wRatio);
-    const off = ITEM_CONTENT_OFFSET[id] || {};
+    const off = (det ? ITEM_CONTENT_OFFSET_V2 : ITEM_CONTENT_OFFSET)[id] || {};
     const cx = A.cx/base*size + (off.dx||0)*w, cy = A.cy/base*size + (off.dy||0)*w;
     ctx.save();
     ctx.translate(cx, cy);
@@ -255,7 +292,7 @@ export const badgeSymbol = (b)=>{
   if(id.startsWith("b_level")) return "arrow";
   return "gem"; // badges de thème
 };
-export function renderBadgeToCtx(ctx, b, earned, W=44){
+export function renderBadgeToCtx(ctx, b, earned, W=44, noSymbol=false){
   const sc=W/24, s=v=>Math.round(v*sc); ctx.clearRect(0,0,W,W);
   const gold=earned?"#FFCB2E":"#4a4a4a", goldD=earned?"#C7860A":"#333", sym=earned?"#3a2400":"#222";
   // Médaillon (disque)
@@ -263,6 +300,7 @@ export function renderBadgeToCtx(ctx, b, earned, W=44){
   ctx.fillStyle=gold;  ctx.beginPath(); ctx.arc(W/2,W/2,s(10),0,7); ctx.fill();
   ctx.fillStyle=earned?"#FFE48A":"#5a5a5a"; ctx.beginPath(); ctx.arc(W/2,W/2,s(8.2),0,7); ctx.fill();
   ctx.fillStyle=gold; ctx.beginPath(); ctx.arc(W/2,W/2,s(7),0,7); ctx.fill();
+  if(noSymbol) return; // Refonte Phase 7 — le glyphe PixelLab est superposé par-dessus (BadgeIcon)
   ctx.fillStyle=sym; const R=(x,y,w,h)=>ctx.fillRect(s(x),s(y),s(w),s(h));
   switch(badgeSymbol(b)){
     case "star": R(11,5,2,14);R(5,11,14,2);R(8,8,8,8);ctx.fillStyle=gold;R(9,9,6,6);break;
@@ -278,10 +316,26 @@ export function renderBadgeToCtx(ctx, b, earned, W=44){
     default: R(9,7,6,2);R(7,9,10,2);R(8,11,8,3);R(10,14,4,2); // gem
   }
 }
+// Refonte Phase 7 — le médaillon canvas reste le CADRE ; si un glyphe PixelLab existe
+// (public/sprites/ui/badge_<id>.png), il remplace le symbole dessiné (superposé, ~58 %
+// du médaillon, grisé si non gagné). Repli : médaillon + symbole dessiné, comme avant.
+const BADGE_PNG_FAILED = new Set();
 export function BadgeIcon({ badge, earned, size=44, style={} }){
   const ref=useRef(null);
-  useEffect(()=>{ const c=ref.current; if(c) renderBadgeToCtx(c.getContext("2d"), badge, earned, size); },[badge,earned,size]);
-  return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+  const [pngOk, setPngOk] = useState(!BADGE_PNG_FAILED.has(badge?.id));
+  useEffect(()=>{ setPngOk(!BADGE_PNG_FAILED.has(badge?.id)); },[badge?.id]);
+  useEffect(()=>{ const c=ref.current; if(c) renderBadgeToCtx(c.getContext("2d"), badge, earned, size, pngOk); },[badge,earned,size,pngOk]);
+  const g=Math.round(size*0.58);
+  return (
+    <span style={{position:"relative",display:"inline-block",width:size,height:size,lineHeight:0,...style}}>
+      <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated"}}/>
+      {pngOk && <img src={`/sprites/ui/badge_${badge?.id}.png`} width={g} height={g} alt=""
+        onError={()=>{ BADGE_PNG_FAILED.add(badge?.id); setPngOk(false); }}
+        style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",
+          imageRendering:"pixelated",objectFit:"contain",
+          filter:earned?undefined:"grayscale(1) brightness(0.55)"}}/>}
+    </span>
+  );
 }
 
 // ─── COFFRES MYSTÈRES (loot boxes) ────────────────────────────

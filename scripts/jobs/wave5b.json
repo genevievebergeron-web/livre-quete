@@ -1,0 +1,450 @@
+[
+ {
+  "out": "public/sprites/items/in2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Carapace coccinelle, 🐛 Insectes style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/in3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Antennes grillon, 🐛 Insectes style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/in4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Cocon doré, 🐛 Insectes style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/in5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Armure fourmi, 🐛 Insectes style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/in6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Branche camouflage, 🐛 Insectes style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Masque de monstre, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Dents géantes, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Cape de monstre, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Chaînes de boss, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Œil central, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mo6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Coeur de ténèbres, 👹 Monstres style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Massue de roche, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Peau de mammouth, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Peinture rupestre, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Œuf de dinosaure, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Parure de chef, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/pr6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Feu sacré, 🦕 Préhistoire style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Flagelle doré, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Noyau cellulaire, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Mitochondrie légendaire, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Seringue de pouvoir, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Bulle protectrice, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mi6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Pipette d'élite, 🦠 Micro style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Chapeau aux oeufs, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Gemme Admin, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Brique ultime, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Épée légendaire obby, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Bouclier noob+, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/rb6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Trophée Owner, 🎮 Roblox style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/bs1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Nuage rose, 🌈 Bisounours style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/bs2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Coeur géant, 🌈 Bisounours style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/bs3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Arc-en-ciel en plastique, 🌈 Bisounours style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/bs4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Paillettes obligatoires, 🌈 Bisounours style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/bs6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Noeud rose fluo, 🌈 Bisounours style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Toque de chef, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Tablier légendaire, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Couteau pro, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Spatule d'or, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — 3 étoiles Michelin, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/cu6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Pizza magique, 🍳 Cuisine style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Lampe de poche, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Masque de hockey, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Clé de la cave, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Amulette protectrice, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Stigmate du survivant, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/ho6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Crâne du boss final, 😱 Horreur style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mx1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Tourbillon de trucs, 🌪️ Chaos style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mx2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Item mystère, 🌪️ Chaos style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mx4.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Arc-en-ciel scientifique, 🌪️ Chaos style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mx5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Dé du destin, 🌪️ Chaos style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/mx6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Chapeau de chaos, 🌪️ Chaos style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/hp1.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Baguette en bois de houx, 🪄 Poudlard style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/hp2.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Écharpe de maison, 🪄 Poudlard style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/hp3.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Chapeau du Choixpeau, 🪄 Poudlard style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/hp5.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Coupe des Quatre Maisons, 🪄 Poudlard style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/items/hp6.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — Boule de cristal, 🪄 Poudlard style, game inventory item",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ }
+]

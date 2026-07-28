@@ -738,9 +738,19 @@ export const getPlayerTheme = (id) => PLAYER_THEMES[id] || PLAYER_THEMES.none;
 
 // ─── CATALOGUE BOUTIQUE (niveau module pour que le PROFIL puisse résoudre les items) ──
 export const BASE_SHOP_ITEMS = {
-  hats:[{id:"h1",emoji:"🎩",name:"Chapeau magique",cost:20,slot:"hat"},{id:"h2",emoji:"👑",name:"Couronne",cost:40,slot:"hat"},{id:"h3",emoji:"⛑",name:"Casque héros",cost:25,slot:"hat"},{id:"h4",emoji:"🪖",name:"Casque diamant",cost:35,slot:"hat"},{id:"h5",emoji:"🎓",name:"Chapeau savant",cost:30,slot:"hat"},{id:"h6",emoji:"🧢",name:"Cap champion",cost:15,slot:"hat"}],
-  armors:[{id:"a1",emoji:"🛡️",name:"Bouclier",cost:15,slot:"armor"},{id:"a2",emoji:"⚔️",name:"Épée",cost:20,slot:"armor"},{id:"a3",emoji:"🏹",name:"Arc en or",cost:35,slot:"armor"},{id:"a4",emoji:"💎",name:"Armure diamant",cost:50,slot:"armor"},{id:"a5",emoji:"🪄",name:"Bâton magique",cost:30,slot:"armor"},{id:"a6",emoji:"🧻",name:"Armure de papier de toilette",cost:25,slot:"armor"},{id:"a7",emoji:"🗒️",name:"Armure de post-it",cost:20,slot:"armor"},{id:"a8",emoji:"🛡️",name:"Armure de chevalier",cost:45,slot:"armor"},{id:"a9",emoji:"🥇",name:"Armure royale dorée",cost:60,slot:"armor"}],
-  pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"},{id:"pet_duck",emoji:"🦆",name:"Canard jaune",cost:20,slot:"pet"},{id:"pet_worm",emoji:"🪱",name:"Ver de terre",cost:15,slot:"pet"},{id:"pet_capy",emoji:"🦫",name:"Capybara",cost:40,slot:"pet"},{id:"pet_bee",emoji:"🐝",name:"Abeille",cost:25,slot:"pet"},{id:"pet_spider",emoji:"🕷️",name:"Araignée",cost:30,slot:"pet"}],
+  hats:[{id:"h1",emoji:"🎩",name:"Chapeau magique",cost:20,slot:"hat"},{id:"h2",emoji:"👑",name:"Couronne",cost:40,slot:"hat"},{id:"h3",emoji:"⛑",name:"Casque héros",cost:25,slot:"hat"},{id:"h4",emoji:"🪖",name:"Casque diamant",cost:35,slot:"hat"},{id:"h5",emoji:"🎓",name:"Chapeau savant",cost:30,slot:"hat"},{id:"h6",emoji:"🧢",name:"Cap champion",cost:15,slot:"hat"},
+    // Phase 7 (28-07, demande Gen) — items rigolos
+    {id:"h7",emoji:"🥚",name:"Chapeau coquille d'oeuf",cost:20,slot:"hat"},{id:"h8",emoji:"🥫",name:"Casque papier d'alu",cost:25,slot:"hat"}],
+  armors:[{id:"a1",emoji:"🛡️",name:"Bouclier",cost:15,slot:"armor"},{id:"a2",emoji:"⚔️",name:"Épée",cost:20,slot:"armor"},{id:"a3",emoji:"🏹",name:"Arc en or",cost:35,slot:"armor"},{id:"a4",emoji:"💎",name:"Armure diamant",cost:50,slot:"armor"},{id:"a5",emoji:"🪄",name:"Bâton magique",cost:30,slot:"armor"},{id:"a6",emoji:"🧻",name:"Armure de papier de toilette",cost:25,slot:"armor"},{id:"a7",emoji:"🗒️",name:"Armure de post-it",cost:20,slot:"armor"},{id:"a8",emoji:"🛡️",name:"Armure de chevalier",cost:45,slot:"armor"},{id:"a9",emoji:"🥇",name:"Armure royale dorée",cost:60,slot:"armor"},
+    // Phase 7 (28-07, demande Gen) — items rigolos (a10/a13 tenus en main, voir HELD_WEAPON_IDS)
+    {id:"a10",emoji:"🧀",name:"Bouclier tranche de fromage",cost:20,slot:"armor"},{id:"a11",emoji:"🧀",name:"Armure fromagère",cost:35,slot:"armor"},{id:"a12",emoji:"🌯",name:"Armure tortilla",cost:30,slot:"armor"},{id:"a13",emoji:"🪵",name:"Épée beau bâton de bois",cost:15,slot:"armor"}],
+  pets:[{id:"p1",emoji:"🐱",name:"Chat",cost:20,slot:"pet"},{id:"p2",emoji:"🐶",name:"Chien",cost:20,slot:"pet"},{id:"p3",emoji:"🐺",name:"Loup",cost:35,slot:"pet"},{id:"p4",emoji:"🦊",name:"Renard",cost:30,slot:"pet"},{id:"p5",emoji:"🐉",name:"Dragon",cost:60,slot:"pet"},{id:"p6",emoji:"🦜",name:"Perroquet",cost:25,slot:"pet"},{id:"pet_duck",emoji:"🦆",name:"Canard jaune",cost:20,slot:"pet"},{id:"pet_worm",emoji:"🪱",name:"Ver de terre",cost:15,slot:"pet"},{id:"pet_capy",emoji:"🦫",name:"Capybara",cost:40,slot:"pet"},{id:"pet_bee",emoji:"🐝",name:"Abeille",cost:25,slot:"pet"},{id:"pet_spider",emoji:"🕷️",name:"Araignée",cost:30,slot:"pet"},
+    // Phase 7 (28-07, demande Gen) — familiers ÉPIQUES de la vraie famille
+    {id:"pet_boulette",emoji:"🐰",name:"Boulette",cost:60,slot:"pet"},
+    {id:"pet_phibi",emoji:"🐈",name:"Phibi",cost:60,slot:"pet"},
+    {id:"pet_chewy",emoji:"🐕",name:"Chewy",cost:55,slot:"pet"},
+    {id:"pet_angelo",emoji:"🐠",name:"Angelo",cost:50,slot:"pet"},
+    {id:"pet_crevettes",emoji:"🦐",name:"Armée de p'tites crevettes",cost:65,slot:"pet"}],
 };
 BASE_SHOP_ITEMS.skins=[
   {id:"usk9", emoji:"✨",name:"Peau d'or",     cost:50,slot:"skin"},

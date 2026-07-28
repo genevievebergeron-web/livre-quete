@@ -1,0 +1,282 @@
+[
+ {
+  "out": "public/sprites/deco/deco_lego.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing LEGO, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_medieval.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Médiéval, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_kpop.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing K-Pop, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_unicorn.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Licornes, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_demon.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Démons, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_angel.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Anges, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_scientifique.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Scientifique, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_insectes.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Insectes, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_monstres.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Monstres, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_prehistoire.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Préhistoire, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_microscopique.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Microscopique, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_roblox.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Roblox, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_bisounours.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Rose Bisounours 🆘, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_cuisine.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Cuisine, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_horreur.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Horreur, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_melange.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Totalement Mélangé, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_harrypotter.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Harry Potter, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_geantdefer.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Géant de Fer, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_trolls.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Les Trolls, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_ghibli.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Univers Ghibli, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_singes.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Planète des Singes, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_jamesbond.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing James Bond, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_boomerangfu.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Boomerang Fu, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_minecraftpp.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Minecraft ++, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_coursefutur.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Course Futuriste, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_canards.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing 🦆 Canards Jaunes, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_aliens.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing 👽 Invasion Alien, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_pirates.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing 🏴 Pirates, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_sushi.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing 🍣 Sushi World, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_robots.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing 🤖 Robots, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_japon.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Japon, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_licornes.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Licornes ✨, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_marvel.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Marvel, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_disney.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Disney, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ },
+ {
+  "out": "public/sprites/deco/deco_pixar.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — ornate gold trophy representing Pixar, on small pedestal",
+  "width": 64,
+  "height": 64,
+  "detail": "medium detail",
+  "shading": "basic shading"
+ }
+]

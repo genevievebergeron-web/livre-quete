@@ -1,0 +1,23 @@
+[
+ { "out": "public/sprites/items/gh1.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — vintage paper bus ticket with a smiling cat face stamp on it, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/jb3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — elegant black tuxedo suit jacket with white shirt and black bow tie, front view, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/tr3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — round bright badge with two cartoon arms hugging a pink heart, cheerful, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/si2.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — military general shoulder epaulette with gold braid fringe and star, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/mc1.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — pickaxe with bright blue diamond blade and wooden handle, blocky cubic mining style, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/cf3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — round turbocharger engine part with spiral fins and lightning glow, racing upgrade, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/cf6.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — glowing ghostly translucent engine block with sparkle trail, phantom racing part, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" }
+]

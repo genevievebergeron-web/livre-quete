@@ -28,6 +28,8 @@ const imgOf  = j => (j.result?.content || []).find(p => p.type === "image");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function genOne(job) {
+  // Idempotent : un PNG déjà présent n'est pas régénéré (permet de relancer un lot interrompu).
+  if (!job.force && fs.existsSync(job.out)) return { out: job.out, ok: true, bytes: fs.statSync(job.out).size, skipped: true };
   const args = {
     description: job.description,
     width: job.width || 64, height: job.height || 64,
