@@ -265,7 +265,9 @@ function drawMouth(ctx, s, { av, mouthPart, mood }){
     ctx.fillRect(s(12),s(19),s(12),s(2));
   }
   else if(av.mouth==="mo2"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillRect(s(10),s(16),s(2),s(3));ctx.fillRect(s(24),s(16),s(2),s(3));}
+  else if(av.mouth==="mo3"){ctx.fillRect(s(11),s(19),s(14),s(2));ctx.fillRect(s(9),s(19),s(2),s(2));ctx.fillRect(s(25),s(19),s(2),s(2));} // Sérieux — ligne fine, coins tombants
   else if(av.mouth==="mo4"){ctx.fillRect(s(11),s(18),s(14),s(3));ctx.fillStyle="#FF88AA";ctx.fillRect(s(14),s(21),s(8),s(4));}
+  else if(av.mouth==="mo5"){ctx.fillRect(s(10),s(17),s(16),s(5));ctx.fillStyle="#fff";ctx.fillRect(s(12),s(18),s(2),s(3));ctx.fillRect(s(16),s(18),s(2),s(3));ctx.fillRect(s(20),s(18),s(2),s(3));} // Crispé — grimace, dents serrées
   else if(av.mouth==="mo6"){ctx.fillRect(s(10),s(18),s(16),s(2));ctx.fillRect(s(10),s(18),s(2),s(5));ctx.fillRect(s(24),s(18),s(2),s(5));}
   else{ctx.fillRect(s(11),s(18),s(14),s(3));}
 }

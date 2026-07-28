@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.13.5";
+const APP_VERSION = "2.13.6";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.13.6", date:"2026-07-27", features:[
+    "👄 Bouches SÉRIEUX et CRISPÉ dans Mon Perso : elles ne faisaient rien avant (mêmes pixels que NEUTRE) — chacune a maintenant sa vraie bouche.",
+  ]},
   { version:"2.13.5", date:"2026-07-27", features:[
     "🪖 Le heaume de chevalier est maintenant bien posé sur la tête (son panache décentrait le casque) — et quelques autres items sont mieux alignés aussi.",
   ]},
