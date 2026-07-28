@@ -1,0 +1,14 @@
+[
+ { "out": "public/sprites/items/jp2.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — pink cherry blossom flower with five petals, sakura, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/mv1.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — round hero shield with a star in the center and concentric rings, red white and blue, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/px3.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — cartoon toy spaceship rocket with rounded cockpit and green purple accents, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/items/px4.png", "force": true,
+   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, crisp readable silhouette, centered, transparent background — small white articulated desk lamp with round head on bent arm, cute and friendly, game inventory item",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" }
+]

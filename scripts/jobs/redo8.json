@@ -1,0 +1,8 @@
+[
+ { "out": "public/sprites/items/h8.png", "force": true,
+   "description": "16-bit pixel art game icon, crisp readable silhouette, centered, transparent background — shiny bright silver crumpled aluminum foil hat, metallic reflections, funny pointy tinfoil hat, light grey silver color",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" },
+ { "out": "public/sprites/pets/crevettes.png", "force": true,
+   "description": "16-bit pixel art game icon, crisp readable silhouette, centered, transparent background — small group of tiny cute shrimp: some white shrimp, some bright red shrimp, some blue shrimp, three distinct colors clearly visible, marching together like a tiny army",
+   "width": 64, "height": 64, "detail": "medium detail", "shading": "basic shading" }
+]
