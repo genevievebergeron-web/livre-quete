@@ -210,3 +210,22 @@ Seed direct de `localStorage` (2 joueurs de test, dont un richement équipé : p
 
 ### Non couvert cette passe (pour la prochaine)
 Onglets Chapeaux/Armures/Maison/Peaux de la Boutique (seuls Récompenses et Familiers testés), achat réel d'un item avec double-clic rapide sur "Acheter" dans ce nouveau système de tiers, popup Mon Perso (onglets Créer/Familier/Maison/Peaux en dehors de l'onboarding), les 3 coffres de la Boutique (Commun/Rare/Légendaire), le nouvel extra "Bras en plus" (v2.13.3) et les peaux à débloquer (usk9-12, v2.13.0).
+
+---
+
+## Mini-check du 2026-07-28 (matin, ÉTAPE 0.5)
+
+Lecture `GET /api/famille` (lecture seule). 7 `config.bugs`, 5 messages `feed` de type `chat`, 0 `errorLogs`.
+
+### 🐛 Bugs passés en revue
+- 6 des 7 bugs (`bug_xcqtyr7`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_74klxs1`, `bug_k1gqpz6`) — déjà documentés et traités dans les passages précédents, rien de nouveau.
+- **`bug_6k7827p`** (28 juillet 07:19 EDT, signalé par « Le GOAT!!! » = Elli) « Quand je pèse sur l'icône maison et spécial et que je veux acheter un truc, rien ne ce passe » — ✅ **corrigé en v2.15.3**, voir entrée dédiée dans `PROJET-ETAT.md`. Root cause réelle : garde "fonds insuffisants" totalement silencieuse dans la grille d'items de la Boutique (pas spécifique à Maison/Spécial — Elli avait `coins:0`, donc TOUS les items lui semblaient cassés). Achat réel dans Maison et Spécial avec fonds suffisants testé et confirmé fonctionnel — pas de bug de clic sur ces onglets spécifiquement.
+
+### 💬 Fil de famille
+5 messages `chat`, dont 4 déjà documentés (renommer familier ✅ fait, défi qui se reset ✅ fait, « LETS GOOOOOO » et « yo la tribus sa vas moi oui » sans action). Nouveau : « Ouais » (25 juillet, Olivier) — pas de contenu actionnable, aucune action.
+
+### Suite de ce passage
+File d'implémentation (`le-design-de-mon-mighty-mountain.md`) revérifiée : tous les chantiers listés (correctifs 24 juillet, quêtes de réparation, décisions 26 juillet, refonte visuelle 6 phases, "Ma journée" sectionnée) sont déjà livrés en code (confirmé par le code réel jusqu'à v2.15.2, "Calendrier refondu" + colonnes flex). Aucun nouvel item de file à démarrer ce passage — le bug live du mini-check a été traité à la place (règle de priorité de l'ÉTAPE 0.5).
+
+### ⚠️ Collision concurrente rencontrée et gérée
+Session live active en parallèle sur `App.jsx` pendant tout ce passage (chantier calendrier flex-wrap, `v2.15.2`, commit `ae6cbd3`). Le hunk de mon fix (isolé via `git add -p`) s'est retrouvé embarqué dans leur commit avant que je committe moi-même (index Git partagé — voir détail complet dans `PROJET-ETAT.md`). Code fonctionnel intact et déployé, seule l'attribution du commit est décalée (bump de version + changelog committés séparément en `c2e9918`).
