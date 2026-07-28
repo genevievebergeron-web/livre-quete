@@ -73,6 +73,17 @@ async function putFamille(id, data) {
 // (même une vieille version) n'écrase JAMAIS les changements d'un autre.
 const _uniq = (a) => [...new Set(a || [])];
 const isNewer = (a, b) => { if (!a) return false; if (!b) return true; try { return new Date(a) > new Date(b); } catch { return false; } };
+// v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — port du même garde-fou côté client
+// (src/recurring.js, isValidCustodyWeekKey) : une valeur corrompue trouvée en prod ("2026-07-25z2",
+// jamais produite par custodyWeekKey() — qui ne renvoie que des vendredis YYYY-MM-DD) battait pour
+// toujours la vraie clé du jour dans la comparaison `>=` brute ci-dessous, rendant la corruption
+// increvable via une simple synchro. Une clé invalide perd désormais face à une clé valide.
+const isValidCustodyWeekKey = (v) => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + "T00:00:00");
+  if (isNaN(d.getTime())) return false;
+  return d.getDay() === 5; // vendredi
+};
 const _mergeCalendar = (a, b) => { const m = new Map(); for (const e of [...(a||[]), ...(b||[])]) { if (e && e.id != null) m.set(e.id, e); } return [...m.values()]; };
 const mergePetXp = (a, b) => { const out = { ...(a||{}) }; for (const k in (b||{})) out[k] = Math.max(out[k]||0, b[k]||0); return out; };
 const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
@@ -173,7 +184,10 @@ const mergeFamily = (base, incoming) => {
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
     // Lot 7 — last-write-wins par weekKey (plus récent gagne)
-    weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests; if (!a) return b||null; if (!b) return a; return (a.generatedForWeek||"") >= (b.generatedForWeek||"") ? a : b; })(),
+    weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests; if (!a) return b||null; if (!b) return a;
+      const aValid=isValidCustodyWeekKey(a.generatedForWeek), bValid=isValidCustodyWeekKey(b.generatedForWeek);
+      if (aValid !== bValid) return aValid ? a : b;
+      return (a.generatedForWeek||"") >= (b.generatedForWeek||"") ? a : b; })(),
     weeklyChallenge: (() => { const a=bC.weeklyChallenge, b=iC.weeklyChallenge; if (!a) return b||null; if (!b) return a;
       if (a.weekKey !== b.weekKey) return (a.weekKey||"") >= (b.weekKey||"") ? a : b;
       // Même semaine : fusionner les checkins par enfant (union des jours cochés)

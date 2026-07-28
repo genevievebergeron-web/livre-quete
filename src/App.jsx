@@ -19,7 +19,7 @@ import { AvatarPopup } from "./avatarpopup.jsx";
 import { DECO_CATALOG, decoForTheme, DecoSprite, HouseScene } from "./house.jsx";
 import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
-import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
+import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
 const APP_VERSION = "2.15.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
@@ -1216,6 +1216,26 @@ const mergeFamily = (base, incoming) => {
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
     // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
     announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — Lot 7 (semaine de garde) :
+    // weeklyQuests n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}` ci-dessus
+    // — iC (incoming) écrasait TOUJOURS bC, sans égard à la fraîcheur (même bug déjà corrigé pour
+    // weeklyChallenge, voir plus bas). Un appareil resté sur une semaine de garde plus vieille (ou sur
+    // `weeklyQuests:null`) pouvait donc effacer les assignations de la semaine en cours partout, orphelinant
+    // les demandes de validation en attente. Fix : dernière-semaine-gagne par generatedForWeek, comme le
+    // fait déjà server.cjs (mergeFamily côté serveur) — les deux moitiés de la fusion restent cohérentes.
+    weeklyQuests: (() => {
+      const a = bC.weeklyQuests, b = iC.weeklyQuests;
+      if (!a) return b || null;
+      if (!b) return a;
+      // v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) : une donnée corrompue trouvée
+      // en prod ("2026-07-25z2", jamais produite par ce code — voir isValidCustodyWeekKey) battait
+      // pour toujours la vraie clé du jour dans une comparaison `>=` brute, empêchant tout correctif
+      // via une simple synchro. Une clé invalide perd maintenant automatiquement face à une clé
+      // valide, peu importe l'ordre alphabétique.
+      const aValid = isValidCustodyWeekKey(a.generatedForWeek), bValid = isValidCustodyWeekKey(b.generatedForWeek);
+      if (aValid !== bValid) return aValid ? a : b;
+      return (a.generatedForWeek || "") >= (b.generatedForWeek || "") ? a : b;
+    })(),
     // v2.6.0 — quêtes de réparation 🕊️ : union-by-id (id = instanceId de l'assignation) = effet
     // collectif exactly-once même après fusion multi-appareils. ⚠️ JAMAIS sur config.boss (merge shallow).
     repairEvents: (() => { const m = new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
@@ -1428,12 +1448,42 @@ const migrateSavedData = (data) => {
     const before = mergedConfig.assignments || [];
     mergedConfig.assignments = before.filter(a => knownTaskIds2.has(a.taskId));
     const purgedFromStatic = before.filter(a => !knownTaskIds2.has(a.taskId)).map(a => a.instanceId);
+    // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) : les instanceId purgés de
+    // weeklyQuests.assignments n'étaient PAS ajoutés à orphanPendingInstanceIds (contrairement à
+    // ceux de config.assignments juste au-dessus) — leurs `pending` correspondants survivaient donc
+    // indéfiniment, orphelins, et « Valider » ne donnait plus jamais d'XP/pièce pour ces demandes.
+    let purgedFromWq = [];
     if (mergedConfig.weeklyQuests) {
       const beforeWq = mergedConfig.weeklyQuests.assignments || [];
       mergedConfig.weeklyQuests = { ...mergedConfig.weeklyQuests, assignments: beforeWq.filter(a => knownTaskIds2.has(a.taskId)) };
+      purgedFromWq = beforeWq.filter(a => !knownTaskIds2.has(a.taskId)).map(a => a.instanceId);
     }
-    orphanPendingInstanceIds = new Set(purgedFromStatic);
+    orphanPendingInstanceIds = new Set([...purgedFromStatic, ...purgedFromWq]);
     mergedConfig.orphanAssignCleanupV2 = true;
+  }
+  // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — orphanAssignCleanupV1/V2 ci-dessus
+  // sont des ménages À DRAPEAU UNIQUE (ne s'exécutent qu'une fois). Si une tâche personnalisée est
+  // supprimée APRÈS leur passage — exactement ce qui est arrivé : 7 tâches rituelles supprimées les
+  // 24-28 juillet alors que V2 avait déjà tourné —, l'assignation orpheline qui en résulte n'est plus
+  // JAMAIS nettoyée : chaque jour l'enfant la complète, la demande atterrit dans `pending`, et
+  // « Valider » échoue silencieusement pour toujours (« Tâche supprimée entretemps », 0 XP/pièce).
+  // Même leçon déjà tirée pour `removalRequests` juste en dessous : ce ménage doit tourner à CHAQUE
+  // chargement (idempotent — ne retire que des références déjà mortes, aucun coût sur données propres).
+  {
+    const knownTaskIdsLive = new Set([...TASK_CATALOG.map(t=>t.id), ...(mergedConfig.customTasks||[]).map(t=>t.id)]);
+    const beforeLive = mergedConfig.assignments || [];
+    mergedConfig.assignments = beforeLive.filter(a => knownTaskIdsLive.has(a.taskId));
+    const purgedLiveStatic = beforeLive.filter(a => !knownTaskIdsLive.has(a.taskId)).map(a => a.instanceId);
+    let purgedLiveWq = [];
+    if (mergedConfig.weeklyQuests) {
+      const beforeLiveWq = mergedConfig.weeklyQuests.assignments || [];
+      mergedConfig.weeklyQuests = { ...mergedConfig.weeklyQuests, assignments: beforeLiveWq.filter(a => knownTaskIdsLive.has(a.taskId)) };
+      purgedLiveWq = beforeLiveWq.filter(a => !knownTaskIdsLive.has(a.taskId)).map(a => a.instanceId);
+    }
+    if (purgedLiveStatic.length || purgedLiveWq.length) {
+      const extra = new Set([...purgedLiveStatic, ...purgedLiveWq]);
+      orphanPendingInstanceIds = orphanPendingInstanceIds ? new Set([...orphanPendingInstanceIds, ...extra]) : extra;
+    }
   }
   // v2.9.1 (corrigé v2.11.1) — bug signalé par Gen : « plusieurs de ses rituels sont vides » +
   // « demandes de retrait fantômes ». Les rituels (routines[].taskIds) et les demandes de retrait
@@ -2518,7 +2568,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           // bruit réduit) ; done/pending gardent leur bordure pleine couleur (état, pas décor).
           <div key={ass.instanceId} style={{background:done||pending?"rgba(0,0,0,0.55)":"linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.35))",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"var(--b-soft)"}`,borderLeft:`4px solid ${DIFF_COLOR(task.diff)}`,boxShadow:done||pending?undefined:"var(--elev1)",borderRadius:5,padding:"10px 12px",position:"relative",transition:"border 0.2s"}}>
             {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}{isWeekAss(ass)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:""}</div>
+            {/* v2.15.6 (demande de Gen, 2026-07-28) : ce renderCard n'est utilisé QUE pour la liste
+                déjà filtrée à aujourd'hui (myAssignments/list, voir plus bas) — jamais pour la vue
+                semaine. Afficher `ass.days` en entier (ex: « Lun Mar Mer Jeu Ven ») sur une carte du
+                jour donnait l'impression trompeuse que « le reste de la semaine » s'affichait dans
+                Mes tâches, alors que la carte elle-même est bien filtrée à aujourd'hui — seul le
+                badge mentait. Le header de section dit déjà « AUJOURD'HUI », donc plus besoin d'un
+                badge jour ici : ne garder que l'heure du moment (matin/soir/etc.), le cas échéant. */}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
             <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
             {/* v2.6.0 — quête de réparation 🕊️ : les 3 petites étapes descriptives (texte simple, pas de cases) */}
             {Array.isArray(task.steps)&&task.steps.length>0&&<div style={{marginBottom:6}}>

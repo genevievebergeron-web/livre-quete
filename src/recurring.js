@@ -4,15 +4,6 @@
 
 const CUSTODY_REFERENCE = "2026-07-24"; // vendredi PM
 
-// ── Détection de la semaine active ──────────────────────────────────────────
-export function isCustodyWeek(now = new Date()) {
-  const ref = new Date(CUSTODY_REFERENCE + "T12:00:00");
-  const diffMs = now.getTime() - ref.getTime();
-  if (diffMs < 0) return false; // avant l'ancre → jamais actif
-  const weeksSince = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
-  return weeksSince % 2 === 0;
-}
-
 // Clé de la semaine de garde (vendredi-ancre de la semaine courante, format YYYY-MM-DD)
 // ⚠️ Date LOCALE obligatoire : toISOString() (UTC) faisait basculer la clé au lendemain
 // après 20h (Québec = UTC-4) — la clé oscillait matin/soir chaque jour, déclenchant le
@@ -22,6 +13,44 @@ export function custodyWeekKey(now = new Date()) {
   const dow = d.getDay(); // 0=dim...6=sam
   d.setDate(d.getDate() - ((dow + 2) % 7)); // recule au vendredi précédent
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// ── Détection de la semaine active ──────────────────────────────────────────
+// v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) : cette fonction comparait
+// à une ancre calée à MIDI (`T12:00:00`) alors que `custodyWeekKey()` ci-dessus bascule à
+// MINUIT (comparaison de date locale, sans heure). Résultat : une fenêtre de plusieurs
+// heures chaque vendredi matin (00h–12h) où `custodyWeekKey()` annonçait déjà la nouvelle
+// semaine alors qu'`isCustodyWeek()` répondait encore pour l'ancienne — le
+// useEffect qui (ré)génère/efface `config.weeklyQuests` (App.jsx) pouvait alors se
+// déclencher au mauvais moment et effacer des assignations avec des demandes de
+// validation encore en attente. Fix : dériver isCustodyWeek() de la MÊME clé de date
+// que custodyWeekKey(), pour que les deux basculent toujours ensemble, à la même limite.
+export function isCustodyWeek(now = new Date()) {
+  const key = custodyWeekKey(now);
+  const ref = new Date(CUSTODY_REFERENCE + "T00:00:00");
+  const cur = new Date(key + "T00:00:00");
+  if (cur.getTime() < ref.getTime()) return false; // avant l'ancre → jamais actif
+  const weeksSince = Math.round((cur.getTime() - ref.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  return weeksSince % 2 === 0;
+}
+
+// v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — trouvé en prod : `weeklyQuests.
+// generatedForWeek` valait "2026-07-25z2", une valeur que ce fichier ne peut PAS produire
+// (custodyWeekKey() ne renvoie que des vendredis au format YYYY-MM-DD ; le 25 juillet 2026 est un
+// SAMEDI). Un reliquat d'une manipulation antérieure. Problème : la fusion (App.jsx + server.cjs,
+// « dernière-semaine-gagne ») compare les clés en `>=` brut — "2026-07-25z2" bat "2026-07-24" (la
+// vraie clé du jour) juste parce que "5" > "4", ce qui rend la valeur corrompue increvable jusqu'à
+// ce que la vraie clé dépasse alphabétiquement "07-25" (prochain cycle, début août). Résultat
+// concret : chaque appareil qui charge l'app pendant cette semaine de garde re-déclenche la
+// régénération de weeklyQuests (generatedForWeek stocké ≠ cwk() réel) sans jamais réussir à
+// « accrocher » la bonne valeur. Fix : n'accepter dans la comparaison que des clés qui sont de
+// VRAIS vendredis-ancres (celles que custodyWeekKey() pourrait réellement produire) — une valeur
+// invalide comme celle-ci perd automatiquement face à n'importe quelle vraie clé, peu importe l'ordre alphabétique.
+export function isValidCustodyWeekKey(v) {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + "T00:00:00");
+  if (isNaN(d.getTime())) return false;
+  return d.getDay() === 5; // vendredi (0=dim...6=sam)
 }
 
 // ── PRNG déterministe (mulberry32) ──────────────────────────────────────────
@@ -165,9 +194,13 @@ export function generateCustodyWeekAssignments(players, weekKey) {
       }
     }
 
-    // Jouer 45 min calmement avec son frère (Elli + Antoine Emery, personnel, pas de rotation) — demande de Gen, 25 juillet
-    if (elliPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", elliPlayer.id, `d${ci}`), taskId: "td10", playerIds: [elliPlayer.id], days: [appDay], time: "", isRecurring: true });
-    if (antoineEmeryPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", antoineEmeryPlayer.id, `d${ci}`), taskId: "td10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "", isRecurring: true });
+    // Jouer 45 min calmement avec son frère (Elli + Antoine Emery, personnel, pas de rotation) — demande
+    // de Gen, 25 juillet ; restreint à mercredi (appDay 2) et samedi (appDay 5) seulement — demande de
+    // Gen, 28 juillet (auparavant généré chaque jour de la semaine de garde par erreur).
+    if (appDay === 2 || appDay === 5) {
+      if (elliPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", elliPlayer.id, `d${ci}`), taskId: "td10", playerIds: [elliPlayer.id], days: [appDay], time: "", isRecurring: true });
+      if (antoineEmeryPlayer) assignments.push({ instanceId: wqId(weekKey, "td10", antoineEmeryPlayer.id, `d${ci}`), taskId: "td10", playerIds: [antoineEmeryPlayer.id], days: [appDay], time: "", isRecurring: true });
+    }
 
     // Plancher → enfant C du jour
     const plancher = shuffled[(ci + 2) % N]?.id;
