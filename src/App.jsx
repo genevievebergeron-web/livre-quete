@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.15.2";
+const APP_VERSION = "2.15.3";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.3", date:"2026-07-28", features:[
+    "🪙 Boutique (Maison, Spécial et les autres onglets) : si tu n'as pas assez de pièces pour un item, tu le sais maintenant tout de suite (avant, rien ne se passait quand tu appuyais dessus)!",
+  ]},
   { version:"2.15.2", date:"2026-07-28", features:[
     "📅 Les calendriers de toute la famille s'affichent maintenant côte à côte quand l'écran est assez large — plus besoin de défiler pour comparer les journées!",
   ]},
