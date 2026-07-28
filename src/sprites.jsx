@@ -31,7 +31,9 @@ export function ItemSprite({ itemId, emoji, size=48, style={} }) {
   useEffect(()=>{ if(usePng||!hasGrid) return; const c=canvasRef.current; if(!c)return; renderItemToCtx(c.getContext("2d"), itemId, size); },[usePng,hasGrid,itemId,size]);
   if(usePng) return <img src={`/sprites/items/${itemId}.png`} width={size} height={size} alt="" onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",objectFit:"contain",display:"block",...style}}/>;
   if(hasGrid) return <canvas ref={canvasRef} width={size} height={size} style={{imageRendering:"pixelated",display:"block",...style}}/>;
-  return <span style={{fontSize:Math.round(size*0.78),lineHeight:1,display:"block",...style}}>{emoji}</span>;
+  // Repli emoji : centré dans sa boîte (le glyphe se calait en haut-gauche → items
+  // « décalés du torse », retour Gen sur le 👕 équipé).
+  return <span style={{fontSize:Math.round(size*0.78),lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",...style}}>{emoji}</span>;
 }
 
 // v1.81.0 — Ancrage anatomique des items équipés. AVANT : hat/face/armor étaient centrés sur le CANVAS
