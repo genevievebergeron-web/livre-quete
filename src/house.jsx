@@ -9,7 +9,7 @@ import { useState } from "react";
 import { PT_LIST, getPlayerTheme, ALL_SHOP_ITEMS } from "./themes.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
 import { PetSprite, EquippedGear } from "./sprites.jsx";
-import { petSpriteKey } from "./pets.js";
+import { petSpriteKey, petLevel, petPalOverride, petIsLegendary } from "./pets.js";
 
 export const DEFAULT_HOUSE = { wallpaper:null, floor:null, placed:{} };
 
@@ -75,6 +75,15 @@ const floorStyle = (id, pt) => {
   return { background:`linear-gradient(180deg, ${pt.primary||"#222"}44, #111)` }; // défaut : teinte du thème
 };
 
+// Familier CORPS COMPLET pour la pièce : /sprites/pets/full/<clé>.png → repli PetSprite
+// (portrait/canvas habituel) si le PNG complet n'existe pas encore.
+function FullPetSprite({ petKey, size }){
+  const [fail, setFail] = useState(false);
+  if(fail) return <PetSprite petKey={petKey} size={size}/>;
+  return <img src={`/sprites/pets/full/${petKey}.png`} alt="" width={size} onError={()=>setFail(true)}
+    style={{imageRendering:"pixelated",display:"block",width:size,height:"auto"}}/>;
+}
+
 // Pièce PixelLab par défaut (perspective, /sprites/deco/room.png) — masquée si le PNG
 // manque (onError), la base CSS en dessous reste alors visible (repli garanti).
 function RoomImg(){
@@ -128,10 +137,20 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={} }) 
           <EquippedGear eq={pState.equipped} items={ALL_SHOP_ITEMS} size={avSz} avatarDef={pState.avatar}/>
         </div>
       </div>
-      {(pState.equipped?.pet && petSpriteKey(pState.equipped.pet)) &&
-        <div style={{position:"absolute",left:"64%",bottom:Math.round(floorH*0.10),pointerEvents:"none"}}>
-          <PetSprite itemId={pState.equipped.pet} size={Math.round(avSz*0.30)}/>
-        </div>}
+      {(pState.equipped?.pet && petSpriteKey(pState.equipped.pet)) && (()=>{
+        // Gen : « le familier devrait être complet » — les PNG pets/ historiques sont des
+        // PORTRAITS (têtes, dessinés par le fils) : parfaits en icône, mais tête flottante
+        // dans la pièce. Ici : corps complet /sprites/pets/full/<clé>.png (PixelLab), repli
+        // sur le sprite habituel ; les ÉVOLUÉS gardent leur canvas recoloré (leur vraie forme).
+        const pid = pState.equipped.pet;
+        const evo = (pState.petEvo||{})[pid];
+        const lv = petLevel((pState.petXp||{})[pid]||0);
+        const pal = petPalOverride(evo), leg = petIsLegendary(evo, lv);
+        return <div style={{position:"absolute",left:"67%",bottom:Math.round(floorH*0.06),pointerEvents:"none"}}>
+          {(!pal && !leg)
+            ? <FullPetSprite petKey={petSpriteKey(pid)} size={Math.round(avSz*0.42)}/>
+            : <PetSprite itemId={pid} size={Math.round(avSz*0.42)} palOverride={pal} legendary={leg}/>}
+        </div>;})()}
       </>);})()}
     </div>
   );

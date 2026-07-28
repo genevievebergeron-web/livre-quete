@@ -52,7 +52,7 @@ export const AVATAR_EQUIP_ANCHORS = {
 // Ancres pour le PERSONNAGE DÉTAILLÉ v2 (trame 144, chantier E) — anatomie de la base :
 // tête x≈52-92 y≈12-52 (centre x72), torse y≈54-96, main droite x≈100 y≈80, pieds y≈135.
 export const AVATAR_EQUIP_ANCHORS_V2 = {
-  hat:    { cx:72,  cy:1,   wRatio:0.28, shadow:true, base:144 },
+  hat:    { cx:72,  cy:7,   wRatio:0.28, shadow:true, base:144 },
   face:   { cx:72,  cy:33,  wRatio:0.20, base:144 },
   armor:  { cx:72,  cy:76,  wRatio:0.30, shadow:true, base:144 },
   weapon: { cx:103, cy:80,  wRatio:0.30, rotate:22, shadow:true, base:144 },
