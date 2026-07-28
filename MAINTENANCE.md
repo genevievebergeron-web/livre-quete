@@ -186,3 +186,27 @@ Seul endroit de l'app littéralement nommé « Tâches » : l'onglet 📋 Tâche
 
 ### ⚠️ Collision concurrente rencontrée et gérée
 Session avatar live toujours active en parallèle (`v2.13.0` poussé entre-temps, commentaires de version corrigés en conséquence de `v2.12.3` à `v2.13.1` en cours de route). Commit scopé à `src/App.jsx` uniquement (`git diff --stat` vérifié avant `git add`), aucun fichier avatar (`house.jsx`/`sprites.jsx`, en cours d'édition par l'autre session) inclus.
+
+---
+
+## Tests approfondis du 2026-07-27 (soir) — focus système avatar/maison/familiers
+
+File d'implémentation vidée (voir passage précédent) : conformément à l'ordre de la routine, cette passe explore le nouveau système avatar détaillé/maison/familiers (v2.9.0→v2.13.3), jamais couvert par les 3 passages de tests du 25 juillet (tous antérieurs à ce chantier).
+
+### Méthode
+Seed direct de `localStorage` (2 joueurs de test, dont un richement équipé : pets/déco/peaux possédés, maison entièrement meublée) plutôt que le parcours `SetupWizard` — plus rapide et fiable pour explorer en profondeur. Serveur dev isolé sur le port 5191 (jamais la prod, jamais d'écriture `PUT`).
+
+### Zones couvertes
+- **Onboarding avatar (étape 2/4, création yeux/bouche)** : les 6 combinaisons d'yeux (Normal/Joyeux/Cool/Étoile/Chat/Alien) sélectionnées confirmées par comparaison de **hash de pixels du canvas** (pas juste une lecture visuelle de screenshot, trop peu fiable à cette échelle) — le canvas de prévisualisation change bien de rendu à chaque sélection. Confirme empiriquement que le bug `bug_xcqtyr7` (« les yeux/bouches ne changent pas ») est bien réglé par v2.13.0.
+- **Dashboard avec maison entièrement meublée** (8 meubles placés aux ancres, familier équipé affiché dans la scène) : rendu correct, zéro erreur console.
+- **Liste des badges** (28 badges affichés) : voir bug trouvé ci-dessous.
+- **Boutique** : tiers Petite/Moyenne (Phase 2 refonte visuelle) affichés correctement avec étiquette "Calme" sur la récompense bain ; onglet Familiers avec bordures de rareté par item (Commun/Rare/Ultra Rare/Unique) et étiquette "✅ ÉQUIPÉ"/"Équiper" cohérente (confirme le fix ON→ÉQUIPÉ du 25 juillet tient toujours).
+
+### 🐛 Bug trouvé et corrigé — ✅ v2.13.4
+**2 badges différents partageaient le même nom affiché** : `b_streak3` (« Journée Marathon », 6 quêtes/jour) et `b_day10` (10 quêtes/jour, catalog.js ligne ~243) affichaient TOUS LES DEUX « Journée Marathon » dans la liste des 28 badges — indistinguables pour un enfant. Root cause : le renommage v2.5.25 de `b_streak3` (de « Machine à Habitudes » vers « Journée Marathon ») n'avait pas vérifié qu'aucun autre badge ne portait déjà ce nom — `b_day10` le portait depuis plus longtemps. Fix : `b_day10` renommé « Journée Titanesque » (id/desc/check inchangés, aucun badge déjà gagné affecté). `npm run build` propre.
+
+### ⚠️ Collision concurrente rencontrée et gérée
+`src/sprites.jsx` était en cours d'édition par une autre session (chantier avatar) pendant tout ce passage — mon serveur de test local (port 5191) partage le même répertoire surveillé par Vite, donc chaque sauvegarde de l'autre session déclenchait un rechargement HMR complet dans MON navigateur de test, réinitialisant la vue courante (retour à l'écran de connexion). Aucune perte de données : `localStorage` (mes 2 joueurs de test) a survécu à chaque rechargement, confirmant que c'est un artefact de l'environnement de test partagé, pas un bug applicatif. Commit final scopé à `src/App.jsx`+`src/catalog.js`+`PROJET-ETAT.md` uniquement, `sprites.jsx` non inclus.
+
+### Non couvert cette passe (pour la prochaine)
+Onglets Chapeaux/Armures/Maison/Peaux de la Boutique (seuls Récompenses et Familiers testés), achat réel d'un item avec double-clic rapide sur "Acheter" dans ce nouveau système de tiers, popup Mon Perso (onglets Créer/Familier/Maison/Peaux en dehors de l'onboarding), les 3 coffres de la Boutique (Commun/Rare/Légendaire), le nouvel extra "Bras en plus" (v2.13.3) et les peaux à débloquer (usk9-12, v2.13.0).
