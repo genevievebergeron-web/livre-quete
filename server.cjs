@@ -120,7 +120,11 @@ const mergeGS = (a, b, preferIncoming) => {
     avatar: avatarConfigured,
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
-    routines: (() => { const m = new Map(); for (const r of [...(a.routines||[]), ...(b.routines||[])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    // v2.15.8 — port du même tombstone que le client (App.jsx, mergeGS) : les routines n'avaient
+    // aucun tombstone, contrairement à assignments/customTasks/childTaskProposals — une routine
+    // supprimée localement revenait dès que ce merge serveur la retrouvait dans l'état existant.
+    removedRoutineIds: _uniq([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]).slice(-200),
+    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); for (const r of [...(a.routines||[]), ...(b.routines||[])]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
     hiddenRewards: _uniq([...(a.hiddenRewards||[]), ...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,

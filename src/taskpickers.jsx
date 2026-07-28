@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { SFX } from "./sfx.js";
 import { catMeta } from "./catalog.js";
+import { UIIcon } from "./sprites.jsx";
 
 // v1.53.0 — Sélecteur de tâches en GRILLE groupée + code couleur par étiquette.
 // L'enfant CHOISIT une tâche existante (réutilise son taskId → zéro doublon). Repli: créer la sienne.
@@ -36,7 +37,7 @@ export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
             {groups[c].map(t=>(
               <button key={t.id} onClick={()=>{SFX.click&&SFX.click();onPick(t.id);}}
                 style={{display:"flex",alignItems:"center",gap:8,textAlign:"left",padding:"9px 10px",background:"rgba(0,0,0,0.45)",border:`2px solid ${m.color}55`,borderLeft:`5px solid ${m.color}`,borderRadius:8,cursor:"pointer"}}>
-                <span style={{fontSize:20}}>{t.emoji||"⭐"}</span>
+                <UIIcon name={"task_"+t.id} emoji={t.emoji||"⭐"} size={20}/>
                 <span style={{display:"flex",flexDirection:"column",minWidth:0}}>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#fff",lineHeight:1.1}}>{t.label}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:m.color}}>+{t.xp||0} XP · {t.coins||0} 🪙</span>

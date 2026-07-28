@@ -4,9 +4,9 @@ import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, ALL_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
 import { PET_LEVELS, PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, renderPetToCtx, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
-import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
+import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, calEventIconName, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, REPAIR_PRESETS } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
-import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, renderAvatarSprite, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite } from "./sprites.jsx";
+import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, renderAvatarSprite, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad } from "./ui.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
@@ -918,6 +918,11 @@ const FAMILY_ID = "livre-quetes-bergeron-2026"; // identifiant unique de la fami
 const supaEnabled = () => Boolean(SYNC_URL && SYNC_KEY);
 const supaHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY}`, "Content-Type": "application/json" });
 let LAST_SAVED_AT = null; // horodatage de la dernière sauvegarde connue localement
+// v2.15.8 (cause racine de la casse généralisée des tâches perso — voir ménage orphelines plus bas) :
+// true seulement quand load() a reçu une vraie réponse cloud (fusionnée ou seule source). false quand
+// remotePull() a échoué (serveur endormi, réseau) et qu'on est retombé sur la copie locale SEULE —
+// potentiellement périmée si cet appareil n'a pas rouvert l'app depuis un moment.
+let LAST_LOAD_SYNCED = false;
 let _pushTimer = null;
 let API_OK = null; // détection unique de l'API même-origine
 // Signale à l'UI qu'une synchro cloud vient de réussir (pour l'indicateur ☁️)
@@ -1075,7 +1080,11 @@ const mergeGS = (a, b, preferIncoming) => {
     // PIN : dernière écriture gagne (permet de changer le code d'un enfant depuis un autre appareil)
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
-    routines: (() => { const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    // v2.15.8 — tombstone des rituels supprimés (union, comme removedProposals) : sans ça, une
+    // routine retirée localement (« Supprimer le rituel ») revenait dès qu'un autre appareil (ou le
+    // serveur, qui garde l'ancien état) réapparaissait dans la fusion union-by-id ci-dessous.
+    removedRoutineIds: _uniq([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]).slice(-200),
+    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
     hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
@@ -1313,6 +1322,7 @@ const load = async () => {
   const hasRemoteData = remote && remote !== PULL_FAILED; // objet data réel
   // Les deux existent → on FUSIONNE (rien n'est écrasé, l'XP ne peut que monter)
   if (hasRemoteData && local) {
+    LAST_LOAD_SYNCED = true; // v2.15.8 — vraie donnée cloud reçue, assignments/customTasks à jour
     const merged = mergeFamily(local, remote);
     if (_famSig(merged) !== _famSig(local)) {
       merged.savedAt = new Date().toISOString();
@@ -1326,13 +1336,20 @@ const load = async () => {
   }
   // Seul le cloud a des données → on les prend
   if (hasRemoteData && !local) {
+    LAST_LOAD_SYNCED = true; // v2.15.8 — idem, données cloud à jour (pas de copie locale à fusionner)
     try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
     LAST_SAVED_AT = remote.savedAt || null;
     return remote;
   }
   // Cloud JOINT mais VIDE (remote===null) → on peut semer le local sans risque d'écraser quoi que ce soit
   if (remote === null && local) remotePush(local);
-  // remote===PULL_FAILED → échec réseau : on NE touche PAS au cloud, on garde le local et la boucle réessaiera
+  // remote===PULL_FAILED → échec réseau : on NE touche PAS au cloud, on garde le local et la boucle réessaiera.
+  // v2.15.8 (cause racine de la casse généralisée des tâches perso, 2026-07-28) : LAST_LOAD_SYNCED reste
+  // false ici — cette copie locale peut être périmée (assignments incomplets si l'appareil n'a pas
+  // rouvert l'app depuis un moment). Le ménage des tâches orphelines (plus bas) DOIT vérifier ce drapeau
+  // avant de tombstoner quoi que ce soit, sinon un simple délai réseau (serveur Canner qui se réveille,
+  // ~1-4s selon SYNC.md) suffit à faire supprimer pour toujours des tâches perso bien vivantes ailleurs.
+  LAST_LOAD_SYNCED = false;
   LAST_SAVED_AT = local?.savedAt || null;
   return local;
 };
@@ -1367,6 +1384,12 @@ const migrateGameState = (gs) => {
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
+    // v2.15.8 (bug trouvé en reconstruisant les rituels Matin/École/Camp/Soir, 2026-07-28) : contrairement
+    // à assignments/customTasks/childTaskProposals, les routines n'avaient AUCUN tombstone — « Supprimer
+    // le rituel » (App.jsx ~2924) filtrait juste localement, mais la fusion routines (union-by-id) allait
+    // le RESSUSCITER dès qu'un autre appareil (ou le serveur, qui garde l'ancien état) réapparaissait dans
+    // la fusion. Même patron que removedProposals/removedAssignments.
+    removedRoutineIds: gs.removedRoutineIds || [],
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
     settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, femTitles:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12; femTitles: v2.5.27)
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
@@ -2017,6 +2040,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const dashboardMood = avatarMood!=="neutral" ? avatarMood : (new Date().getHours()>=19 && _allDoneToday ? "tired" : "neutral");
   const themedCat = pt.shopCategory;
   const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", skins:"✨ Spécial", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  // Refonte Phase 7 — icônes pixel art des onglets boutique (repli = l'emoji du libellé).
+  // Le libellé SHOP_TABS garde son emoji en tête de string : au rendu on le sépare pour
+  // afficher <UIIcon> + texte (l'onglet thématique n'a pas de sprite dédié → emoji).
+  const SHOP_TAB_ICONS = { rewards:"shop_rewards", hats:"shop_hats", armors:"shop_armors", pets:"shop_pets", deco:"shop_house", skins:"shop_special" };
+  const splitEmojiLabel = (l)=>{ const m=/^(\S+)\s+(.*)$/.exec(l||""); return m?[m[1],m[2]]:[null,l]; };
   // Ma maison (2026-07-27) — items déco visibles : génériques + ceux du thème ACTIF seulement
   const decoItems = decoForTheme(player.themeId||"none");
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
@@ -2167,7 +2195,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{height:9,background:"#111",border:"2px solid #333",borderRadius:1,overflow:"hidden",marginBottom:6}}>
             <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},#85CDD1)`,transition:"width 0.8s ease"}}/>
           </div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#D9BC5C"}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:"#D9BC5C"}}><Coin size={14}/> {pState.coins} {pt.coinName||"pièces"}</div>
           {/* v1.84.0 (Lot 1 #B3) — sieste visible ICI aussi (pas juste sur la carte familier) dès
               qu'au moins une activité plaisir (boutique/avatar) est bloquée par l'énergie */}
           {(()=>{ const cur=currentEnergy(pState); const thresh=Math.max(SHOP_ENERGY,AVATAR_ENERGY);
@@ -2510,9 +2538,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return (
                 <div key={a.instanceId} onClick={()=>{SFX.click();setRoutineBuilder(b=>({...b,taskIds:sel?b.taskIds.filter(x=>x!==a.instanceId):[...b.taskIds,a.instanceId]}));}}
                   style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:sel?`${th.accent||player.color}25`:"rgba(0,0,0,0.4)",border:`2px solid ${sel?(th.accent||player.color):"#333"}`,borderRadius:4,cursor:"pointer"}}>
-                  <span style={{fontSize:18}}>{sel?"✅":t.emoji}</span>
+                  <span style={{fontSize:18,lineHeight:0}}>{sel?<UIIcon name="check" emoji="✅" size={18}/>:<UIIcon name={"task_"+t.id} emoji={t.emoji} size={18}/>}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{t.label}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{t.xp}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}><Xp size={9}/>{t.xp}</span>
                 </div>
               );
             })}
@@ -2583,7 +2611,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           // Refonte visuelle Phase 3 — bordure neutre .card-n1 (patron Phase 1) au repos, la
           // difficulté quitte la bordure pour un liseré gauche 4px DIFF_COLOR (info conservée,
           // bruit réduit) ; done/pending gardent leur bordure pleine couleur (état, pas décor).
-          <div key={ass.instanceId} style={{background:done||pending?"rgba(0,0,0,0.55)":"linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.35))",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"var(--b-soft)"}`,borderLeft:`4px solid ${DIFF_COLOR(task.diff)}`,boxShadow:done||pending?undefined:"var(--elev1)",borderRadius:5,padding:"10px 12px",position:"relative",transition:"border 0.2s"}}>
+          <div key={ass.instanceId} className={done||pending?"":"texture-grain"} style={{background:done||pending?"rgba(0,0,0,0.55)":"var(--tile-bg)",border:`3px solid ${done?"#5CAD68":pending?"#D9BC5C":"var(--b-soft)"}`,borderTop:done||pending?undefined:"3px solid rgba(255,255,255,0.14)",borderLeft:`4px solid ${DIFF_COLOR(task.diff)}`,boxShadow:done||pending?undefined:"var(--elev3)",borderRadius:8,padding:"10px 12px",position:"relative",transition:"border 0.2s"}}>
             {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
             {/* v2.15.6 (demande de Gen, 2026-07-28) : ce renderCard n'est utilisé QUE pour la liste
                 déjà filtrée à aujourd'hui (myAssignments/list, voir plus bas) — jamais pour la vue
@@ -2593,7 +2621,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 badge mentait. Le header de section dit déjà « AUJOURD'HUI », donc plus besoin d'un
                 badge jour ici : ne garder que l'heure du moment (matin/soir/etc.), le cas échéant. */}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
-            <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",marginBottom:5,lineHeight:1.3}}><span style={{fontSize:18}}>{task.emoji}</span> {task.label}</div>
+            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:5}}>
+              <span className="icon-tile" style={{width:36,height:36,flex:"0 0 36px"}}><UIIcon name={"task_"+task.id} emoji={task.emoji} size={26} block/></span>
+              <span style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",lineHeight:1.3,flex:1}}>{task.label}</span>
+            </div>
             {/* v2.6.0 — quête de réparation 🕊️ : les 3 petites étapes descriptives (texte simple, pas de cases) */}
             {Array.isArray(task.steps)&&task.steps.length>0&&<div style={{marginBottom:6}}>
               {task.steps.map((s,si)=>(
@@ -2601,8 +2632,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               ))}
             </div>}
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{task.xp} XP</span>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{task.coins}</span>
+              <span className="chip-cost" style={{color:"#85CDD1",borderColor:"rgba(133,205,209,0.55)",background:"rgba(133,205,209,0.10)"}}><Xp size={9}/>{task.xp} XP</span>
+              <span className="chip-cost"><Coin size={9}/>{task.coins}</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
               {/* Backlog UX #12 — temps approximatif, dérivé du palier de difficulté (~8/18/25/30 min) */}
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#999",border:"1px solid #444",padding:"1px 4px"}}>⏱️~{estMinOf(task.diff)}min</span>
@@ -2718,7 +2749,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           cards.push(
             <div key="first-then" style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px dashed #444",borderRadius:6,fontFamily:"'VT323',monospace",fontSize:14,color:"#777",flexWrap:"wrap"}}>
               <span>👉 Ensuite:</span>
-              {next && <span style={{fontSize:16}}>{next.emoji}</span>}
+              {next && <UIIcon name={"task_"+next.id} emoji={next.emoji} size={16}/>}
               <span style={{color:"#aaa"}}>{next?next.label:"?"}</span>
             </div>
           );
@@ -2838,7 +2869,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   const dayEvents=(pState.calendar||[]).filter(e=> e && (e.recur?.freq==="daily" || (e.recur?.freq==="weekly" && e.recur.day===dIdx) || e.date===stamp));
                   return dayEvents.map(e=>(
                     <div key={e.id} style={{display:"flex",gap:4,alignItems:"flex-start",marginTop:3,padding:"3px 5px",background:"rgba(133,205,209,0.12)",border:"1px solid #85CDD155",borderRadius:3}}>
-                      <span style={{fontSize:10,lineHeight:"13px"}}>{calEventIcon(e)}</span>
+                      <span style={{fontSize:10,lineHeight:"13px"}}><UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)} size={10}/></span>
                       <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
                     </div>
                   ));
@@ -2852,7 +2883,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   const done=isToday && ((pState.completed||[]).includes(doneKey)||(pState.pending||[]).includes(doneKey));
                   return (
                     <div key={a.instanceId} style={{display:"flex",alignItems:"flex-start",gap:4,marginTop:4,opacity:done?0.45:1}}>
-                      <span style={{fontSize:12,lineHeight:"14px"}}>{done?"✓":t.emoji}</span>
+                      <span style={{fontSize:12,lineHeight:"14px"}}>{done?"✓":<UIIcon name={"task_"+t.id} emoji={t.emoji} size={12}/>}</span>
                       <span style={{fontFamily:"'VT323',monospace",fontSize:14,lineHeight:"14px",color:"#ccc",textDecoration:done?"line-through":"none",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{t.label}</span>
                     </div>
                   );
@@ -2875,7 +2906,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {laterWeek.map(ass=>{ const t=allTasks.find(x=>x.id===ass.taskId); if(!t)return null;
               return (
                 <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:4}}>
-                  <span style={{fontSize:15}}>{t.emoji}</span>
+                  <UIIcon name={"task_"+t.id} emoji={t.emoji} size={15}/>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",flex:1}}>{t.label}</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#85CDD1"}}>{ass.days.map(d=>DAYS_SHORT[d]).join(" ")}</span>
                 </div>
@@ -2913,7 +2944,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:th.accent||player.color,background:"transparent",border:`1px solid ${th.accent||player.color}55`,borderRadius:3,cursor:"pointer"}}>
             ✏️ Modifier
           </button>
-          <button onClick={()=>{ if(window.confirm(`Supprimer le rituel «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),activeRoutineId:null,mode:"week"}); } }}
+          <button onClick={()=>{ if(window.confirm(`Supprimer le rituel «${activeRoutine.name}» ? (tes tâches et ton XP restent)`)){ onPatchState({routines:myRoutines.filter(r=>r.id!==activeRoutine.id),removedRoutineIds:[...new Set([...(pState.removedRoutineIds||[]),activeRoutine.id])].slice(-200),activeRoutineId:null,mode:"week"}); } }}
             style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D98C8C",background:"transparent",border:"1px solid #D98C8C40",borderRadius:3,cursor:"pointer"}}>
             🗑️ Supprimer
           </button>
@@ -2924,7 +2955,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {homeTab==="shop" && (<>
       {/* Shop */}
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}>🛒 BOUTIQUE — {pState.coins} 🪙</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}><UIIcon name="nav_shop" emoji="🛒" size={11}/> BOUTIQUE — {pState.coins} <Coin size={11}/></div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
 
       {/* 🎁 Coffres mystères */}
@@ -2945,7 +2976,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",background:`linear-gradient(180deg,${ch.color}1A,rgba(0,0,0,0.5))`,border:`2px solid ${ch.color}`,borderRadius:8,cursor:can?"pointer":"not-allowed",opacity:can?1:0.45,boxShadow:can?`0 0 8px ${ch.color}40`:"none"}}>
             <ChestSprite open={false} size={48}/>
             <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:ch.color,textAlign:"center"}}>{ch.name.replace("Coffre ","")}</span>
-            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>{ch.cost} 🪙</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>{ch.cost} <Coin size={9}/></span>
           </button>
         ); })}
       </div>
@@ -2958,7 +2989,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 statique (box-shadow) reste visible même figée — la récompense reste "spéciale". */}
             <div style={{position:"relative",width:80,height:80,display:"flex",alignItems:"center",justifyContent:"center",animation:"popIn 0.5s cubic-bezier(0.34,1.56,0.64,1)"}}>
               <div className="rays-bg" style={{color:rar.color}}/>
-              <div style={{fontSize:48,position:"relative",zIndex:1,borderRadius:"50%",boxShadow:`0 0 40px ${rar.color}`}}>{it.emoji}</div>
+              <div style={{position:"relative",zIndex:1,borderRadius:"50%",boxShadow:`0 0 40px ${rar.color}`}}><ItemSprite itemId={it.id} emoji={it.emoji} size={52}/></div>
             </div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:rar.color}}>{rar.name.toUpperCase()}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#fff"}}>{it.name}</div>
@@ -2972,9 +3003,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
       <div className="card-n2" style={{background:"rgba(0,0,0,0.45)",padding:10}}>
         <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
-          {Object.entries(SHOP_TABS).map(([k,l])=>(
-            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#888",border:`2px solid ${shopTab===k?"#D9BC5C":"#555"}`,borderRadius:2,cursor:"pointer"}}>{l}</button>
-          ))}
+          {Object.entries(SHOP_TABS).map(([k,l])=>{ const [em,txt]=splitEmojiLabel(l); return (
+            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{display:"inline-flex",alignItems:"center",gap:4,fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#888",border:`2px solid ${shopTab===k?"#D9BC5C":"#555"}`,borderRadius:2,cursor:"pointer"}}>{em&&<UIIcon name={SHOP_TAB_ICONS[k]} emoji={em} size={12}/>}{txt}</button>
+          );})}
         </div>
         {shopTab==="rewards" && (
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -3008,16 +3039,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     return (
                       <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)} className={bought?"":T2.cls}
                         style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(0,0,0,0.4)",border:bought?"2px solid #5CAD68":undefined,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
-                        <span style={{fontSize:22}}>{r.emoji}</span>
+                        <span className="icon-tile" style={{width:38,height:38,flex:"0 0 38px"}}><UIIcon name={r.id} emoji={r.emoji} size={26} block/></span>
                         <div style={{flex:1}}>
                           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#5CAD68":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                             {r.label}
                             {REWARD_CAT_BADGE[r.cat] && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:REWARD_CAT_BADGE[r.cat].color,borderRadius:3,padding:"2px 5px"}}>{REWARD_CAT_BADGE[r.cat].label}</span>}
                           </div>
-                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":rPrice+" 🪙"}</div>
+                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":<>{rPrice} <Coin size={9}/></>}</div>
                         </div>
                         {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
-                        {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}>🔒</span>}
+                        {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}><UIIcon name="lock" emoji="🔒" size={12} style={{opacity:0.6}}/></span>}
                         {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
                           <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
                             style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#D99248",border:"1px solid #D99248",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
@@ -3055,13 +3086,15 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   className={equipped?"":rar.cls}
                   style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||(canAfford&&hasEnergy)?"pointer":"not-allowed",opacity:!owned&&(!canAfford||!hasEnergy)?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
-                  {isDeco
-                    ? <DecoSprite decoId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px"}}/>
-                    : petSpriteKey(item.id)
-                    ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
-                    : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
+                  <span className="icon-tile" style={{width:40,height:40,flex:"none",margin:"8px auto 3px"}}>
+                    {isDeco
+                      ? <DecoSprite decoId={item.id} emoji={item.emoji} size={30}/>
+                      : petSpriteKey(item.id)
+                      ? <PetSprite itemId={item.id} size={30}/>
+                      : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{fontSize:20}}/>}
+                  </span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ · retirer":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ · retirer":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):<>{iPrice} <Coin size={9}/></>}</span>
                 </div>
               );
             })}
@@ -3162,7 +3195,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               🐉 COMBAT FINAL<br/><span style={{fontFamily:"'VT323',monospace",fontSize:13}}>Affronte ta tête d'Hydre en mini-jeu!</span>
             </button>
             {!won && <div style={{background:`${boss.color||"#FF5555"}22`,border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"7px 10px",textAlign:"center"}}>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>{mod.emoji} {mod.label} (aujourd'hui)</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}><UIIcon name={"boss_mod_"+mod.id} emoji={mod.emoji} size={11}/> {mod.label} (aujourd'hui)</span>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#eee"}}>{mod.desc}</div>
             </div>}
             {enraged && <div style={{background:"#3a0e0e",border:"2px solid #D97070",borderRadius:8,padding:"7px 10px",textAlign:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#FF8888"}}>🔥 Le boss ENRAGE! Il vide les PV de la famille 2× plus vite — achevez-le!</div>}
@@ -3194,12 +3227,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",justifyContent:"center",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)",paddingBottom:"env(safe-area-inset-bottom)"}}>
         <div style={{display:"flex",width:"100%",maxWidth:900}}>
         {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
-          const tabs=[["accueil","🏠","Accueil"],["jour","✅","Aujourd'hui"],...(bossActive?[["boss","⚔️","BOSS"]]:[]),["sem","📅","Semaine"],["shop","🛒","Boutique"]];
-          return tabs.map(([k,ic,lb])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
+          const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Aujourd'hui","nav_today"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
+          return tabs.map(([k,ic,lb,icn])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
             return (
               <button key={k} onClick={()=>{setHomeTab(k);SFX.click();}}
                 style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer"}}>
-                <span style={{fontSize:20,filter:on?"none":"grayscale(0.3) opacity(0.8)",animation:isBoss?"pulse 1.4s infinite":"none"}}>{ic}</span>
+                <span style={{fontSize:20,lineHeight:0,filter:on?"none":"grayscale(0.3) opacity(0.8)",animation:isBoss?"pulse 1.4s infinite":"none"}}><UIIcon name={icn} emoji={ic} size={20} block/></span>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"#888")}}>{lb}</span>
               </button>
             );
@@ -3376,7 +3409,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
               </div>
               <div style={{display:"flex",gap:10}}>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {ps.xp}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>🪙 {ps.coins}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}><Coin size={10}/> {ps.coins}</span>
               </div>
               <div style={{display:"flex",gap:6,marginTop:8}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>{mayOpen(i)?"Voir mes quêtes →":"Voir le profil →"}</div>
@@ -3545,11 +3578,11 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [rTaskIds, setRTaskIds] = useState([]);
   const T = th;
 
-  const TabBtn = ({k,l}) => (
+  const TabBtn = ({k,l,icon,em}) => (
     <button onClick={()=>setTab(k)} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",
       padding:"8px 4px",background:tab===k?"#D99248":"#222",color:tab===k?"#0d0d0d":"#888",
       border:`2px solid ${tab===k?"#D99248":"#444"}`,borderRadius:3,cursor:"pointer"}}>
-      {l}
+      {icon&&<><UIIcon name={icon} emoji={em} size={11}/> </>}{l}
     </button>
   );
   const Row = ({children,style={}}) => <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,...style}}>{children}</div>;
@@ -3581,14 +3614,14 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
 
       {/* Tabs */}
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
-        <TabBtn k="valid"    l={`✅ À valider${nbValid>0?` (${nbValid})`:""}`}/>
-        <TabBtn k="tasks"    l="📋 Tâches"/>
-        <TabBtn k="defis"    l="🌟 Défis"/>
-        <TabBtn k="actions"  l="⚡ Actions"/>
-        <TabBtn k="annonces" l="📣 Annonces"/>
-        <TabBtn k="log"      l="🕐 Journal"/>
-        <TabBtn k="pin"      l="🔐 Code"/>
-        <TabBtn k="export"   l="💾 Sauvegarde"/>
+        <TabBtn k="valid"    icon="parent_validate" em="✅" l={`À valider${nbValid>0?` (${nbValid})`:""}`}/>
+        <TabBtn k="tasks"    icon="parent_tasks"    em="📋" l="Tâches"/>
+        <TabBtn k="defis"    icon="parent_defis"    em="🌟" l="Défis"/>
+        <TabBtn k="actions"  icon="parent_actions"  em="⚡" l="Actions"/>
+        <TabBtn k="annonces" icon="parent_annonces" em="📣" l="Annonces"/>
+        <TabBtn k="log"      icon="parent_journal"  em="🕐" l="Journal"/>
+        <TabBtn k="pin"      icon="parent_code"     em="🔐" l="Code"/>
+        <TabBtn k="export"   icon="parent_save"     em="💾" l="Sauvegarde"/>
       </div>
 
       {/* Content */}
@@ -3601,7 +3634,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             const pl=players[i];
             (gs.pending||[]).forEach(k=>{
               const instanceId=k.slice(0,k.lastIndexOf("_"));
-              let emoji="📋", label="Tâche", xp=null, coins=null, orphaned=false;
+              let emoji="📋", label="Tâche", xp=null, coins=null, orphaned=false, taskId=null;
               if(instanceId.startsWith("cal_")){
                 const entry=(gs.calendar||[]).find(e=>"cal_"+e.id===instanceId);
                 const exam=entry?.type==="examen";
@@ -3612,7 +3645,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 const _allAss=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])];
                 const ass=_allAss.find(a=>a.instanceId===instanceId);
                 const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
-                if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;}
+                if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;taskId=task.id;}
                 // Bug signalé par Gen (25 juillet) : assignation ou tâche personnalisée supprimée
                 // ENTRE le moment où l'enfant a demandé la validation et maintenant (ex: tâche perso
                 // effacée, ou semaine de garde régénérée entretemps) — le contenu original est
@@ -3621,7 +3654,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 // de cliquer, pas après.
                 else orphaned=true;
               }
-              items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins,orphaned});
+              items.push({playerIdx:i,doneKey:k,pl,emoji,label,xp,coins,orphaned,taskId});
             });
           });
           // Regrouper les demandes PAR ENFANT
@@ -3641,12 +3674,12 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   {its.map(it=>(
                 <div key={it.doneKey} style={{background:it.orphaned?"rgba(180,120,0,0.12)":"rgba(0,0,0,0.4)",border:`2px solid ${it.orphaned?"#C8942A":(it.pl?.color||"#444")}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <span style={{fontSize:18}}>{it.orphaned?"⚠️":it.emoji}</span>
+                    <span style={{fontSize:18,lineHeight:0}}>{it.orphaned?"⚠️":<UIIcon name={it.taskId?"task_"+it.taskId:null} emoji={it.emoji} size={18}/>}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:it.orphaned?"#FFB300":"#ddd",lineHeight:1.2}}>{it.orphaned?"Tâche supprimée entretemps":it.label}</div>
                       <div style={{display:"flex",gap:8,marginTop:2}}>
-                        {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{it.xp}</span>}
-                        {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙{it.coins}</span>}
+                        {it.xp!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}><Xp size={9}/>{it.xp}</span>}
+                        {it.coins!=null&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}><Coin size={9}/>{it.coins}</span>}
                       </div>
                     </div>
                   </div>
@@ -3671,7 +3704,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                     return (
                       <div key={req.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl?.color||"#444"}50`,borderRadius:5,padding:"10px",marginBottom:8}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                          <span style={{fontSize:18}}>{task.emoji}</span>
+                          <UIIcon name={"task_"+task.id} emoji={task.emoji} size={18}/>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",lineHeight:1.2}}>{task.label}</div>
                             <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:pl?.color||"#888"}}>{pl?displayName(pl):""}</span>
@@ -3806,7 +3839,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   if(!task)return null;
                   return (
                     <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:"rgba(0,0,0,0.4)",border:"1px solid #333",borderRadius:4,marginBottom:5}}>
-                      <span style={{fontSize:16}}>{task.emoji}</span>
+                      <UIIcon name={"task_"+task.id} emoji={task.emoji} size={16}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
                         <div style={{display:"flex",gap:6}}>
@@ -3863,7 +3896,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                       return (
                         <div key={a.instanceId} onClick={()=>{SFX.click();setRTaskIds(ids=>sel?ids.filter(x=>x!==a.instanceId):[...ids,a.instanceId]);}}
                           style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:sel?"#1a3a1a":"rgba(0,0,0,0.4)",border:`2px solid ${sel?"#5CAD68":"#333"}`,borderRadius:4,cursor:"pointer"}}>
-                          <span style={{fontSize:15}}>{sel?"✅":t.emoji}</span>
+                          <span style={{fontSize:15,lineHeight:0}}>{sel?<UIIcon name="check" emoji="✅" size={15}/>:<UIIcon name={"task_"+t.id} emoji={t.emoji} size={15}/>}</span>
                           <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1}}>{t.label}</span>
                         </div>
                       );
@@ -4983,7 +5016,7 @@ function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComple
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:acc}}>📋 Tâches de « {ritual.name} »</div>
       {ritualTasks.map(({iid,ass,t})=>{ const st=_taskStatus(iid); return (
         <div key={iid} style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18}}>{t.emoji}</span>
+          <UIIcon name={"task_"+t.id} emoji={t.emoji} size={18}/>
           <span style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,color:st==="done"?"#5CAD68":"#eee",textDecoration:st?"line-through":"none",opacity:st?0.65:1}}>{t.label}</span>
           {st==="done" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✅</span>
            : st==="pending" ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#FFC107"}}>⏳ attente</span>
@@ -5610,8 +5643,18 @@ export default function App() {
             removedAssignments:_uniq([...(data.config.removedAssignments||[]), ...expired]).slice(-800)};
         }
         // 🧹 v1.55.0 — ménage des tâches perso ORPHELINES (plus aucune assignation) → tombstone durable
-        {
-          const usedTaskIds=new Set((data.config.assignments||[]).map(a=>a.taskId));
+        // v2.15.8 (CAUSE RACINE de la casse généralisée des tâches perso de toute la famille, trouvée
+        // le 2026-07-28 en reconstruisant les rituels Matin/École/Camp/Soir) : ce ménage tournait à
+        // CHAQUE chargement, sur CHAQUE appareil, sans aucune protection, avec deux failles combinées :
+        // (1) ne regardait QUE config.assignments, jamais config.weeklyQuests.assignments (Lot 7) ;
+        // (2) tournait même quand load() retombait sur la copie LOCALE seule après un échec réseau
+        // (LAST_LOAD_SYNCED=false — serveur Canner qui se réveille, ~1-4s, ou simple délai wifi,
+        // documenté dans SYNC.md) — une copie locale peut alors être périmée (n'a pas encore vu les
+        // assignations créées ailleurs depuis sa dernière vraie synchro), faisant passer des tâches
+        // BIEN VIVANTES pour orphelines, tombstonées pour toujours et repoussées au cloud aussitôt
+        // (save() plus bas). Fix : n'agir QUE sur une synchro cloud confirmée, et inclure weeklyQuests.
+        if (LAST_LOAD_SYNCED) {
+          const usedTaskIds=new Set([...(data.config.assignments||[]).map(a=>a.taskId), ...((data.config.weeklyQuests||{}).assignments||[]).map(a=>a.taskId)]);
           const orphans=(data.config.customTasks||[]).filter(t=>t&&t.id&&!usedTaskIds.has(t.id)).map(t=>t.id);
           if(orphans.length){
             const orphSet=new Set(orphans);
@@ -6986,7 +7029,7 @@ export default function App() {
   const currentPlayerState = currentPlayerView!==null ? gameStates[currentPlayerView] : null;
 
   return (
-    <div className={"game-root"+(CALM?" calm-mode":"")} style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
+    <div className={"game-root vignette-bg"+(CALM?" calm-mode":"")} style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
       <style>{GLOBAL_CSS+`
         .nav-btn:hover{opacity:0.85;}
         .task-card:hover{transform:translateY(-1px);}
@@ -7216,7 +7259,7 @@ export default function App() {
                                   const editable = parentMode || (mine && (e.type||"evenement")==="evenement");
                                   return (
                                   <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"3px 0"}}>
-                                    <span style={{fontSize:14}}>{calEventIcon(e)}</span>
+                                    <span style={{fontSize:14}}><UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)} size={14}/></span>
                                     {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:34}}>{e.time}</span>}
                                     <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
                                     {editable && <>
@@ -7384,7 +7427,7 @@ export default function App() {
             </div>
             <div className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,18px)",color:"#D9BC5C",marginBottom:8}}>🏆 VICTOIRE!</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:19,color:"#fff",marginBottom:8,lineHeight:1.3}}>Vous avez vaincu<br/><b style={{color:bossWin.color||"#D9BC5C"}}>{bossWin.name}</b> en équipe! 💪</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#5CAD68",margin:"12px 0 8px",lineHeight:1.6}}>+40 🪙 · +50 ⚡<br/>🐲 Badge « Tombeur de Boss »!</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#5CAD68",margin:"12px 0 8px",lineHeight:1.6}}>+40 <Coin size={12}/> · +50 <Xp size={12}/><br/>🐲 Badge « Tombeur de Boss »!</div>
             {bossWin.items && bossWin.items.length>0 && (
               <div style={{background:"rgba(255,91,174,0.12)",border:"2px solid #FF5BAE",borderRadius:10,padding:"10px 12px",margin:"4px 0 8px"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#FF5BAE",marginBottom:6}}>🎁 ITEM ULTRA LÉGENDAIRE!</div>
