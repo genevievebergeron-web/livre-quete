@@ -152,3 +152,37 @@ Lecture prod (lecture seule) : le gameState d'Antoine Emery (`q2ymbl8`) avait **
 
 ### ⚠️ Collision concurrente rencontrée et gérée
 Une autre session travaillait en direct sur `App.jsx`/`avatar.jsx`/`house.jsx`/`sprites.jsx`/`themes.js` pendant ce fix (chantier avatar détaillé, commits `2b0fb61`→`7572589` poussés pendant que ce fix était en cours). Un correctif précédent (v2.12.1, toast honnête du plafond XP familier) s'était même retrouvé inclus par erreur dans leur commit `7572589` en cours de route — documenté après coup dans une entrée dédiée. Pour ce fix-ci, commit scoping vérifié avant `git add` (`git diff --stat` limité à `server.cjs`+`src/App.jsx`, aucun fichier avatar touché).
+
+---
+
+## Mini-check du 2026-07-27 (soir)
+
+Lecture `GET /api/famille` (lecture seule). 6 `config.bugs`, 4 messages `feed` de type `chat`, 0 `errorLogs`, `coinsWeek` stable à `2026-07-25` pour les 4 enfants (attendu jusqu'à vendredi 31 juillet, cf. post-mortem v2.5.24/v2.5.26 déjà documenté — rien d'anormal).
+
+### 🐛 Bugs passés en revue
+- 5 des 6 bugs (`bug_74klxs1`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_k1gqpz6`) — déjà documentés et traités dans les passages précédents ci-dessus, rien de nouveau.
+- **`bug_xcqtyr7`** (27 juillet 18:12 EDT, signalé par « D1TEXXY!!! ») « Je clique sur changer les yeux, et ça ne marche pas, ça reste pareil, c'est aussi comme ça pour quand je pèse sur l'option bouches du personnage » — ✅ **déjà corrigé, 17 minutes après le signalement** : commit `11b306d` (v2.13.0, poussé 18:29 EDT le même soir, session interactive avec Gen) a ajouté 20 nouvelles couches yeux/bouches (`ey2-ey6`/`mo2-mo6`) au moteur détaillé — exactement le symptôme décrit. Vérifié dans le code : `src/avatar.jsx` définit bien `ey2`/`ey3`/`mo2`/`mo3` etc. avec rendu canvas dédié. Rien à faire, purement une confirmation a posteriori que le signalement et le fix se recoupent.
+
+### 💬 Fil de famille
+Les 4 messages `chat` sont identiques à ceux déjà documentés au passage du 27 juillet précédent (renommer familier ✅ fait, défi qui se reset ✅ fait, « LETS GOOOOOO » sans action, + un nouveau message social sans contenu actionnable « yo la tribus sa vas moi oui »).
+
+### Suite de ce passage
+File d'implémentation (plan `le-design-de-mon-mighty-mountain.md`) revérifiée item par item contre l'état réel du code plutôt que contre les cases à cocher du plan (souvent en retard sur le vrai travail livré en session interactive) : Correctifs 1-3, Correctif 2C, bug boss #1, backlog UX 24 juillet (16 items), quêtes de réparation + PHILOSOPHIE.md, les 4 décisions du 26 juillet (semaine graduée, gratification instantanée, récompenses moments, Ma maison), et les Phases 1/2/3/4 de la refonte visuelle sont TOUS déjà implémentés en code (confirmé par grep direct, pas seulement par les checkmarks du plan). Seul reste ouvert dans la refonte visuelle : Phase 5 — `setMoodFor` n'est câblé que pour "happy" (tap "J'AI FAIT ÇA!"), pas encore pour "proud" (badge/level-up), "levelup" (victoire boss) ni "equipped" (clic Équiper en boutique) — explicitement laissé à cette routine par la note de réservation du chantier avatar. Traité dans ce même passage, voir entrée suivante.
+
+---
+
+## Bug live signalé par Gen le 2026-07-27 (soir) — liste "Tâches" du portail parent donnait l'impression que toute la semaine était due aujourd'hui
+
+Gen : « Dans la section tâches, faudrait que seules les tâches de la journée soient visibles sinon ça donne l'impression que toutes les tâches de la semaine soient à faire. Possible de trigger les tâches du jour à minuit le matin seulement? »
+
+### 🐛 Corrigé — ✅ v2.13.1
+Seul endroit de l'app littéralement nommé « Tâches » : l'onglet 📋 Tâches du tiroir parent (`ParentPanel`, `App.jsx`). Sa liste « TÂCHES ACTUELLES » affichait TOUS les `config.assignments` en une seule liste plate, sans aucune indication de quel(s) jour(s) chaque tâche planifiée s'applique (juste un tag générique « 📅 semaine » identique pour toutes) — donc en la consultant, tout semblait dû aujourd'hui.
+
+**Fix** : la liste filtre maintenant par défaut sur `todayDayIdx` (les tâches type "routine", `days:[]`, restent toujours visibles puisqu'elles sont quotidiennes par nature ; les tâches type "semaine" ne s'affichent que si `days.includes(todayDayIdx)`). Un bouton « ▼ Voir toute la semaine (+N) » reste disponible pour ne pas casser la gestion des autres jours (ex. modifier une tâche du mercredi un lundi). Le tag générique « 📅 semaine » est aussi devenu « 📅 Lun Mer » etc. (jours réels) pour les tâches visibles en mode « toute la semaine ».
+
+**Sur le « trigger à minuit »** : aucun mécanisme séparé n'était nécessaire. `todayDayIdx` est recalculé à CHAQUE rendu (`new Date().getDay()`, même patron que partout ailleurs dans l'app, ex. `todayStamp()`) — le filtre bascule donc naturellement à minuit heure locale, dès le prochain rendu du composant, sans code de déclenchement dédié à écrire.
+
+**Vérifié** : navigateur, 4 assignations de test (2 aujourd'hui, 1 un autre jour, 1 routine quotidienne) → liste par défaut montre bien les 3 pertinentes (« TÂCHES D'AUJOURD'HUI (3) ») avec le lien « Voir toute la semaine (+1) » ; bascule vers « TÂCHES — TOUTE LA SEMAINE (4) » et retour testés, zéro tâche perdue, zéro erreur console. `npm run build` propre.
+
+### ⚠️ Collision concurrente rencontrée et gérée
+Session avatar live toujours active en parallèle (`v2.13.0` poussé entre-temps, commentaires de version corrigés en conséquence de `v2.12.3` à `v2.13.1` en cours de route). Commit scopé à `src/App.jsx` uniquement (`git diff --stat` vérifié avant `git add`), aucun fichier avatar (`house.jsx`/`sprites.jsx`, en cours d'édition par l'autre session) inclus.

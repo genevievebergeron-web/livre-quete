@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.13.0";
+const APP_VERSION = "2.13.1";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.13.1", date:"2026-07-27", features:[
+    "📋 Dans le portail parent, l'onglet Tâches montre maintenant seulement les tâches d'AUJOURD'HUI par défaut — un bouton permet de voir toute la semaine si besoin.",
+  ]},
   { version:"2.13.0", date:"2026-07-27", features:[
     "👀 Tes YEUX et ta BOUCHE changent maintenant sur ton nouveau perso : lunettes fumées, yeux étoiles, yeux de chat, yeux d'alien, sourire, langue, bouche zippée…",
     "✨ Nouvelles PEAUX à débloquer dans la Boutique (onglet Peaux) : Or, Zombie, Lave et Glace!",
@@ -1818,6 +1821,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const lvTitle = getLevelTitle(pState.xp, player.themeId, settings.femTitles);
   const xbr = xpBar(pState.xp);
   const xpPct = Math.min(100, (xbr.cur/xbr.needed)*100);
+  // Refonte visuelle Phase 5 (suite) — "proud" (badge gagné ou niveau monté) et "levelup" (victoire
+  // de boss réclamée pour ce joueur) détectés localement par comparaison à la valeur précédente,
+  // sans prop drilling depuis App() : badges/niveau/bossClaimed sont déjà dans `pState`.
+  const prevBadgeCountRef = useRef((pState.badges||[]).length);
+  const prevLevelRef = useRef(lv.level);
+  const prevBossClaimedRef = useRef(pState.bossClaimed);
+  useEffect(()=>{
+    const badgeCount=(pState.badges||[]).length;
+    if(badgeCount>prevBadgeCountRef.current) setMoodFor("proud",4000);
+    prevBadgeCountRef.current=badgeCount;
+  },[pState.badges]);
+  useEffect(()=>{
+    if(lv.level>prevLevelRef.current) setMoodFor("proud",4000);
+    prevLevelRef.current=lv.level;
+  },[lv.level]);
+  useEffect(()=>{
+    if(pState.bossClaimed && pState.bossClaimed!==prevBossClaimedRef.current) setMoodFor("levelup",4000);
+    prevBossClaimedRef.current=pState.bossClaimed;
+  },[pState.bossClaimed]);
   const pMode = playerMode || config.mode || "routine";
   const allMine = assignments.filter(a=>a.playerIds.includes(player.id));
   const isWeekAss = (a)=> Array.isArray(a.days) && a.days.length>0;
@@ -2935,7 +2957,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const canAfford=pState.coins>=iPrice;
               const rar=rarityOf(item.cost);
               return (
-                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco)onEquip(item,player.id); else if(!owned&&canAfford)onBuy(item,player.id); }}
+                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford)onBuy(item,player.id); }}
                   className={equipped?"":rar.cls}
                   style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
@@ -3094,7 +3116,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
 
     {/* Avatar popup */}
     {avatarOpen && <AvatarPopup player={player} pState={pState} onClose={()=>setAvatarOpen(false)}
-      onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{onEquip(item,player.id);}}
+      onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{setMoodFor("equipped",3000);onEquip(item,player.id);}}
       onUpdateHouse={(h)=>onPatchState({house:h})}
       allShopItems={allShopItemsFlat} th={th}/>}
     {finalBattle && <HydraFinalGame player={player} pState={pState} color={player.color} onClose={()=>setFinalBattle(false)}/>}
@@ -3416,6 +3438,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [addType, setAddType] = useState("routine"); // "routine" | "week"
   const [addDays, setAddDays] = useState([0,1,2,3,4]); // v1.71.0 — jours choisis pour la récurrence (mode planifié)
   const [addTime, setAddTime] = useState(""); // v2.11.2 — moment de la journée (sectionnement "Ma journée")
+  const [tasksShowAllDays, setTasksShowAllDays] = useState(false); // v2.13.1 — "TÂCHES ACTUELLES" filtrée à aujourd'hui par défaut (Gen : la liste complète donnait l'impression que tout était dû le jour même)
+  const todayDayIdx = (new Date().getDay()+6)%7; // Mon=0 — recalculé à chaque rendu, comme partout ailleurs dans l'app
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
@@ -3674,26 +3698,45 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               onClose={()=>setCustomOpen(false)}
               onCreate={(data)=>{ const id=onAddCustomTask(data); if(id)setAddTaskId(id); setCustomOpen(false); }}/>}
 
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"6px 0 10px"}}>TÂCHES ACTUELLES ({(config.assignments||[]).length})</div>
-            {(config.assignments||[]).map(ass=>{
-              const task=allTasks.find(t=>t.id===ass.taskId);
-              const assignees=players.filter(p=>ass.playerIds.includes(p.id));
-              if(!task)return null;
-              return (
-                <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:"rgba(0,0,0,0.4)",border:"1px solid #333",borderRadius:4,marginBottom:5}}>
-                  <span style={{fontSize:16}}>{task.emoji}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
-                    <div style={{display:"flex",gap:6}}>
-                      {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#85CDD1":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?"📅 semaine":"⏰ routine"}</span>
-                      {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
-                    </div>
-                  </div>
-                  <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:4}}>×</button>
+            {/* v2.13.1 — filtrée à AUJOURD'HUI par défaut (Gen : la liste complète, sans indication de
+                jour, donnait l'impression que toutes les tâches de la semaine étaient dues aujourd'hui).
+                todayDayIdx est recalculé à chaque rendu (comme partout ailleurs dans l'app) — le
+                filtre bascule donc tout seul à minuit, sans mécanisme de déclenchement séparé.
+                Les tâches "routine" (rituel quotidien, days:[]) restent toujours visibles. Un lien
+                permet de voir la semaine complète pour gérer les autres jours. */}
+            {(()=>{
+              const all=config.assignments||[];
+              const isToday=ass=>!(Array.isArray(ass.days)&&ass.days.length>0) || ass.days.includes(todayDayIdx);
+              const visible=tasksShowAllDays?all:all.filter(isToday);
+              const hiddenCount=all.length-visible.length;
+              return (<>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"6px 0 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span>TÂCHES {tasksShowAllDays?"— TOUTE LA SEMAINE":"D'AUJOURD'HUI"} ({visible.length})</span>
                 </div>
-              );
-            })}
+                {visible.map(ass=>{
+                  const task=allTasks.find(t=>t.id===ass.taskId);
+                  const assignees=players.filter(p=>ass.playerIds.includes(p.id));
+                  if(!task)return null;
+                  return (
+                    <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",background:"rgba(0,0,0,0.4)",border:"1px solid #333",borderRadius:4,marginBottom:5}}>
+                      <span style={{fontSize:16}}>{task.emoji}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</div>
+                        <div style={{display:"flex",gap:6}}>
+                          {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
+                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#85CDD1":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:"⏰ routine"}</span>
+                          {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
+                        </div>
+                      </div>
+                      <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:4}}>×</button>
+                    </div>
+                  );
+                })}
+                <button onClick={()=>setTasksShowAllDays(s=>!s)} style={{width:"100%",fontFamily:"'VT323',monospace",fontSize:13,padding:"6px",marginTop:2,background:"transparent",border:"1px dashed #444",color:"#888",borderRadius:4,cursor:"pointer"}}>
+                  {tasksShowAllDays ? "▲ Revenir à aujourd'hui seulement" : `▼ Voir toute la semaine${hiddenCount?` (+${hiddenCount})`:""}`}
+                </button>
+              </>);
+            })()}
             <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#444",marginTop:8,lineHeight:1.4}}>
               Pour les horaires et les jours de la semaine, passe par ⚙️ Modifier le livre (onglet Actions).
             </div>
