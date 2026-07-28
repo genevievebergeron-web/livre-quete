@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.14.3";
+const APP_VERSION = "2.15.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.0", date:"2026-07-27", features:[
+    "📅 Calendrier tout neuf : un seul endroit pour tes rendez-vous et activités (plus de doublon), organisé en Lever/Matin/Dîner/Après-midi/Souper/Soirée, et tu peux maintenant modifier tes événements après les avoir ajoutés!",
+  ]},
   { version:"2.14.3", date:"2026-07-27", features:[
     "👕 Les items sans dessin (affichés en emoji, comme le chandail) sont maintenant bien centrés sur ton perso au lieu d'être décalés.",
   ]},
@@ -1337,7 +1340,10 @@ const migrateGameState = (gs) => {
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
     activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
     bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
-    calendar: gs.calendar || [],  // v1.6.0 — examens/devoirs
+    // v2.15.0 — calendrier purement événementiel (demande de Gen) : "devoir"/"examen" agissaient
+    // comme des tâches à XP déguisées en calendrier — migration ponctuelle et sans perte : on garde
+    // l'entrée (date/heure/récurrence/libellé intacts), seul le type devient "evenement" générique.
+    calendar: (gs.calendar || []).map(e => (e && (e.type==="devoir"||e.type==="examen")) ? {...e, type:"evenement"} : e),
     house: gs.house || { wallpaper:null, floor:null, placed:{} }, // v2.8.0 — Ma maison (décor).
     // Fusion : transporté en bloc par le spread ...a,...b de mergeGS (dernière écriture gagne,
     // comme boughtRewards) — AUCUN changement client/serveur requis, miroir server.cjs intouché.
@@ -2317,34 +2323,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         );
       })()}
 
-      {homeTab==="sem" && (<>
-      {/* Calendar reminders */}
-      {(()=>{
-        const today = new Date().toISOString().split("T")[0];
-        const reminders = computeCalendarReminders(pState.calendar||[], today);
-        if (!reminders.length) return null;
-        return reminders.map(rem=>{
-          const doneKey = rem.instanceId+"_"+player.id;
-          const done = pState.completed?.includes(doneKey);
-          return (
-            <div key={rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":"#85CDD1"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
-              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
-              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#85CDD1",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
-              <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>{rem._daysLeft===0?"📅 AUJOURD'HUI":`📅 dans ${rem._daysLeft}j`}</span>
-              </div>
-              {!done&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
-                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
-                ✔ J'AI ÉTUDIÉ!
-              </button>}
-            </div>
-          );
-        });
-      })()}
-
-      </>)}
+      {/* v2.15.0 — les rappels devoir/examen (computeCalendarReminders) ont été retirés d'ici :
+          le calendrier n'accorde plus d'XP, c'est maintenant purement informationnel (demande de
+          Gen) — homeTab==="sem" n'avait plus que ça comme contenu propre, donc plus de wrapper. */}
       {homeTab==="jour" && (<>
       {/* Lot 7A — bannière semaine de pause */}
       {!isCustodyWeek() && (()=>{
@@ -2359,33 +2340,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           </div>
         );
       })()}
-      {/* v1.85.0 (Lot 2 #5/#10) — rappels calendrier (devoirs/examens) du jour AUSSI ici,
-          pas seulement dans l'onglet "📅 Semaine" séparé : "Aujourd'hui" doit vraiment
-          montrer tout ce qu'il y a à faire aujourd'hui en un seul endroit. */}
-      {(()=>{
-        const today = new Date().toISOString().split("T")[0];
-        const reminders = computeCalendarReminders(pState.calendar||[], today).filter(r=>r._daysLeft===0);
-        if (!reminders.length) return null;
-        return reminders.map(rem=>{
-          const doneKey = rem.instanceId+"_"+player.id;
-          const done = pState.completed?.includes(doneKey);
-          return (
-            <div key={"jour_"+rem.id} style={{background:"rgba(0,0,0,0.55)",border:`3px solid ${done?"#5CAD68":"#85CDD1"}`,borderRadius:5,padding:"9px 11px",position:"relative"}}>
-              {done&&<div style={{position:"absolute",inset:0,background:"rgba(0,30,0,0.7)",display:"flex",alignItems:"center",justifyContent:"safe center",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1vw,10px)",color:"#5CAD68",borderRadius:5}}>✅ VALIDÉ!</div>}
-              <div style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#85CDD1",marginBottom:5,lineHeight:1.3}}>{rem.title}</div>
-              <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",background:"rgba(93,236,245,0.1)",border:"1px solid rgba(93,236,245,0.3)",padding:"1px 4px"}}>⚡{rem.xp} XP</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",padding:"1px 4px"}}>🪙{rem.coins}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",padding:"1px 4px"}}>📅 AUJOURD'HUI</span>
-              </div>
-              {!done&&<button className="btn-press" onClick={e=>{SFX.click();onRequestComplete(rem,player.id,e);}}
-                style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#85CDD1",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
-                ✔ J'AI ÉTUDIÉ!
-              </button>}
-            </div>
-          );
-        });
-      })()}
+      {/* v2.15.0 — rappels devoir/examen retirés d'ici aussi (voir plus haut) : le calendrier
+          est maintenant consulté dans son propre écran, purement informationnel. */}
       {/* ── NAVIGATION CLAIRE À 2 NIVEAUX ──
           1) Gros choix : Semaine (accueil) vs Rituels.  2) Si Rituels : quel rituel. */}
       {(()=>{
@@ -3446,7 +3402,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 
 // ─── PARENT PANEL ────────────────────────────────────────────
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
-  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
+  allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
@@ -3477,12 +3433,6 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [defiDraft, setDefiDraft] = useState({}); // Lot 7C — {[playerId]: {text, emoji}} pour l'édition des défis
   // v2.6.0 — formulaire création d'annonce parent
   const [annDraft, setAnnDraft] = useState({ emoji:"📣", title:"", text:"", secret:false, targetAll:true, targetPlayerIds:[], countdownTo:"", countdownLabel:"", countdownDoneText:"", dismissLabel:"", sharedTasksDraft:"", sharedTasksLabel:"", expiresAt:"", playerTasksDraft:{} });
-  // Ajout d'événement au calendrier (parent)
-  const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
-  const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
-  const [cePlayers,setCePlayers]=useState((players||[]).map(p=>p.id));
-  const [ceTime,setCeTime]=useState(""); // v2.6.6 — heure optionnelle
-  const [ceEditKey,setCeEditKey]=useState(null); // {id,playerName} de l'événement en cours de modification, sinon null
   const [rChildIdx, setRChildIdx] = useState(0); // assignation de routine: enfant ciblé
   const [rName, setRName] = useState("");
   const [rTaskIds, setRTaskIds] = useState([]);
@@ -3528,7 +3478,6 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         <TabBtn k="tasks"    l="📋 Tâches"/>
         <TabBtn k="defis"    l="🌟 Défis"/>
         <TabBtn k="actions"  l="⚡ Actions"/>
-        <TabBtn k="cal"      l="➕ Ajouter au calendrier"/>
         <TabBtn k="annonces" l="📣 Annonces"/>
         <TabBtn k="log"      l="🕐 Journal"/>
         <TabBtn k="pin"      l="🔐 Code"/>
@@ -4000,86 +3949,9 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         </>}
 
         {/* LOG TAB */}
-        {/* CALENDAR TAB */}
-        {tab==="cal" && (()=>{
-          const allEntries = (gameStates||[]).flatMap((gs,i)=>{
-            const pl = config.players[i];
-            return (gs.calendar||[]).map(e=>({...e, playerName: pl?.name||"?", playerColor: pl?.color||"#888"}));
-          }).sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.time||"").localeCompare(b.time||""));
-          const today = new Date().toISOString().split("T")[0];
-          const recurLbl=(e)=> e.recur?.freq==="daily"?"Chaque jour":e.recur?.freq==="weekly"?("Chaque "+(DAYS[e.recur.day]||"")):(e.date||"");
-          const resetForm=()=>{ setCeEditKey(null); setCeLabel(""); setCeType("evenement"); setCeRecur("none"); setCeDate(""); setCeDay(0); setCeTime(""); setCePlayers((players||[]).map(p=>p.id)); };
-          const startEdit=(e)=>{
-            setCeEditKey({id:e.id,playerName:e.playerName});
-            setCeLabel(e.label); setCeType(e.type||"evenement");
-            setCeRecur(e.recur?e.recur.freq:"none"); setCeDate(e.date||""); setCeDay(e.recur?.day??0); setCeTime(e.time||"");
-            setCePlayers([]); // pas pertinent en édition (un seul enfant, déjà fixé)
-          };
-          const dayPartLabel = (t) => dayPartOf(t)?.label || "Toute la journée";
-          return (
-            <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>{ceEditKey?"✏️ MODIFIER L'ÉVÉNEMENT":"➕ AJOUTER UN ÉVÉNEMENT"}</div>
-              <input value={ceLabel} onChange={e=>setCeLabel(e.target.value.slice(0,50))} placeholder="Ex: Cours de natation, Rendez-vous dentiste…"
-                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #85CDD1",borderRadius:4,marginBottom:8,outline:"none"}}/>
-              <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
-                {[["evenement","📅 Événement"],["devoir","📚 Devoir"],["examen","📝 Examen"],
-                  ["sante",CAL_TYPES.sante.label],["sport",CAL_TYPES.sport.label],["intervenant",CAL_TYPES.intervenant.label],["camp",CAL_TYPES.camp.label]].map(([v,l])=>(
-                  <button key={v} onClick={()=>{setCeType(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceType===v?"#85CDD1":"#1a1a1a",color:ceType===v?"#0d0d0d":"#888",border:`2px solid ${ceType===v?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
-                {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>{setCeRecur(v);SFX.click();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:ceRecur===v?"#D99248":"#1a1a1a",color:ceRecur===v?"#0d0d0d":"#888",border:`2px solid ${ceRecur===v?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
-                ))}
-              </div>
-              {ceRecur==="none" && <input type="date" value={ceDate} onChange={e=>setCeDate(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none",display:"block"}}/>}
-              {ceRecur==="weekly" && <select value={ceDay} onChange={e=>setCeDay(+e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8}}>{DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>}
-              <div style={{marginBottom:8}}>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Heure (optionnel)</div>
-                <input type="time" value={ceTime} onChange={e=>setCeTime(e.target.value)} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
-              </div>
-              {!ceEditKey && <>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-                  {players.map(pl=>{ const sel=cePlayers.includes(pl.id); return (
-                    <div key={pl.id} onClick={()=>setCePlayers(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
-                  ); })}
-                </div>
-              </>}
-              <div style={{display:"flex",gap:6}}>
-                <PBtn onClick={()=>{
-                  if(!ceLabel.trim()||(ceRecur!=="none"?false:!ceDate)) return;
-                  const payload={type:ceType,label:ceLabel.trim(),date:ceRecur==="none"?ceDate:null,time:ceTime||null,recur:ceRecur==="none"?null:(ceRecur==="weekly"?{freq:"weekly",day:ceDay}:{freq:"daily"})};
-                  if(ceEditKey){ onUpdateCalendarEvent&&onUpdateCalendarEvent(ceEditKey.playerName,{...payload,id:ceEditKey.id}); }
-                  else if(cePlayers.length){ onAddCalendarEvent&&onAddCalendarEvent(cePlayers,payload); }
-                  else return;
-                  resetForm();
-                }} color={ceLabel.trim()&&(ceEditKey||cePlayers.length)&&(ceRecur!=="none"||ceDate)?"#85CDD1":"#333"} textColor="#0d0d0d" style={{flex:1,opacity:ceLabel.trim()&&(ceEditKey||cePlayers.length)&&(ceRecur!=="none"||ceDate)?1:0.5}}>
-                  {ceEditKey?"✓ Enregistrer les modifications":"➕ Ajouter au calendrier"}
-                </PBtn>
-                {ceEditKey && <PBtn onClick={resetForm} color="#333" textColor="#888" style={{flex:"0 0 auto"}}>✕ Annuler</PBtn>}
-              </div>
-
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"14px 0 10px"}}>CALENDRIER COMMUN</div>
-              {allEntries.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16}}>Aucun événement.</div>}
-              {allEntries.map(e=>(
-                <div key={e.id+"_"+e.playerName} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:"rgba(0,0,0,0.4)",border:`2px solid ${(e.date&&e.date<today)?"#333":e.date===today?"#D9BC5C":"#444"}`,borderRadius:4,marginBottom:6,opacity:(e.date&&e.date<today)?0.4:1}}>
-                  <span style={{fontSize:16}}>{calEventIcon(e)}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd"}}>{e.label}</div>
-                    <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.playerColor}}>{e.playerName}</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:e.date===today?"#D9BC5C":"#666"}}>{recurLbl(e)}</span>
-                      {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>{e.time} · {dayPartLabel(e.time)}</span>}
-                    </div>
-                  </div>
-                  <button onClick={()=>startEdit(e)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:14,lineHeight:1}}>✏️</button>
-                  <button onClick={()=>onDeleteCalendarEvent&&onDeleteCalendarEvent(e.playerName,e.id)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:15,lineHeight:1}}>✕</button>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+        {/* v2.15.0 — l'onglet "➕ Ajouter au calendrier" a été retiré : une seule section calendrier
+            reste dans l'app (demande de Gen), celle accessible via le pied de page collant côté
+            enfant / le bouton "📅 Calendriers" de la barre parent — voir view==="calendars". */}
 
         {/* ── v2.6.0 ANNONCES PARENT ──────────────────────────── */}
         {tab==="annonces" && <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -4922,18 +4794,6 @@ function MiniGame({ player, playerThemeId, level, onFinish, forcedType, isGift }
 // LOGIN SCREEN — "Qui joue?" + PIN par joueur
 // ═══════════════════════════════════════════════════════════════
 // ─── CALENDAR HELPERS ────────────────────────────────────────────────────────
-// Compter N jours ouvrables (lun-ven) en remontant depuis une date
-const subWeekdays = (dateISO, n) => {
-  const d = new Date(dateISO); d.setHours(0,0,0,0);
-  let count = 0;
-  while (count < n) {
-    d.setDate(d.getDate() - 1);
-    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
-  }
-  return d;
-};
-
-// Retourne les rappels actifs pour aujourd'hui
 // Libellé lisible d'une récurrence
 const recurLabel = (e) => {
   if (e?.recur?.freq==="daily") return "Chaque jour";
@@ -4942,14 +4802,16 @@ const recurLabel = (e) => {
 };
 // v2.6.6 — refonte calendrier (demande de Gen) : sections par moment de journée + heure optionnelle.
 // `time` ("HH:MM") est un champ optionnel sur les entrées de calendrier — sans heure, l'événement
-// tombe dans la section "Toute la journée" (comportement historique des devoirs/examens, inchangé).
+// tombe dans la section "Toute la journée". Libellés texte seul (sans emoji, demande de Gen) —
+// l'icône du type d'événement à côté de chaque entrée suffit, doubler avec un emoji par section
+// était du bruit visuel.
 const DAY_PARTS = [
-  { key:"dejeuner",  label:"🌅 Déjeuner",    from:6*60,        to:10*60 },
-  { key:"avantmidi", label:"☀️ Avant-midi",  from:10*60,       to:11*60+30 },
-  { key:"diner",     label:"🍽️ Dîner",       from:11*60+30,    to:13*60+30 },
-  { key:"apresmidi", label:"🌤️ Après-midi",  from:13*60+30,    to:17*60 },
-  { key:"souper",    label:"🌆 Souper",      from:17*60,       to:19*60+30 },
-  { key:"soir",      label:"🌙 Soir",        from:19*60+30,    to:30*60 }, // >24h = avant 6h le lendemain
+  { key:"dejeuner",  label:"Lever",       from:6*60,        to:10*60 },
+  { key:"avantmidi", label:"Matin",       from:10*60,       to:11*60+30 },
+  { key:"diner",     label:"Dîner",       from:11*60+30,    to:13*60+30 },
+  { key:"apresmidi", label:"Après-midi",  from:13*60+30,    to:17*60 },
+  { key:"souper",    label:"Souper",      from:17*60,       to:19*60+30 },
+  { key:"soir",      label:"Soirée",      from:19*60+30,    to:30*60 }, // >24h = avant 6h le lendemain
 ];
 const dayPartOf = (time) => {
   if (!time) return null; // pas d'heure → section "Toute la journée"
@@ -4971,34 +4833,6 @@ const upcomingOccurrences = (e, days=14) => {
     if(hit) out.push(iso);
   }
   return out;
-};
-
-const computeCalendarReminders = (calendar, today) => {
-  const t = new Date(today); t.setHours(0,0,0,0);
-  return (calendar || []).flatMap(entry => {
-    if (!entry.date || entry.recur) return []; // les événements récurrents/sans date ne génèrent pas de rappel d'étude
-    // v1.85.0 (Lot 2 #9) — seuls devoir/examen génèrent un rappel "à étudier" avec bonus XP; les
-    // nouvelles catégories (santé/sport/intervenant/camp) et "événement" restent de simples entrées
-    // de calendrier (visibles dans la liste), pas des tâches à XP — un rendez-vous chez le dentiste
-    // n'est pas un devoir à "étudier".
-    if (entry.type!=="examen" && entry.type!=="devoir") return [];
-    const examDate = new Date(entry.date); examDate.setHours(0,0,0,0);
-    if (t > examDate) return []; // dépassé
-    const triggerDate = subWeekdays(entry.date, 3);
-    if (t < triggerDate) return []; // trop tôt
-    const daysLeft = Math.round((examDate - t) / (1000*60*60*24));
-    return [{
-      id: `cal_${entry.id}`,
-      instanceId: `cal_${entry.id}`,
-      title: entry.type==="examen" ? `📅 Étudier: ${entry.label}` : `📅 Devoir: ${entry.label}`,
-      xp: entry.type==="examen" ? 20 : 10,
-      coins: entry.type==="examen" ? 5 : 3,
-      assignedTo: [],
-      _isCalendar: true,
-      _daysLeft: daysLeft,
-      _entryId: entry.id,
-    }];
-  });
 };
 
 // ─── MINUTERIE (chrono + rituel + encouragements) ────────────
@@ -5625,7 +5459,8 @@ export default function App() {
   const [timerRitual, setTimerRitual] = useState(null); // rituel pré-sélectionné en ouvrant la minuterie
   // v2.6.6 — calendrier consolidé (menu du bas) : formulaire d'ajout/modification pour l'enfant connecté.
   const [myCalOpen, setMyCalOpen] = useState(false);
-  const [myCalForm, setMyCalForm] = useState({ editId:null, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 });
+  const [myCalForm, setMyCalForm] = useState({ editId:null, ownerIdx:null, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 });
+  const [myCalTargets, setMyCalTargets] = useState([]); // v2.15.0 — enfant(s) ciblé(s) par un ajout en mode parent (checkboxes, comme l'ancien onglet parent retiré)
   const [actionLog, setActionLog] = useState([]); // [{time,msg,color}]
   const [undoStack, setUndoStack] = useState([]);
   const [pinChangeMode, setPinChangeMode] = useState(false);
@@ -6981,16 +6816,6 @@ export default function App() {
     setConfig(newCfg); persist(newCfg, gameStates); SFX.epic&&SFX.epic();
     showToast("🎨 Nouveau thème activé pour la semaine!","#D9BC5C",3000);
   }, [view, config, gameStates, persist, showToast]);
-  // v2.6.6 — calendrier consolidé : met à jour le calendrier d'un enfant précis par INDEX (pas
-  // forcément `view`, puisque l'écran "calendars" n'est pas un dashboard numéroté). Remplace
-  // onDashUpdateCalendar/onDashCalendarAdd (retirés avec l'ancien "Mon calendrier" par enfant).
-  const onCalendarUpdate = useCallback((playerIdx, newCal)=>{
-    const gs=[...gameStates];
-    gs[playerIdx]={...gs[playerIdx],calendar:newCal};
-    setGameStates(gs);
-    save({config,gameStates:gs,savedAt:new Date().toISOString()});
-  }, [gameStates, config]);
-
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
   if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}
     onCancel={editingBook?()=>{setEditingBook(false);setScreen("game");setParentPanel(true);}:null}/>;
@@ -7131,44 +6956,52 @@ export default function App() {
       {/* paddingBottom dégage le footer fixe pour que la dernière tâche reste atteignable */}
       <div style={{position:"relative",maxWidth:view==="week"?"100%":900,margin:"0 auto",paddingBottom:48}}>
         {view==="calendars"&&(()=>{
-          // v2.6.6 — calendrier consolidé (demande de Gen) : seul point d'accès (menu du bas),
-          // événements uniquement (les tâches restent dans "Ma semaine"), sections par moment de
-          // journée, heure optionnelle, modification. L'enfant connecté peut ajouter/modifier/
-          // supprimer SES entrées (devoir/examen/événement) ; les calendriers des autres restent
-          // en lecture seule (les types santé/sport/intervenant/camp restent gérés par le parent).
+          // v2.15.0 — SEULE section calendrier de l'app (demande de Gen, celle accessible via le
+          // pied de page collant côté enfant / le bouton "📅 Calendriers" côté parent — l'ancien
+          // onglet séparé du tiroir parent a été retiré). Purement événementiel : plus de
+          // devoir/examen (ces "tâches à XP" ont été retirées du calendrier, voir migration
+          // migrateGameState). Tout le monde peut modifier : le parent peut éditer n'importe quelle
+          // entrée de n'importe quel enfant (y compris santé/sport/intervenant/camp, qu'il gère) ;
+          // l'enfant connecté peut modifier ses propres entrées "événement".
           const order=(config.players||[]).map((p,i)=>i).sort((a,b)=> (a===sessionPlayer?-1:b===sessionPlayer?1:0));
-          const resetForm=()=>{ setMyCalForm({editId:null,type:"evenement",label:"",date:"",time:"",recur:"none",day:0}); setMyCalOpen(false); };
-          const startEdit=(e)=>{
-            setMyCalForm({editId:e.id,type:e.type||"evenement",label:e.label,date:e.date||"",time:e.time||"",recur:e.recur?e.recur.freq:"none",day:e.recur?.day??0});
+          const TYPE_OPTIONS = parentMode
+            ? [["evenement","📅 Événement"],["sante",CAL_TYPES.sante.label],["sport",CAL_TYPES.sport.label],["intervenant",CAL_TYPES.intervenant.label],["camp",CAL_TYPES.camp.label]]
+            : [["evenement","📅 Événement"]];
+          const blankForm = { editId:null, ownerIdx:null, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 };
+          const resetForm=()=>{ setMyCalForm(blankForm); setMyCalTargets(sessionPlayer!=null?[config.players[sessionPlayer]?.id].filter(Boolean):[]); setMyCalOpen(false); };
+          const startEdit=(e,ownerIdx)=>{
+            setMyCalForm({editId:e.id,ownerIdx,type:e.type||"evenement",label:e.label,date:e.date||"",time:e.time||"",recur:e.recur?e.recur.freq:"none",day:e.recur?.day??0});
             setMyCalOpen(true);
           };
           const saveForm=()=>{
             if(!myCalForm.label.trim()||(myCalForm.recur==="none"&&!myCalForm.date)) return;
-            const entry={
-              id: myCalForm.editId || `cal_${Date.now()}`,
+            const payload={
               type: myCalForm.type,
               label: myCalForm.label.trim(),
               date: myCalForm.recur==="none" ? myCalForm.date : null,
               time: myCalForm.time || null,
               recur: myCalForm.recur==="none" ? null : (myCalForm.recur==="weekly" ? {freq:"weekly",day:myCalForm.day} : {freq:"daily"}),
             };
-            const cal=(gameStates[sessionPlayer]?.calendar)||[];
-            const newCal = myCalForm.editId ? cal.map(x=>x.id===entry.id?entry:x) : [...cal, entry];
-            onCalendarUpdate(sessionPlayer, newCal);
+            if(myCalForm.editId!=null){
+              const owner=config.players[myCalForm.ownerIdx];
+              if(owner) handleUpdateCalendarEvent(owner.name, {...payload, id:myCalForm.editId});
+            } else if(myCalTargets.length){
+              handleAddCalendarEvent(myCalTargets, payload);
+            } else return;
             SFX.click();
             resetForm();
           };
-          const deleteEntry=(id)=>{
-            const cal=(gameStates[sessionPlayer]?.calendar)||[];
-            onCalendarUpdate(sessionPlayer, cal.filter(e=>e.id!==id));
+          const deleteEntry=(id,ownerIdx)=>{
+            const owner=config.players[ownerIdx];
+            if(owner) handleDeleteCalendarEvent(owner.name, id);
             SFX.click();
           };
           return (
             <div style={{padding:"10px 8px",display:"flex",flexDirection:"column",gap:10}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:th.accent}}>📅 CALENDRIER</div>
-              {sessionPlayer!=null && (
+              {(sessionPlayer!=null || parentMode) && (
                 <div>
-                  <button onClick={()=>{ if(myCalOpen) resetForm(); else { setMyCalForm({editId:null,type:"evenement",label:"",date:"",time:"",recur:"none",day:0}); setMyCalOpen(true); } SFX.click(); }}
+                  <button onClick={()=>{ if(myCalOpen) resetForm(); else { setMyCalForm(blankForm); setMyCalTargets(sessionPlayer!=null?[config.players[sessionPlayer]?.id].filter(Boolean):[]); setMyCalOpen(true); } SFX.click(); }}
                     style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"12px",
                       background:myCalOpen?"#1a1a1a":th.accent,color:myCalOpen?th.accent:"#0d0d0d",
                       border:`3px solid ${myCalOpen?th.accent:"#0d0d0d"}`,borderRadius:5,cursor:"pointer",
@@ -7177,15 +7010,15 @@ export default function App() {
                   </button>
                   {myCalOpen && (
                     <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${th.accent}`,borderRadius:5,padding:10,display:"flex",flexDirection:"column",gap:6}}>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {[["devoir","📚 Devoir"],["examen","📝 Examen"],["evenement","📅 Événement"]].map(([v,l])=>(
+                      {TYPE_OPTIONS.length>1 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {TYPE_OPTIONS.map(([v,l])=>(
                           <button key={v} onClick={()=>{setMyCalForm(f=>({...f,type:v}));SFX.click();}}
                             style={{flex:"1 0 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 8px",background:myCalForm.type===v?th.accent:"#1a1a1a",color:myCalForm.type===v?"#0d0d0d":"#888",border:`2px solid ${myCalForm.type===v?th.accent:"#333"}`,borderRadius:3,cursor:"pointer"}}>
                             {l}
                           </button>
                         ))}
-                      </div>
-                      <input value={myCalForm.label} onChange={e=>setMyCalForm(f=>({...f,label:e.target.value.slice(0,50)}))} placeholder={myCalForm.type==="examen"?"Maths, Français...":myCalForm.type==="devoir"?"Devoir de sciences...":"Cours de natation, rendez-vous..."}
+                      </div>}
+                      <input value={myCalForm.label} onChange={e=>setMyCalForm(f=>({...f,label:e.target.value.slice(0,50)}))} placeholder="Cours de natation, rendez-vous..."
                         style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none",width:"100%",boxSizing:"border-box"}}/>
                       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                         {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
@@ -7202,9 +7035,19 @@ export default function App() {
                         <input type="time" value={myCalForm.time} onChange={e=>setMyCalForm(f=>({...f,time:e.target.value}))}
                           style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none"}}/>
                       </div>
+                      {parentMode && myCalForm.editId==null && (
+                        <div>
+                          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                            {config.players.map(pl=>{ const sel=myCalTargets.includes(pl.id); return (
+                              <div key={pl.id} onClick={()=>setMyCalTargets(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                            ); })}
+                          </div>
+                        </div>
+                      )}
                       <button onClick={saveForm}
                         style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px",background:th.accent,color:"#0d0d0d",border:"none",borderRadius:3,cursor:"pointer"}}>
-                        ✓ {myCalForm.editId?"Modifier":"Enregistrer"}
+                        ✓ {myCalForm.editId!=null?"Modifier":"Enregistrer"}
                       </button>
                     </div>
                   )}
@@ -7222,29 +7065,34 @@ export default function App() {
                     {[...byDate.entries()].map(([d,evs])=>{
                       const noTime=evs.filter(e=>!e.time);
                       const withTime=evs.filter(e=>e.time);
+                      // Colonnes flex verticales séparées par section (demande de Gen) — un bloc par
+                      // moment de journée, chacun empilant ses entrées, avec un filet de séparation
+                      // entre blocs plutôt qu'un simple retrait de texte.
                       const sections=[{label:"Toute la journée",evs:noTime}, ...DAY_PARTS.map(p2=>({label:p2.label,evs:withTime.filter(e=>dayPartOf(e.time)?.key===p2.key)}))].filter(s=>s.evs.length>0);
                       return (
-                        <div key={d} style={{marginBottom:6}}>
-                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",marginBottom:2}}>{fmtDateShort(d)}</div>
-                          {sections.map(sec=>(
-                            <div key={sec.label} style={{marginLeft:4,marginBottom:2}}>
-                              <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{sec.label}</div>
-                              {sec.evs.map((e,k)=>{
-                                const editable=mine && ["devoir","examen","evenement"].includes(e.type||"evenement");
-                                return (
-                                <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"4px 0",borderBottom:"1px solid #222"}}>
-                                  <span style={{fontSize:14}}>{calEventIcon(e)}</span>
-                                  {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:34}}>{e.time}</span>}
-                                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
-                                  {editable && <>
-                                    <button onClick={()=>startEdit(e)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:13,lineHeight:1}}>✏️</button>
-                                    <button onClick={()=>deleteEntry(e.id)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
-                                  </>}
-                                </div>
-                                );
-                              })}
-                            </div>
-                          ))}
+                        <div key={d} style={{marginBottom:10}}>
+                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",marginBottom:4}}>{fmtDateShort(d)}</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {sections.map(sec=>(
+                              <div key={sec.label} style={{display:"flex",flexDirection:"column",gap:4,paddingTop:6,borderTop:"1px solid #262626"}}>
+                                <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{sec.label}</div>
+                                {sec.evs.map((e,k)=>{
+                                  const editable = parentMode || (mine && (e.type||"evenement")==="evenement");
+                                  return (
+                                  <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"3px 0"}}>
+                                    <span style={{fontSize:14}}>{calEventIcon(e)}</span>
+                                    {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:34}}>{e.time}</span>}
+                                    <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
+                                    {editable && <>
+                                      <button onClick={()=>startEdit(e,i)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:13,lineHeight:1}}>✏️</button>
+                                      <button onClick={()=>deleteEntry(e.id,i)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
+                                    </>}
+                                  </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       );
                     })}
@@ -7360,9 +7208,6 @@ export default function App() {
           onPlanMoment={handlePlanMoment}
           onMarkMomentDone={handleMarkMomentDone}
           bossActive={!!(config.boss && !config.boss.defeatedAt)}
-          onAddCalendarEvent={handleAddCalendarEvent}
-          onUpdateCalendarEvent={handleUpdateCalendarEvent}
-          onDeleteCalendarEvent={handleDeleteCalendarEvent}
           onRemoveAssignment={handleRemoveAssignment}
           onApproveRemoval={handleApproveRemoval}
           onRefuseRemoval={handleRefuseRemoval}
