@@ -229,3 +229,23 @@ File d'implémentation (`le-design-de-mon-mighty-mountain.md`) revérifiée : to
 
 ### ⚠️ Collision concurrente rencontrée et gérée
 Session live active en parallèle sur `App.jsx` pendant tout ce passage (chantier calendrier flex-wrap, `v2.15.2`, commit `ae6cbd3`). Le hunk de mon fix (isolé via `git add -p`) s'est retrouvé embarqué dans leur commit avant que je committe moi-même (index Git partagé — voir détail complet dans `PROJET-ETAT.md`). Code fonctionnel intact et déployé, seule l'attribution du commit est décalée (bump de version + changelog committés séparément en `c2e9918`).
+
+---
+
+## Tests approfondis du 2026-07-28 — focus calendrier refondu (v2.15.0→v2.15.4)
+
+Mini-check bugs fait en premier (lecture `GET /api/famille`, lecture seule) : 8 `config.bugs` — 7 déjà documentés/traités, le nouveau (`bug_rak8rzv`, 28 juillet 07:45 EDT) est du texte au hasard sans contenu actionnable ("GUigggyhjgihhJe suis le goût ereeerrhuhtufygdyftufgu"). 5 messages `feed` type chat, tous déjà documentés. `coinsWeek` stable à `2026-07-25` pour les 4 enfants (attendu, aucune régression UTC). File d'implémentation revérifiée vide (tous les chantiers du plan confirmés livrés en code). → Passe de tests approfondis sur le calendrier refondu, jamais couvert par cette routine (livré en session live entre le 27 et le 28 juillet).
+
+### Méthode
+Serveur dev isolé port 5183, réutilisation de données de test déjà présentes dans le profil navigateur (2 joueurs : TestFri, TestToday, PIN parent 1234) plutôt qu'un nouveau seed — plus rapide, toujours jamais la prod.
+
+### Zones couvertes
+- **Écran "📅 Calendrier"** (vue unique post-refonte v2.15.0) : ajout d'un événement Sport récurrent hebdomadaire (mercredi 17h30, ciblant les 2 enfants) — formulaire complet testé (5 catégories, 3 modes de récurrence, sélecteur multi-enfants, heure optionnelle). Enregistrement confirmé : occurrences correctement calculées sur les 2 prochaines semaines, regroupées par date puis par section "Souper" (17h-19h30), icône ⚽ correcte, boutons ✏️/✕ présents pour le parent.
+- **Colonnes flex côte à côte** (v2.15.2) : les 2 calendriers enfants s'affichent bien côte à côte à cette largeur d'écran.
+- **"Ma Semaine" (dashboard enfant, vue Colonnes)** : voir bug trouvé ci-dessous.
+
+### 🐛 Bug trouvé et corrigé — ✅ v2.15.5
+**Icône générique 📅 au lieu de l'icône de catégorie dans "Ma Semaine".** Voir entrée détaillée dans `PROJET-ETAT.md` v2.15.5. Résumé : le pinning des événements en haut de chaque colonne (v2.15.3) codait `📅` en dur au lieu d'appeler `calEventIcon(e)` comme le fait l'écran Calendrier — un événement Sport/Santé/Intervenant/Camp perdait son icône distinctive dès qu'il apparaissait dans Ma Semaine. Fix d'une ligne, vérifié en navigateur (⚽ s'affiche maintenant correctement), `npm run build` propre, `git fetch` sans dérive avant commit.
+
+### Non couvert cette passe (pour la prochaine)
+Modification/suppression d'un événement depuis l'écran Calendrier (seul l'ajout a été testé), formulaire simplifié côté enfant (seul le formulaire parent multi-catégories a été testé), vue "📋 Liste" de Ma Semaine (seule la vue "🗓️ Colonnes" a été testée), Boutique (achats/double-clic dans le nouveau système de tiers), popup Mon Perso (onglets Maison/Peaux), les 3 coffres, ajustement XP/pièces à 0/négatif dans l'onglet Actions.
