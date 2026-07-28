@@ -240,7 +240,7 @@ export const BADGES = [
   { id:"b_100tasks", emoji:"💯", name:"Centurion",            desc:"Complète 100 quêtes",        type:"general", check:(ps)=>(ps.completed?.length||0)>=100 },
   { id:"b_300tasks", emoji:"🛡️", name:"Vétéran des Corvées",   desc:"Complète 300 quêtes",        type:"general", check:(ps)=>(ps.completed?.length||0)>=300 },
   { id:"b_xp2500",   emoji:"☄️", name:"Comète",               desc:"Accumule 2500 XP",           type:"general", check:(ps)=>(ps.xp||0)>=2500 },
-  { id:"b_day10",    emoji:"🌟", name:"Journée Marathon",     desc:"10 quêtes dans la même journée", type:"general", check:(ps,c)=>c>=10 },
+  { id:"b_day10",    emoji:"🌟", name:"Journée Titanesque",   desc:"10 quêtes dans la même journée", type:"general", check:(ps,c)=>c>=10 }, // v2.13.4 — renommé : partageait littéralement le même nom que b_streak3 ("Journée Marathon", 6 quêtes) depuis le renommage v2.5.25, rendant les 2 badges indistinguables dans la liste. id/desc/check inchangés, badges déjà gagnés préservés.
   { id:"b_boss",     emoji:"🐲", name:"Tombeur de Boss",      desc:"Vaincs un boss de famille en équipe", type:"general", check:()=>false }, // v1.72.0 — décerné à la victoire (pas via checkBadges)
   { id:"b_maitre",   emoji:"🧘", name:"Maître de soi",        desc:"Réussis ton défi de la semaine 7 jours sur 7", type:"general", check:()=>false }, // v2.6.2 — décerné au palier 7/7 du défi hebdo gradué (pas via checkBadges)
 ];
