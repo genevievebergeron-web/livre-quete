@@ -67,6 +67,7 @@ export const AVATAR_PARTS = {
     {id:"xt0",emoji:"🚫",label:"Aucun"},
     {id:"xt1",emoji:"😈",label:"Cornes de démon", color:"#8B2500"},
     {id:"xt2",emoji:"🐙",label:"Tentacules",      color:"#9B59B6"},
+    {id:"xt3",emoji:"💪",label:"Bras en plus",    color:"#E8C4A0"}, // fabriqué par duplication des bras de la base
   ],
   // Silhouette (demande Gen 2026-07-27, choisie à la création de compte) — pas de couche
   // dessinée : aucune différence dans le rendu procédural actuel. Sélectionnera le jeu de
@@ -337,8 +338,8 @@ export function renderAvatarToCtx(ctx, avatarDef, bodyColor, W=72, H=72, blink=f
       const sfx = v2Suffix(av);
       const draw = (name)=>{ const im = name && getV2Png(name); if(im) ctx.drawImage(im, 0, 0, W, H); };
       if (av.back  && !av.back.endsWith("0"))  draw(av.back + sfx);   // ailes/cape (derrière)
-      ctx.drawImage(body, 0, 0, W, H);                                 // corps re-teint
-      if (av.extra && !av.extra.endsWith("0")) draw(av.extra + sfx);  // cornes/tentacules
+      if (av.extra && !av.extra.endsWith("0")) draw(av.extra + sfx);  // cornes/tentacules/bras — DERRIÈRE
+      ctx.drawImage(body, 0, 0, W, H);                                 // corps re-teint (les extras émergent derrière)
       if (av.hair)                             draw(av.hair + sfx);   // chevelure
       // Choix d'yeux/bouche (retour des enfants : « ils ne changent pas ») — surcouches
       // v2 ; ey1/mo1 = visage neutre de la base. L'humeur garde le dernier mot.

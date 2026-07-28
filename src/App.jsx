@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.13.2";
+const APP_VERSION = "2.13.3";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.13.3", date:"2026-07-27", features:[
+    "💪 Nouvel Extra dans Mon Perso : des BRAS EN PLUS! (Et oui, quatre bras.)",
+  ]},
   { version:"2.13.2", date:"2026-07-27", features:[
     "🐾 Ton familier apparaît maintenant EN ENTIER dans ta maison — corps, pattes et queue, plus juste sa tête! (Les familiers évolués gardent leur forme spéciale.)",
   ]},
