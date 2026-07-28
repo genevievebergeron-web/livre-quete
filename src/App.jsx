@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.15.1";
+const APP_VERSION = "2.15.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.2", date:"2026-07-28", features:[
+    "📅 Les calendriers de toute la famille s'affichent maintenant côte à côte quand l'écran est assez large — plus besoin de défiler pour comparer les journées!",
+  ]},
   { version:"2.15.1", date:"2026-07-28", features:[
     "🔄 Ton parent peut maintenant te renvoyer une annonce importante que tu as fermée trop vite — elle réapparaît sur ton accueil!",
   ]},
@@ -2947,7 +2950,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const canAfford=pState.coins>=iPrice;
               const rar=rarityOf(item.cost);
               return (
-                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford)onBuy(item,player.id); }}
+                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford){onBuy(item,player.id);} else if(!owned&&!canAfford){SFX.click&&SFX.click();showToast(`🪙 Pas assez de pièces! Il t'en manque ${iPrice-(pState.coins||0)}.`,"#D98C8C",2600);} }}
                   className={equipped?"":rar.cls}
                   style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
@@ -7082,13 +7085,16 @@ export default function App() {
                   )}
                 </div>
               )}
+              {/* v2.15.2 — colonnes flex qui s'ajustent (demande de Gen) : les calendriers des
+                  enfants se placent côte à côte quand l'écran le permet, et s'empilent sur mobile. */}
+              <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-start"}}>
               {order.map(i=>{ const p=config.players[i]; const cal=(gameStates[i]?.calendar)||[];
                 const mine=i===sessionPlayer;
                 const items=cal.flatMap(e=>upcomingOccurrences(e,14).map(d=>({d,e}))).sort((a,b)=>a.d.localeCompare(b.d)||(a.e.time||"").localeCompare(b.e.time||"")).slice(0,20);
                 // Regroupement par date, puis par section de moment de journée à l'intérieur de chaque date.
                 const byDate=new Map(); for(const it of items){ if(!byDate.has(it.d)) byDate.set(it.d,[]); byDate.get(it.d).push(it.e); }
                 return (
-                  <div key={p.id} style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${p.color}99`,borderRadius:8,padding:12}}>
+                  <div key={p.id} style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${p.color}99`,borderRadius:8,padding:12,flex:"1 1 300px",minWidth:0}}>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:p.color,marginBottom:6}}>{displayName(p)}{mine?" (toi)":""}</div>
                     {byDate.size===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
                     {[...byDate.entries()].map(([d,evs])=>{
@@ -7128,6 +7134,7 @@ export default function App() {
                   </div>
                 );
               })}
+              </div>
             </div>
           );
         })()}
