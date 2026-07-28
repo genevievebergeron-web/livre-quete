@@ -70,6 +70,23 @@ export function equipAnchorStyle(key, size, detailed=false) {
     pointerEvents:"none",
   };
 }
+// Correction de CENTRAGE par item (mesurée hors-ligne : centre de masse du PNG vs centre
+// du cadre — ex. h3 : casque à gauche, plumeau à droite → le cadre est centré mais le
+// casque paraît décalé, bug signalé 2×  par Gen). Fractions de la taille affichée.
+export const ITEM_CONTENT_OFFSET = {
+  h3:  { dx: 0.11, dy: 0.02 },   // heaume : corps du casque à x0.39 du cadre (plumeau à droite)
+  h5:  { dx: -0.05, dy: -0.09 }, // chapeau savant : masse en bas-droite
+  a3:  { dx: 0.05, dy: 0.08 },   // arc : masse en haut-gauche
+  di1: { dy: -0.10 },
+  sc1: { dy: -0.07 },
+};
+const withContentOffset = (style, itemId) => {
+  const o = ITEM_CONTENT_OFFSET[itemId];
+  if (!o) return style;
+  return { ...style,
+    left: style.left + Math.round((o.dx||0)*style.width),
+    top:  style.top  + Math.round((o.dy||0)*style.height) };
+};
 // Armures générées en couche PLEINE TRAME v2 (a6-a9) : portées exactement sur le corps
 // détaillé — jamais utilisées en mode procédural (repli = emoji à l'ancre armor).
 export const V2_FULLFRAME_ARMOR = new Set(["a6","a7","a8","a9"]);
@@ -96,12 +113,12 @@ export function EquippedGear({ eq, items, size, avatarDef=null }) {
   const armorAnchor = eq.armor && HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor";
   const armorFull = det && eq.armor && V2_FULLFRAME_ARMOR.has(eq.armor);
   return (<>
-    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size,det).width}         style={equipAnchorStyle("hat",size,det)}/>}
-    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size,det).width}        style={equipAnchorStyle("face",size,det)}/>}
+    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size,det).width}         style={withContentOffset(equipAnchorStyle("hat",size,det),eq.hat)}/>}
+    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size,det).width}        style={withContentOffset(equipAnchorStyle("face",size,det),eq.face)}/>}
     {eq.armor  && (armorFull
       ? <FullFrameArmor id={eq.armor} sfx={sfx} size={size}/>
-      : <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size,det).width}   style={equipAnchorStyle(armorAnchor,size,det)}/>)}
-    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size,det).width}      style={equipAnchorStyle("themed",size,det)}/>}
+      : <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size,det).width}   style={withContentOffset(equipAnchorStyle(armorAnchor,size,det),eq.armor)}/>)}
+    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size,det).width}      style={withContentOffset(equipAnchorStyle("themed",size,det),eq.themed)}/>}
   </>);
 }
 
@@ -145,7 +162,8 @@ export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutra
     const A = det ? AVATAR_EQUIP_ANCHORS_V2[anchorKey] : AVATAR_EQUIP_ANCHORS[anchorKey];
     const base = A.base || 72;
     const w = Math.round(size*A.wRatio);
-    const cx = A.cx/base*size, cy = A.cy/base*size;
+    const off = ITEM_CONTENT_OFFSET[id] || {};
+    const cx = A.cx/base*size + (off.dx||0)*w, cy = A.cy/base*size + (off.dy||0)*w;
     ctx.save();
     ctx.translate(cx, cy);
     if(A.rotate) ctx.rotate(A.rotate*Math.PI/180);

@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.13.4";
+const APP_VERSION = "2.13.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.13.5", date:"2026-07-27", features:[
+    "🪖 Le heaume de chevalier est maintenant bien posé sur la tête (son panache décentrait le casque) — et quelques autres items sont mieux alignés aussi.",
+  ]},
   { version:"2.13.4", date:"2026-07-27", features:[
     "🏅 Le badge « Journée Marathon » (10 quêtes) a un nouveau nom : « Journée Titanesque » — pour ne plus le confondre avec son cousin à 6 quêtes!",
   ]},
