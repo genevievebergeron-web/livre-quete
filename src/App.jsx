@@ -1095,8 +1095,21 @@ const mergeGS = (a, b, preferIncoming) => {
     // Énergie : consommable → l'horodatage energyTs arbitre directement (pas le flag coarse preferIncoming).
     // Bug v2.5.3 : preferIncoming basé sur savedAt global pouvait annuler une consommation d'énergie
     // si l'appareil qui avait ouvert un coffre avait un savedAt plus vieux que l'autre.
-    energy: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0; return bT>=aT ? (b.energy??a.energy??100) : (a.energy??b.energy??100); })(),
-    energyTs: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0; return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
+    // v2.15.7 (bug signalé « le coffre se recharge trop vite parfois », 2026-07-28) : l'énergie
+    // (pool partagé boutique/avatar/familier/coffre) se fusionnait par « dernier energyTs gagne »
+    // — dans une fenêtre de synchro quasi simultanée entre deux appareils, celui qui n'avait pas
+    // encore reçu la dépense de l'autre pouvait pousser un timestamp perçu comme plus récent avec
+    // une énergie plus haute, remboursant silencieusement une dépense déjà faite (achat, coffre…).
+    // Fix : sous ~5 min d'écart (fenêtre de course plausible), prendre le MINIMUM des deux valeurs
+    // — ne se trompe jamais dans le sens généreux — et son energyTs assorti (cohérent avec la
+    // régénération recalculée depuis ce timestamp par currentEnergy/minsToEnergy). Au-delà de 5 min,
+    // comportement inchangé (le plus récent gagne — nécessaire pour que la régénération progresse).
+    energy: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0;
+      if (Math.abs(aT-bT) <= 5*60*1000) return Math.min(a.energy??100, b.energy??100);
+      return bT>=aT ? (b.energy??a.energy??100) : (a.energy??b.energy??100); })(),
+    energyTs: (()=>{ const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0;
+      if (Math.abs(aT-bT) <= 5*60*1000) return (a.energy??100) <= (b.energy??100) ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
+      return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
@@ -2191,6 +2204,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const fedToday=pState.lastFedDay===todayStamp();
         const eColor=cur>=60?"#5CAD68":cur>=30?"#D9BC5C":"#D98C8C";
         const napping=cur<PLAY_ENERGY;
+        // v2.15.7 (demande de Gen, 2026-07-28) : depuis v2.11.3, jouer restait TOUJOURS permis même
+        // plafond atteint (seul le message changeait, honnêtement) — décision volontaire à l'époque.
+        // Gen veut maintenant un vrai blocage visuel du bouton une fois le plafond quotidien atteint.
+        const capReached = pState.petDay?.day===todayStamp() && (pState.petDay.xp||0) >= PET_DAILY_CAP;
         return (
           <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:10}}>
             {/* Série */}
@@ -2233,8 +2250,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={(e)=>{e.stopPropagation();onFeedPet&&onFeedPet();}} disabled={fedToday}
                     style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#5CAD68",color:fedToday?"#555":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
-                  <button onClick={(e)=>{e.stopPropagation();onPlayPet&&onPlayPet();}}
-                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:napping?"#1a1a1a":acc,color:napping?"#777":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:"pointer"}}>{napping?"💤 Sieste":"🎾 Jouer"}</button>
+                  <button onClick={(e)=>{e.stopPropagation();if(capReached)return;onPlayPet&&onPlayPet();}} disabled={napping||capReached}
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:(napping||capReached)?"#1a1a1a":acc,color:(napping||capReached)?"#777":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:(napping||capReached)?"default":"pointer",opacity:(napping||capReached)?0.6:1}}>{capReached?"🌙 Demain":napping?"💤 Sieste":"🎾 Jouer"}</button>
                 </div>
               </>); })() : (
                 <div onClick={openAvatar} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
@@ -3024,10 +3041,19 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               const iPrice=priceOf(item);
               const canAfford=pState.coins>=iPrice;
               const rar=rarityOf(item.cost);
+              // v2.15.7 (bug signalé par Antoine Emery, 2026-07-28 : « je pèse sur Maison/Spécial et
+              // rien ne se passe ») : le clic vérifiait déjà les pièces (toast si insuffisant) mais
+              // JAMAIS l'énergie avant d'appeler onBuy → handleBuy — qui, lui, bloque bien l'achat si
+              // l'énergie manque (App.jsx:6093), mais après coup, avec un message générique sans lien
+              // visible avec l'item cliqué. Comme Maison/Spécial contiennent les items les plus chers,
+              // c'est là que l'énergie (dépensée par les achats précédents + ouverture de Mon Perso,
+              // même pool) s'épuise le plus souvent — d'où l'impression que « rien ne se passe ».
+              // Fix : même garde + même toast explicite AVANT le clic, comme pour les pièces.
+              const hasEnergy = currentEnergy(pState) >= SHOP_ENERGY;
               return (
-                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford){onBuy(item,player.id);} else if(!owned&&!canAfford){SFX.click&&SFX.click();showToast(`🪙 Pas assez de pièces! Il t'en manque ${iPrice-(pState.coins||0)}.`,"#D98C8C",2600);} }}
+                <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford&&!hasEnergy){SFX.click&&SFX.click();const m=minsToEnergy(pState,SHOP_ENERGY);showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour acheter ça!`,"#85CDD1",3000);} else if(!owned&&canAfford){onBuy(item,player.id);} else if(!owned&&!canAfford){SFX.click&&SFX.click();showToast(`🪙 Pas assez de pièces! Il t'en manque ${iPrice-(pState.coins||0)}.`,"#D98C8C",2600);} }}
                   className={equipped?"":rar.cls}
-                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||canAfford?"pointer":"not-allowed",opacity:!owned&&!canAfford?0.45:1,position:"relative"}}>
+                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||(canAfford&&hasEnergy)?"pointer":"not-allowed",opacity:!owned&&(!canAfford||!hasEnergy)?0.45:1,position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   {isDeco
                     ? <DecoSprite decoId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px"}}/>

@@ -133,8 +133,18 @@ const mergeGS = (a, b, preferIncoming) => {
     petXp: mergePetXp(a.petXp, b.petXp),
     petDay: (() => { const A=a.petDay||{}, B=b.petDay||{}; if (A.day && A.day===B.day) return { day:A.day, xp:Math.max(A.xp||0,B.xp||0) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     petEvo: (() => { const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(),
-    energy: (preferIncoming ? b.energy : a.energy) ?? (a.energy ?? b.energy ?? 100),
-    energyTs: (preferIncoming ? b.energyTs : a.energyTs) ?? (a.energyTs ?? b.energyTs ?? null),
+    // v2.15.7 — port du correctif client (App.jsx, mergeGS) : ce bloc utilisait `preferIncoming`
+    // (basé sur le savedAt GLOBAL de tout le blob famille), plus grossier que la comparaison par
+    // energyTs déjà faite côté client — un vrai désaccord entre les deux moitiés de la fusion.
+    // Même fix : sous ~5 min d'écart entre les deux energyTs (fenêtre de course plausible entre
+    // deux appareils), prendre le minimum d'énergie (jamais de remboursement accidentel) et son
+    // energyTs assorti ; au-delà, comparer directement par energyTs (pas par preferIncoming).
+    energy: (() => { const aT=a.energyTs?new Date(a.energyTs).getTime():0, bT=b.energyTs?new Date(b.energyTs).getTime():0;
+      if (Math.abs(aT-bT) <= 5*60*1000) return Math.min(a.energy??100, b.energy??100);
+      return bT>=aT ? (b.energy??a.energy??100) : (a.energy??b.energy??100); })(),
+    energyTs: (() => { const aT=a.energyTs?new Date(a.energyTs).getTime():0, bT=b.energyTs?new Date(b.energyTs).getTime():0;
+      if (Math.abs(aT-bT) <= 5*60*1000) return (a.energy??100) <= (b.energy??100) ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
+      return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null,
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
