@@ -144,7 +144,10 @@ export function EquippedGear({ eq, items, size, avatarDef=null }) {
   const armorAnchor = eq.armor && HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor";
   const armorFull = det && eq.armor && V2_FULLFRAME_ARMOR.has(eq.armor);
   const Spr = det ? FittedItemSprite : ItemSprite; // détaillé : centrage par contenu, offsets inutiles
-  const st = (key, id) => det ? equipAnchorStyle(key, size, true) : withContentOffset(equipAnchorStyle(key, size, false), id);
+  // ⚠️ Les DEUX mécanismes sont nécessaires (régression v2.14.0, 4e signalement du heaume) :
+  // le recadrage par contenu neutralise les MARGES, mais pas l'asymétrie de MASSE (h3 :
+  // casque à gauche + panache à droite remplissent 97 % du cadre → bbox ≈ cadre).
+  const st = (key, id) => withContentOffset(equipAnchorStyle(key, size, det), id);
   return (<>
     {eq.hat    && <Spr itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={st("hat",eq.hat).width}         style={st("hat",eq.hat)}/>}
     {eq.face   && <Spr itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={st("face",eq.face).width}        style={st("face",eq.face)}/>}

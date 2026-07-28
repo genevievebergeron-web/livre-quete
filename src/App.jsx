@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.14.0";
+const APP_VERSION = "2.14.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.14.2", date:"2026-07-27", features:[
+    "🪖 Cette fois c'est la bonne : le casque de chevalier est bien centré sur la tête (on avait perdu un réglage en route — désolé!).",
+  ]},
+  { version:"2.14.1", date:"2026-07-27", features:[
+    "📣 Les annonces parent sont personnalisables : texte du bouton, messages du compte à rebours, titre et liste des tâches communes — fini les textes fixes sur les invités.",
+  ]},
   { version:"2.14.0", date:"2026-07-27", features:[
     "🪖 Le casque de chevalier est VRAIMENT bien placé maintenant (le jeu recadre lui-même chaque item sur son contenu — fini les décalages).",
     "↩️ Tu peux enfin RETIRER un item équipé : retape-le dans ton Inventaire (ou la Boutique) et il s'enlève!",
@@ -1758,22 +1764,24 @@ function TaskCheck({ text }) {
   );
 }
 // v2.6.0 — compte à rebours live vers l'heure cible d'une annonce parent
-function AnnouncementCountdown({ target }) {
+// v2.14.1 — textes personnalisables par annonce (label = suite du temps, doneText = à zéro)
+function AnnouncementCountdown({ target, label, doneText }) {
   const [remaining, setRemaining] = useState("");
   useEffect(()=>{
+    const suffix = label || "avant que les invités commencent à arriver !";
     const tick = ()=>{
       const diff = new Date(target) - new Date();
-      if(diff<=0){ setRemaining("Les invités arrivent maintenant ! 🎉"); return; }
+      if(diff<=0){ setRemaining(doneText || "Les invités arrivent maintenant ! 🎉"); return; }
       const h = Math.floor(diff/3600000);
       const m = Math.floor((diff%3600000)/60000);
       const s = Math.floor((diff%60000)/1000);
-      setRemaining(h>0 ? `⏱ ${h}h ${m}min avant que les invités commencent à arriver !`
-                       : `⏱ ${m}min ${s}s avant que les invités commencent à arriver !`);
+      setRemaining(h>0 ? `⏱ ${h}h ${m}min ${suffix}`
+                       : `⏱ ${m}min ${s}s ${suffix}`);
     };
     tick();
     const id = setInterval(tick, 1000);
     return ()=>clearInterval(id);
-  }, [target]);
+  }, [target, label, doneText]);
   return <div style={{marginTop:10,color:"#FFD54F",fontWeight:"bold",fontSize:14,textAlign:"center"}}>{remaining}</div>;
 }
 
@@ -2034,15 +2042,15 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {a.title && <div style={{color:"#FFD54F",fontWeight:"bold",fontSize:16,marginBottom:10,
               letterSpacing:0.3,textAlign:"center",lineHeight:1.3,fontFamily:"'Press Start 2P',monospace"}}>{a.title}</div>}
             <div style={{fontSize:15,lineHeight:1.5,fontFamily:"'VT323',monospace",color:"#eee"}}>{a.emoji} {a.text}</div>
-            {a.countdownTo && <AnnouncementCountdown target={a.countdownTo}/>}
-            {(a.sharedTasks||[]).length>0 && <><div style={{marginTop:12,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>AVANT 10H30 :</div>
+            {a.countdownTo && <AnnouncementCountdown target={a.countdownTo} label={a.countdownLabel} doneText={a.countdownDoneText}/>}
+            {(a.sharedTasks||[]).length>0 && <><div style={{marginTop:12,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>{a.sharedTasksLabel || (a.countdownTo ? "AVANT 10H30 :" : "À FAIRE :")}</div>
               {(a.sharedTasks||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
-            {((a.playerTasks||{})[player.id]||[]).length>0 && <><div style={{marginTop:10,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>TES MISSIONS (dans la journée) :</div>
+            {((a.playerTasks||{})[player.id]||[]).length>0 && <><div style={{marginTop:10,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>{a.playerTasksLabel || "TES MISSIONS (dans la journée) :"}</div>
               {((a.playerTasks||{})[player.id]||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
             <button onClick={()=>{if(SFX.click)SFX.click();onDismissAnnouncement&&onDismissAnnouncement(a.id);}}
               style={{marginTop:12,padding:"8px 16px",borderRadius:8,fontFamily:"'Press Start 2P',monospace",
                 fontSize:8,background:"#333",border:"2px solid #555",color:"#eee",cursor:"pointer",display:"block",width:"100%"}}>
-              🤐 Compris, je reste discret·e !
+              {a.dismissLabel || "🤐 Compris, je reste discret·e !"}
             </button>
           </div>
         ))
@@ -3465,7 +3473,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
   const [defiDraft, setDefiDraft] = useState({}); // Lot 7C — {[playerId]: {text, emoji}} pour l'édition des défis
   // v2.6.0 — formulaire création d'annonce parent
-  const [annDraft, setAnnDraft] = useState({ emoji:"📣", title:"", text:"", secret:false, targetAll:true, targetPlayerIds:[], countdownTo:"", expiresAt:"", sharedTasks:[], playerTasksDraft:{} });
+  const [annDraft, setAnnDraft] = useState({ emoji:"📣", title:"", text:"", secret:false, targetAll:true, targetPlayerIds:[], countdownTo:"", countdownLabel:"", countdownDoneText:"", dismissLabel:"", sharedTasksDraft:"", sharedTasksLabel:"", expiresAt:"", playerTasksDraft:{} });
   // Ajout d'événement au calendrier (parent)
   const [ceLabel,setCeLabel]=useState(""); const [ceType,setCeType]=useState("evenement");
   const [ceRecur,setCeRecur]=useState("none"); const [ceDate,setCeDate]=useState(""); const [ceDay,setCeDay]=useState(0);
@@ -4108,6 +4116,27 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               <input type="datetime-local" value={annDraft.countdownTo} onChange={e=>setAnnDraft(d=>({...d,countdownTo:e.target.value}))}
                 style={{flex:1,fontFamily:"'VT323',monospace",fontSize:13,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4}}/>
             </div>
+            {annDraft.countdownTo && <>
+              <input placeholder='Texte pendant le compte (ex: "avant le départ !") — suit le temps affiché' value={annDraft.countdownLabel}
+                onChange={e=>setAnnDraft(d=>({...d,countdownLabel:e.target.value}))}
+                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,marginBottom:8}}/>
+              <input placeholder='Texte à zéro (ex: "C&#39;est l&#39;heure ! 🎉")' value={annDraft.countdownDoneText}
+                onChange={e=>setAnnDraft(d=>({...d,countdownDoneText:e.target.value}))}
+                style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,marginBottom:8}}/>
+            </>}
+            <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+              <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa"}}>Bouton :</span>
+              <input placeholder='Texte du bouton (défaut : "🤐 Compris, je reste discret·e !")' value={annDraft.dismissLabel}
+                onChange={e=>setAnnDraft(d=>({...d,dismissLabel:e.target.value}))}
+                style={{flex:1,fontFamily:"'VT323',monospace",fontSize:13,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4}}/>
+            </div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",marginBottom:6}}>TÂCHES COMMUNES (pour tous) :</div>
+            <input placeholder='Titre de la section (défaut : "À FAIRE :")' value={annDraft.sharedTasksLabel}
+              onChange={e=>setAnnDraft(d=>({...d,sharedTasksLabel:e.target.value}))}
+              style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,marginBottom:6}}/>
+            <textarea placeholder="Une tâche par ligne…" value={annDraft.sharedTasksDraft}
+              onChange={e=>setAnnDraft(d=>({...d,sharedTasksDraft:e.target.value}))}
+              style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,minHeight:50,resize:"vertical",marginBottom:8}}/>
             <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
               <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa"}}>Expiration :</span>
               <input type="date" value={annDraft.expiresAt} onChange={e=>setAnnDraft(d=>({...d,expiresAt:e.target.value}))}
@@ -4144,6 +4173,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 const tasks=raw.split("\n").map(s=>s.trim()).filter(Boolean);
                 if(tasks.length) playerTasks[p.id]=tasks;
               }
+              const sharedTasks=(annDraft.sharedTasksDraft||"").split("\n").map(s=>s.trim()).filter(Boolean);
               onCreateAnnouncement&&onCreateAnnouncement({
                 emoji:annDraft.emoji||"📣",
                 title:annDraft.title.trim()||undefined,
@@ -4152,10 +4182,15 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 targetAll:annDraft.targetAll,
                 targetPlayerIds:annDraft.targetAll?[]:annDraft.targetPlayerIds,
                 countdownTo:annDraft.countdownTo||undefined,
+                countdownLabel:annDraft.countdownLabel.trim()||undefined,
+                countdownDoneText:annDraft.countdownDoneText.trim()||undefined,
+                dismissLabel:annDraft.dismissLabel.trim()||undefined,
+                sharedTasks:sharedTasks.length?sharedTasks:undefined,
+                sharedTasksLabel:annDraft.sharedTasksLabel.trim()||undefined,
                 expiresAt:annDraft.expiresAt||undefined,
                 playerTasks:Object.keys(playerTasks).length?playerTasks:undefined,
               });
-              setAnnDraft({emoji:"📣",title:"",text:"",secret:false,targetAll:true,targetPlayerIds:[],countdownTo:"",expiresAt:"",sharedTasks:[],playerTasksDraft:{}});
+              setAnnDraft({emoji:"📣",title:"",text:"",secret:false,targetAll:true,targetPlayerIds:[],countdownTo:"",countdownLabel:"",countdownDoneText:"",dismissLabel:"",sharedTasksDraft:"",sharedTasksLabel:"",expiresAt:"",playerTasksDraft:{}});
             }} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px",background:annDraft.text.trim()?"#D99248":"#333",
               color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:annDraft.text.trim()?"pointer":"not-allowed",
               width:"100%",opacity:annDraft.text.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
