@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.15.3";
+const APP_VERSION = "2.15.4";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.4", date:"2026-07-28", features:[
+    "📅 Ta semaine affiche maintenant aussi tes événements (camp, sorties, rendez-vous) en haut de chaque journée — les quêtes restent en dessous!",
+  ]},
   { version:"2.15.3", date:"2026-07-28", features:[
     "🪙 Boutique (Maison, Spécial et les autres onglets) : si tu n'as pas assez de pièces pour un item, tu le sais maintenant tout de suite (avant, rien ne se passait quand tu appuyais dessus)!",
   ]},
@@ -2751,9 +2754,18 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div key={stamp} style={{flex:"0 0 auto",width:138,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${acc}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                 {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
-                {/* v2.6.6 — les événements de calendrier ne s'affichent plus ici (demande de Gen :
-                    "Ma semaine" = tâches seulement, le calendrier vit désormais uniquement dans
-                    l'onglet 📅 du menu du bas). */}
+                {/* v2.15.3 — les événements du calendrier reviennent ici, épinglés EN HAUT de chaque
+                    colonne et visuellement distincts des quêtes (demande de Gen 28 juillet, remplace
+                    la décision v2.6.6 "tâches seulement" — elle veut voir l'horaire du camp partout). */}
+                {(()=>{
+                  const dayEvents=(pState.calendar||[]).filter(e=> e && (e.recur?.freq==="daily" || (e.recur?.freq==="weekly" && e.recur.day===dIdx) || e.date===stamp));
+                  return dayEvents.map(e=>(
+                    <div key={e.id} style={{display:"flex",gap:4,alignItems:"flex-start",marginTop:3,padding:"3px 5px",background:"rgba(133,205,209,0.12)",border:"1px solid #85CDD155",borderRadius:3}}>
+                      <span style={{fontSize:10,lineHeight:"13px"}}>📅</span>
+                      <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
+                    </div>
+                  ));
+                })()}
                 {dayTasks.length===0 && (
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:4}}>🌿 Libre</div>
                 )}
