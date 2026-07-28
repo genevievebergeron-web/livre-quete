@@ -747,6 +747,14 @@ BASE_SHOP_ITEMS.skins=[
   {id:"usk10",emoji:"🧟",name:"Peau de zombie",cost:35,slot:"skin"},
   {id:"usk11",emoji:"🌋",name:"Peau de lave",  cost:60,slot:"skin"},
   {id:"usk12",emoji:"🧊",name:"Peau de glace", cost:45,slot:"skin"},
+  // Déblocages Dos/Extras (demande Gen : « faudrait en bloquer une partie ») — slot "skin"
+  // = même mécanique de déblocage (jamais équipé, se choisit dans Mon Perso une fois acheté)
+  {id:"ubk1",emoji:"🕊️",name:"Ailes plumées",   cost:45,slot:"skin"},
+  {id:"ubk2",emoji:"🦇",name:"Ailes de dragon", cost:55,slot:"skin"},
+  {id:"ubk3",emoji:"🧣",name:"Cape",            cost:30,slot:"skin"},
+  {id:"uxt1",emoji:"😈",name:"Cornes de démon", cost:40,slot:"skin"},
+  {id:"uxt2",emoji:"🐙",name:"Tentacules",      cost:50,slot:"skin"},
+  {id:"uxt3",emoji:"💪",name:"Bras en plus",    cost:60,slot:"skin"},
 ];
 export const ALL_SHOP_ITEMS = [
   ...BASE_SHOP_ITEMS.hats, ...BASE_SHOP_ITEMS.armors, ...BASE_SHOP_ITEMS.pets, ...BASE_SHOP_ITEMS.skins,

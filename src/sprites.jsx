@@ -87,6 +87,37 @@ const withContentOffset = (style, itemId) => {
     left: style.left + Math.round((o.dx||0)*style.width),
     top:  style.top  + Math.round((o.dy||0)*style.height) };
 };
+// Item ÉQUIPÉ en mode détaillé : canvas recadré sur le CONTENU opaque du PNG puis
+// centré — insensible aux marges/asymétries de l'art (heaume h3 décalé 3× chez Gen :
+// le panache déportait le casque dans son cadre). Repli ItemSprite (emoji) si pas de PNG.
+export function FittedItemSprite({ itemId, emoji, size, style={} }){
+  const ref = useRef(null);
+  const [fail, setFail] = useState(false);
+  useEffect(()=>{
+    if(fail || !itemId) return;
+    const c = ref.current; if(!c) return;
+    const img = new Image();
+    img.onload = ()=>{
+      const t = document.createElement("canvas"); t.width = img.width; t.height = img.height;
+      const tx = t.getContext("2d"); tx.drawImage(img, 0, 0);
+      let x0=t.width, y0=t.height, x1=0, y1=0;
+      const d = tx.getImageData(0, 0, t.width, t.height).data;
+      for(let y=0; y<t.height; y++) for(let x=0; x<t.width; x++){
+        if(d[(y*t.width+x)*4+3] > 40){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+      }
+      if(x1 < x0) return;
+      const w=x1-x0+1, h=y1-y0+1, sc=Math.min(size/w, size/h);
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0,0,size,size); ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, x0, y0, w, h, (size-w*sc)/2, (size-h*sc)/2, w*sc, h*sc);
+    };
+    img.onerror = ()=>setFail(true);
+    img.src = `/sprites/items/${itemId}.png`;
+  },[itemId, size, fail]);
+  if(fail || !itemId) return <ItemSprite itemId={itemId} emoji={emoji} size={size} style={style}/>;
+  return <canvas ref={ref} width={size} height={size} style={{imageRendering:"pixelated",...style}}/>;
+}
+
 // Armures générées en couche PLEINE TRAME v2 (a6-a9) : portées exactement sur le corps
 // détaillé — jamais utilisées en mode procédural (repli = emoji à l'ancre armor).
 export const V2_FULLFRAME_ARMOR = new Set(["a6","a7","a8","a9"]);
@@ -112,13 +143,15 @@ export function EquippedGear({ eq, items, size, avatarDef=null }) {
   const sfx = det && avatarDef?.build==="bd_enfant" ? "_e" : "";
   const armorAnchor = eq.armor && HELD_WEAPON_IDS.has(eq.armor) ? "weapon" : "armor";
   const armorFull = det && eq.armor && V2_FULLFRAME_ARMOR.has(eq.armor);
+  const Spr = det ? FittedItemSprite : ItemSprite; // détaillé : centrage par contenu, offsets inutiles
+  const st = (key, id) => det ? equipAnchorStyle(key, size, true) : withContentOffset(equipAnchorStyle(key, size, false), id);
   return (<>
-    {eq.hat    && <ItemSprite itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={equipAnchorStyle("hat",size,det).width}         style={withContentOffset(equipAnchorStyle("hat",size,det),eq.hat)}/>}
-    {eq.face   && <ItemSprite itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={equipAnchorStyle("face",size,det).width}        style={withContentOffset(equipAnchorStyle("face",size,det),eq.face)}/>}
+    {eq.hat    && <Spr itemId={eq.hat}    emoji={find(eq.hat)?.emoji}    size={st("hat",eq.hat).width}         style={st("hat",eq.hat)}/>}
+    {eq.face   && <Spr itemId={eq.face}   emoji={find(eq.face)?.emoji}   size={st("face",eq.face).width}        style={st("face",eq.face)}/>}
     {eq.armor  && (armorFull
       ? <FullFrameArmor id={eq.armor} sfx={sfx} size={size}/>
-      : <ItemSprite itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={equipAnchorStyle(armorAnchor,size,det).width}   style={withContentOffset(equipAnchorStyle(armorAnchor,size,det),eq.armor)}/>)}
-    {eq.themed && <ItemSprite itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={equipAnchorStyle("themed",size,det).width}      style={withContentOffset(equipAnchorStyle("themed",size,det),eq.themed)}/>}
+      : <Spr itemId={eq.armor}  emoji={find(eq.armor)?.emoji}  size={st(armorAnchor,eq.armor).width}   style={st(armorAnchor,eq.armor)}/>)}
+    {eq.themed && <Spr itemId={eq.themed} emoji={find(eq.themed)?.emoji} size={st("themed",eq.themed).width}      style={st("themed",eq.themed)}/>}
   </>);
 }
 
@@ -143,6 +176,7 @@ function getPngBySrc(src){
   return e.status==="ok" ? e.img : null;
 }
 const getItemPng = (itemId)=> itemId ? getPngBySrc(`/sprites/items/${itemId}.png`) : null;
+const _bboxCache = new Map(); // boîte du contenu opaque par item (pour le centrage par contenu)
 export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutral", equipped=null, items=[] } = {}){
   const c = document.createElement("canvas");
   c.width = c.height = size;
@@ -168,7 +202,21 @@ export function renderAvatarSprite(avatarDef, bodyColor, { size=96, mood="neutra
     ctx.translate(cx, cy);
     if(A.rotate) ctx.rotate(A.rotate*Math.PI/180);
     const img = getItemPng(id);
-    if(img) ctx.drawImage(img, -w/2, -w/2, w, w);
+    if(img){
+      // Même règle que FittedItemSprite : centrer le CONTENU opaque, pas le cadre.
+      let bb = _bboxCache.get(id);
+      if(!bb){
+        const t=document.createElement("canvas"); t.width=img.width; t.height=img.height;
+        const tx=t.getContext("2d"); tx.drawImage(img,0,0);
+        const dd=tx.getImageData(0,0,t.width,t.height).data;
+        let x0=t.width,y0=t.height,x1=0,y1=0;
+        for(let y=0;y<t.height;y++)for(let x=0;x<t.width;x++){ if(dd[(y*t.width+x)*4+3]>40){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+        bb = x1>=x0 ? {x0,y0,w:x1-x0+1,h:y1-y0+1} : {x0:0,y0:0,w:img.width,h:img.height};
+        _bboxCache.set(id, bb);
+      }
+      const sc2 = Math.min(w/bb.w, w/bb.h);
+      ctx.drawImage(img, bb.x0, bb.y0, bb.w, bb.h, -bb.w*sc2/2, -bb.h*sc2/2, bb.w*sc2, bb.h*sc2);
+    }
     else if(ITEM_SPRITES[id]){
       const t = document.createElement("canvas"); t.width=t.height=w;
       renderItemToCtx(t.getContext("2d"), id, w);

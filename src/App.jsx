@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.13.6";
+const APP_VERSION = "2.14.0";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,11 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.14.0", date:"2026-07-27", features:[
+    "🪖 Le casque de chevalier est VRAIMENT bien placé maintenant (le jeu recadre lui-même chaque item sur son contenu — fini les décalages).",
+    "↩️ Tu peux enfin RETIRER un item équipé : retape-le dans ton Inventaire (ou la Boutique) et il s'enlève!",
+    "🔒 Les ailes, capes, cornes, tentacules et bras en plus se DÉBLOQUENT maintenant à la Boutique (onglet ✨ Spécial) — ceux qui les portaient déjà les gardent!",
+  ]},
   { version:"2.13.6", date:"2026-07-27", features:[
     "👄 Bouches SÉRIEUX et CRISPÉ dans Mon Perso : elles ne faisaient rien avant (mêmes pixels que NEUTRE) — chacune a maintenant sa vraie bouche.",
   ]},
@@ -1916,7 +1921,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const _allDoneToday = myAssignments.length>0 && myAssignments.every(a=>pState.completed?.includes(_todayDoneKey(a)));
   const dashboardMood = avatarMood!=="neutral" ? avatarMood : (new Date().getHours()>=19 && _allDoneToday ? "tired" : "neutral");
   const themedCat = pt.shopCategory;
-  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", skins:"✨ Peaux", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
+  const SHOP_TABS = { rewards:"🎁 Récompenses", hats:"🎩 Chapeaux", armors:"🛡️ Armures", pets:"🐾 Familiers", deco:"🏠 Maison", skins:"✨ Spécial", ...(themedCat.items.length>0?{[themedCat.id]:themedCat.label}:{}) };
   // Ma maison (2026-07-27) — items déco visibles : génériques + ceux du thème ACTIF seulement
   const decoItems = decoForTheme(player.themeId||"none");
   const SHOP_ITEMS = BASE_SHOP_ITEMS;
@@ -2982,7 +2987,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     ? <PetSprite itemId={item.id} size={30} style={{margin:"6px auto 2px"}}/>
                     : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{margin:"6px auto 2px",fontSize:20}}/>}
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ · retirer":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):iPrice+" 🪙"}</span>
                 </div>
               );
             })}
@@ -6138,9 +6143,11 @@ export default function App() {
 
   const handleEquip = useCallback((item,playerId)=>{
     const idx=config.players.findIndex(p=>p.id===playerId); if(idx<0)return;
-    setGameStates(gs=>{ const n=[...gs]; n[idx]={...n[idx],equipped:{...(n[idx].equipped||{}),[item.slot]:item.id}}; persist(config,n); return n; });
-    showToast(`✅ ${item.emoji} équipé!`,"#5CAD68");
-  },[config,persist,showToast]);
+    // v2.13.x (retour Gen : « on peut pas le déséquiper? ») — TOGGLE : retaper l'item équipé le retire.
+    const already = (gameStates[idx]?.equipped||{})[item.slot]===item.id;
+    setGameStates(gs=>{ const n=[...gs]; n[idx]={...n[idx],equipped:{...(n[idx].equipped||{}),[item.slot]:already?null:item.id}}; persist(config,n); return n; });
+    showToast(already?`↩️ ${item.emoji} retiré`:`✅ ${item.emoji} équipé!`, already?"#85CDD1":"#5CAD68");
+  },[config,gameStates,persist,showToast]);
 
   // ── Parent mode actions ──────────────────────────────────
   const handleDeComplete = useCallback((doneKey, playerIdx) => {

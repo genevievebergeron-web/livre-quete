@@ -130,12 +130,16 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
               {AVATAR_PARTS[partTab].map(p=>{
                 const sel = avatarDef[partTab]===p.id || (!avatarDef[partTab] && (p.id.endsWith("0")||p.id==="bd_ado"));
+                // Verrouillé tant que l'item de déblocage n'est pas acheté (Boutique ✨ Spécial).
+                // Les enfants qui portaient DÉJÀ l'option la gardent (le rendu ne vérifie pas).
+                const locked = p.unlock && !pState.owned?.includes(p.unlock) && !sel;
                 const col = p.color || "#888";
                 return (
-                  <div key={p.id} onClick={()=>update(partTab,p.id)}
-                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:sel?`${col}30`:"rgba(0,0,0,0.4)",border:`3px solid ${sel?col:"#333"}`,borderRadius:5,cursor:"pointer",boxShadow:sel&&p.color?`0 0 10px ${col}60`:"none"}}>
-                    <span style={{fontSize:26}}>{p.emoji}</span>
-                    <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{p.label}</span>
+                  <div key={p.id} onClick={()=>{ if(locked) return; update(partTab,p.id); }}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:sel?`${col}30`:"rgba(0,0,0,0.4)",border:`3px solid ${sel?col:"#333"}`,borderRadius:5,cursor:locked?"default":"pointer",opacity:locked?0.45:1,boxShadow:sel&&p.color?`0 0 10px ${col}60`:"none"}}>
+                    <span style={{fontSize:26,filter:locked?"grayscale(0.7)":"none"}}>{p.emoji}</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{locked?"🔒 ":""}{p.label}</span>
+                    {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#777"}}>Boutique ✨</span>}
                   </div>
                 );
               })}
@@ -216,7 +220,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                   <span style={{fontSize:24}}>{item.emoji}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#ccc",textAlign:"center",lineHeight:1.2}}>{item.name||item.label}</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:isEq?"#5CAD68":"#888"}}>
-                    {isEq?"✅ ÉQUIPÉ":item.slot?"Équiper":"-"}
+                    {isEq?"✅ ÉQUIPÉ · retirer":item.slot?"Équiper":"-"}
                   </span>
                 </div>
               );

@@ -57,17 +57,17 @@ export const AVATAR_PARTS = {
   back: [ // couche ARRIÈRE, derrière tout le personnage
     {id:"bk0",emoji:"🚫",label:"Aucun"},
     // bk1 : ailes de fée → ailes PLUMÉES (décision Gen 2026-07-27 — 4 garçons)
-    {id:"bk1",emoji:"🕊️",label:"Ailes plumées",   color:"#E8E0CC"},
-    {id:"bk2",emoji:"🦇",label:"Ailes de dragon", color:"#7A4A9E"},
-    {id:"bk3",emoji:"🧣",label:"Cape",            color:"#B0413E"},
+    {id:"bk1",emoji:"🕊️",label:"Ailes plumées",   color:"#E8E0CC", unlock:"ubk1"},
+    {id:"bk2",emoji:"🦇",label:"Ailes de dragon", color:"#7A4A9E", unlock:"ubk2"},
+    {id:"bk3",emoji:"🧣",label:"Cape",            color:"#B0413E", unlock:"ubk3"},
   ],
   // Extras (demande Gen 2026-07-27) : cornes+queue, tentacules… (bras supp. à venir).
   // Rendu UNIQUEMENT en mode détaillé v2 (aucun repli procédural — trop fin pour les blocs).
   extra: [
     {id:"xt0",emoji:"🚫",label:"Aucun"},
-    {id:"xt1",emoji:"😈",label:"Cornes de démon", color:"#8B2500"},
-    {id:"xt2",emoji:"🐙",label:"Tentacules",      color:"#9B59B6"},
-    {id:"xt3",emoji:"💪",label:"Bras en plus",    color:"#E8C4A0"}, // fabriqué par duplication des bras de la base
+    {id:"xt1",emoji:"😈",label:"Cornes de démon", color:"#8B2500", unlock:"uxt1"},
+    {id:"xt2",emoji:"🐙",label:"Tentacules",      color:"#9B59B6", unlock:"uxt2"},
+    {id:"xt3",emoji:"💪",label:"Bras en plus",    color:"#E8C4A0", unlock:"uxt3"}, // fabriqué par duplication des bras de la base
   ],
   // Silhouette (demande Gen 2026-07-27, choisie à la création de compte) — pas de couche
   // dessinée : aucune différence dans le rendu procédural actuel. Sélectionnera le jeu de
