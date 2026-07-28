@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks } from "./recurring.js";
 
-const APP_VERSION = "2.15.4";
+const APP_VERSION = "2.15.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.15.5", date:"2026-07-28", features:[
+    "📅 Les événements épinglés en haut de ta Semaine (v2.15.4) affichent maintenant leur vraie icône (🏥⚽🧑‍⚕️🏕️) au lieu d'un 📅 générique pour tous — plus facile de repérer un match de sport ou un camp d'un coup d'oeil!",
+  ]},
   { version:"2.15.4", date:"2026-07-28", features:[
     "📅 Ta semaine affiche maintenant aussi tes événements (camp, sorties, rendez-vous) en haut de chaque journée — les quêtes restent en dessous!",
   ]},
@@ -2761,7 +2764,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   const dayEvents=(pState.calendar||[]).filter(e=> e && (e.recur?.freq==="daily" || (e.recur?.freq==="weekly" && e.recur.day===dIdx) || e.date===stamp));
                   return dayEvents.map(e=>(
                     <div key={e.id} style={{display:"flex",gap:4,alignItems:"flex-start",marginTop:3,padding:"3px 5px",background:"rgba(133,205,209,0.12)",border:"1px solid #85CDD155",borderRadius:3}}>
-                      <span style={{fontSize:10,lineHeight:"13px"}}>📅</span>
+                      <span style={{fontSize:10,lineHeight:"13px"}}>{calEventIcon(e)}</span>
                       <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
                     </div>
                   ));
