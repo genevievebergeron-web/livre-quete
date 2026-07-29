@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.6";
+const APP_VERSION = "2.16.7";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -122,6 +122,18 @@ const heartsRow = (pct, count=5) => {
   const filled = Math.max(0, Math.min(count, Math.round((pct/100)*count)));
   return "❤️".repeat(filled) + "🖤".repeat(count-filled);
 };
+// v2.16.7 — Chantier 6.6 (demande de Gen) : verrou du matin parent-contrôlé, plage horaire fixe.
+// Heure LOCALE obligatoire (jamais toISOString — leçon v2.5.24, un bug UTC avait déjà cassé un
+// mécanisme similaire basé sur l'heure). Gère le cas où la fenêtre chevauche minuit (start>end).
+const isMorningLocked = (player, now = new Date()) => {
+  const lock = player?.morningLock;
+  if (!lock?.enabled) return false;
+  const [sh, sm] = (lock.start || "06:00").split(":").map(Number);
+  const [eh, em] = (lock.end || "09:00").split(":").map(Number);
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const start = sh * 60 + (sm || 0), end = eh * 60 + (em || 0);
+  return start <= end ? (cur >= start && cur < end) : (cur >= start || cur < end);
+};
 // v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
 // v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
 // en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
@@ -197,6 +209,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.7", date:"2026-07-29", features:[
+    "🚪 Nouveau réglage parent (facultatif) : un « verrou du matin » qui peut fermer la Boutique et le personnalisateur pendant une plage horaire, pour t'aider à te concentrer sur tes tâches du matin — tes autres salles du Livre se réveillent après!",
+  ]},
   { version:"2.16.6", date:"2026-07-29", features:[
     "🌟 5 nouveaux niveaux (11 à 15)! Si tu étais au maximum (niveau 10, SUPRÊME), ta barre d'XP va enfin recommencer à avancer — TRANSCENDANT, IMMORTEL, COSMIQUE, ÉTERNEL, et le tout nouveau titre final MAÎTRE AVENTURIER t'attendent!",
   ]},
@@ -1962,11 +1977,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   };
   useEffect(()=>()=>clearTimeout(moodTimerRef.current),[]);
   // v1.84.0 (Lot 1 #B3) — ouvrir le personnalisateur coûte de l'énergie (frein "plaisir")
+  // v2.16.7 — Chantier 6.6 : verrou du matin (parent-contrôlé) — cadrage ludique, jamais "verrouillé".
   const openAvatar = ()=>{
+    if(isMorningLocked(player)){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); return; }
     if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
   };
+  // v2.16.7 — Chantier 6.6 : si le verrou du matin démarre PENDANT que l'enfant est déjà sur la
+  // boutique (ou avait le popup avatar ouvert), on le ramène en douceur — jamais de piège.
+  useEffect(()=>{
+    if(isMorningLocked(player)){
+      if(homeTab==="shop") setHomeTab("accueil");
+      if(avatarOpen) setAvatarOpen(false);
+    }
+  },[player.morningLock, homeTab, avatarOpen]);
   // Largeur de la bannière « Ma maison » (accueil) — pleine largeur du contenu, plafonnée.
   const bannerW = Math.min(680, (typeof window!=="undefined"?window.innerWidth:360)-16);
   const [themeRevealed, setThemeRevealed] = useState(false);
@@ -3272,13 +3297,18 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:90,display:"flex",justifyContent:"center",background:`${pt.bg||"#1a1a2e"}F2`,borderTop:`2px solid ${(pt.accent||player.color)}55`,backdropFilter:"blur(8px)",boxShadow:"0 -4px 16px rgba(0,0,0,0.45)",paddingBottom:"env(safe-area-inset-bottom)"}}>
         <div style={{display:"flex",width:"100%",maxWidth:900}}>
         {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
+          const morningLocked=isMorningLocked(player); // v2.16.7 — Chantier 6.6
           const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Aujourd'hui","nav_today"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
           return tabs.map(([k,ic,lb,icn])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
+            const locked=k==="shop"&&morningLocked;
             return (
-              <button key={k} onClick={()=>{setHomeTab(k);SFX.click();}}
-                style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer"}}>
+              <button key={k} onClick={()=>{
+                  if(locked){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); SFX.click(); return; }
+                  setHomeTab(k);SFX.click();
+                }}
+                style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer",opacity:locked?0.5:1}}>
                 <span style={{fontSize:20,lineHeight:0,filter:on?"none":"grayscale(0.3) opacity(0.8)",animation:isBoss?"pulse 1.4s infinite":"none"}}><UIIcon name={icn} emoji={ic} size={20} block/></span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"#888")}}>{lb}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"#888")}}>{locked?"🚪":lb}</span>
               </button>
             );
           });
@@ -3588,7 +3618,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
-  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onChangePin,
+  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
   onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -4127,6 +4157,22 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,50)} color="#3a3000" textColor="#D9BC5C" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>+50 🪙</PBtn>
                 <PBtn onClick={()=>{const v=parseInt(prompt("Combien de pièces ajouter (ou négatif pour retirer)?","50")||"0",10); if(v)onAdjustCoins&&onAdjustCoins(i,v);}} color="#3a3000" textColor="#D9BC5C" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>🪙 Montant…</PBtn>
                 <PBtn onClick={()=>onAdjustCoins&&onAdjustCoins(i,-10)} color="#3a1a1a" textColor="#FF6464" style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>-10 🪙</PBtn>
+              </div>
+              {/* v2.16.7 — Chantier 6.6 (demande de Gen) : verrou du matin, plage horaire fixe.
+                  Bloque boutique + popup avatar pendant la fenêtre ; calendrier/tâches intacts. */}
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6,alignItems:"center"}}>
+                <PBtn onClick={()=>onSetMorningLock&&onSetMorningLock(i,{enabled:!pl.morningLock?.enabled})}
+                  color={pl.morningLock?.enabled?"#3a3000":"#1a1a1a"} textColor={pl.morningLock?.enabled?"#D9BC5C":"#888"}
+                  style={{fontSize:"clamp(5px,0.8vw,7px)",padding:"5px 8px"}}>
+                  🚪 Verrou du matin {pl.morningLock?.enabled?"ON":"OFF"}
+                </PBtn>
+                {pl.morningLock?.enabled && (<>
+                  <input type="time" value={pl.morningLock?.start||"06:00"} onChange={e=>onSetMorningLock&&onSetMorningLock(i,{start:e.target.value})}
+                    style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}/>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>à</span>
+                  <input type="time" value={pl.morningLock?.end||"09:00"} onChange={e=>onSetMorningLock&&onSetMorningLock(i,{end:e.target.value})}
+                    style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}/>
+                </>)}
               </div>
             </div>
           ))}
@@ -6278,6 +6324,15 @@ export default function App() {
     showToast(`${delta>0?"+":""}${delta} 🪙 pour ${player?.name}`,"#D9BC5C");
   },[config,persist,logAction,showToast]);
 
+  // v2.16.7 — Chantier 6.6 : verrou du matin parent-contrôlé (demande de Gen). Champ sur
+  // config.players[i], même patron que pin/themeId déjà présents sur l'objet joueur.
+  const handleSetMorningLock = useCallback((playerIdx, patch) => {
+    const newCfg = {...config, players: config.players.map((p,i)=> i===playerIdx
+      ? {...p, morningLock:{enabled:false,start:"06:00",end:"09:00",...p.morningLock,...patch}}
+      : p)};
+    setConfig(newCfg); persist(newCfg, gameStates);
+  },[config,gameStates,persist]);
+
   const handleForceComplete = useCallback((ass, playerId) => {
     const playerIdx=config.players.findIndex(p=>p.id===playerId); if(playerIdx<0)return;
     const player=config.players[playerIdx];
@@ -7453,6 +7508,7 @@ export default function App() {
           onResetPlayer={handleResetPlayer}
           onAdjustXP={handleAdjustXP}
           onAdjustCoins={handleAdjustCoins}
+          onSetMorningLock={handleSetMorningLock}
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}
