@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.15.5";
+const APP_VERSION = "2.16.2";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.2", date:"2026-07-28", features:[
+    "🛒 Boutique : toucher très vite deux fois « Acheter » ne débite plus tes pièces deux fois pour un seul objet — un bug rare mais réel qui pouvait te faire perdre des pièces pour rien!",
+  ]},
   { version:"2.15.5", date:"2026-07-28", features:[
     "📅 Les événements épinglés en haut de ta Semaine (v2.15.4) affichent maintenant leur vraie icône (🏥⚽🧑‍⚕️🏕️) au lieu d'un 📅 générique pour tous — plus facile de repérer un match de sport ou un camp d'un coup d'oeil!",
   ]},
@@ -6176,6 +6179,13 @@ export default function App() {
     SFX.buy();
     setGameStates(gs=>{
       const p=gs[idx];
+      // v2.16.2 — double-clic/double-tap rapide sur "Acheter" (avant que le bouton se réaffiche en
+      // ÉQUIPÉ/RÉCLAMÉ) pouvait re-passer ce test : p0 ci-dessus vient d'une fermeture figée au rendu
+      // du clic, donc un 2e clic quasi simultané le relit encore "pas assez cher" → 2e débit réel de
+      // pièces alors que owned/boughtRewards restent dédupliqués par Set (achat visible une seule fois,
+      // pièces perdues deux fois). Idempotence sur l'état FRAIS de l'updater : déjà possédé → no-op.
+      const alreadyHave = isReward ? (p.boughtRewards||[]).includes(item.id) : (p.owned||[]).includes(item.id);
+      if(alreadyHave) return gs;
       if((p.coins||0)<price)return gs;
       const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
       persist(newCfg,n); // newCfg identique à chaque (double-)invocation → persist reste idempotent

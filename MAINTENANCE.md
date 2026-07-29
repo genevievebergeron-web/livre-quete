@@ -265,7 +265,14 @@ Serveur dev isolé port 5187 (config ajoutée à `.claude/launch.json` du dépô
 - **Ajustement XP/pièces dans l'onglet Actions, cas limites** : `-10 XP` et `-10 🪙` sur un joueur déjà à 0 → reste correctement à 0 (pas de valeur négative). Bouton "🪙 Montant…" (`prompt()` natif, intercepté via `window.prompt` pour tester sans dialogue bloquant) : `-9999` → floor à 0 sans crash ; `"abc"` (non-numérique) → ignoré proprement, aucune corruption `NaN`. Aucune erreur console sur les 4 essais.
 
 ### 🐛 Bugs trouvés
-Aucun — les 4 zones testées fonctionnent correctement de bout en bout.
+Aucun sur ces 4 zones — bloc suivant (même passage) : voir bug trouvé et corrigé ci-dessous, dans la Boutique.
+
+### Bloc suivant (même soir) — Boutique : achats et double-clic
+
+Une fois `App.jsx` reconfirmé stable (aucune écriture détectée depuis plusieurs heures), test des achats en Boutique côté enfant (`TestCal`, 5000 pièces de test injectées en `localStorage`, jamais la prod) : catégorie Récompenses (chest tiers Commun/Rare/Légendaire visibles, non ouverts ce passage) et Chapeaux.
+
+### 🐛 Bug trouvé et corrigé — ✅ v2.16.2
+**Double-clic rapide sur "Acheter" débite les pièces deux fois pour un seul objet.** Voir entrée détaillée dans `PROJET-ETAT.md` v2.16.2. Résumé : `handleBuy` (`App.jsx` ~6158) validait "assez de pièces" via une fermeture (`p0=gameStates[idx]`) figée au moment du clic — un vrai double-clic/double-tap rapide (avant réaffichage du bouton en ÉQUIPÉ/RÉCLAMÉ) relisait la même fermeture périmée et laissait passer un 2e débit réel dans l'updater. `owned`/`boughtRewards` restaient corrects (dédupliqués par `Set`, l'objet n'apparaît acheté qu'une fois) — mais l'enfant perdait des pièces (et de l'énergie boutique) pour rien, sans aucun signe visible. Fix : garde idempotente sur l'état FRAIS à l'intérieur de l'updater (même patron que `handleUnclaimReward` v1.69.0). Testé sur une récompense ET un item boutique (chapeau) : un seul débit réel confirmé dans les deux cas (immédiat + après 1s, pas de débit différé). Les coffres (`handleOpenChest`) utilisent un handler séparé, non concernés. `npm run build` propre.
 
 ### Non couvert cette passe (pour la prochaine, une fois le chantier visuel/maison de Gen stabilisé)
-Boutique (achats/double-clic, nouveau système de tiers), popup Mon Perso (onglets Maison/Peaux — délibérément évité, chantier en cours), les 3 coffres, le nouveau drag-repositionnement de meubles dans `HouseScene` (livré la veille au soir en `avatarpopup.jsx`, encore non commité au moment de ce passage), Phase 7 icônes PixelLab (`v2.16.0`/`v2.16.1`, jamais testée par cette routine).
+Boutique — ouverture réelle des 3 coffres (Commun/Rare/Légendaire), catégories Armures/Familiers/Maison/Spécial/Chaos (seuls Récompenses et Chapeaux testés). Popup Mon Perso (onglets Maison/Peaux — délibérément évité, chantier en cours), le nouveau drag-repositionnement de meubles dans `HouseScene` (livré la veille au soir en `avatarpopup.jsx`, encore non commité au moment de ce passage), Phase 7 icônes PixelLab (`v2.16.0`/`v2.16.1`, jamais testée par cette routine).
