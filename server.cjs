@@ -179,7 +179,14 @@ const mergeFamily = (base, incoming) => {
   const assignMap = new Map(); (bC.assignments||[]).forEach(a => { if (!_rmSet.has(a.instanceId)) assignMap.set(a.instanceId, a); }); (iC.assignments||[]).forEach(a => { if (!_rmSet.has(a.instanceId) && !assignMap.has(a.instanceId)) assignMap.set(a.instanceId, a); });
   const removedCustomTasks = _uniq([...(bC.removedCustomTasks||[]), ...(iC.removedCustomTasks||[])]).slice(-1000);
   const _rmCT = new Set(removedCustomTasks);
-  const taskMap = new Map(); (bC.customTasks||[]).forEach(t => { if (!_rmCT.has(t.id)) taskMap.set(t.id, t); }); (iC.customTasks||[]).forEach(t => { if (!_rmCT.has(t.id) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
+  // v2.15.9 (trouvé en restaurant les rituels perso d'Elli, 2026-07-28) : ce filtre appliquait le
+  // tombstone à l'aveugle, contrairement au client (App.jsx, même merge) qui GARDE une tâche perso
+  // tombstonée si une assignation SURVIVANTE la référence encore (Correctif 2A, v2.5.0) — exactement
+  // le cas d'une tâche restaurée sous son ID d'origine pour rebrancher une assignation déjà vivante.
+  // Sans ce garde-fou ici, le serveur rejetait silencieusement toute restauration de ce genre.
+  const referencedTaskIds = new Set([...assignMap.values()].map(a => a.taskId));
+  const _keepTask = t => referencedTaskIds.has(t.id) || !_rmCT.has(t.id);
+  const taskMap = new Map(); (bC.customTasks||[]).forEach(t => { if (_keepTask(t)) taskMap.set(t.id, t); }); (iC.customTasks||[]).forEach(t => { if (_keepTask(t) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
   const newer = preferIncoming ? incoming : base; const newerC = newer.config||{};
   const config = {
     ...bC, ...iC, players, assignments:[...assignMap.values()], removedAssignments, customTasks:[...taskMap.values()], removedCustomTasks,
