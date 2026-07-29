@@ -17,6 +17,15 @@ export const LEVELS = [
   { level:8,  xpNeeded:1480, title:"DIVIN",      titleF:"DIVIN"       },
   { level:9,  xpNeeded:1980, title:"DIVIN",      titleF:"DIVIN"       },
   { level:10, xpNeeded:2600, title:"SUPRÊME",    titleF:"SUPRÊME"     },
+  // v2.16.6 — Chantier 6.5 (demande de Gen) : le niveau 10 était un vrai plafond mécanique
+  // (getLevel/xpBar ne géraient rien au-delà), pas juste un plafond d'affichage — un enfant qui
+  // dépassait 2600 XP n'avait plus aucune progression. Extension simple du même tableau (pas de
+  // prestige/saisons), même courbe de croissance (~×1.25-1.3/niveau).
+  { level:11, xpNeeded:3400, title:"TRANSCENDANT", titleF:"TRANSCENDANT" },
+  { level:12, xpNeeded:4400, title:"IMMORTEL",     titleF:"IMMORTELLE"   },
+  { level:13, xpNeeded:5600, title:"COSMIQUE",     titleF:"COSMIQUE"     },
+  { level:14, xpNeeded:7000, title:"ÉTERNEL",      titleF:"ÉTERNELLE"    },
+  { level:15, xpNeeded:8600, title:"MAÎTRE AVENTURIER", titleF:"MAÎTRESSE AVENTURIÈRE" },
 ];
 export const getLevel = xp => { let c = LEVELS[0]; for (const l of LEVELS) if (xp >= l.xpNeeded) c = l; return c; };
 export const getLevelTitle = (xp, themeId, fem = false) => {

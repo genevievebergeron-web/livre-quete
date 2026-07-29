@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.5";
+const APP_VERSION = "2.16.6";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -197,6 +197,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.6", date:"2026-07-29", features:[
+    "🌟 5 nouveaux niveaux (11 à 15)! Si tu étais au maximum (niveau 10, SUPRÊME), ta barre d'XP va enfin recommencer à avancer — TRANSCENDANT, IMMORTEL, COSMIQUE, ÉTERNEL, et le tout nouveau titre final MAÎTRE AVENTURIER t'attendent!",
+  ]},
   { version:"2.16.5", date:"2026-07-29", features:[
     "🎨 Les boutons Famille/Calendrier/Minuterie de ton accueil ont maintenant leurs propres jolies icônes pixel art, au lieu des emojis!",
   ]},
