@@ -249,3 +249,23 @@ Serveur dev isolé port 5183, réutilisation de données de test déjà présent
 
 ### Non couvert cette passe (pour la prochaine)
 Modification/suppression d'un événement depuis l'écran Calendrier (seul l'ajout a été testé), formulaire simplifié côté enfant (seul le formulaire parent multi-catégories a été testé), vue "📋 Liste" de Ma Semaine (seule la vue "🗓️ Colonnes" a été testée), Boutique (achats/double-clic dans le nouveau système de tiers), popup Mon Perso (onglets Maison/Peaux), les 3 coffres, ajustement XP/pièces à 0/négatif dans l'onglet Actions.
+
+---
+
+## Passage du 2026-07-28 (soir) — chantier visuel/rituels en cours chez Gen, tests approfondis en périphérie
+
+### ⚠️ Contexte : session live active en parallèle
+En début de passage, `git status` montrait un gros chantier non commité en cours (10 fichiers : `App.jsx`, `house.jsx`, `pets.js`, `catalog.js`, `sprites.jsx`, `themes.js`, `taskpickers.jsx`, `avatarpopup.jsx`, `shared.js`, `scripts/pixellab.mjs`, + ~140 nouveaux sprites) et deux serveurs `vite` déjà actifs — confirmé être une édition live en cours (rechargements HMR de `App.jsx` observés en temps réel pendant un premier essai de test, qui a dû être abandonné). Gen a confirmé explicitement : « c'est une production d'assets visuels + rituels, tu peux faire ce qui ne touche pas à ça ». Sur suggestion "go. continue" ~4h plus tard, le gros du chantier était commité (`v2.15.8`, `v2.16.0`, `v2.16.1` — cause racine casse des tâches perso + tombstone rituels, puis Phase 7 icônes PixelLab), plus aucune écriture fichier détectée depuis 16h25 EDT. Seul `src/avatarpopup.jsx` restait non commité (16 lignes, drag-repositionnement de meubles dans `HouseScene` — encore le même chantier maison) : **non touché**, conformément à la consigne.
+
+### Zones couvertes (items "non couverts" du passage précédent, hors périmètre maison/rituels)
+Serveur dev isolé port 5187 (config ajoutée à `.claude/launch.json` du dépôt `skills`, jamais dans `livre-quete`), joueur de test `TestCal` seedé via l'assistant de configuration réel (pas de `localStorage` bricolé à la main), jamais la prod.
+- **Modification d'un événement calendrier** (parent) : bouton ✏️ pré-remplit correctement le formulaire (catégorie, libellé, date) ; changement de libellé + ajout d'une heure → sauvegarde, toast "événement modifié!", regroupement correct par section horaire ("Souper"). Aucune erreur console.
+- **Suppression d'un événement calendrier** : bouton ✕ supprime immédiatement (pas de confirmation, mais c'est un écran parent déjà derrière PIN — pas un bug). Vérifié que l'événement disparaît aussi de "Ma Semaine" côté enfant après suppression (pas de résidu fantôme).
+- **Vue "📋 Liste" de Ma Semaine** (jamais testée avant) : accordéon "Tâches planifiées (N)" s'ouvre/ferme correctement, affiche les tâches avec leur jour assigné. Aucune erreur console, cohérent avec la vue "🗓️ Colonnes".
+- **Ajustement XP/pièces dans l'onglet Actions, cas limites** : `-10 XP` et `-10 🪙` sur un joueur déjà à 0 → reste correctement à 0 (pas de valeur négative). Bouton "🪙 Montant…" (`prompt()` natif, intercepté via `window.prompt` pour tester sans dialogue bloquant) : `-9999` → floor à 0 sans crash ; `"abc"` (non-numérique) → ignoré proprement, aucune corruption `NaN`. Aucune erreur console sur les 4 essais.
+
+### 🐛 Bugs trouvés
+Aucun — les 4 zones testées fonctionnent correctement de bout en bout.
+
+### Non couvert cette passe (pour la prochaine, une fois le chantier visuel/maison de Gen stabilisé)
+Boutique (achats/double-clic, nouveau système de tiers), popup Mon Perso (onglets Maison/Peaux — délibérément évité, chantier en cours), les 3 coffres, le nouveau drag-repositionnement de meubles dans `HouseScene` (livré la veille au soir en `avatarpopup.jsx`, encore non commité au moment de ce passage), Phase 7 icônes PixelLab (`v2.16.0`/`v2.16.1`, jamais testée par cette routine).
