@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.2";
+const APP_VERSION = "2.16.3";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -191,6 +191,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.3", date:"2026-07-29", features:[
+    "🛍️ Les onglets de la Boutique sont plus grands et plus faciles à toucher (Récompenses/Chapeaux/Armures/Familiers/Maison/Spécial) — icônes bien visibles, texte lisible.",
+  ]},
   { version:"2.16.2", date:"2026-07-28", features:[
     "🛒 Boutique : toucher très vite deux fois « Acheter » ne débite plus tes pièces deux fois pour un seul objet — un bug rare mais réel qui pouvait te faire perdre des pièces pour rien!",
   ]},
@@ -3005,9 +3008,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       })()}
 
       <div className="card-n2" style={{background:"rgba(0,0,0,0.45)",padding:10}}>
-        <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
+        {/* v2.6.6+ — tabs agrandis en style "pastille" (demande de Gen, réf. planche mockup :
+            tap-cible plus grand, texte lisible, icône bien visible — les tabs "microscopiques"
+            fontSize:6/padding:4px 7px ne l'étaient pas assez). */}
+        <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>{ const [em,txt]=splitEmojiLabel(l); return (
-            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{display:"inline-flex",alignItems:"center",gap:4,fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 7px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#888",border:`2px solid ${shopTab===k?"#D9BC5C":"#555"}`,borderRadius:2,cursor:"pointer"}}>{em&&<UIIcon name={SHOP_TAB_ICONS[k]} emoji={em} size={12}/>}{txt}</button>
+            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{display:"inline-flex",alignItems:"center",gap:6,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 14px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#aaa",border:`2px solid ${shopTab===k?"#D9BC5C":"#444"}`,borderRadius:20,cursor:"pointer",transition:"all 0.12s"}}>{em&&<UIIcon name={SHOP_TAB_ICONS[k]} emoji={em} size={18}/>}{txt}</button>
           );})}
         </div>
         {shopTab==="rewards" && (
