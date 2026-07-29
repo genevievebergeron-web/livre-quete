@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.3";
+const APP_VERSION = "2.16.4";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -116,6 +116,12 @@ const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bos
 const repairDamageFor = (repairEvents, bossId) => (repairEvents || []).reduce((s, e) => s + ((e && e.bossStartedAt === bossId) ? (e.dmg || 0) : 0), 0);
 const bossDamageTotal = (gameStates, bossId, repairEvents) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0) + repairDamageFor(repairEvents, bossId);
 const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
+// v2.16.4 — Chantier 6.3 : petits cœurs vintage pixel-art pour la tuile boss (remplace le mini-jeu
+// Hydre déconnecté). 1 cœur = 20% (5 cœurs total), même patron que l'ancien combat-hydre.html:312.
+const heartsRow = (pct, count=5) => {
+  const filled = Math.max(0, Math.min(count, Math.round((pct/100)*count)));
+  return "❤️".repeat(filled) + "🖤".repeat(count-filled);
+};
 // v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
 // v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
 // en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
@@ -191,6 +197,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.4", date:"2026-07-29", features:[
+    "⚔️ Le bouton « Combat final » (qui montrait toujours l'Hydre, peu importe le vrai boss) est remplacé par une petite tuile avec ton visage et des cœurs pour les PV du boss et de la famille — toujours le bon boss, toujours synchronisé avec le vrai combat!",
+  ]},
   { version:"2.16.3", date:"2026-07-29", features:[
     "🛍️ Les onglets de la Boutique sont plus grands et plus faciles à toucher (Récompenses/Chapeaux/Armures/Familiers/Maison/Spécial) — icônes bien visibles, texte lisible.",
   ]},
@@ -1811,6 +1820,11 @@ function BossSprite({ boss, size=120, style={} }){
 
 // v1.77.0 — COMBAT FINAL : mini-jeu plateforme (fichier statique /combat-hydre.html) en iframe isolée,
 // avec le VRAI avatar (renderAvatarToCtx) et le VRAI familier (renderPetToCtx) de l'enfant.
+// ⚠️ v2.16.4 — DÉLIÉ (Chantier 6.3, demande de Gen) : toujours l'Hydre peu importe le vrai boss actif,
+// et gagner/perdre n'affectait pas les vrais PV (seul "hg-close" écouté, jamais "hg-win"). Remplacé par
+// la tuile boss-agnostique dans l'onglet BOSS (voir heartsRow). Plus aucun appelant dans App.jsx —
+// gardé ici pour l'instant (pas encore supprimé, ni public/combat-hydre.html) le temps d'une passe de
+// vérification propre ; à supprimer ensuite comme nettoyage de code mort.
 function HydraFinalGame({ player, pState, color, onClose }){
   const iframeRef = useRef(null);
   // v1.80.0 — filet réseau : un seul enfant (sur 4, en camping avec signal faible) arrivait à charger
@@ -1951,7 +1965,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const bannerW = Math.min(680, (typeof window!=="undefined"?window.innerWidth:360)-16);
   const [themeRevealed, setThemeRevealed] = useState(false);
   const [badgeInfo, setBadgeInfo] = useState(null); // badge tapé → bulle d'info (tablette-friendly)
-  const [finalBattle, setFinalBattle] = useState(false); // v1.77.0 — mini-jeu Combat final de l'Hydre
   const [petNickEditing, setPetNickEditing] = useState(false);
   const [petNickDraft, setPetNickDraft] = useState("");
   const T = th;
@@ -3199,10 +3212,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#D97070,#D9BC5C)",transition:"width 0.5s"}}/></div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
-            <button className="btn-press" onClick={()=>{ if(SFX.click)SFX.click(); setFinalBattle(true); }}
-              style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1.5,padding:"13px 8px",background:"linear-gradient(90deg,#7B2FF2,#FF5555)",color:"#fff",border:"2px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 3px 0 #0d0d0d"}}>
-              🐉 COMBAT FINAL<br/><span style={{fontFamily:"'VT323',monospace",fontSize:13}}>Affronte ta tête d'Hydre en mini-jeu!</span>
-            </button>
+            {/* v2.16.4 — Chantier 6.3 (demande de Gen) : le bouton "COMBAT FINAL" ouvrait TOUJOURS
+                le mini-jeu statique de l'Hydre (HydraFinalGame/combat-hydre.html), peu importe le
+                vrai boss actif — et gagner/perdre n'affectait pas les vrais PV. Remplacé par une
+                tuile boss-agnostique : le visage de l'enfant + 2 rangées de cœurs (PV boss, PV
+                famille), toujours synchronisées avec le vrai combat. Jetons restent en chiffre
+                plus bas (Gen a tranché pour 2 rangées seulement, pas 3). */}
+            <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
+              <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={48} mood={dashboardMood}/>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>PV boss</span>
+                  <span style={{fontSize:15,letterSpacing:1}}>{heartsRow(hpPct)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>PV famille</span>
+                  <span style={{fontSize:15,letterSpacing:1}}>{heartsRow(fhp)}</span>
+                </div>
+              </div>
+            </div>
             {!won && <div style={{background:`${boss.color||"#FF5555"}22`,border:`2px solid ${boss.color||"#FF5555"}55`,borderRadius:8,padding:"7px 10px",textAlign:"center"}}>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}><UIIcon name={"boss_mod_"+mod.id} emoji={mod.emoji} size={11}/> {mod.label} (aujourd'hui)</span>
               <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#eee"}}>{mod.desc}</div>
@@ -3255,7 +3283,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       onUpdateAvatar={(av)=>onUpdateAvatar(av,player.id)} onEquip={(item)=>{setMoodFor("equipped",3000);onEquip(item,player.id);}}
       onUpdateHouse={(h)=>onPatchState({house:h})}
       allShopItems={allShopItemsFlat} th={th}/>}
-    {finalBattle && <HydraFinalGame player={player} pState={pState} color={player.color} onClose={()=>setFinalBattle(false)}/>}
     </div>
   );
 });
