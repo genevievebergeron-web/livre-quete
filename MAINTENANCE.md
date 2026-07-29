@@ -276,3 +276,47 @@ Une fois `App.jsx` reconfirmé stable (aucune écriture détectée depuis plusie
 
 ### Non couvert cette passe (pour la prochaine, une fois le chantier visuel/maison de Gen stabilisé)
 Boutique — ouverture réelle des 3 coffres (Commun/Rare/Légendaire), catégories Armures/Familiers/Maison/Spécial/Chaos (seuls Récompenses et Chapeaux testés). Popup Mon Perso (onglets Maison/Peaux — délibérément évité, chantier en cours), le nouveau drag-repositionnement de meubles dans `HouseScene` (livré la veille au soir en `avatarpopup.jsx`, encore non commité au moment de ce passage), Phase 7 icônes PixelLab (`v2.16.0`/`v2.16.1`, jamais testée par cette routine).
+
+---
+
+## Mini-check du 2026-07-28 (soir tardif, ÉTAPE 0.5)
+
+Lecture `GET /api/famille` (lecture seule). 10 `config.bugs`, 5 messages `feed` de type `chat`, 0 `errorLogs`.
+
+### 🐛 Bugs passés en revue
+- 8 des 10 bugs (`bug_xcqtyr7`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_74klxs1`, `bug_k1gqpz6`, `bug_rak8rzv`, `bug_6k7827p`) — déjà documentés/traités dans les passages précédents, rien de nouveau.
+- **`bug_56gb01a`** (28 juillet 16:58 EDT, Antoine Emery) — « je veut maitre un nouvaut masque mais il me mais tougourun casque de chevalier » (l'équipement d'un nouveau chapeau/masque ne change rien, le casque de chevalier reste affiché). `handleEquip` (`App.jsx` ~6206) a été relu — la logique de toggle par `item.slot` a l'air correcte à première vue. La cause probable est côté **rendu** (priorité d'affichage des couches avatar / `AvatarCanvas`) plutôt que côté état. **Non investigué plus loin ni corrigé** : `avatar.jsx`/`AvatarCanvas`/`EquippedGear` sont dans la zone réservée à la session interactive de Gen (refonte avatar/maison, voir plan `le-design-de-mon-mighty-mountain.md` §"CHANTIER RÉSERVÉ") — toucher au rendu risquerait une collision avec son travail en cours. À reprendre une fois la réserve levée.
+- **`bug_33as986`** (28 juillet 17:03 EDT, Antoine Emery) — « jauài trouver je peut pas deplasser ler chosse de ma maison » (impossible de déplacer les meubles dans Ma Maison). C'est exactement la fonctionnalité de drag-repositionnement en cours d'implémentation par Gen dans `avatarpopup.jsx`/`house.jsx` (encore non commitée au moment de ce passage — voir `git diff` : props `editable`/`onMoveDeco` déjà câblées sur `HouseScene`, mais pas encore poussées). **Aucune action** : c'est un signalement en direct sur une fonctionnalité déjà en cours de construction par Gen elle-même, pas un bug à traiter par la routine.
+
+### 💬 Fil de famille
+5 messages `chat`, tous déjà passés en revue lors du passage précédent (rien de nouveau depuis).
+
+### Suite de ce passage
+Aucun item de la file d'implémentation n'est disponible hors de la zone réservée (avatar/maison) — tout le reste du plan est déjà livré (voir notes de maintenance du plan, à jour au 28 juillet ~21h45). Poursuite de la section Tests approfondis en périphérie du chantier de Gen (Boutique : coffres + catégories non encore testées), voir entrée dédiée ci-dessous.
+
+### ⚠️ Collision concurrente rencontrée et gérée
+`git status` en début de passage montrait `src/App.jsx` et `src/avatarpopup.jsx` modifiés et non commités (style des onglets Boutique en "pastille" + drag de meubles) — confirmé être le même chantier avatar/maison réservé de Gen, encore actif. Fichiers relus mais **non touchés, non committés**, conformément à la consigne de réserve.
+
+---
+
+## Tests approfondis du 2026-07-28 (soir tardif) — Boutique : coffres + catégories Armures/Familiers/Chapeaux/Spécial
+
+Serveur dev isolé port 5191 (config `livre-quete-test-2` ajoutée à `.claude/launch.json` du dépôt `skills` — le port 5187 habituel était déjà pris par une autre session concurrente ce passage), joueur de test `TestA` déjà seedé d'un passage précédent (9999 pièces injectées via `localStorage` pour ce passage), jamais la prod.
+
+### Zones couvertes
+- **3 coffres (Commun/Rare/Légendaire)** : ouverture testée sur Commun (`Cap champion` débloqué, -80 🪙) et Rare (`Épée` débloqué, -170 🪙) — déduction correcte, item ajouté à `owned`, aucune erreur console. Après 2 coffres + 1 achat Armures, le 3e coffre (Légendaire) a été correctement bloqué par la garde d'énergie partagée (`currentEnergy`/`CHEST_ENERGY=30`, même pool que `SHOP_ENERGY`/`AVATAR_ENERGY`) — comportement voulu, pas un bug (le message « les coffres reviennent dans ~X min » est cohérent avec la conception documentée en v1.84.0).
+- **Armures** : achat + auto-équipement de `Bouclier` (45 🪙) confirmé (`ÉQUIPÉ · retirer` affiché, déduction correcte).
+- **Familiers** : bascule `Chat`→`Chien` confirmée (toggle équiper/retirer correct, un seul familier équipé à la fois).
+- **Chapeaux** : bascule `Cap champion`→`Chapeau magique` confirmée avec l'énergie pleine (achat + équipement corrects, ancien chapeau repasse à "Équiper"). **Pertinent pour `bug_56gb01a`** (signalement d'Antoine Emery : « je veux mettre un nouveau masque mais il me remet toujours le casque de chevalier ») : ce test confirme que le mécanisme de bascule d'équipement de `handleEquip` (`App.jsx` ~6206) et la grille de la Boutique fonctionnent correctement — le bug n'est donc PAS dans ce chemin de code. Il reste probablement dans le rendu (`AvatarCanvas`) ou dans l'onglet inventaire d'`avatarpopup.jsx` (survol/tap direct sur l'avatar plutôt que via la Boutique) — les deux dans la zone réservée à la session de Gen, non investigués plus loin.
+
+### 🐛 Bug trouvé, non corrigé (fichier réservé)
+**Icônes invisibles (noir sur fond sombre) pour TOUS les items de la catégorie Spécial (peaux) de la Boutique.** Les 9+ items (`Peau d'or`, `Peau de zombie`, `Peau de lave`, `Peau de glace`, `Ailes plumées`, `Ailes de dragon`, `Cape`, `Cornes de démon`, `Tentacules`, catalogue `themes.js` ~756-767, préfixes `usk*`/`ubk*`/`uxt*`) affichent une case vide au lieu de leur icône. Diagnostic complet :
+- Ces items utilisent `slot:"skin"` → `isDeco=true` (`App.jsx` ~3076) → rendus via `<DecoSprite decoId={item.id} emoji={item.emoji} .../>` (`house.jsx` ~68-78), un composant prévu pour les meubles/déco de « Ma Maison », pas pour les peaux.
+- Aucun fichier `/sprites/deco/usk9.png` (etc.) n'existe (`public/sprites/deco/` ne contient que les préfixes `d*` — meubles — jamais `usk*`/`ubk*`/`uxt*`) → confirmé aussi absent en **production** (`curl -I https://livre-de-quetes.app.canner.ca/sprites/deco/usk9.png` → 200 mais `content-type: text/html`, la plateforme sert le fallback SPA au lieu d'un vrai 404 — mais ça n'empêche pas `onerror` de se déclencher côté navigateur, vérifié directement en JS : `onerror` se déclenche bien).
+- `DecoSprite` bascule donc correctement sur son repli emoji (`setImgFail(true)`) — confirmé en inspectant le DOM réel : le `<span>✨</span>` (etc.) est bel et bien présent pour chaque item.
+- **Cause racine exacte** : le `<span>` de repli emoji (`house.jsx` ligne ~77) n'a **aucune couleur explicite** dans son `style` — il hérite donc du noir par défaut du navigateur (`color: rgb(0,0,0)`, confirmé via `getComputedStyle`), invisible sur les cartes à fond sombre de la Boutique. Le texte est bien là, juste invisible.
+- **Fix suggéré (non appliqué)** : ajouter une couleur explicite claire (ex. `color:"#eee"` ou une variable de thème) au `style` du `<span>` de repli dans `DecoSprite` (`house.jsx` ~77).
+- **Non corrigé** : `house.jsx` est dans la liste des fichiers réservés à la session interactive de Gen (refonte avatar/maison). Correctif d'une ligne, sûr et isolé, à appliquer dès que la réserve est levée.
+
+### Non couvert cette passe (pour la prochaine)
+Maison (délibérément évité, chantier en cours), le nouveau drag de meubles (`avatarpopup.jsx`, toujours non commité), popup Mon Perso (onglets Créer/Peaux/Maison), le fil complet des 47 tâches du catalogue (`estMin` — item de file non encore réalisé), suite de la file d'implémentation une fois la réserve avatar levée.
