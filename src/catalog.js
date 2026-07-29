@@ -273,6 +273,11 @@ export const UI_ICONS = {
   nav_boss:     { emoji:"⚔️", desc:"two crossed swords" },
   nav_week:     { emoji:"📅", desc:"calendar page with gold corner" },
   nav_shop:     { emoji:"🛒", desc:"small market cart full of goods" },
+  // v2.16.5 — Chantier 6.4 (demande de Gen) : les 3 gros boutons de l'accueil (Famille/Calendrier/
+  // Minuterie) utilisaient encore des emojis bruts, pas UIIcon. Calendrier réutilise nav_week (même
+  // concept 📅 déjà généré, zéro nouvel asset).
+  nav_family:   { emoji:"👨‍👩‍👧‍👦", desc:"small pixel family of four holding hands" },
+  nav_timer:    { emoji:"⏱️", desc:"stopwatch, chrome with red button" },
   // Monnaies et états
   coin:           { emoji:"🪙", desc:"single gold coin with star emboss" },
   xp:             { emoji:"⚡", desc:"electric lightning bolt, teal glow" },

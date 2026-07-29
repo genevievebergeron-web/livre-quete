@@ -40,6 +40,22 @@
   "shading": "flat shading"
  },
  {
+  "out": "public/sprites/ui/nav_family.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — small pixel family of four holding hands",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
+  "out": "public/sprites/ui/nav_timer.png",
+  "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — stopwatch, chrome with red button",
+  "width": 32,
+  "height": 32,
+  "detail": "low detail",
+  "shading": "flat shading"
+ },
+ {
   "out": "public/sprites/ui/coin.png",
   "description": "16-bit pixel art game icon, dark fantasy RPG UI style, warm gold and deep charcoal palette, crisp readable silhouette, centered, transparent background — single gold coin with star emboss",
   "width": 32,

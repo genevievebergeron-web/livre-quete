@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.4";
+const APP_VERSION = "2.16.5";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -197,6 +197,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.5", date:"2026-07-29", features:[
+    "🎨 Les boutons Famille/Calendrier/Minuterie de ton accueil ont maintenant leurs propres jolies icônes pixel art, au lieu des emojis!",
+  ]},
   { version:"2.16.4", date:"2026-07-29", features:[
     "⚔️ Le bouton « Combat final » (qui montrait toujours l'Hydre, peu importe le vrai boss) est remplacé par une petite tuile avec ton visage et des cœurs pour les PV du boss et de la famille — toujours le bon boss, toujours synchronisé avec le vrai combat!",
   ]},
@@ -3137,18 +3140,20 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           "Mon calendrier" intégré dans l'onglet Ma semaine, pas celui-ci — retiré séparément. */}
       {(onGoFamily||onGoCalendars||onGoTimer) && (
       <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+        {/* v2.16.5 — Chantier 6.4 (demande de Gen) : icônes personnalisées au lieu des emojis bruts,
+            même patron UIIcon que les tabs boutique (repli emoji automatique tant que le PNG n'existe pas). */}
         {onGoFamily && (
           <button onClick={onGoFamily} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <span style={{fontSize:22}}>👨‍👩‍👧‍👦</span>Famille</button>)}
+            <UIIcon name="nav_family" emoji="👨‍👩‍👧‍👦" size={22} block/>Famille</button>)}
         {onGoCalendars && (
           <button onClick={onGoCalendars} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <span style={{fontSize:22}}>📅</span>Calendrier</button>)}
+            <UIIcon name="nav_week" emoji="📅" size={22} block/>Calendrier</button>)}
         {onGoTimer && (
           // v1.86.0 (Lot 2 #6) — transmet le rituel ACTIF du dashboard (s'il y en a un) au lieu
           // d'ouvrir la minuterie toujours "vierge" : le même rituel reste sélectionné qu'on y
           // arrive par ici (Accueil) ou par "⛶ Minuteur plein écran" depuis l'onglet Rituels.
           <button onClick={()=>onGoTimer(activeRoutine?.id)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <span style={{fontSize:22}}>⏱️</span>Minuterie</button>)}
+            <UIIcon name="nav_timer" emoji="⏱️" size={22} block/>Minuterie</button>)}
       </div>)}
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
