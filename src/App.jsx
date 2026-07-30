@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.10";
+const APP_VERSION = "2.16.11";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -207,6 +207,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.11", date:"2026-07-29", features:[
+    "🥚 Un petit secret se cache peut-être quelque part dans le Livre... à toi de le trouver!",
+  ]},
   { version:"2.16.10", date:"2026-07-29", features:[
     "😂 Une quête validée affiche maintenant, de temps en temps, un petit message rigolo en plus de tes XP et pièces!",
   ]},
@@ -1636,6 +1639,14 @@ const importConfig = (file, onSuccess) => {
 
 // ─── UTILS ───────────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().slice(0,10);
+
+// v2.16.11 (Backlog #12) — easter egg du titre de header, tapé 7 fois d'affilée.
+const TITLE_EASTER_EGGS = [
+  "🥚 Tu l'as trouvé! Le Livre te trouve très curieux·se aujourd'hui.",
+  "🕵️ Secret débloqué : ce titre ne fait absolument rien d'autre que ça.",
+  "🐔 Pourquoi le poulet a traversé la route? Pour éviter tes quêtes, évidemment.",
+  "✨ Bravo, tu viens de gagner... rien du tout. Mais bravo quand même!",
+];
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENTS
@@ -5754,6 +5765,11 @@ export default function App() {
   const [pinChangeMode, setPinChangeMode] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [toast, setToast] = useState(null);
+  // v2.16.11 (Backlog #12) — easter egg : taper vite 7 fois sur le titre du header
+  // révèle un message secret. refs pour ne pas re-render à chaque tap ; le compteur
+  // se remet à zéro si on s'arrête plus d'1.5s (doit être un vrai tapotement rapide).
+  const titleTapCountRef = useRef(0);
+  const titleTapTimerRef = useRef(null);
   const [rewardPopup, setRewardPopup] = useState(null);
   const [bossWin, setBossWin] = useState(null); // v1.72.0 — célébration de victoire de boss
   const [miniGame, setMiniGame] = useState(null); // {player,playerIdx,level,playerThemeId,pendingReward}
@@ -7229,8 +7245,18 @@ export default function App() {
           d'onglets) pour que l'app reste une colonne confortable au lieu de s'étirer sur un écran
           d'ordinateur — le fond dégradé de game-root reste visible de chaque côté. */}
       <div style={{position:"sticky",top:0,zIndex:100,maxWidth:900,margin:"0 auto",background:`${th.bg}F2`,borderBottom:`2px solid ${th.accent}55`,padding:"9px 12px",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        {/* Title + mode badge */}
-        <div style={{flex:1,minWidth:120}}>
+        {/* Title + mode badge — tap 7× d'affilée (<1.5s entre chaque) pour un easter egg discret */}
+        <div style={{flex:1,minWidth:120}} onClick={()=>{
+          clearTimeout(titleTapTimerRef.current);
+          titleTapCountRef.current+=1;
+          if(titleTapCountRef.current>=7){
+            titleTapCountRef.current=0;
+            SFX.epic&&SFX.epic(); spawnParticles("✨");
+            showToast(TITLE_EASTER_EGGS[Math.floor(Math.random()*TITLE_EASTER_EGGS.length)],"#D9BC5C",4500);
+          } else {
+            titleTapTimerRef.current=setTimeout(()=>{titleTapCountRef.current=0;},1500);
+          }
+        }}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : (sessionPlayer!=null && config.players[sessionPlayer] ? `⚔️ Les quêtes de ${displayName(config.players[sessionPlayer])}` : "⚔️ LIVRE DE QUÊTES")}</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
