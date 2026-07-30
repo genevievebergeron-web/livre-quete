@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.8";
+const APP_VERSION = "2.16.9";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -134,6 +134,16 @@ const isMorningLocked = (player, now = new Date()) => {
   const start = sh * 60 + (sm || 0), end = eh * 60 + (em || 0);
   return start <= end ? (cur >= start && cur < end) : (cur >= start || cur < end);
 };
+// Backlog #13 — budget-temps quotidien par enfant (contrôle parental). `dailyMinutesLimit` (config
+// joueur) : null/0 = pas de limite. `pState.sessionMinutes` accumule les minutes du jour courant
+// (voir timer dans App()) — verrouillé seulement une fois le jour ET le plafond atteints.
+const isTimeLocked = (player, pState) => {
+  const limit = player?.dailyMinutesLimit;
+  if (!limit) return false;
+  const sm = pState?.sessionMinutes;
+  if (!sm || sm.day !== todayStamp()) return false;
+  return (sm.minutes || 0) >= limit;
+};
 // v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
 // v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
 // en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
@@ -197,6 +207,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.9", date:"2026-07-29", features:[
+    "⏳ Nouveau réglage parent (facultatif) : un budget-temps quotidien par enfant (15 à 90 min, ou illimité). Une fois atteint, un petit écran de pause propose de demander à un parent de continuer un peu.",
+  ]},
   { version:"2.16.8", date:"2026-07-29", features:[
     "🔥 Ta fiche profil (Vue Famille → Profil) montre maintenant aussi ta série de jours consécutifs, comme sur ton accueil.",
   ]},
@@ -1148,6 +1161,9 @@ const mergeGS = (a, b, preferIncoming) => {
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
+    // Backlog #13 — même jour → max (deux appareils qui comptent la même session ne doivent jamais
+    // sous-compter) ; jour différent → le plus récent (nouveau jour = compteur reparti à 0).
+    sessionMinutes: (()=>{ const A=a.sessionMinutes||{}, B=b.sessionMinutes||{}; if(A.day&&A.day===B.day) return {day:A.day, minutes:Math.max(A.minutes||0,B.minutes||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
 
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
@@ -1437,6 +1453,7 @@ const migrateGameState = (gs) => {
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
     activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
+    sessionMinutes: gs.sessionMinutes || { day: null, minutes: 0 }, // Backlog #13 — budget-temps quotidien (contrôle parental)
     bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
     // v2.15.0 — calendrier purement événementiel (demande de Gen) : "devoir"/"examen" agissaient
     // comme des tâches à XP déguisées en calendrier — migration ponctuelle et sans perte : on garde
@@ -1956,6 +1973,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [timeUnlockOpen, setTimeUnlockOpen] = useState(false); // Backlog #13 — code parent pour prolonger si le budget-temps est atteint
   // Refonte visuelle Phase 5 — avatar vivant : humeur temporaire (non persistée), revient à
   // "neutral" après `ms`. "tired" est calculé en continu (pas un minuteur) : ≥19h ET plus aucune
   // quête restante aujourd'hui — pas de sprite sheet, juste une surcharge canvas (avatar.jsx).
@@ -2099,6 +2117,29 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     ...SHOP_ITEMS.hats, ...SHOP_ITEMS.armors, ...SHOP_ITEMS.pets,
     ...(pt.shopCategory?.items||[]),
   ];
+
+  // Backlog #13 — budget-temps quotidien : une fois le plafond du jour atteint, le dashboard est
+  // remplacé par un écran de pause (jamais les mots "verrouillé"/"interdit", même cadrage anti-punitif
+  // que le verrou du matin v2.16.7). Un parent peut prolonger avec son code — remet le compteur à 0
+  // (extension accordée) sans faire sortir l'enfant de sa session.
+  if (!parentMode && isTimeLocked(player, pState)) {
+    return (
+      <div style={{minHeight:"60vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",padding:24,textAlign:"center"}}>
+        <div style={{fontSize:56,marginBottom:14}}>🛌</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,1.8vw,15px)",color:th.accent,marginBottom:10}}>C'EST L'HEURE DE LA PAUSE!</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#aaa",maxWidth:320,lineHeight:1.4,marginBottom:22}}>Tu as atteint ton temps de jeu pour aujourd'hui. Demande à un parent si tu veux continuer un peu.</div>
+        <button className="btn-press" onClick={()=>{SFX.click();setTimeUnlockOpen(true);}}
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 22px",background:th.accent,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>
+          🔓 Déverrouiller
+        </button>
+        {timeUnlockOpen && (
+          <PinPad pin={config.pin} label="Code parent" th={th}
+            onSuccess={()=>{ setTimeUnlockOpen(false); onPatchState&&onPatchState({sessionMinutes:{day:todayStamp(),minutes:0}}); }}
+            onCancel={()=>setTimeUnlockOpen(false)}/>
+        )}
+      </div>
+    );
+  }
 
   return (
     // v1.87.0 (Lot 3 #12) — accessibilité texte : `zoom` (pas `fontSize`/`rem`) car TOUT le style de
@@ -2284,6 +2325,22 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#D99248":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
             </div>
+            {/* Backlog #13 — budget-temps quotidien : discret, visible seulement si un parent l'a configuré */}
+            {player.dailyMinutesLimit ? (()=>{
+              const sm=pState.sessionMinutes; const used=sm?.day===todayStamp()?(sm.minutes||0):0; const limit=player.dailyMinutesLimit;
+              const pctT=Math.min(100,Math.round(used/limit*100));
+              return (
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏳ Temps aujourd'hui</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:pctT>=100?"#D97070":"#888"}}>{used}/{limit} min</span>
+                  </div>
+                  <div style={{height:6,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:pctT+"%",background:pctT>=100?"#D97070":"#85CDD1",transition:"width 0.6s"}}/>
+                  </div>
+                </div>
+              );
+            })() : null}
             {eqPet ? (()=>{ const xp=(pState.petXp||{})[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
               const _evo=(pState.petEvo||{})[eqPet.id]; const _leg=petIsLegendary(_evo,lv);
               return (<>
@@ -3609,7 +3666,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
-  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onChangePin,
+  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onSetDailyLimit, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
   onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -4164,6 +4221,18 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   <input type="time" value={pl.morningLock?.end||"09:00"} onChange={e=>onSetMorningLock&&onSetMorningLock(i,{end:e.target.value})}
                     style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}/>
                 </>)}
+              </div>
+              {/* Backlog #13 — budget-temps quotidien : frein sur la session globale (l'énergie ne
+                  freine que les loisirs, pas le temps total passé connecté). */}
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6,alignItems:"center"}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>⏳ Budget-temps</span>
+                <select value={pl.dailyMinutesLimit||""} onChange={e=>onSetDailyLimit&&onSetDailyLimit(i, e.target.value?parseInt(e.target.value,10):null)}
+                  style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}>
+                  <option value="">Illimité</option>
+                  {[15,20,30,45,60,90].map(m=><option key={m} value={m}>{m} min/jour</option>)}
+                </select>
+                {pl.dailyMinutesLimit ? (()=>{ const sm=gameStates[i]?.sessionMinutes; const used=sm?.day===todayStamp()?(sm.minutes||0):0;
+                  return <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:used>=pl.dailyMinutesLimit?"#D97070":"#888"}}>{used}/{pl.dailyMinutesLimit} min aujourd'hui</span>; })() : null}
               </div>
             </div>
           ))}
@@ -5769,6 +5838,31 @@ export default function App() {
   const cfgRef = useRef(config); cfgRef.current = config;
   const gsRef = useRef(gameStates); gsRef.current = gameStates;
   const viewRef = useRef(view); viewRef.current = view; // pour ne pas casser l'écran courant pendant la sync
+
+  // Backlog #13 — budget-temps quotidien par enfant (contrôle parental). Comptabilise le temps de
+  // session en minutes RÉELLES écoulées (horodatage, pas des ticks comptés — un intervalle peut être
+  // retardé quand l'onglet est en arrière-plan) pendant qu'un enfant est connecté (hors mode parent).
+  // Flush aussi quand l'onglet passe en arrière-plan (visibilitychange), pour ne pas perdre de temps
+  // déjà écoulé si l'enfant quitte l'app avant le prochain tick de 60s.
+  useEffect(()=>{
+    if(sessionPlayer==null || parentMode) return;
+    let lastFlush = Date.now();
+    const flush = () => {
+      const elapsedMin = Math.floor((Date.now()-lastFlush)/60000);
+      if(elapsedMin<=0) return;
+      lastFlush += elapsedMin*60000;
+      const day = todayStamp();
+      const gs = gsRef.current; const s = gs[sessionPlayer]; if(!s) return;
+      const sm = s.sessionMinutes && s.sessionMinutes.day===day ? s.sessionMinutes : {day, minutes:0};
+      const n=[...gs]; n[sessionPlayer]={...s, sessionMinutes:{day, minutes:(sm.minutes||0)+elapsedMin}};
+      setGameStates(n); persist(cfgRef.current, n);
+    };
+    const iv=setInterval(flush,60000);
+    const onVis=()=>{ if(document.visibilityState==="hidden") flush(); };
+    document.addEventListener("visibilitychange",onVis);
+    return ()=>{ clearInterval(iv); document.removeEventListener("visibilitychange",onVis); flush(); };
+  },[sessionPlayer, parentMode, persist]);
+
   // v1.90.0 — capture globale des erreurs JS techniques → config.errorLogs (synced comme config.bugs),
   // pour aider au troubleshooting à distance (voir MAINTENANCE.md, chantier "logs techniques" du 21
   // juillet). Discret : aucune UI enfant, lisible seulement par le parent (ParentPanel, onglet Journal)
@@ -6320,6 +6414,15 @@ export default function App() {
   const handleSetMorningLock = useCallback((playerIdx, patch) => {
     const newCfg = {...config, players: config.players.map((p,i)=> i===playerIdx
       ? {...p, morningLock:{enabled:false,start:"06:00",end:"09:00",...p.morningLock,...patch}}
+      : p)};
+    setConfig(newCfg); persist(newCfg, gameStates);
+  },[config,gameStates,persist]);
+
+  // Backlog #13 — budget-temps quotidien par enfant (contrôle parental). Même patron que
+  // handleSetMorningLock : champ sur config.players[i], null/0 = pas de limite.
+  const handleSetDailyLimit = useCallback((playerIdx, minutes) => {
+    const newCfg = {...config, players: config.players.map((p,i)=> i===playerIdx
+      ? {...p, dailyMinutesLimit: minutes || null}
       : p)};
     setConfig(newCfg); persist(newCfg, gameStates);
   },[config,gameStates,persist]);
@@ -7500,6 +7603,7 @@ export default function App() {
           onAdjustXP={handleAdjustXP}
           onAdjustCoins={handleAdjustCoins}
           onSetMorningLock={handleSetMorningLock}
+          onSetDailyLimit={handleSetDailyLimit}
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}

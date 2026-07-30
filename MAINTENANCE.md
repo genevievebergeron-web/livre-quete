@@ -335,3 +335,13 @@ Pas de nouveau contenu actionnable au-delà de ce qui est déjà documenté.
 
 ### Suite de ce passage — Backlog #8 et #10
 File d'implémentation du plan `le-design-de-mon-mighty-mountain.md` revérifiée : rien de nouveau hors de la zone réservée. Repris `PROJET-ETAT.md` § « Ce qui reste à faire » : **#10** (calendrier devoirs/examens) s'est révélé déjà entièrement livré en code depuis v1.85.0-v2.15.0 (types Devoir/Examen, XP bonus, rappels) — juste jamais retiré de la liste, corrigé cette passe. **#8** (pages profil famille) avait déjà l'essentiel (XP, badges, inventaire, classement) sauf la série — ajoutée en v2.16.8 en réutilisant `streakOf` (déplacée d'`App.jsx` vers `shared.js` pour éviter la duplication). Détail complet dans `PROJET-ETAT.md` v2.16.8. Vérifié en Chrome (serveur isolé port 5187, joueur `TestCal`, jamais la prod), `npm run build` propre.
+
+---
+
+## Suite du passage du 2026-07-29 (nuit) — Backlog #13 : budget-temps quotidien
+
+Continuation directe du même passage nocturne (utilisateur absent, session planifiée). Repris `PROJET-ETAT.md` § « Ce qui reste à faire » : **#13** (budget-temps quotidien par enfant, contrôle parental) avait déjà une spec complète et détaillée jamais implémentée — construite telle quelle, sans décision de conception à trancher (patron `dailyMinutesLimit`/`handleSetDailyLimit` calqué sur le verrou du matin v2.16.7 déjà en place). Détail technique complet dans `PROJET-ETAT.md` v2.16.9.
+
+Vérifié en Chrome (serveur isolé port 5187, joueur `TestCal`, jamais la prod) : parent configure 30 min/jour → indicateur « 0/30 min aujourd'hui » visible côté parent et côté enfant ; `sessionMinutes` forcé à 31/30 via localStorage (pour ne pas attendre 31 vraies minutes) + rechargement → écran de pause « C'EST L'HEURE DE LA PAUSE! » s'affiche correctement à la place du dashboard (header/nav restent visibles au-dessus, comme prévu) ; PIN parent → dashboard restauré, compteur confirmé remis à 0 en localStorage ; zéro erreur console à chaque étape. `npm run build` propre.
+
+`src/avatarpopup.jsx` (chantier réservé de Gen, toujours le même diff de drag-repositionnement non commité) à nouveau non touché.
