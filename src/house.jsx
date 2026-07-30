@@ -5,7 +5,7 @@
 // déco s'achètent en Boutique (nouveau puits de dépense de pièces, tiers Phase 2).
 // Chaque élément : PNG /sprites/deco/<id>.png si présent, sinon emoji (patron ItemSprite).
 // Aucune animation — conforme au mode calme d'office.
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PT_LIST, getPlayerTheme, ALL_SHOP_ITEMS } from "./themes.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
 import { PetSprite, EquippedGear } from "./sprites.jsx";
@@ -129,6 +129,50 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={}, ed
   const [drag, setDrag] = useState(null); // {aid, x, y} pendant un glissement
   const dragRef = useRef(null);           // {aid, px, py, x0, y0, wall}
   const dragLiveRef = useRef(null);       // miroir de `drag` (lecture synchrone au pointerup)
+  const geomRef = useRef({ width, H, floorH });
+  geomRef.current = { width, H, floorH };
+  // v2.16.16 — bug signalé (« les enfants n'arrivent pas à déplacer leurs meubles ») : move/up
+  // n'étaient posés QUE sur le petit sprite lui-même, et comptaient sur setPointerCapture pour
+  // continuer à les recevoir si le doigt dérive hors de sa (petite) zone — ce que Safari iOS ne
+  // garantit pas de façon fiable. Un doigt réel dérive beaucoup plus facilement qu'un curseur de
+  // souris précis, donc le test de Gen (souris) passait alors que les enfants (tactile) restaient
+  // bloqués dès que le doigt quittait le sprite. Fix : écoute move/up sur `window` pendant tout le
+  // glissement, peu importe où le pointeur se déplace ensuite — setPointerCapture reste posé en
+  // renfort (inoffensif) mais n'est plus le seul mécanisme de suivi.
+  useEffect(()=>{
+    if(!editable) return;
+    const onMove = (e)=>{
+      const st = dragRef.current;
+      if(!st) return;
+      const { width:w, H:h, floorH:fh } = geomRef.current;
+      const dx = (e.clientX - st.px)/w*100;
+      const clamp = (v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+      const x = clamp(st.x0 + dx, 6, 94);
+      const y = st.wall
+        ? clamp(st.y0 + (e.clientY - st.py)/h*100, 6, 62)          // mur : % de H depuis le haut
+        : clamp(st.y0 - (e.clientY - st.py)/fh*100, 0, 60);        // sol : % de floorH depuis le bas
+      const next = { aid:st.aid, x:Math.round(x*10)/10, y:Math.round(y*10)/10 };
+      dragLiveRef.current = next;
+      setDrag(next);
+    };
+    const onUp = ()=>{
+      const st = dragRef.current;
+      if(!st) return;
+      dragRef.current = null;
+      const cur = dragLiveRef.current;
+      dragLiveRef.current = null;
+      setDrag(null);
+      if(cur && onMoveDeco) onMoveDeco(cur.aid, { x:cur.x, y:cur.y });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return ()=>{
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [editable, onMoveDeco]);
   const visible = (d) => d && (!d.themeId || d.themeId===(player.themeId||"none"));
   const wp = visible(decoById(house.wallpaper)) ? house.wallpaper : null;
   const fl = visible(decoById(house.floor)) ? house.floor : null;
@@ -163,31 +207,9 @@ export function HouseScene({ player, pState, width=320, ratio=0.78, style={}, ed
           setDrag({ aid, x:ax, y:ay });
           try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointeur synthétique */ }
         };
-        const moveDrag = (e)=>{
-          const st = dragRef.current;
-          if(!st || st.aid!==aid) return;
-          const dx = (e.clientX - st.px)/width*100;
-          const clamp = (v,lo,hi)=>Math.min(hi,Math.max(lo,v));
-          const x = clamp(st.x0 + dx, 6, 94);
-          const y = st.wall
-            ? clamp(st.y0 + (e.clientY - st.py)/H*100, 6, 62)          // mur : % de H depuis le haut
-            : clamp(st.y0 - (e.clientY - st.py)/floorH*100, 0, 60);    // sol : % de floorH depuis le bas
-          const next = { aid, x:Math.round(x*10)/10, y:Math.round(y*10)/10 };
-          dragLiveRef.current = next;
-          setDrag(next);
-        };
-        const endDrag = ()=>{
-          const st = dragRef.current;
-          if(!st || st.aid!==aid) return;
-          dragRef.current = null;
-          const cur = dragLiveRef.current;
-          dragLiveRef.current = null;
-          setDrag(null);
-          if(cur && cur.aid===aid && onMoveDeco) onMoveDeco(aid, { x:cur.x, y:cur.y });
-        };
         const dragging = drag?.aid===aid;
         return <div key={aid}
-          onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}
+          onPointerDown={startDrag}
           style={{position:"absolute",...pos,
             pointerEvents:editable?"auto":"none", touchAction:editable?"none":undefined,
             cursor:editable?(dragging?"grabbing":"grab"):undefined,
