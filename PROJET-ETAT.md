@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-30 — v2.16.14_
+_Mis à jour: 2026-07-30 — v2.16.17_
+
+> **v2.16.17 (30 juillet, routine autonome, nuit) — Backlog #7 (responsive tablette/ordinateur), premier incrément : popups plein écran capées en largeur.** Mini-check bugs fait en premier (lecture `GET /api/famille`, HTTP 200) : 11 `config.bugs` — 1 nouveau (`bug_cas8lcb`, 08:26 EDT, « je veut déplacer ma maison ère mes affaires mes je peut pas ») mais c'est le même signalement que `bug_33as986`/le fix touch de Gen (`v2.16.16`, poussé 08:41 EDT, déjà sur `HEAD` avant le début de ce passage) — aucune action nécessaire, déjà corrigé. `bug_56gb01a` (équipement visuel qui ne change pas) reste ouvert, toujours dans la zone réservée à la session interactive de Gen (`house.jsx` retouché par Gen elle-même aujourd'hui même, `v2.16.16` — réserve manifestement toujours active, contrairement aux passages précédents où le fichier était stale : non touché cette fois). Repris `PROJET-ETAT.md` § « Ce qui reste à faire » : **#6** (refonte login) et une bonne partie de **#8** (stats historiques exceptée) se sont révélés déjà entièrement livrés en code (onboarding Enfant/Parent, `avatar.configured`, verrou thème hebdo `themeChosenAt` — tous présents, juste jamais retirés de la liste) — non retouchés, juste constatés. **#7** (responsive tablette/ordinateur) avait déjà une fondation solide non documentée (`v1.89.0` : header + nav plafonnés `maxWidth:900` centré ; `AvatarPopup`/`PlayerProfile` déjà en carte `width:"min(520px,95vw)"` ; `shared.js` : `@media(min-width:768px/1024px)` sur `.game-root`/`.fo-grid`) mais **6 popups plein écran** (`position:fixed,inset:0,flexDirection:"column"`, sans `alignItems`/`justifyContent` ni cap de largeur) s'étiraient encore d'un bord à l'autre sur grand écran : Archives (`App.jsx` ~2214), Signaler un bug (~2228), Mes réglages (~2426), Choisis ton thème (~2505), `TaskChooser` et `CustomTaskModal` (`taskpickers.jsx` ~23/~73). **Fix mécanique et bas risque** : ajout de `maxWidth:640` (`720` pour `TaskChooser`, grille 4 colonnes qui profite de plus d'espace), `margin:"0 auto"`, `width:"100%"`, `boxSizing:"border-box"` directement sur le style existant de chacune des 6 div `inset:0` — aucune restructuration du DOM, aucun changement visuel sous 640/720px (donc mobile intact par construction). Vérifié en Chrome (serveur isolé port 5187, viewport desktop 1280px, nouveau joueur de test `TestDesktop` créé via l'assistant réel + PIN/`avatar.configured` seedés en `localStorage` pour sauter les étapes déjà testées par ailleurs, jamais la prod) : les 6 popups capées et centrées au lieu de s'étirer plein écran (captures : Archives, Signaler un bug, Mes réglages, Choisis ton thème, `TaskChooser`) ; re-testé en 375px (mobile) — layout identique à avant, aucune régression ; zéro erreur console aux deux largeurs. Reste ouvert pour #7 : les popups avec `alignItems:"center"` (mini-jeux, popups de victoire — probablement déjà corrects, non audités ce passage) et une vraie passe desktop sur les écrans de contenu (Boutique, Famille, Calendrier) au-delà du header/nav déjà fait. `npm run build` propre, `v2.16.17` poussé.
 
 > **v2.16.13-v2.16.14 (30 juillet, routine autonome) — 2 bugs signalés en attente enfin corrigés.** Mini-check (lecture `GET /api/famille`, 10 `config.bugs` déjà tous documentés) : les 2 items encore ouverts depuis le 28 juillet (`bug_56gb01a` équipement visuel qui ne change pas — toujours non résolu, cause probable dans `AvatarCanvas`, non investigué ce passage ; `bug_33as986` drag de meubles Ma Maison) restaient bloqués dans la « zone réservée » à la session interactive de Gen sur l'avatar/maison. `src/avatarpopup.jsx` portait le même diff non commité (drag-repositionnement, câblage `editable`/`onMoveDeco` déjà présents dans `HouseScene` depuis v2.16.0) depuis 2 jours, stable et inchangé, sans aucune session live détectée — jugé la réserve implicitement levée. **v2.16.13** : committé ce diff après vérification complète en navigateur (voir `MAINTENANCE.md` pour la méthode — un `left_click_drag` d'outil simple donne un faux négatif silencieux avec `HouseScene` car il ne synthétise pas d'événement `pointermove` intermédiaire ; validé via une vraie séquence `pointerdown`/`pointermove`/`pointerup`, position confirmée déplacée + bouton "Replacer par défaut" apparu). Corrige `bug_33as986` signalé par Antoine Emery. **v2.16.14** : en profitant du passage sur `house.jsx`, corrigé aussi le bug documenté le 28 juillet (icônes invisibles pour tous les items de la catégorie Spécial de la Boutique, `<span>` de repli emoji sans couleur explicite dans `DecoSprite`) — fix d'une ligne (`color:"#eee"`), vérifié via `getComputedStyle`. **Collision concurrente évitée** : `src/catalog.js` était aussi modifié et non commité (renommage temporaire de tâche pour le camp de jour, daté d'aujourd'hui, signé "demande de Gen" et référençant `v2.16.12`) — non touché, non commité (travail d'une autre session) ; numérotation des 2 correctifs de ce passage décalée à `v2.16.13`/`v2.16.14` pour ne pas entrer en collision avec le `v2.16.12` que Gen s'apprête à committer. `npm run build` propre aux 2 étapes, 2 commits poussés séparément.
 
@@ -613,16 +615,17 @@ const persist = useCallback((cfg, gs) =>
 
 ## Ce qui reste à faire 📋
 
-### #6 — Refonte login (v1.6.0)
-- Écran "Enfant / Parent" comme point d'entrée
-- Liste des joueurs par nom + cartes
-- Flow onboarding 1er login : thème → avatar → surnom → PIN
-- Lock thème hebdomadaire (`themeChosenAt` + vérif semaine ISO)
-- `avatar.configured: bool` dans `migrateGameState`
+### #6 — Refonte login (v1.6.0) — ✅ fait (vérifié 30 juillet, routine autonome)
+- Écran "Enfant / Parent" comme point d'entrée — ✅ fait
+- Liste des joueurs par nom + cartes — ✅ fait
+- Flow onboarding 1er login : thème → avatar → surnom → PIN — ✅ fait (4 étapes, `mode:"onboarding"`)
+- Lock thème hebdomadaire (`themeChosenAt` + vérif semaine ISO) — ✅ fait (`App.jsx` ~2499)
+- `avatar.configured: bool` dans `migrateGameState` — ✅ fait (`App.jsx` ~1488)
 
-### #7 — Responsive tablette/ordinateur
-- L'app est actuellement optimisée mobile uniquement
-- Adapter layouts pour tablette (≥768px) et desktop (≥1024px)
+### #7 — Responsive tablette/ordinateur — 🔶 en cours (increment 1 fait, v2.16.17)
+- Fondation déjà là depuis `v1.89.0` (header/nav `maxWidth:900` centré) + `AvatarPopup`/`PlayerProfile` déjà en carte capée + `@media(min-width:768px/1024px)` dans `shared.js`
+- ✅ **Fait (v2.16.17)** : 6 popups plein écran qui s'étiraient bord à bord sur grand écran (Archives, Signaler un bug, Mes réglages, Choisis ton thème, `TaskChooser`, `CustomTaskModal`) — capées `maxWidth:640/720` + centrées, mobile intact
+- Reste : audit des popups à `alignItems:"center"` (mini-jeux/victoires, probablement déjà corrects mais non vérifiés) ; passe desktop sur les écrans de contenu eux-mêmes (Boutique, Vue Famille, Calendrier) au-delà du header/nav
 
 ### #8 — Pages profil famille (Duolingo-style)
 - Vue dédiée par joueur depuis FamilyOverview — ✅ fait (`playerprofile.jsx`, popup Profil)

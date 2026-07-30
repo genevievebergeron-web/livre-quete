@@ -365,3 +365,20 @@ En profitant du passage sur `house.jsx`, repris aussi le bug documenté le 28 ju
 
 ### 💬 Fil de famille
 Rien de nouveau au-delà de ce qui est déjà documenté dans les passages précédents.
+
+---
+
+## Mini-check du 2026-07-30 (nuit, routine autonome, suite) — 1 nouveau bug déjà corrigé + Backlog #7 increment 1 (v2.16.17)
+
+Lecture `GET /api/famille` (accessible, HTTP 200). 11 `config.bugs` — 1 nouveau depuis le dernier passage.
+
+### 🐛 `bug_cas8lcb` (30 juillet 08:26 EDT, « je suis le gote ») — déjà corrigé au moment du signalement
+« Je veut déplacer ma maison ère mes affaires mes je peut pas » — même symptôme que `bug_33as986` (drag de meubles). Signalé 15 minutes avant que `v2.16.16` (poussé 08:41 EDT par Gen, déjà sur `HEAD` avant le début de ce passage) ne corrige la vraie cause : `HouseScene` ne posait ses handlers `pointermove`/`pointerup` que sur le petit sprite du meuble, perdus dès qu'un doigt (moins précis qu'une souris) dérivait hors de sa zone sur tactile — d'où le fix v2.16.13 (souris) qui semblait fonctionner mais pas sur les appareils réels des enfants. Aucune action nécessaire ce passage : déjà réglé.
+
+`bug_56gb01a` (équipement visuel qui ne change pas) reste ouvert, toujours dans la zone réservée à la session interactive de Gen sur l'avatar/maison — `house.jsx` a été retouché par Gen elle-même aujourd'hui (`v2.16.16`), donc la réserve est manifestement toujours active (contrairement aux passages récents où le fichier était stale depuis des jours) : non touché cette fois, par prudence.
+
+### 📋 Backlog #7 — Responsive tablette/ordinateur, increment 1 (v2.16.17)
+En profitant de l'absence de nouveau bug actionnable, repris `PROJET-ETAT.md` § « Ce qui reste à faire ». **#6** (refonte login) s'est révélé déjà entièrement livré en code (écran Enfant/Parent, onboarding 4 étapes, `avatar.configured`, lock thème hebdo `themeChosenAt`) — juste jamais retiré de la liste, corrigé cette passe (comme #10/#8 lors de passages précédents). **#7** avait une fondation non documentée (`v1.89.0` : header/nav `maxWidth:900` centré ; `AvatarPopup`/`PlayerProfile` déjà en carte `width:"min(520px,95vw)"` ; `@media(min-width:768px/1024px)` dans `shared.js`) mais 6 popups plein écran (`position:fixed,inset:0`, `flexDirection:"column"`, sans `alignItems`/`justifyContent` ni cap de largeur — repérés par grep systématique des ~40 overlays `position:fixed,inset:0` du code) s'étiraient encore bord à bord sur grand écran : Archives, Signaler un bug, Mes réglages, Choisis ton thème (`App.jsx`), `TaskChooser` et `CustomTaskModal` (`taskpickers.jsx`). Fix mécanique et bas risque : `maxWidth:640` (`720` pour `TaskChooser`, sa grille 4 colonnes profite de plus d'espace) + `margin:"0 auto"` + `width:"100%"` + `boxSizing:"border-box"` ajoutés directement au style existant de chaque overlay — aucune restructuration DOM. Vérifié en Chrome (serveur isolé port 5187, nouveau joueur de test `TestDesktop` créé via l'assistant réel — onboarding avatar/PIN accéléré en seedant `avatar.configured`/`pin` dans `localStorage` une fois le flow déjà confirmé fonctionnel manuellement, jamais la prod) : les 6 popups capées et centrées à 1280px au lieu de plein écran ; re-testé à 375px (mobile) — layout identique à avant, zéro régression ; zéro erreur console aux deux largeurs. `npm run build` propre, `v2.16.17` poussé. Reste ouvert pour #7 : popups à `alignItems:"center"` (mini-jeux/victoires, probablement déjà corrects, non audités) et passe desktop sur les écrans de contenu (Boutique, Vue Famille, Calendrier).
+
+### 💬 Fil de famille
+Rien de nouveau au-delà de ce qui est déjà documenté.
