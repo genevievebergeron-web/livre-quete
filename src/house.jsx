@@ -74,7 +74,7 @@ export function DecoSprite({ decoId, emoji, size=32, maxH=null, style={} }) {
       onLoad={e=>setRatio(e.target.naturalWidth/e.target.naturalHeight)}
       onError={()=>setImgFail(true)} style={{imageRendering:"pixelated",display:"block",width:w,height:"auto",...style}}/>;
   }
-  return <span style={{fontSize:Math.round(size*0.82),lineHeight:1,display:"block",...style}}>{emoji}</span>;
+  return <span style={{fontSize:Math.round(size*0.82),lineHeight:1,display:"block",color:"#eee",...style}}>{emoji}</span>;
 }
 
 // Motifs CSS des surfaces (repli quand pas de PNG /sprites/deco/<id>.png — v1 : toujours CSS).
