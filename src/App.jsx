@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.14";
+const APP_VERSION = "2.16.15";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -207,6 +207,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.15", date:"2026-07-30", features:[
+    "🎒 La tâche « Préparer son sac » s'appelle maintenant « Sac à dos (MDP) » et rappelle quoi mettre dedans pour le camp de jour (collation, bouteille d'eau, chapeau, boîte à lunch vide).",
+  ]},
   { version:"2.16.14", date:"2026-07-30", features:[
     "✨ Correctif : les icônes des peaux spéciales dans la Boutique (onglet Spécial), invisibles sur fond sombre, s'affichent maintenant correctement.",
   ]},

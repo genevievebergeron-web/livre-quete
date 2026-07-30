@@ -32,7 +32,11 @@ export const TASK_CATALOG = [
   // Routine
   { id:"tr01", emoji:"🥣",  label:"Bon déjeuner",                            xp:10, coins:5,  diff:"easy",   cat:"routine" },
   { id:"tr02", emoji:"💊",  label:"Prendre ses pilules",                      xp:20, coins:10, diff:"easy",   cat:"routine" },
-  { id:"tr03", emoji:"🎒",  label:"Préparer son sac",                        xp:15, coins:8,  diff:"easy",   cat:"routine" },
+  // v2.16.15 — "Sac à dos (MDP)" temporaire (demande de Gen, 30 juillet) : renommé + sous-tâches
+  // du camp de jour (mêmes items que l'annonce "Départ: 8:00!" du 28 juillet). À REMETTRE à
+  // "Préparer son sac" (contenu sac d'école) fin août, quand le camp de jour se termine.
+  { id:"tr03", emoji:"🎒",  label:"Sac à dos (MDP)",                        xp:15, coins:8,  diff:"easy",   cat:"routine",
+    steps:["Collation","Bouteille d'eau","Chapeau","Boîte à lunch vide + glace"] },
   { id:"tr04", emoji:"🚿",  label:"Prendre ma douche",                       xp:20, coins:10, diff:"easy",   cat:"routine" },
   { id:"tr05", emoji:"🛁",  label:"Bain",                                    xp:20, coins:10, diff:"easy",   cat:"routine" },
   { id:"tr06", emoji:"📚",  label:"Faire ses devoirs + études",              xp:40, coins:20, diff:"hard",   cat:"routine" },
