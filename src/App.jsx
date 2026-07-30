@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.11";
+const APP_VERSION = "2.16.13";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -207,6 +207,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.13", date:"2026-07-30", features:[
+    "🪑 Correctif : le glisser-déposer des meubles dans Ma Maison, qui ne faisait plus rien, fonctionne à nouveau — tu peux les replacer où tu veux, avec un bouton pour les remettre par défaut.",
+  ]},
   { version:"2.16.11", date:"2026-07-29", features:[
     "🥚 Un petit secret se cache peut-être quelque part dans le Livre... à toi de le trouver!",
   ]},

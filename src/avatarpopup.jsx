@@ -168,11 +168,26 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             else { if (isPlaced(d)) delete h.placed[d.anchor]; else h.placed[d.anchor] = d.id; }
             onUpdateHouse && onUpdateHouse(h);
           };
+          const hasCustomPos = Object.keys(house.pos||{}).length>0;
+          const hasPlaced = Object.keys(house.placed||{}).length>0;
           return (
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
               <div style={{display:"flex",justifyContent:"center"}}>
-                <HouseScene player={player} pState={pState} width={Math.min(360, typeof window!=="undefined"?window.innerWidth-90:360)}/>
+                <HouseScene player={player} pState={pState} width={Math.min(360, typeof window!=="undefined"?window.innerWidth-90:360)}
+                  editable={hasPlaced}
+                  onMoveDeco={(aid,p)=>{ onUpdateHouse && onUpdateHouse({ ...house, pos:{ ...(house.pos||{}), [aid]:p } }); }}/>
               </div>
+              {hasPlaced && (
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>✋ Glisse tes meubles pour les replacer</span>
+                  {hasCustomPos && (
+                    <button onClick={()=>{ SFX.click(); onUpdateHouse && onUpdateHouse({ ...house, pos:{} }); }}
+                      style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#aaa",background:"rgba(0,0,0,0.4)",border:"1px solid #444",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>
+                      Replacer par défaut
+                    </button>
+                  )}
+                </div>
+              )}
               {usable.length===0 && (
                 <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:12,lineHeight:1.4}}>
                   Ta chambre est aux couleurs de ton thème! 🏠<br/>Achète des meubles et des décorations dans la Boutique (onglet 🏠 Maison) pour la rendre unique.
