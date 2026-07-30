@@ -17,6 +17,22 @@ const FUNNY_PIN_MSGS = [
   "PSST: ton parent va finir par changer le code pour 0000.",
 ];
 
+// v2.16.10 (Backlog #12) — messages sarcastiques, tirés au sort dans RewardPopup après une quête validée.
+const FUNNY_MSGS = [
+  "Wow. La tâche est faite. La Terre continue de tourner. 🌎",
+  "T'as prouvé que tu peux faire des choses! Maintenant recommence.",
+  "ALERTE: un enfant a accompli une tâche! NASA informé. 🚀",
+  "Légendaire! (C'est-à-dire: ça s'est produit une fois.) 📜",
+  "Félicitations! T'es officiellement moins paresseux·se qu'une plante. 🌱",
+  "La famille a confirmé: t'as pas juste dit que t'allais le faire. 👀",
+  "C'est tellement impressionnant... même le chat fait semblant d'être fier. 🐱",
+  "Performance historique. Les archéologues en parleront dans 3000 ans.",
+  "Le plancher était là depuis tout ce temps. T'as enfin remarqué. 🧹",
+  "Des XP! Des pièces! Et toujours aucun médaillon d'or dans la vraie vie.",
+  "INCROYABLE. Ça a pris 45 secondes. Bon, c'est mieux que jamais, disons.",
+  "Voilà ce qu'on appelle un niveau de productivité tout à fait acceptable. 👑",
+];
+
 // v1.57.0 — Choix d'évolution : 2 éléments tirés au hasard, l'enfant choisit la voie de son familier
 export function EvolutionModal({ petId, tier, evo, onChoose, th }) {
   const opts = petEvoOptions(petId, tier, evo);
@@ -133,6 +149,9 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
 
 export function RewardPopup({ task, player, newBadges, onClose, th }) {
   const T = th || THEMES.minecraft;
+  // 1 fois sur 3, un message sarcastique — tiré au sort une seule fois par ouverture du popup,
+  // pas à chaque re-render (sinon il changerait sous les yeux de l'enfant).
+  const [funnyMsg] = useState(()=> Math.random()<0.33 ? FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)] : null);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto"}}>
       <div style={{background:`radial-gradient(circle at 50% 28%, ${T.accent}22, ${T.bg} 70%)`,border:`6px solid ${T.accent}`,borderRadius:10,padding:"clamp(18px,4vw,30px) clamp(20px,5vw,40px)",textAlign:"center",maxWidth:440,width:"90%",maxHeight:"90vh",overflowY:"auto",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>
@@ -149,6 +168,7 @@ export function RewardPopup({ task, player, newBadges, onClose, th }) {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#D9BC5C"}}>+{task.coins} 🪙</div>
         </div>
         {player && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:player.color,marginBottom:14}}>Bravo {displayName(player)}! 🎉</div>}
+        {funnyMsg && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",fontStyle:"italic",marginBottom:14,maxWidth:340,marginLeft:"auto",marginRight:"auto",lineHeight:1.35}}>{funnyMsg}</div>}
         {newBadges&&newBadges.length>0&&(
           <div style={{background:"rgba(0,0,0,0.4)",borderRadius:6,padding:"10px 14px",marginBottom:14}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:8}}>🏅 BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""}!</div>

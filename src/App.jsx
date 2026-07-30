@@ -21,7 +21,7 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, CHALLENGE_PERFECTION_FRAME_ID, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 
-const APP_VERSION = "2.16.9";
+const APP_VERSION = "2.16.10";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -207,6 +207,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.10", date:"2026-07-29", features:[
+    "😂 Une quête validée affiche maintenant, de temps en temps, un petit message rigolo en plus de tes XP et pièces!",
+  ]},
   { version:"2.16.9", date:"2026-07-29", features:[
     "⏳ Nouveau réglage parent (facultatif) : un budget-temps quotidien par enfant (15 à 90 min, ou illimité). Une fois atteint, un petit écran de pause propose de demander à un parent de continuer un peu.",
   ]},
@@ -1631,21 +1634,6 @@ const importConfig = (file, onSuccess) => {
   r.readAsText(file);
 };
 
-// ─── FUNNY MESSAGES (#12) ────────────────────────────────────
-const FUNNY_MSGS = [
-  "Wow. La tâche est faite. La Terre continue de tourner. 🌎",
-  "T'as prouvé que tu peux faire des choses! Maintenant recommence.",
-  "ALERTE: un enfant a accompli une tâche! NASA informé. 🚀",
-  "Légendaire! (C'est-à-dire: ça s'est produit une fois.) 📜",
-  "Félicitations! T'es officiellement moins paresseux·se qu'une plante. 🌱",
-  "La famille a confirmé: t'as pas juste dit que t'allais le faire. 👀",
-  "C'est tellement impressionnant... même le chat fait semblant d'être fier. 🐱",
-  "Performance historique. Les archéologues en parleront dans 3000 ans.",
-  "Le plancher était là depuis tout ce temps. T'as enfin remarqué. 🧹",
-  "Des XP! Des pièces! Et toujours aucun médaillon d'or dans la vraie vie.",
-  "INCROYABLE. Ça a pris 45 secondes. Bon, c'est mieux que jamais, disons.",
-  "Voilà ce qu'on appelle un niveau de productivité tout à fait acceptable. 👑",
-];
 // ─── UTILS ───────────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().slice(0,10);
 
