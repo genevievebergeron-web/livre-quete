@@ -8,7 +8,7 @@ import { getPlayerTheme, shopItemById } from "./themes.js";
 import { getLevelTitle, xpBar } from "./leveling.js";
 import { BADGES, rarityOf } from "./catalog.js";
 import { petLevel } from "./pets.js";
-import { displayName, todayStamp } from "./shared.js";
+import { displayName, todayStamp, streakOf } from "./shared.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
 
 export function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins, onCreateOffer, assignments }) {
@@ -23,6 +23,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
   const pct = Math.min(100, Math.round((bar.cur/bar.needed)*100));
   const myBadges = (gs.badges||[]).map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).slice(-6);
   const myDone = assignments.filter(a=>a.playerIds.includes(player.id)&&(gs.completed||[]).includes(a.instanceId+"_"+player.id+"#"+todayStamp())).length;
+  const streak = streakOf(gs.activeDays);
   const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
   const maxXp = Math.max(...siblings.map(s=>s.xp),1);
   return (
@@ -47,8 +48,8 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
             </div>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-          {[["⚡",gs.xp||0,"XP"],["🪙",gs.coins||0,"Pièces"],["✅",myDone,"Quêtes"]].map(([icon,val,lbl])=>(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
+          {[["⚡",gs.xp||0,"XP"],["🪙",gs.coins||0,"Pièces"],["✅",myDone,"Quêtes"],["🔥",streak,"Série"]].map(([icon,val,lbl])=>(
             <div key={lbl} style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:6,padding:"8px 4px",textAlign:"center"}}>
               <div style={{fontSize:18,marginBottom:2}}>{icon}</div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#fff"}}>{val}</div>

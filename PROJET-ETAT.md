@@ -1,5 +1,7 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-07-29 — v2.16.7_
+_Mis à jour: 2026-07-29 — v2.16.8_
+
+> **v2.16.8 (29 juillet, routine autonome) — Backlog #8 (pages profil famille) : ajout de la série de jours au popup Profil.** Mini-check bugs fait en premier (lecture `GET /api/famille`) : 10 `config.bugs`, tous déjà documentés dans les passages précédents (mêmes IDs qu'au 28 juillet soir tardif), 0 nouveau. Les 2 items encore ouverts (`bug_56gb01a` équipement visuel, `bug_33as986` drag de meubles) restent dans la zone réservée à la session interactive de Gen — `src/avatarpopup.jsx` porte toujours le même incrément de drag-repositionnement non commité que lors du dernier passage (fichier stale depuis le 28 juillet, aucun serveur `vite` actif détecté ce passage, mais toujours non fini — non touché par prudence). Repris le backlog (`## Ce qui reste à faire`, item **#8 — Pages profil famille**) : `playerprofile.jsx` avait déjà XP/niveau/pièces/quêtes du jour/badges/inventaire/classement famille, mais pas la série ("Série" existe déjà sur le dashboard via `streakOf`, jamais affichée dans le popup Profil). `streakOf` déplacée de `App.jsx` vers `shared.js` (module d'utilitaires purs déjà partagé, évite la duplication) et importée dans `playerprofile.jsx` ; grille de stats passée de 3 à 4 tuiles (⚡XP / 🪙Pièces / ✅Quêtes / 🔥Série), même patron visuel que les 3 existantes. **En profitant du passage, corrigé aussi l'item #10 du backlog** (« Calendrier devoirs/examens ») — déjà entièrement livré en v1.85.0-v2.15.0 (types Devoir/Examen, XP bonus, rappels 3 jours avant) mais jamais retiré de la liste ; voir section backlog mise à jour ci-dessous. Vérifié en Chrome (serveur isolé port 5187, joueur de test `TestCal` avec 4 jours actifs seedés, jamais la prod) : dashboard confirme "Série : 4 jours", popup Profil affiche maintenant la 4e tuile "4 · Série" en cohérence, zéro erreur console. `npm run build` propre.
 
 > **v2.16.7 (29 juillet, session live avec Gen) — Verrou du matin parent-contrôlé (Chantier 6.6, dernier item de la session).** Motivé par : le plus jeune a du mal à démarrer ses tâches du matin sans « éniaiser » ailleurs dans l'app. Le réglage existant « 🎯 Une tâche à la fois » (`settings.focus`, auto-activé par l'enfant) ne change QUE l'affichage de la liste — ne restreint aucune section. Nouveau chantier séparé, parent-contrôlé. **Décisions de Gen** : plage horaire fixe (se déverrouille tout seul, pas de bouton à penser chaque matin) ; bloque **boutique + popup avatar seulement** (calendrier/tâches intacts, pas jugé distrayant). **Implémentation** : nouveau champ `config.players[i].morningLock:{enabled,start,end}` (même patron que `pin`/`themeId`) ; helper pur `isMorningLocked(player,now)` (heure LOCALE obligatoire — leçon v2.5.24) ; toggle+plage horaire dans `ParentPanel` bloc PAR JOUEUR ; côté enfant, tab Boutique dimé+étiqueté 🚪 (clic bloqué, toast ludique « Les autres salles du Livre se réveillent après tes tâches du matin! ») et `openAvatar()` bloqué avec le même message ; un `useEffect` ramène en douceur l'enfant s'il était déjà sur la boutique/le popup ouvert quand la fenêtre démarre. Jamais les mots "verrouillé"/"interdit" dans l'UI (cadrage anti-punitif). Vérifié en Chrome (joueur de test, jamais la prod) : côté enfant, fenêtre active → tab Boutique dimé+🚪, clic bloqué (pas de navigation), popup avatar bloqué (pas d'ouverture) ; désactivé → accès restauré instantanément ; côté parent, toggle ON affiche les 2 champs heure pré-remplis (06:00/23:59), toggle OFF les cache ; zéro erreur console.
 
@@ -615,12 +617,9 @@ const persist = useCallback((cfg, gs) =>
 - Adapter layouts pour tablette (≥768px) et desktop (≥1024px)
 
 ### #8 — Pages profil famille (Duolingo-style)
-- Vue dédiée par joueur depuis FamilyOverview
-- Stats historiques, progression XP, badges en vitrine, streak, ligues
-
-### #10 — Calendrier devoirs/examens
-- Saisie d'examens/devoirs avec date dans `gameStates[i].calendar[]`
-- Rappel contextuel dans le dashboard
+- Vue dédiée par joueur depuis FamilyOverview — ✅ fait (`playerprofile.jsx`, popup Profil)
+- XP/niveau, pièces, quêtes du jour, badges en vitrine, inventaire, classement famille, **série** — ✅ tous faits (série ajoutée v2.16.8)
+- Reste : stats historiques (courbe de progression XP dans le temps), ligues — pas commencé, concept "ligues" à définir avec Gen avant de coder
 
 ### #12 — Humour et trolling
 - Messages sarcastiques/drôles aléatoires dans l'UI

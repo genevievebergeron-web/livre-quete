@@ -19,6 +19,18 @@ export const uid = () => Math.random().toString(36).slice(2,9);
 
 export const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
+// Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
+export const streakOf = (activeDays) => {
+  const set = new Set(activeDays || []);
+  if (!set.size) return 0;
+  const d = new Date(); d.setHours(12,0,0,0);
+  const key = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  if (!set.has(key(d))) { d.setDate(d.getDate()-1); if (!set.has(key(d))) return 0; } // ni aujourd'hui ni hier → série rompue
+  let n = 0;
+  while (set.has(key(d))) { n++; d.setDate(d.getDate()-1); }
+  return n;
+};
+
 export const COLORS = ["#5F87B3","#A874B0","#5CAD68","#C77B54","#D9BC5C","#D97070","#4FA8B3","#8A5A96","#C4789E","#0a0a0a","#F0F0FF"];
 
 // Lot 6 #26 — mapping ancien→nouveau pour la migration ponctuelle des couleurs de joueurs déjà

@@ -320,3 +320,18 @@ Serveur dev isolé port 5191 (config `livre-quete-test-2` ajoutée à `.claude/l
 
 ### Non couvert cette passe (pour la prochaine)
 Maison (délibérément évité, chantier en cours), le nouveau drag de meubles (`avatarpopup.jsx`, toujours non commité), popup Mon Perso (onglets Créer/Peaux/Maison), le fil complet des 47 tâches du catalogue (`estMin` — item de file non encore réalisé), suite de la file d'implémentation une fois la réserve avatar levée.
+
+---
+
+## Mini-check du 2026-07-29 (nuit, routine autonome)
+
+Lecture `GET /api/famille` (lecture seule). 10 `config.bugs`, 0 `errorLogs`.
+
+### 🐛 Bugs passés en revue
+Les 10 bugs correspondent exactement aux 10 IDs déjà documentés au passage précédent (`bug_74klxs1`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_k1gqpz6`, `bug_xcqtyr7`, `bug_6k7827p`, `bug_rak8rzv`, `bug_56gb01a`, `bug_33as986`) — rien de nouveau. Les 2 encore ouverts (`bug_56gb01a` équipement visuel qui ne change pas, `bug_33as986` drag de meubles) restent dans la zone réservée à la session interactive de Gen. `git status` en début de passage montrait `src/avatarpopup.jsx` modifié et non commité (même diff de drag-repositionnement que le passage précédent — `mtime` du 28 juillet, aucun processus `vite` actif détecté) : toujours non fini côté Gen, donc **non touché** par prudence même si aucune session live n'était active au moment de ce passage.
+
+### 💬 Fil de famille
+Pas de nouveau contenu actionnable au-delà de ce qui est déjà documenté.
+
+### Suite de ce passage — Backlog #8 et #10
+File d'implémentation du plan `le-design-de-mon-mighty-mountain.md` revérifiée : rien de nouveau hors de la zone réservée. Repris `PROJET-ETAT.md` § « Ce qui reste à faire » : **#10** (calendrier devoirs/examens) s'est révélé déjà entièrement livré en code depuis v1.85.0-v2.15.0 (types Devoir/Examen, XP bonus, rappels) — juste jamais retiré de la liste, corrigé cette passe. **#8** (pages profil famille) avait déjà l'essentiel (XP, badges, inventaire, classement) sauf la série — ajoutée en v2.16.8 en réutilisant `streakOf` (déplacée d'`App.jsx` vers `shared.js` pour éviter la duplication). Détail complet dans `PROJET-ETAT.md` v2.16.8. Vérifié en Chrome (serveur isolé port 5187, joueur `TestCal`, jamais la prod), `npm run build` propre.
