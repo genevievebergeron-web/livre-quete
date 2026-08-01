@@ -435,3 +435,11 @@ Rien de nouveau au-delà des bugs déjà passés en revue ci-dessus.
 Lecture `GET /api/famille` (HTTP 200) : mêmes 14 `config.bugs` et 5 messages `feed` que le mini-check précédent de la même nuit (30 min plus tôt) — rien de nouveau, pas d'entrée dédiée supplémentaire nécessaire.
 
 Backlog #8 et les 2 derniers items du plan `le-design-de-mon-mighty-mountain.md` toujours bloqués sur une décision de Gen. Repris à la place le chantier Lot 5/#24 (« découpage progressif d'`App.jsx` en plusieurs fichiers par écran »), resté explicitement ouvert et purement mécanique — voir `PROJET-ETAT.md` pour le détail complet. `LoginScreen` (~468 lignes, écrans Enfant/Parent + onboarding 4 étapes + PIN) extrait dans `src/loginscreen.jsx`, seule dépendance externe (`APP_VERSION`) passée en prop pour ne pas déplacer la convention de versionnage hors d'`App.jsx`. Vérifié en Chrome de bout en bout (child-select → PIN erroné → PIN correct → dashboard), zéro erreur console, `npm run build` propre. `App.jsx` : 7698 → 7229 lignes.
+
+---
+
+## Mini-check du 2026-08-01 (nuit, 3e passage) — aucun nouveau bug, mini-jeux extraits
+
+Lecture `GET /api/famille` (HTTP 200) : mêmes 14 `config.bugs` et 5 messages `feed` que les 2 passages précédents de la même nuit — rien de nouveau, pas d'entrée dédiée supplémentaire nécessaire.
+
+Backlog toujours épuisé côté items autonomes (#8 et les 2 derniers items du plan mighty-mountain bloqués sur une décision de Gen). Poursuite du chantier Lot 5/#24 : les 3 mini-jeux (`MiniGameRunner`/`MiniGamePacman`/`MiniGameWhack`) + leur routeur `MiniGame` (~624 lignes, entièrement autonomes — seules dépendances externes react/`SFX`/`getPlayerTheme`) extraits dans `src/minigames.jsx`. Vérifié en Chrome de bout en bout avec un nouveau joueur de test créé via l'assistant réel (jamais la prod) : XP ajusté via le panneau parent puis tâche complétée+validée pour franchir un seuil de niveau, popup de choix de mini-jeu affiché, partie « Cours et saute! » jouée du countdown jusqu'à l'écran de fin, popup de récompense finale avec badges — comportement identique à avant l'extraction, zéro erreur console. `npm run build` propre. `App.jsx` : 7231 → 6607 lignes. Détail complet dans `PROJET-ETAT.md`.
