@@ -427,3 +427,11 @@ Aucun nouvel item autonome disponible — confirmé une 2e fois (voir constat du
 
 ### 💬 Fil de famille
 Rien de nouveau au-delà des bugs déjà passés en revue ci-dessus.
+
+---
+
+## Mini-check du 2026-08-01 (nuit, routine autonome, suite) — aucun nouveau bug, `LoginScreen` extrait
+
+Lecture `GET /api/famille` (HTTP 200) : mêmes 14 `config.bugs` et 5 messages `feed` que le mini-check précédent de la même nuit (30 min plus tôt) — rien de nouveau, pas d'entrée dédiée supplémentaire nécessaire.
+
+Backlog #8 et les 2 derniers items du plan `le-design-de-mon-mighty-mountain.md` toujours bloqués sur une décision de Gen. Repris à la place le chantier Lot 5/#24 (« découpage progressif d'`App.jsx` en plusieurs fichiers par écran »), resté explicitement ouvert et purement mécanique — voir `PROJET-ETAT.md` pour le détail complet. `LoginScreen` (~468 lignes, écrans Enfant/Parent + onboarding 4 étapes + PIN) extrait dans `src/loginscreen.jsx`, seule dépendance externe (`APP_VERSION`) passée en prop pour ne pas déplacer la convention de versionnage hors d'`App.jsx`. Vérifié en Chrome de bout en bout (child-select → PIN erroné → PIN correct → dashboard), zéro erreur console, `npm run build` propre. `App.jsx` : 7698 → 7229 lignes.
