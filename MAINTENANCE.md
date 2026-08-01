@@ -408,3 +408,22 @@ Avec #7 fermé, il ne reste **aucun item autonome connu** dans `PROJET-ETAT.md` 
 
 ### 💬 Fil de famille
 Rien de nouveau au-delà des bugs déjà passés en revue ci-dessus.
+
+---
+
+## Mini-check du 2026-08-01 (nuit, routine autonome) — aucun nouveau bug, nettoyage cosmétique + racine du bug avatar identifiée
+
+`git pull`/`npm run build` en Phase 0 : build cassé par 2 avertissements de clés dupliquées (`boughtRewards`/`pending` dans `migrateGameState`, déjà notés cosmétiques le 31 juillet) — nettoyés cette passe puisque la routine repassait justement dans cette zone : les défauts `pending`/`boughtRewards`/`badges`/`owned` dans le bloc initial de `App.jsx` ~1437 étaient morts (toujours réécrits explicitement après le spread `...gs`), retirés sans changement de comportement. `npm run build` propre, zéro avertissement. Commité seul (`f18d...`, pas de bump `APP_VERSION` — aucun changement observable, dans le même esprit que les commits d'audit `MAINTENANCE.md` sans code).
+
+Lecture `GET /api/famille` (HTTP 200). 14 `config.bugs` — **identiques aux 14 déjà documentés le 31 juillet**, aucun nouveau signalement depuis.
+
+### 🐛 Bugs revus
+- Les 12 bugs déjà classés non-actionnables/corrigés/documentés dans les passages précédents (`bug_74klxs1`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_k1gqpz6`, `bug_xcqtyr7`, `bug_6k7827p`, `bug_rak8rzv`, `bug_dvtx5rm`, `bug_ix3lmjs`, `bug_cas8lcb`, `bug_33as986`) — rien de nouveau à ajouter.
+- `bug_hlu9mkd` (perte de 150 pièces) — toujours non résolu en lecture seule, flag pour Gen inchangé depuis le 31 juillet.
+- `bug_56gb01a` (équipement visuel/masque qui ne change pas, « il me met toujours un casque de chevalier ») — **réserve réévaluée ce passage** : `git status` propre, aucun processus `vite` actif, `mtime` de `house.jsx`/`avatarpopup.jsx` inchangés depuis leurs derniers commits (`v2.16.16`/28 juillet) — la réserve pour session interactive de Gen semble bien levée. **Root cause identifiée par lecture de code** (non corrigée) : `src/avatar.jsx` (moteur de rendu en couches de la refonte du 27 juillet) ne définit AUCUN calque `slot:"hat"` dans `LAYER_ORDER` (~ligne 305-314 : back/hairBack/head/hairTop/eyes/mouth/body/arms/legs/shoes — pas de hat) — décision documentée en commentaire ligne 56 (« Pas de slot accessoires de tête : les chapeaux/visages ÉQUIPÉS couvrent déjà ça »), mais les items `hats:[…]` du catalogue (`themes.js` ~741, dont `md6` « Heaume de chevalier ») restent achetables/équipables (`equipped.hat`) sans qu'aucun calque ne les rende sur le nouveau avatar — dont l'affichage figé constaté par l'enfant provient vraisemblablement d'un ancien rendu emoji/sprite statique ailleurs dans l'UI qui ignore `equipped.hat`. **Pas un correctif rapide** : implique soit d'ajouter un vrai calque hat au moteur (assets PixelLab manquants, chantier E de la refonte avatar réservé à une session avec Gen selon la mémoire du projet), soit de retirer/masquer la catégorie hat du shop tant qu'elle n'est pas rendue — les deux sont des décisions de conception, pas des bugs à corriger en autonome. Reste ouvert, non touché, mais diagnostic complet consigné ici pour accélérer la prochaine session avec Gen.
+
+### 📋 Backlog
+Aucun nouvel item autonome disponible — confirmé une 2e fois (voir constat du 31 juillet ci-dessus, toujours vrai : #8 et les 2 items du plan mighty-mountain nécessitent une décision de Gen). Cadence de la routine toujours à 1×/nuit, changement non exécuté par prudence (même raison que le 31 juillet — hors mandat de cette routine).
+
+### 💬 Fil de famille
+Rien de nouveau au-delà des bugs déjà passés en revue ci-dessus.

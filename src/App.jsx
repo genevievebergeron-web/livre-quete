@@ -1434,7 +1434,7 @@ const migrateGameState = (gs) => {
   const storedWeek = gs.coinsWeek?.week || "";
   const coinsWeekReset = !!gs.coinsWeek && storedWeek < cwk;
   return {
-    xp: 0, completed: [], pending: [], owned: [], equipped: {}, boughtRewards: [], badges: [],
+    xp: 0, completed: [], equipped: {},
     ...gs,
     badges: gs.badges || [],
     owned: (gs.owned || []).filter(id => id !== CHALLENGE_PERFECTION_FRAME_ID), // v2.6.2 — retire l'item fantôme « cadre » accordé par l'ancien défi parfait (jamais défini, rendu vide)
