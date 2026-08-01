@@ -2,7 +2,7 @@
 // Extrait de App.jsx (Lot 5 #24, découpage progressif) : composants purement présentationnels
 // (aucun state applicatif, seulement leurs props + SFX pour le clic clavier) — zéro état
 // partagé au niveau module, zéro changement de comportement.
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { SFX } from "./sfx.js";
 
 // ─── TOAST ───────────────────────────────────────────────────
@@ -39,4 +39,37 @@ export function PinKeypad({ onDigit, onBack, onClose, onSubmit, closeLabel="✕"
       ))}
     </div>
   );
+}
+
+// v2.6.0 — case à cocher locale (éphémère) pour les tâches des annonces parent
+export function TaskCheck({ text }) {
+  const [done, setDone] = useState(false);
+  return (
+    <div onClick={()=>setDone(!done)} style={{cursor:"pointer",padding:"4px 0",display:"flex",gap:8,alignItems:"flex-start",
+      color:done?"#555":"#ddd",textDecoration:done?"line-through":"none",fontSize:14,lineHeight:1.4}}>
+      <span style={{flexShrink:0,fontSize:16}}>{done?"✅":"⬜"}</span>
+      <span>{text}</span>
+    </div>
+  );
+}
+// v2.6.0 — compte à rebours live vers l'heure cible d'une annonce parent
+// v2.14.1 — textes personnalisables par annonce (label = suite du temps, doneText = à zéro)
+export function AnnouncementCountdown({ target, label, doneText }) {
+  const [remaining, setRemaining] = useState("");
+  useEffect(()=>{
+    const suffix = label || "avant que les invités commencent à arriver !";
+    const tick = ()=>{
+      const diff = new Date(target) - new Date();
+      if(diff<=0){ setRemaining(doneText || "Les invités arrivent maintenant ! 🎉"); return; }
+      const h = Math.floor(diff/3600000);
+      const m = Math.floor((diff%3600000)/60000);
+      const s = Math.floor((diff%60000)/1000);
+      setRemaining(h>0 ? `⏱ ${h}h ${m}min ${suffix}`
+                       : `⏱ ${m}min ${s}s ${suffix}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return ()=>clearInterval(id);
+  }, [target, label, doneText]);
+  return <div style={{marginTop:10,color:"#FFD54F",fontWeight:"bold",fontSize:14,textAlign:"center"}}>{remaining}</div>;
 }
