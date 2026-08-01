@@ -382,3 +382,29 @@ En profitant de l'absence de nouveau bug actionnable, repris `PROJET-ETAT.md` §
 
 ### 💬 Fil de famille
 Rien de nouveau au-delà de ce qui est déjà documenté.
+
+---
+
+## Mini-check du 2026-07-31 (nuit, routine autonome) — Backlog #7 fermé (audit, aucun code changé) + 1 signalement pièces flag pour Gen
+
+`git pull`/`npm run build` propres en Phase 0 (2 avertissements bénins pré-existants, `boughtRewards`/`pending` dupliqués dans un objet littéral de `migrateGameState` — cosmétique, JS garde la dernière valeur, pas d'impact fonctionnel confirmé, à nettoyer un jour si on repasse dans cette zone).
+
+Lecture `GET /api/famille` (HTTP 200). 14 `config.bugs` — 3 nouveaux depuis le dernier passage (`bug_cas8lcb` était le dernier documenté).
+
+### 🐛 Bugs passés en revue
+- `bug_dvtx5rm` (30 juillet 20:45 EDT, « allo la tribu ») et `bug_ix3lmjs` (30 juillet 20:46 EDT, texte au hasard sans contenu actionnable) — même patron que `bug_rak8rzv` déjà vu, non actionnables.
+- `bug_hlu9mkd` (31 juillet 07:59 EDT, « Le GOAT!!! » — pseudo libre non recoupé avec certitude à un `players[].id`, probablement Olivier par élimination des 3 autres pseudos déjà vus dans le fil `feed`) — « J'ai perdu 150 pièces, je peux le récupérer? ». Investigation forensique (méthode `completedAt`/`coinsLifetime`, voir mémoire `economie-pieces-forensique` — incident similaire du 28 juillet) : **aucune entrée `completedAt` pour ce joueur depuis le 28 juillet** (donc pas de gain récent qui expliquerait un "avant/après"), **`coins:0` pour LES 4 ENFANTS SIMULTANÉMENT** au moment de la lecture — une coïncidence à 4/4 est en soi suspecte, mais sans historique d'achats correspondant dans `boughtRewards`/`coinOffers` pour confirmer une dépense légitime. **Non résolu, pas assez d'éléments en lecture seule** pour trancher entre "il a tout dépensé" (normal) et "bug de perte" (comme l'incident de sync 2 Mo du 28 juillet) — flag consigné dans `PROJET-ETAT.md` pour que Gen tranche directement avec l'enfant ou creuse avec un accès write.
+- `bug_56gb01a` (équipement visuel qui ne change pas) reste ouvert, zone réservée avatar/maison — non revérifié ce passage (pas de signal que la réserve soit levée ou toujours active, `house.jsx` non retouché depuis `v2.16.16`).
+
+### 📋 Backlog #7 — fermé par audit (aucun changement de code)
+Les 2 items laissés ouverts par `v2.16.17` ont été vérifiés directement dans le code, sans besoin de fix :
+- **Popups `alignItems:"center"`** (8 sites : mini-jeux, level-up, victoire de boss) — tous ont un contenu naturellement borné (canvas de taille fixe, ou carte interne avec son propre `maxWidth`, ex. `maxWidth:380` sur la popup de victoire de boss `App.jsx` ~7652) — jamais de texte/grille qui s'étire réellement bord à bord même en `alignItems:"center"` sans cap explicite sur le conteneur `inset:0` lui-même.
+- **Passe desktop sur les écrans de contenu** (Boutique, Vue Famille, Calendrier) — le conteneur principal de contenu (`App.jsx` ~7362 : `<div style={{position:"relative",maxWidth:view==="week"?"100%":900,margin:"0 auto",...}}>`) enveloppe déjà TOUTES les vues dans le même plafond `900px` que le header/nav, sauf `"week"` (100% voulu — colonnes qui profitent de l'espace). C'était déjà fait depuis `v1.89.0`, jamais retiré de la liste #7 faute d'avoir été vérifié explicitement.
+
+Vérification en navigateur amorcée (serveur isolé port 5199, viewport 1280px) — l'écran `SetupWizard` (même famille de pattern que Boutique/Famille) confirmé visuellement bien plafonné et centré à cette largeur. La vérification des écrans Boutique/Famille/Calendrier eux-mêmes via un joueur de test complet n'a pas été terminée ce passage (onboarding plus long que prévu) — confiance basée sur la lecture de code (une seule expression, appliquée uniformément à toutes les vues), pas sur une capture d'écran directe de ces 3 écrans précis. À revérifier visuellement si un doute survient.
+
+### 🔭 Constat de fin de backlog autonome
+Avec #7 fermé, il ne reste **aucun item autonome connu** dans `PROJET-ETAT.md` (#8 restant = stats historiques/ligues, explicitement "à définir avec Gen") ni dans le plan `le-design-de-mon-mighty-mountain.md` (Lots 4/5 : les 2 seuls items restants — check-in émotions, décision service worker offline — sont aussi explicitement "à trancher avec Gen"). Le plan (ligne ~182) anticipait ce moment et demandait de faire passer cette routine en cadence réduite (1×/3 jours, mode maintenance) une fois ce point atteint. **Non exécuté** : changer la cadence de la tâche planifiée elle-même est un changement de comportement de l'automatisation, hors du mandat du `SKILL.md` de cette routine — flag laissé pour une confirmation explicite de Gen plutôt qu'une bascule unilatérale.
+
+### 💬 Fil de famille
+Rien de nouveau au-delà des bugs déjà passés en revue ci-dessus.
