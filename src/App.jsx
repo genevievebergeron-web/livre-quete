@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.25";
+const APP_VERSION = "2.16.26";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -147,6 +147,22 @@ const isTimeLocked = (player, pState) => {
   if (!sm || sm.day !== todayStamp()) return false;
   return (sm.minutes || 0) >= limit;
 };
+// v2.16.26 — Backlog #15 : accès boutique/avatar débloqué après X tâches ROTATIVES (isRecurring:true,
+// système récurrent du Lot 7 — recurring.js) complétées aujourd'hui, pas juste n'importe quelle tâche.
+// Compte les assignations distinctes (pas les XP) : 1 tâche rotative faite = 1, peu importe sa difficulté.
+const SHOP_UNLOCK_DEFAULT = 2;
+const rotatingDoneToday = (assignments, completed, playerId) => {
+  const stamp = todayStamp();
+  const doneSet = new Set(completed || []);
+  return (assignments || []).filter(a =>
+    a.isRecurring && (a.playerIds || []).includes(playerId) && doneSet.has(a.instanceId + "_" + playerId + "#" + stamp)
+  ).length;
+};
+const isShopLocked = (config, pState, assignments, playerId) => {
+  const need = config?.shopUnlockCount ?? SHOP_UNLOCK_DEFAULT;
+  if (need <= 0) return false; // 0 = parent a désactivé la condition
+  return rotatingDoneToday(assignments, pState?.completed, playerId) < need;
+};
 // v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
 // v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
 // en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
@@ -210,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.26", date:"2026-08-02", features:[
+    "🔒 Nouveau réglage parent : la Boutique et le personnalisateur peuvent maintenant demander de faire quelques tâches rotatives d'abord (réglable, désactivable). Le jeu indique clairement combien il en reste!",
+  ]},
   { version:"2.16.25", date:"2026-08-02", features:[
     "✨ Petit coup de polish : ton avatar, ton niveau et tes pièces sont maintenant visibles direct dans l'onglet Aujourd'hui, et un petit 🔒 indique clairement les objets pas encore accessibles en Boutique.",
   ]},
@@ -1750,6 +1769,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // v2.16.7 — Chantier 6.6 : verrou du matin (parent-contrôlé) — cadrage ludique, jamais "verrouillé".
   const openAvatar = ()=>{
     if(isMorningLocked(player)){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); return; }
+    if(isShopLocked(config,pState,assignments,player.id)){ const need=(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id); showToast&&showToast(`🔒 Fais encore ${need} tâche${need>1?"s":""} rotative${need>1?"s":""} aujourd'hui pour débloquer ton perso!`,"#D9BC5C",3500); return; }
     if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
@@ -2826,7 +2846,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
 
       </>)}
-      {homeTab==="shop" && (<>
+      {homeTab==="shop" && (isShopLocked(config,pState,assignments,player.id) ? (
+        <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pt.accent||player.color}55`,borderRadius:10,padding:20,textAlign:"center",marginTop:8}}>
+          <div style={{fontSize:34,marginBottom:8}}>🔒</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pt.accent||player.color,marginBottom:10}}>BOUTIQUE VERROUILLÉE</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.4}}>
+            Fais encore <b style={{color:"#D9BC5C"}}>{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))}</b> tâche{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))>1?"s":""} rotative{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))>1?"s":""} aujourd'hui pour débloquer la boutique!
+          </div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#888",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT}</div>
+        </div>
+      ) : (<>
       {/* Shop */}
       <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}><UIIcon name="nav_shop" emoji="🛒" size={11}/> BOUTIQUE — {pState.coins} <Coin size={11}/></div>
@@ -2981,7 +3010,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           </div>
         )}
       </div>
-      </>)}
+      </>))}
       {homeTab==="accueil" && (<>
       {/* ── BANNIÈRE « Ma maison » (demande Gen 2026-07-27) : la chambre de l'enfant en large,
           avec son avatar dedans, sur l'écran d'accueil. Tap → Mon Perso (même gate énergie). ── */}
@@ -3461,7 +3490,7 @@ const PARENT_CATS = [
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
-  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onSetDailyLimit, onChangePin,
+  onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onSetDailyLimit, onSetShopUnlockCount, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
   onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
@@ -4043,6 +4072,17 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               </div>
             </div>
           ))}
+          {/* v2.16.26 — Backlog #15 : réglage global (tous les enfants), pas par enfant — plus
+              simple, et les tâches rotatives sont déjà partagées entre eux par la rotation. */}
+          <div style={{background:"rgba(0,0,0,0.3)",border:"2px solid #333",borderRadius:6,padding:"10px 12px",marginTop:10}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🔒 DÉBLOCAGE BOUTIQUE/AVATAR</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:6}}>Nombre de tâches rotatives à faire avant que la boutique et le personnalisateur se débloquent (0 = toujours ouvert).</div>
+            <select value={config.shopUnlockCount??SHOP_UNLOCK_DEFAULT} onChange={e=>onSetShopUnlockCount&&onSetShopUnlockCount(parseInt(e.target.value,10))}
+              style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}>
+              <option value={0}>Toujours débloqué</option>
+              {[1,2,3,4,5].map(n=><option key={n} value={n}>{n} tâche{n>1?"s":""} rotative{n>1?"s":""}</option>)}
+            </select>
+          </div>
         </>}
 
         {/* LOG TAB */}
@@ -5841,6 +5881,15 @@ export default function App() {
     setPinChangeMode(false); setNewPin("");
   },[config,gameStates,persist,logAction,showToast]);
 
+  // v2.16.26 — Backlog #15 : réglage global (pas par enfant, plus simple) du nombre de tâches
+  // rotatives requises avant de débloquer boutique/avatar. 0 = désactivé (voir isShopLocked).
+  const handleSetShopUnlockCount = useCallback((n)=>{
+    const newConfig={...config, shopUnlockCount:Math.max(0,Math.min(10,n))};
+    setConfig(newConfig);
+    persist(newConfig,gameStates);
+    logAction(`🔒 Seuil de déblocage boutique/avatar : ${n} tâche(s) rotative(s)`,"#888");
+  },[config,gameStates,persist,logAction]);
+
   const handleUndo = useCallback(()=>{
     if(!undoStack.length)return;
     const last=undoStack[undoStack.length-1]; setUndoStack(u=>u.slice(0,-1));
@@ -6387,6 +6436,7 @@ export default function App() {
           onAdjustCoins={handleAdjustCoins}
           onSetMorningLock={handleSetMorningLock}
           onSetDailyLimit={handleSetDailyLimit}
+          onSetShopUnlockCount={handleSetShopUnlockCount}
           onChangePin={handleChangePin}
           onExport={handleExport}
           onImport={handleImport}
