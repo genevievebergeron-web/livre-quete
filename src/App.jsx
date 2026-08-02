@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.24";
+const APP_VERSION = "2.16.25";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.25", date:"2026-08-02", features:[
+    "✨ Petit coup de polish : ton avatar, ton niveau et tes pièces sont maintenant visibles direct dans l'onglet Aujourd'hui, et un petit 🔒 indique clairement les objets pas encore accessibles en Boutique.",
+  ]},
   { version:"2.16.24", date:"2026-08-02", features:[
     "🔐 Portail parent réorganisé en 4 catégories (Suivi/Communication/Actions/Compte) au lieu de 8 onglets à plat — plus facile à naviguer. Le Journal sépare maintenant clairement les nouveautés des actions.",
   ]},
@@ -2293,6 +2296,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           le calendrier n'accorde plus d'XP, c'est maintenant purement informationnel (demande de
           Gen) — homeTab==="sem" n'avait plus que ça comme contenu propre, donc plus de wrapper. */}
       {homeTab==="jour" && (<>
+      {/* v2.16.25 — Backlog #16 : petit bandeau avatar + barre XP en haut de "Aujourd'hui", pour
+          garder la mini-vitrine perso visible même sans repasser par Accueil (réutilise AvatarCanvas/
+          xpBar déjà en place, aucun nouveau composant). */}
+      <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(0,0,0,0.35)",border:"2px solid #2a2a2a",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+        <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={36} mood={dashboardMood}
+          style={{border:`2px solid ${pt.accent||player.color}`,borderRadius:4,flexShrink:0}}/>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontFamily:"'Press Start 2P',monospace",fontSize:6,color:pt.accent||player.color,marginBottom:3}}>
+            <span>Niv.{lvTitle.level}</span><span><Coin size={9}/> {pState.coins}</span>
+          </div>
+          <div style={{height:6,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
+            <div style={{height:"100%",width:xpPct+"%",background:`linear-gradient(90deg,${player.color},${pt.accent||"#85CDD1"})`,transition:"width 0.8s ease"}}/>
+          </div>
+        </div>
+      </div>
       {/* Lot 7A — bannière semaine de pause */}
       {!isCustodyWeek() && (()=>{
         const now2=new Date();
@@ -2945,6 +2963,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   className={equipped?"":rar.cls}
                   style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||(canAfford&&hasEnergy)?"pointer":"not-allowed",opacity:!owned&&(!canAfford||!hasEnergy)?0.45:1,filter:!owned&&(!canAfford||!hasEnergy)?"grayscale(1)":"none",position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
+                  {/* v2.16.25 — Backlog #16 : cadenas systématique (déjà présent en Récompenses,
+                      App.jsx ~2925) étendu ici pour une cohérence grisé+cadenas dans tout le jeu. */}
+                  {!owned&&(!canAfford||!hasEnergy)&&<span style={{position:"absolute",top:2,right:3}}><UIIcon name="lock" emoji="🔒" size={10} style={{opacity:0.7}}/></span>}
                   <span className="icon-tile" style={{width:40,height:40,flex:"none",margin:"8px auto 3px"}}>
                     {isDeco
                       ? <DecoSprite decoId={item.id} emoji={item.emoji} size={30}/>
