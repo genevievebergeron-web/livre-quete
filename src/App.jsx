@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.20";
+const APP_VERSION = "2.16.21";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.21", date:"2026-08-02", features:[
+    "🎁 Coffres-surprise plus honnêtes : prix baissés (Commun 50, Rare 120, Légendaire 250) et garantie anti-doublon — tant qu'il reste un objet jamais eu dans ta bande de chance, tu l'obtiens en priorité!",
+  ]},
   { version:"2.16.20", date:"2026-08-02", features:[
     "⚔️ Combat de boss : dès que le boss a perdu 70% de ses PV, un « COUP DE GRÂCE » apparaît — n'importe lequel des 4 membres de la famille peut l'achever, sans jeton!",
   ]},
@@ -2807,7 +2810,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <button key={ch.id} disabled={!can} onClick={()=>{
               if(pState.coins<ch.cost || currentEnergy(pState)<CHEST_ENERGY)return;
               const pool=allShopItemsFlat.filter(it=>it.slot);
-              const item=pickFromChest(pool, ch); if(!item)return;
+              const item=pickFromChest(pool, ch, pState.owned||[]); if(!item)return;
               const dup=pState.owned?.includes(item.id); const refund=Math.max(3,Math.round(baseCost(item)/3));
               onOpenChest&&onOpenChest({cost:ch.cost,itemId:item.id,dup,refund});
               setChestReveal({item,dup,chest:ch,refund});

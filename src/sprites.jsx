@@ -339,18 +339,25 @@ export function BadgeIcon({ badge, earned, size=44, style={} }){
 }
 
 // ─── COFFRES MYSTÈRES (loot boxes) ────────────────────────────
+// v2.16.21 — rééquilibrage éthique (demande de Gen, reprend ANALYSE-GAME-DESIGN.md §"coffres
+// surpayés de 50-64%") : prix ramenés à un niveau honnête par rapport à la valeur espérée réelle.
 export const CHESTS = [
-  { id:"common", name:"Coffre Commun",     cost:80,  color:"#9AA0A6", bands:["Commun","Rare"],                    w:[70,30] },
-  { id:"rare",   name:"Coffre Rare",        cost:170, color:"#4FA3FF", bands:["Rare","Ultra Rare","Légendaire"],  w:[55,35,10] },
-  { id:"epic",   name:"Coffre Légendaire",  cost:320, color:"#FFB02E", bands:["Ultra Rare","Légendaire","Unique"],w:[55,33,12] },
+  { id:"common", name:"Coffre Commun",     cost:50,  color:"#9AA0A6", bands:["Commun","Rare"],                    w:[70,30] },
+  { id:"rare",   name:"Coffre Rare",        cost:120, color:"#4FA3FF", bands:["Rare","Ultra Rare","Légendaire"],  w:[55,35,10] },
+  { id:"epic",   name:"Coffre Légendaire",  cost:250, color:"#FFB02E", bands:["Ultra Rare","Légendaire","Unique"],w:[55,33,12] },
 ];
-export const pickFromChest = (pool, chest) => {
+// v2.16.21 — garantie anti-doublon (pity) : dans la bande tirée, on exclut les items déjà
+// possédés quand c'est possible — on ne retombe sur la bande complète (doublons inclus) que si
+// TOUT y est déjà possédé. Plus honnête que rembourser après coup (33% déjà en place ailleurs).
+export const pickFromChest = (pool, chest, owned=[]) => {
   // tire une bande selon les poids, puis un item de cette bande (repli: tout le pool)
   let r=Math.random()*chest.w.reduce((a,b)=>a+b,0), band=chest.bands[0];
   for(let i=0;i<chest.bands.length;i++){ if(r<chest.w[i]){band=chest.bands[i];break;} r-=chest.w[i]; }
   let cand=pool.filter(it=>rarityOf(it.cost).name===band);
   if(!cand.length) cand=pool;
-  return cand[Math.floor(Math.random()*cand.length)];
+  const fresh=cand.filter(it=>!owned.includes(it.id));
+  const finalCand=fresh.length?fresh:cand;
+  return finalCand[Math.floor(Math.random()*finalCand.length)];
 };
 export function renderChestToCtx(ctx, open, W=96){
   const sc=W/24, s=v=>Math.round(v*sc); ctx.clearRect(0,0,W,W);
