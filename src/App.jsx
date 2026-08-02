@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.21";
+const APP_VERSION = "2.16.22";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.22", date:"2026-08-02", features:[
+    "🪙 Tes pièces ne repartent plus à zéro le vendredi — ton solde reste le tien jusqu'à ce que tu dépenses!",
+  ]},
   { version:"2.16.21", date:"2026-08-02", features:[
     "🎁 Coffres-surprise plus honnêtes : prix baissés (Commun 50, Rare 120, Légendaire 250) et garantie anti-doublon — tant qu'il reste un objet jamais eu dans ta bande de chance, tu l'obtiens en priorité!",
   ]},
@@ -1447,7 +1450,10 @@ const migrateGameState = (gs) => {
   // prod via le merge max — avec `!==`, chaque client À JOUR (clé 2026-07-24) re-effaçait les pièces
   // à CHAQUE chargement jusqu'au vendredi suivant. Comparaison lexicographique sûre (format YYYY-MM-DD).
   const storedWeek = gs.coinsWeek?.week || "";
-  const coinsWeekReset = !!gs.coinsWeek && storedWeek < cwk;
+  // v2.16.22 (Chantier #2, plan du 1er-2 août) — reset hebdomadaire retiré (inéquitable, coïncidait avec
+  // les signalements « pièces perdues » type bug_hlu9mkd) : `noCoinsResetV1` fige `coins` en solde
+  // persistant dès qu'un client a migré une fois — même patron que `rotativeCleanupV1`/`petMigV2` plus haut.
+  const coinsWeekReset = !gs.noCoinsResetV1 && !!gs.coinsWeek && storedWeek < cwk;
   return {
     xp: 0, completed: [], equipped: {},
     ...gs,
@@ -1458,8 +1464,9 @@ const migrateGameState = (gs) => {
     pending: gs.rotativeCleanupV1 ? (gs.pending || []) : [], // v1.108.0 — ménage unique (Gen) : vide les tâches en suspens pour la bascule vers les quêtes rotatives
     rotativeCleanupV1: true, // v1.108.0 — drapeau : ménage de transition Lot 7 appliqué (xp/coins/badges/completed/routines intacts)
     coinsLifetime: gs.coinsLifetime ?? (gs.coins || 0), // v2.5.0 — jamais réinitialisé ni décrémenté (badges Petit Trésor/Oncle Picsou), seedé depuis le solde actuel au premier déploiement
-    coins: coinsWeekReset ? 0 : (gs.coins || 0), // v2.5.0 — remis à 0 au changement de semaine de garde (vendredi minuit)
+    coins: coinsWeekReset ? 0 : (gs.coins || 0), // v2.5.0 — remis à 0 au changement de semaine de garde (vendredi minuit) ; v2.16.22 — plus jamais après la 1re migration, voir noCoinsResetV1
     coinsWeek: { week: storedWeek > cwk ? storedWeek : cwk }, // v2.5.26 — garde le stamp max (cohérent avec le merge v2.5.3) pour ne pas relancer la guerre de stamps avec un vieux client
+    noCoinsResetV1: true, // v2.16.22 — drapeau : reset hebdomadaire des pièces désactivé (solde persistant désormais)
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
