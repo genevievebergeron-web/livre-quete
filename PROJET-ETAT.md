@@ -1,5 +1,9 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-08-02 — v2.16.24_
+_Mis à jour: 2026-08-02 — v2.16.26_
+
+> **v2.16.25-26 — suite du plan.** **v2.16.25** (Backlog #16) — petite refonte décorative : bandeau avatar+niveau+XP+pièces sur l'onglet "Aujourd'hui" ; audit `icon-tile` (déjà cohérent, aucun oubli) ; cadenas 🔒 étendu aux items boutique grisés. **v2.16.26** (Backlog #15) — Boutique + personnalisateur débloqués après X tâches ROTATIVES complétées aujourd'hui (pas un montant d'XP — demande explicite de Gen), réglage parent global 0-5 (défaut 2). Nouveau `rotatingDoneToday`/`isShopLocked`. Vérifié par script Node (12 scénarios) + Chrome (écran verrouillé "0/2" affiché, avatar bloqué, réglage parent fonctionnel). Zéro erreur console, `npm run build` propre aux 2 étapes.
+>
+> Backlog du plan `1-ajouter-un-token-unified-milner.md` : 8/13 chantiers faits (#5, #18, #3, #4, #12, #8/9/10, #16, #15). Restent : #2 (restitution — chiffres à confirmer avec Gen), #1 (sécurité, nécessite Claude in Chrome), #7/11 (nav, gros), #13 (stats/ligues, gros), #17 (tâches en équipe, gros).
 
 > **v2.16.23-24 — suite du plan.** **v2.16.23** (Backlog #12) — cartes `FamilyOverview` allégées (XP/pièces retirés, déjà dans le popup Profil). **v2.16.24** (Backlog #8/9/#10) — `ParentPanel` : 8 onglets à plat regroupés en 4 catégories (Suivi/Communication/Actions/Compte, nouveau `PARENT_CATS`) ; Journal segmenté en 2 sections repliables (Nouveautés/Actions) au lieu d'un bloc "Historique" mélangé. Vérifié en Chrome (vue Famille + mode parent, les 4 catégories + sous-onglets naviguent correctement, rien perdu), zéro erreur console, `npm run build` propre aux 2 étapes.
 
