@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.26";
+const APP_VERSION = "2.16.27";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.27", date:"2026-08-02", features:[
+    "🛡️ Petite amélioration technique côté serveur (rien de visible pour toi).",
+  ]},
   { version:"2.16.26", date:"2026-08-02", features:[
     "🔒 Nouveau réglage parent : la Boutique et le personnalisateur peuvent maintenant demander de faire quelques tâches rotatives d'abord (réglable, désactivable). Le jeu indique clairement combien il en reste!",
   ]},
