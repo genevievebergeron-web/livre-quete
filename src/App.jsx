@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.19";
+const APP_VERSION = "2.16.20";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.20", date:"2026-08-02", features:[
+    "⚔️ Combat de boss : dès que le boss a perdu 70% de ses PV, un « COUP DE GRÂCE » apparaît — n'importe lequel des 4 membres de la famille peut l'achever, sans jeton!",
+  ]},
   { version:"2.16.19", date:"2026-08-02", features:[
     "🎨 Les objets de la Boutique pas encore accessibles (trop chers ou énergie basse) s'affichent maintenant grisés en plus d'être atténués, pour être plus clairs d'un coup d'œil.",
   ]},
@@ -1685,7 +1688,7 @@ const TITLE_EASTER_EGGS = [
 
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
-const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, onBossFinish, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -3071,6 +3074,16 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#D9BC5C":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#0d0d0d":"#999",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 🐾 Attaque du familier<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{PET_ATTACK_COST} jetons · dégâts selon ton familier{_petReady?"":" — nourris-le, niv.4+"}</span>
               </button>
+              {/* v2.16.20 — Coup de grâce : dès 70%+ de dégâts (hpPct<=30, même seuil que le mode
+                  enragé ci-dessus), accessible aux 4 enfants SANS jeton — c'est la finition
+                  collective, pas une attaque de plus. */}
+              {enraged && <div style={{background:"linear-gradient(180deg,#3a2e0e,#1a1a1a)",border:"2px solid #D9BC5C",borderRadius:8,padding:"10px 12px",textAlign:"center",display:"flex",flexDirection:"column",gap:8}}>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C"}}>🔥 Le boss vacille! Coup de grâce disponible!</span>
+                <button className="btn-press" onClick={()=>{ if(SFX.click)SFX.click(); onBossFinish&&onBossFinish(); }}
+                  style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 6px",background:"#D9BC5C",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
+                  ⚔️ COUP DE GRÂCE
+                </button>
+              </div>}
               {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
             </>)}
           </div>
@@ -5233,6 +5246,42 @@ export default function App() {
     });
   },[gameStates,persist,showToast]);
 
+  // v2.16.20 — Coup de grâce : dès que le boss a perdu 70%+ de ses PV (hpPct<=30, même seuil que
+  // le mode "enraged" déjà existant), les 4 enfants peuvent l'achever d'un coup, SANS jeton — c'est
+  // la finition collective, pas une attaque de plus (demande de Gen : « les 4 enfants doivent y
+  // avoir accès »). Même patron que handleBossAttack/handleBossPetAttack (verrou bossQuestsAllDone
+  // conservé tel quel — si les corvées du jour ne sont pas finies, le message "RÉSISTE" habituel
+  // s'affiche, le coup de grâce ne contourne pas ce verrou).
+  const handleBossFinish = useCallback((playerIdx)=>{
+    const boss = cfgRef.current?.boss; if(!boss || boss.defeatedAt) return;
+    const bid = boss.startedAt;
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
+      const bb=(p.bossBattle&&p.bossBattle.bossId===bid)?p.bossBattle:{bossId:bid,earned:0,spent:0,dmg:0};
+      const totalDmgBefore = n.reduce((s,g)=> s + ((g.bossBattle&&g.bossBattle.bossId===bid)?(g.bossBattle.dmg||0):0), 0) + repairDamageFor(cfgRef.current?.repairEvents, bid);
+      const HPMAX=(boss.hpMax||80);
+      const hpPctBefore = Math.round(Math.max(0,HPMAX-totalDmgBefore)/HPMAX*100);
+      if(hpPctBefore>30) return gs; // pas encore à 70%+ de dégâts — le bouton ne devrait même pas être cliquable
+      const dmg = Math.max(0, HPMAX-totalDmgBefore); // juste assez pour finir, jamais plus
+      const newBB={...bb, dmg:bb.dmg+dmg};
+      n[playerIdx]={...p, bossBattle:newBB};
+      let totalDmg = totalDmgBefore + dmg;
+      let nb = {...boss, lastHitTs:new Date().toISOString()};
+      const questsDone=bossQuestsAllDone(cfgRef.current, n);
+      if(!questsDone && totalDmg > HPMAX-1){ const over=totalDmg-(HPMAX-1); newBB.dmg=Math.max(bb.dmg||0, newBB.dmg-over); n[playerIdx]={...p, bossBattle:newBB}; totalDmg=HPMAX-1; }
+      const locked = !questsDone && totalDmg >= HPMAX-1;
+      const defeated = questsDone && totalDmg >= HPMAX;
+      const alreadyClaimed = n.some(g=>g.bossClaimed===bid);
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } }
+      else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
+      const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
+      const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
+      setConfig(ncfg); persist(ncfg, n);
+      if(defeated && !alreadyClaimed){ setTimeout(()=>{ try{ if(!CALM){ spawnParticles("🎉"); spawnParticles("🏆"); } SFX.epic&&SFX.epic(); }catch{} showToast(`🏆 Boss vaincu! Récompense ultra légendaire pour tout le monde!`,"#D9BC5C",5000); },150); }
+      else if(locked){ setTimeout(()=>{ try{ if(!CALM) spawnParticles(boss.emoji||"🐉"); }catch{} showToast(`${boss.emoji||"🐉"} ${boss.name||"Le boss"} RÉSISTE! Finissez TOUTES vos corvées pour l'achever! ⚡`,"#D98C8C",3600); },60); }
+      return n;
+    });
+  },[persist,showToast]);
+
   // Le parent crée/assigne une routine à un enfant (atterrit dans gs[idx].routines)
   const handleAssignRoutine = useCallback((playerIdx, routine)=>{
     if(playerIdx==null||!routine?.name?.trim()||!(routine.taskIds||[]).length)return;
@@ -5822,6 +5871,7 @@ export default function App() {
   const onDashDismissAnnouncement = useCallback((id)=>handleDismissAnnouncement(view,id), [view, handleDismissAnnouncement]); // v2.6.0
   const onDashBossAttack = useCallback((type)=>handleBossAttack(view,type), [view, handleBossAttack]);
   const onDashBossPetAttack = useCallback(()=>handleBossPetAttack(view), [view, handleBossPetAttack]);
+  const onDashBossFinish = useCallback(()=>handleBossFinish(view), [view, handleBossFinish]);
   const onDashLogout = useCallback(()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}, []);
   const onDashOpenParentPin = useCallback(()=>{SFX.click();setParentPinOpen(true);}, []);
   const onDashReportBug = useCallback((text)=>handleReportBug(text, displayName(config.players[view])), [config, view, handleReportBug]);
@@ -6209,6 +6259,7 @@ export default function App() {
             onDismissAnnouncement={onDashDismissAnnouncement}
             onBossAttack={onDashBossAttack}
             onBossPetAttack={onDashBossPetAttack}
+            onBossFinish={onDashBossFinish}
             allStates={gameStates}
             onLogout={onDashLogout}
             onOpenParentPin={onDashOpenParentPin}
