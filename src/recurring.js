@@ -297,6 +297,18 @@ export function carryOverUnfinishedTasks(assignments, gameStates, players, today
       (b.days || []).some(d => custodyOrder(d) >= todayOrder)
     );
     if (hasUpcomingOccurrence) return a;
+    // v2.16.18 — bug signalé par Gen : un enfant qui rate sa tâche rotative peut se la faire
+    // reporter aujourd'hui alors que la ROTATION NORMALE l'a déjà attribuée à un AUTRE enfant
+    // aujourd'hui même (ex: vaisselle manquée lundi par A, reportée mercredi, alors que la
+    // rotation assigne déjà la vaisselle de mercredi à C) — 2 enfants voient la même tâche
+    // physique le même jour. La vérification ci-dessus (hasUpcomingOccurrence) ne regarde que
+    // LE MÊME enfant ; celle-ci regarde N'IMPORTE QUEL AUTRE enfant, seulement pour AUJOURD'HUI
+    // précisément (pas plus tard cette semaine — un report reste légitime si personne d'autre
+    // n'a cette tâche aujourd'hui, même si quelqu'un l'aura vendredi).
+    const hasSameDayElsewhere = assignments.some(b =>
+      b !== a && b.taskId === a.taskId && (b.days || []).includes(todayDayIdx)
+    );
+    if (hasSameDayElsewhere) return a;
     changed = true;
     return { ...a, days: [...a.days, todayDayIdx] };
   });

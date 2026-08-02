@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.17";
+const APP_VERSION = "2.16.19";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,12 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.19", date:"2026-08-02", features:[
+    "🎨 Les objets de la Boutique pas encore accessibles (trop chers ou énergie basse) s'affichent maintenant grisés en plus d'être atténués, pour être plus clairs d'un coup d'œil.",
+  ]},
+  { version:"2.16.18", date:"2026-08-02", features:[
+    "🧹 Correctif : une tâche rotative manquée qui revient un autre jour ne s'affiche plus en double chez 2 enfants le même jour.",
+  ]},
   { version:"2.16.17", date:"2026-07-30", features:[
     "🖥️ Sur tablette/ordinateur : les popups Archives, Signaler un bug, Réglages, Choix du thème et Choisir une quête restent maintenant lisibles au centre de l'écran au lieu de s'étirer d'un bord à l'autre.",
   ]},
@@ -2918,7 +2924,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return (
                 <div key={item.id} onClick={()=>{ if(equipped||(isDeco&&owned))return; if(owned&&item.slot&&!isDeco){setMoodFor("equipped",3000);onEquip(item,player.id);} else if(!owned&&canAfford&&!hasEnergy){SFX.click&&SFX.click();const m=minsToEnergy(pState,SHOP_ENERGY);showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour acheter ça!`,"#85CDD1",3000);} else if(!owned&&canAfford){onBuy(item,player.id);} else if(!owned&&!canAfford){SFX.click&&SFX.click();showToast(`🪙 Pas assez de pièces! Il t'en manque ${iPrice-(pState.coins||0)}.`,"#D98C8C",2600);} }}
                   className={equipped?"":rar.cls}
-                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||(canAfford&&hasEnergy)?"pointer":"not-allowed",opacity:!owned&&(!canAfford||!hasEnergy)?0.45:1,position:"relative"}}>
+                  style={{background:equipped?"linear-gradient(180deg,#5CAD6814,rgba(0,0,0,0.45))":undefined,border:equipped?"2px solid #5CAD68":undefined,borderRadius:6,padding:"7px 5px 5px",textAlign:"center",cursor:equipped||(isDeco&&owned)?"default":owned||(canAfford&&hasEnergy)?"pointer":"not-allowed",opacity:!owned&&(!canAfford||!hasEnergy)?0.45:1,filter:!owned&&(!canAfford||!hasEnergy)?"grayscale(1)":"none",position:"relative"}}>
                   <span style={{position:"absolute",top:2,left:0,right:0,fontFamily:"'Press Start 2P',monospace",fontSize:4,color:rar.color}}>{rar.name.toUpperCase()}</span>
                   <span className="icon-tile" style={{width:40,height:40,flex:"none",margin:"8px auto 3px"}}>
                     {isDeco
