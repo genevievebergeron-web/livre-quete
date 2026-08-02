@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.23";
+const APP_VERSION = "2.16.24";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.24", date:"2026-08-02", features:[
+    "🔐 Portail parent réorganisé en 4 catégories (Suivi/Communication/Actions/Compte) au lieu de 8 onglets à plat — plus facile à naviguer. Le Journal sépare maintenant clairement les nouveautés des actions.",
+  ]},
   { version:"2.16.23", date:"2026-08-02", features:[
     "👨‍👩‍👧‍👦 Vue Famille allégée : les cartes montrent maintenant juste l'essentiel (qui a fait quoi aujourd'hui) — XP/pièces/série restent dans le Profil détaillé.",
   ]},
@@ -3427,6 +3430,13 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
 // ═══════════════════════════════════════════════════════════════
 
 // ─── PARENT PANEL ────────────────────────────────────────────
+// v2.16.24 — Backlog #8/9 : 8 onglets à plat regroupés en 4 catégories.
+const PARENT_CATS = [
+  { k:"suivi",   l:"Suivi",         icon:"parent_validate", em:"📋", color:"#D99248", tabs:["valid","tasks","defis"] },
+  { k:"comm",    l:"Communication", icon:"parent_annonces", em:"📣", color:"#85CDD1", tabs:["annonces","log"] },
+  { k:"actions", l:"Actions",       icon:"parent_actions",  em:"⚡", color:"#D9BC5C", tabs:["actions"] },
+  { k:"compte",  l:"Compte",        icon:"parent_code",     em:"⚙️", color:"#888",    tabs:["pin","export"] },
+];
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
   onApproveProposal, onRefuseProposal,
@@ -3438,6 +3448,9 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
   const nbValid = nbPending + removalReqs.length + proposals.length;
   const [tab, setTab] = useState(nbValid>0?"valid":"actions"); // valid | tasks | actions | cal | log | pin | export
+  // v2.16.24 — Backlog #8/9 : les 8 onglets à plat regroupés en 4 catégories (moins de bruit visuel,
+  // patron à 2 niveaux catégorie→sous-onglet, réutilise TabBtn tel quel). PARENT_CATS défini plus bas.
+  const [cat, setCat] = useState(()=> nbValid>0 ? "suivi" : "actions");
   const [xpPlayer, setXpPlayer] = useState(0);
   const [xpDelta, setXpDelta] = useState(10);
   const [pinVal, setPinVal] = useState("");
@@ -3456,6 +3469,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   const [customOpen, setCustomOpen] = useState(false); // modale création tâche perso
   const [chooserOpen, setChooserOpen] = useState(false); // v1.82.0 (Lot 1 #3/B7) — grille TaskChooser au lieu du <select> plat
   const [errLogsOpen, setErrLogsOpen] = useState(false); // v1.90.0 — section logs techniques repliée par défaut
+  const [newsOpen, setNewsOpen] = useState(false); // v2.16.24 — Backlog #10 : nouveautés repliées par défaut
+  const [actionsLogOpen, setActionsLogOpen] = useState(true); // v2.16.24 — actions parent dépliées par défaut (le plus consulté)
   const [defiDraft, setDefiDraft] = useState({}); // Lot 7C — {[playerId]: {text, emoji}} pour l'édition des défis
   // v2.6.0 — formulaire création d'annonce parent
   const [annDraft, setAnnDraft] = useState({ emoji:"📣", title:"", text:"", secret:false, targetAll:true, targetPlayerIds:[], countdownTo:"", countdownLabel:"", countdownDoneText:"", dismissLabel:"", sharedTasksDraft:"", sharedTasksLabel:"", expiresAt:"", playerTasksDraft:{} });
@@ -3498,16 +3513,23 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Catégories (Backlog #8/9) — 4 groupes au lieu de 8 onglets à plat */}
+      <div style={{display:"flex",gap:4,padding:"8px 10px 0",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
+        {PARENT_CATS.map(c=>(
+          <button key={c.k} onClick={()=>{ setCat(c.k); if(!c.tabs.includes(tab)) setTab(c.tabs[0]); }}
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",
+              padding:"9px 4px",background:cat===c.k?c.color:"#1a1a1a",color:cat===c.k?"#0d0d0d":"#888",
+              border:`2px solid ${cat===c.k?c.color:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+            <UIIcon name={c.icon} emoji={c.em} size={11}/> {c.l}{c.k==="suivi"&&nbValid>0?` (${nbValid})`:""}
+          </button>
+        ))}
+      </div>
+      {/* Sous-onglets de la catégorie active */}
       <div style={{display:"flex",gap:4,padding:"8px 10px",flexShrink:0,background:"#111",flexWrap:"wrap"}}>
-        <TabBtn k="valid"    icon="parent_validate" em="✅" l={`À valider${nbValid>0?` (${nbValid})`:""}`}/>
-        <TabBtn k="tasks"    icon="parent_tasks"    em="📋" l="Tâches"/>
-        <TabBtn k="defis"    icon="parent_defis"    em="🌟" l="Défis"/>
-        <TabBtn k="actions"  icon="parent_actions"  em="⚡" l="Actions"/>
-        <TabBtn k="annonces" icon="parent_annonces" em="📣" l="Annonces"/>
-        <TabBtn k="log"      icon="parent_journal"  em="🕐" l="Journal"/>
-        <TabBtn k="pin"      icon="parent_code"     em="🔐" l="Code"/>
-        <TabBtn k="export"   icon="parent_save"     em="💾" l="Sauvegarde"/>
+        {PARENT_CATS.find(c=>c.k===cat).tabs.map(k=>{
+          const meta={valid:["parent_validate","✅",`À valider${nbValid>0?` (${nbValid})`:""}`],tasks:["parent_tasks","📋","Tâches"],defis:["parent_defis","🌟","Défis"],actions:["parent_actions","⚡","Actions"],annonces:["parent_annonces","📣","Annonces"],log:["parent_journal","🕐","Journal"],pin:["parent_code","🔐","Code"],export:["parent_save","💾","Sauvegarde"]}[k];
+          return <TabBtn key={k} k={k} icon={meta[0]} em={meta[1]} l={meta[2]}/>;
+        })}
       </div>
 
       {/* Content */}
@@ -4173,23 +4195,39 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               ))}
             </div>
           )}
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>HISTORIQUE ({actionLog.length})</div>
-          {/* Changelog de mise à jour */}
-          {(config.updateFeedEntries||[]).map((entry,i)=>(
-            <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginBottom:8}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:6}}>📖 LIVRE DE QUÊTES v{entry.version} — NOUVELLES PAGES!</div>
-              {entry.features.map((f,j)=>(
-                <div key={j} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.4,paddingLeft:8}}>• {f}</div>
+          {/* v2.16.24 — Backlog #10 : "HISTORIQUE" mélangeait à plat le changelog et les actions
+              parent brutes — séparé en 2 sections distinctes et repliables (même patron visuel
+              que 🔧 LOGS TECHNIQUES ci-dessus). */}
+          {(config.updateFeedEntries||[]).length>0 && (
+            <div style={{background:"rgba(94,222,245,0.05)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
+              <div onClick={()=>setNewsOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>📖 NOUVEAUTÉS ({(config.updateFeedEntries||[]).length})</div>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{newsOpen?"▲":"▼"}</span>
+              </div>
+              {newsOpen && (config.updateFeedEntries||[]).map((entry,i)=>(
+                <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginTop:8}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:6}}>📖 LIVRE DE QUÊTES v{entry.version} — NOUVELLES PAGES!</div>
+                  {entry.features.map((f,j)=>(
+                    <div key={j} style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ccc",lineHeight:1.4,paddingLeft:8}}>• {f}</div>
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
-          {actionLog.length===0 && (config.updateFeedEntries||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444"}}>Aucune action encore.</div>}
-          {actionLog.map((entry,i)=>(
-            <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1a1a1a"}}>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",flexShrink:0,marginTop:2}}>{entry.time}</span>
-              <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:entry.color||"#aaa",lineHeight:1.3}}>{entry.msg}</span>
+          )}
+          <div style={{background:"rgba(255,255,255,0.03)",border:"2px solid #333",borderRadius:6,padding:"10px 12px"}}>
+            <div onClick={()=>setActionsLogOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>🕐 ACTIONS ({actionLog.length})</div>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{actionsLogOpen?"▲":"▼"}</span>
             </div>
-          ))}
+            {actionsLogOpen && (actionLog.length===0
+              ? <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444",marginTop:8}}>Aucune action encore.</div>
+              : actionLog.map((entry,i)=>(
+                <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1a1a1a",marginTop:i===0?8:0}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",flexShrink:0,marginTop:2}}>{entry.time}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:entry.color||"#aaa",lineHeight:1.3}}>{entry.msg}</span>
+                </div>
+              )))}
+          </div>
         </>}
 
         {/* PIN TAB */}
