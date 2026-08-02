@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.22";
+const APP_VERSION = "2.16.23";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -210,6 +210,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.23", date:"2026-08-02", features:[
+    "👨‍👩‍👧‍👦 Vue Famille allégée : les cartes montrent maintenant juste l'essentiel (qui a fait quoi aujourd'hui) — XP/pièces/série restent dans le Profil détaillé.",
+  ]},
   { version:"2.16.22", date:"2026-08-02", features:[
     "🪙 Tes pièces ne repartent plus à zéro le vendredi — ton solde reste le tien jusqu'à ce que tu dépenses!",
   ]},
@@ -3291,10 +3294,9 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${player.color},${th.accent})`,transition:"width 0.8s ease"}}/>
                 </div>
               </div>
-              <div style={{display:"flex",gap:10}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {ps.xp}</span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}><Coin size={10}/> {ps.coins}</span>
-              </div>
+              {/* v2.16.22 — Backlog #12 : XP/pièces retirés d'ici (déjà dans le popup Profil,
+                  juste en dessous) — la carte reste un coup d'œil rapide "quêtes du jour",
+                  le Profil devient LA source de détail (niveau/XP/pièces/série/inventaire). */}
               <div style={{display:"flex",gap:6,marginTop:8}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color,flex:1,alignSelf:"center"}}>{mayOpen(i)?"Voir mes quêtes →":"Voir le profil →"}</div>
                 <button onClick={e=>{e.stopPropagation();SFX.click();setProfileIdx(i);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:th.accent,border:`1px solid ${th.accent}`,borderRadius:3,cursor:"pointer",flexShrink:0}}>📊 Profil</button>
