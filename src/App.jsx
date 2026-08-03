@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.30";
+const APP_VERSION = "2.16.31";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.31", date:"2026-08-03", features:[
+    "📅 L'onglet « Semaine » s'appelle maintenant « Calendrier » — il montre tes rendez-vous et événements en 7 colonnes. Tes tâches de la semaine, elles, ont déménagé dans « Quêtes » (nouveau bouton « Cette semaine » en haut à droite)!",
+  ]},
   { version:"2.16.30", date:"2026-08-03", features:[
     "⛶ La Minuterie a déménagé dans l'onglet « Rituels » — plus facile à trouver quand tu en as besoin!",
   ]},
@@ -1742,6 +1745,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
+  const [jourView, setJourView] = useState("today"); // v2.16.31 — Backlog #7+#11 incrément 4/5 : toggle "Aujourd'hui"/"Cette semaine" DANS l'onglet Quêtes (pMode==="week" seulement)
   const [openRoutineGroups, setOpenRoutineGroups] = useState({}); // mode "Tout" : quels rituels sont dépliés
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [bugOpen, setBugOpen] = useState(false); const [bugText, setBugText] = useState("");
@@ -2479,7 +2483,19 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         </div>
       )}
 
-      {homeTab==="jour" && (<>
+      {/* v2.16.31 — Backlog #7+#11 incrément 4/5 : la vue 7-colonnes de l'ancien onglet "Semaine"
+          devient un 2e mode d'affichage ici, dans "Quêtes" (seulement en mode "📋 Mes tâches" —
+          les Rituels ont déjà leur propre déroulé journalier, pas de sens à segmenter par semaine). */}
+      {homeTab==="jour" && pMode==="week" && (
+        <div style={{display:"flex",justifyContent:"flex-end",gap:4,marginTop:2}}>
+          {[["today","✅ Aujourd'hui"],["week","📅 Cette semaine"]].map(([v,l])=>{
+            const active = jourView===v;
+            return <button key={v} onClick={()=>{ SFX.click&&SFX.click(); setJourView(v); }}
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"#777",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
+          })}
+        </div>
+      )}
+      {homeTab==="jour" && !(pMode==="week" && jourView==="week") && (<>
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
@@ -2738,11 +2754,15 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {taskTimerFor && <TaskTimerModal task={taskTimerFor} accent={th.accent||player.color} onClose={()=>setTaskTimerFor(null)}/>}
 
       </>)}
-      {homeTab==="sem" && (<>
+      {homeTab==="jour" && pMode==="week" && jourView==="week" && (<>
       {/* v2.6.1 — Vue Semaine en colonnes (comme un calendrier papier), demandée par Gen.
           Toggle 🗓️/📋 persisté PAR ENFANT (settings.weekCols, défaut colonnes) — repères stables :
           l'ancienne liste reste à un tap. 7 colonnes = les 7 prochains jours à partir d'AUJOURD'HUI,
-          défilement horizontal avec snap (téléphone), aujourd'hui encadré à l'accent du thème. */}
+          défilement horizontal avec snap (téléphone), aujourd'hui encadré à l'accent du thème.
+          v2.16.31 — Backlog #7+#11 incrément 4/5 : déplacée depuis l'ex-onglet "Semaine" (devenu
+          "Calendrier", vue événements-only — voir onGoCalendars). Les événements du calendrier,
+          qui étaient épinglés en haut de chaque colonne depuis v2.15.3, sont retirés d'ici : ils
+          vivent maintenant exclusivement dans l'écran Calendrier pour éviter la duplication. */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",color:"#85CDD1"}}>📅 MA SEMAINE</div>
         <div style={{display:"flex",gap:4}}>
@@ -2768,18 +2788,6 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div key={stamp} style={{flex:"0 0 auto",width:138,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${acc}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                 {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
-                {/* v2.15.3 — les événements du calendrier reviennent ici, épinglés EN HAUT de chaque
-                    colonne et visuellement distincts des quêtes (demande de Gen 28 juillet, remplace
-                    la décision v2.6.6 "tâches seulement" — elle veut voir l'horaire du camp partout). */}
-                {(()=>{
-                  const dayEvents=(pState.calendar||[]).filter(e=> e && (e.recur?.freq==="daily" || (e.recur?.freq==="weekly" && e.recur.day===dIdx) || e.date===stamp));
-                  return dayEvents.map(e=>(
-                    <div key={e.id} style={{display:"flex",gap:4,alignItems:"flex-start",marginTop:3,padding:"3px 5px",background:"rgba(133,205,209,0.12)",border:"1px solid #85CDD155",borderRadius:3}}>
-                      <span style={{fontSize:10,lineHeight:"13px"}}><UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)} size={10}/></span>
-                      <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
-                    </div>
-                  ));
-                })()}
                 {dayTasks.length===0 && (
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:4}}>🌿 Libre</div>
                 )}
@@ -3038,23 +3046,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       <div onClick={openAvatar} style={{marginTop:8,cursor:"pointer"}} title="Ma maison — touche pour personnaliser">
         <HouseScene player={player} pState={pState} width={bannerW} ratio={0.36}/>
       </div>
-      {/* ── MENU : accès aux autres écrans (remplace les onglets du haut) ── */}
-      {/* v2.6.6 — c'est en fait le SEUL accès enfant à l'écran Calendrier (le footer n'est qu'un
-          bouton retour "🏠 Accueil", pas une barre de nav — la nav du haut avec l'onglet 📅 est
-          cachée en session enfant). Le point d'accès en double que Gen voulait retirer était
-          "Mon calendrier" intégré dans l'onglet Ma semaine, pas celui-ci — retiré séparément. */}
-      {/* v2.16.30 — Backlog #7+#11 incrément 3/5 : "Famille" retiré d'ici (redondant depuis
-          l'ajout de son propre onglet dans la nav du bas en v2.16.29) et "Minuterie" déplacé
-          dans le sous-onglet Rituels (voir plus bas, bouton "⛶ Minuteur plein écran" visible
-          avec ou sans rituel actif) — seul "Calendrier" reste ici en attendant l'incrément qui
-          le transforme en vue 7-colonnes événements-only et le branche à la nav du bas. */}
-      {onGoCalendars && (
-      <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr",gap:8}}>
-        {/* v2.16.5 — Chantier 6.4 (demande de Gen) : icônes personnalisées au lieu des emojis bruts,
-            même patron UIIcon que les tabs boutique (repli emoji automatique tant que le PNG n'existe pas). */}
-        <button onClick={onGoCalendars} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-          <UIIcon name="nav_week" emoji="📅" size={22} block/>Calendrier</button>
-      </div>)}
+      {/* v2.16.31 — Backlog #7+#11 incréments 3+4/5 : le dernier bouton du menu Accueil
+          ("Calendrier") est retiré à son tour — même raison que "Famille" en v2.16.30, devenu
+          pur doublon depuis que "Calendrier" a sa propre place dans la nav du bas (ex-onglet
+          "Semaine"). Le menu Accueil (Famille/Calendrier/Minuterie à l'origine) est maintenant
+          entièrement vide — les 3 destinations ont chacune leur point d'accès dédié ailleurs. */}
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#D9BC5C",marginBottom:4}}>🏅 BADGES</div>
@@ -3186,17 +3182,20 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           // "actif" au sens des autres onglets puisqu'on quitte le dashboard). v2.16.30 —
           // increment 3/5 : bouton "Famille" retiré du bloc Accueil (redondant avec l'onglet du
           // bas) et "Minuterie" déplacée dans le sous-onglet Rituels (avec ou sans rituel actif).
-          // Reste à faire par incréments ultérieurs : transformer Calendrier en vue 7-colonnes
-          // événements-only et le brancher à la nav du bas (remplacera l'onglet "Semaine"
-          // ci-dessous), puis fusionner les tâches de "Semaine" dans "Quêtes" via un toggle —
-          // voir le plan 1-ajouter-un-token-unified-milner.md §#7+#11 et PROJET-ETAT.md.
-          const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Quêtes","nav_today"],["family","👨‍👩‍👧‍👦","Famille","nav_family"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
-          return tabs.map(([k,ic,lb,icn])=>{ const isFamily=k==="family"; const on=!isFamily&&homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
+          // v2.16.31 — increments 3+4/5 (couplés) : "Semaine" devient "Calendrier" — même
+          // position/icône, mais navigue maintenant vers view==="calendars" (via onGoCalendars,
+          // même patron que Famille/onGoFamily) plutôt que de basculer un homeTab local, puisque
+          // son contenu (vue 7-colonnes événements-only) vit désormais dans l'écran Calendrier
+          // partagé — voir plus bas. Les tâches qu'affichait l'ancien onglet "Semaine" ont
+          // migré dans "Quêtes" via le toggle "Aujourd'hui"/"Cette semaine" (jourView).
+          const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Quêtes","nav_today"],["family","👨‍👩‍👧‍👦","Famille","nav_family"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Calendrier","nav_week"],["shop","🛒","Boutique","nav_shop"]];
+          return tabs.map(([k,ic,lb,icn])=>{ const isFamily=k==="family"; const isCalendars=k==="sem"; const on=!isFamily&&!isCalendars&&homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
             const locked=k==="shop"&&morningLocked;
             return (
               <button key={k} onClick={()=>{
                   if(locked){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); SFX.click(); return; }
                   if(isFamily){ onGoFamily&&onGoFamily(); return; }
+                  if(isCalendars){ onGoCalendars&&onGoCalendars(); return; }
                   setHomeTab(k);SFX.click();
                 }}
                 style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer",opacity:locked?0.5:1}}>
@@ -4365,41 +4364,6 @@ const recurLabel = (e) => {
   if (e?.recur?.freq==="weekly") return "Chaque "+(DAYS[e.recur.day]||"?");
   return e?.date||"";
 };
-// v2.6.6 — refonte calendrier (demande de Gen) : sections par moment de journée + heure optionnelle.
-// `time` ("HH:MM") est un champ optionnel sur les entrées de calendrier — sans heure, l'événement
-// tombe dans la section "Toute la journée". Libellés texte seul (sans emoji, demande de Gen) —
-// l'icône du type d'événement à côté de chaque entrée suffit, doubler avec un emoji par section
-// était du bruit visuel.
-const DAY_PARTS = [
-  { key:"dejeuner",  label:"Lever",       from:6*60,        to:10*60 },
-  { key:"avantmidi", label:"Matin",       from:10*60,       to:11*60+30 },
-  { key:"diner",     label:"Dîner",       from:11*60+30,    to:13*60+30 },
-  { key:"apresmidi", label:"Après-midi",  from:13*60+30,    to:17*60 },
-  { key:"souper",    label:"Souper",      from:17*60,       to:19*60+30 },
-  { key:"soir",      label:"Soirée",      from:19*60+30,    to:30*60 }, // >24h = avant 6h le lendemain
-];
-const dayPartOf = (time) => {
-  if (!time) return null; // pas d'heure → section "Toute la journée"
-  const [h,m] = time.split(":").map(Number);
-  if (Number.isNaN(h)) return null;
-  let mins = h*60+(m||0);
-  if (mins < 6*60) mins += 24*60; // avant 6h du matin = fin de la section "Soir" de la veille
-  return DAY_PARTS.find(p => mins>=p.from && mins<p.to) || DAY_PARTS[DAY_PARTS.length-1];
-};
-// Prochaines dates (ISO) d'un événement sur N jours (gère récurrence)
-const upcomingOccurrences = (e, days=14) => {
-  const out=[]; const today=new Date(); today.setHours(0,0,0,0);
-  for(let d=0; d<days; d++){
-    const dt=new Date(today); dt.setDate(today.getDate()+d); const iso=dt.toISOString().slice(0,10);
-    let hit=false;
-    if(e?.recur?.freq==="daily") hit=true;
-    else if(e?.recur?.freq==="weekly") hit=((dt.getDay()+6)%7)===e.recur.day;
-    else hit=(e?.date===iso);
-    if(hit) out.push(iso);
-  }
-  return out;
-};
-
 // ─── MINUTERIE (chrono + rituel + encouragements) ────────────
 const TIMER_ENCOURAGE=["Continue, tu es capable! 💪","Super rythme! ⚡","Tu gères ça comme un·e champion·ne! 🔥","Presque là, lâche pas! 🌟","Wow, quelle belle énergie! 🚀","Tu fais ça super bien! 👏"];
 function TimerView({ config, gameStates, sessionPlayer, parentMode, th, onComplete, initialRitualId, onCompleteTask }){
@@ -6288,51 +6252,48 @@ export default function App() {
                 </div>
               )}
               {/* v2.15.2 — colonnes flex qui s'ajustent (demande de Gen) : les calendriers des
-                  enfants se placent côte à côte quand l'écran le permet, et s'empilent sur mobile. */}
+                  enfants se placent côte à côte quand l'écran le permet, et s'empilent sur mobile.
+                  v2.16.31 — Backlog #7+#11 incréments 3+4/5 : chaque carte enfant passe de la
+                  liste "14 prochains jours groupés par date" à une grille "7 colonnes" (même
+                  patron visuel que l'ex-onglet "Semaine", maintenant retiré des tâches — voir
+                  homeTab==="jour"), scrollable horizontalement, jours à partir d'AUJOURD'HUI. */}
               <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-start"}}>
               {order.map(i=>{ const p=config.players[i]; const cal=(gameStates[i]?.calendar)||[];
                 const mine=i===sessionPlayer;
-                const items=cal.flatMap(e=>upcomingOccurrences(e,14).map(d=>({d,e}))).sort((a,b)=>a.d.localeCompare(b.d)||(a.e.time||"").localeCompare(b.e.time||"")).slice(0,20);
-                // Regroupement par date, puis par section de moment de journée à l'intérieur de chaque date.
-                const byDate=new Map(); for(const it of items){ if(!byDate.has(it.d)) byDate.set(it.d,[]); byDate.get(it.d).push(it.e); }
                 return (
                   <div key={p.id} style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${p.color}99`,borderRadius:8,padding:12,flex:"1 1 300px",minWidth:0}}>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:p.color,marginBottom:6}}>{displayName(p)}{mine?" (toi)":""}</div>
-                    {byDate.size===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777"}}>Rien de prévu dans les 2 prochaines semaines.</div>}
-                    {[...byDate.entries()].map(([d,evs])=>{
-                      const noTime=evs.filter(e=>!e.time);
-                      const withTime=evs.filter(e=>e.time);
-                      // Colonnes flex verticales séparées par section (demande de Gen) — un bloc par
-                      // moment de journée, chacun empilant ses entrées, avec un filet de séparation
-                      // entre blocs plutôt qu'un simple retrait de texte.
-                      const sections=[{label:"Toute la journée",evs:noTime}, ...DAY_PARTS.map(p2=>({label:p2.label,evs:withTime.filter(e=>dayPartOf(e.time)?.key===p2.key)}))].filter(s=>s.evs.length>0);
-                      return (
-                        <div key={d} style={{marginBottom:10}}>
-                          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",marginBottom:4}}>{fmtDateShort(d)}</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                            {sections.map(sec=>(
-                              <div key={sec.label} style={{display:"flex",flexDirection:"column",gap:4,paddingTop:6,borderTop:"1px solid #262626"}}>
-                                <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{sec.label}</div>
-                                {sec.evs.map((e,k)=>{
-                                  const editable = parentMode || (mine && (e.type||"evenement")==="evenement");
-                                  return (
-                                  <div key={k} style={{display:"flex",gap:8,alignItems:"center",padding:"3px 0"}}>
-                                    <span style={{fontSize:14}}><UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)} size={14}/></span>
-                                    {e.time && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1",minWidth:34}}>{e.time}</span>}
-                                    <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",flex:1}}>{e.label}</span>
-                                    {editable && <>
-                                      <button onClick={()=>startEdit(e,i)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:13,lineHeight:1}}>✏️</button>
-                                      <button onClick={()=>deleteEntry(e.id,i)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
-                                    </>}
+                    <div style={{display:"flex",gap:6,overflowX:"auto",scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",paddingBottom:6}}>
+                      {Array.from({length:7},(_,k)=>{
+                        const dt=new Date(); dt.setDate(dt.getDate()+k);
+                        // stamp en date LOCALE (jamais toISOString — leçon v2.5.24)
+                        const stamp=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+                        const dIdx=(dt.getDay()+6)%7;
+                        const dayEvents=cal.filter(e=> e && (e.recur?.freq==="daily" || (e.recur?.freq==="weekly" && e.recur.day===dIdx) || e.date===stamp));
+                        const isToday=k===0;
+                        return (
+                          <div key={stamp} style={{flex:"0 0 auto",width:128,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${p.color}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
+                            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?p.color:"#999",marginBottom:4}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
+                            {dayEvents.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555"}}>🌿 Rien</div>}
+                            {dayEvents.map(e=>{
+                              const editable = parentMode || (mine && (e.type||"evenement")==="evenement");
+                              return (
+                                <div key={e.id} style={{display:"flex",flexDirection:"column",gap:1,marginTop:4,padding:"3px 5px",background:"rgba(133,205,209,0.12)",border:"1px solid #85CDD155",borderRadius:3}}>
+                                  <div style={{display:"flex",gap:4,alignItems:"flex-start"}}>
+                                    <span style={{fontSize:11,lineHeight:"13px"}}><UIIcon name={calEventIconName(e)} emoji={calEventIcon(e)} size={11}/></span>
+                                    <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",flex:1,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
                                   </div>
-                                  );
-                                })}
-                              </div>
-                            ))}
+                                  {editable && <div style={{display:"flex",gap:6,marginTop:2,alignSelf:"flex-end"}}>
+                                    <button onClick={()=>startEdit(e,i)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:11,lineHeight:1,padding:0}}>✏️</button>
+                                    <button onClick={()=>deleteEntry(e.id,i)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:12,lineHeight:1,padding:0}}>✕</button>
+                                  </div>}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}

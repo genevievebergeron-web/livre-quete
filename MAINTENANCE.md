@@ -487,3 +487,22 @@ Phase 1 : lecture `GET /api/famille` (HTTP 200) — 14 `config.bugs`, identiques
 Phase 3 : repris #7+#11 (increment 3/5 dans le séquencement reproposé en v2.16.28 — nettoyage du bloc 3-boutons Accueil). Retiré le bouton "Famille" (doublon depuis l'ajout de son onglet en v2.16.29) et déplacé le point d'accès "Minuterie" dans le sous-onglet Rituels (nouveau bouton visible même sans rituel actif, en plus du bouton existant qui ne s'affichait que rituel actif) — voir l'entrée détaillée dans `PROJET-ETAT.md` (v2.16.30) pour le détail technique complet et la vérification Chrome (desktop + mobile, avec et sans rituel actif, zéro erreur console). `npm run build` propre, `v2.16.30` poussé.
 
 Prochain candidat naturel : increments 3 (Calendrier → 7-colonnes événements-only) + 4 (fusion des tâches de Semaine dans Quêtes) du chantier #7+#11 — couplés, à faire ensemble dans une session dédiée (plus gros que les incréments précédents).
+
+---
+
+## Session du 2026-08-03 (nuit, routine autonome, suite) — Backlog #7+#11 incréments 3+4/5 (v2.16.31)
+
+Phase 0 : `git pull` propre (déjà à jour sur `v2.16.30`), `npm run build` propre.
+
+Phase 1 : lecture `GET /api/famille` (HTTP 200) — 14 `config.bugs`, identiques id pour id à tous les passages précédents documentés depuis le 31 juillet, rien de nouveau. `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente, inchangés.
+
+Phase 3 : repris #7+#11 là où `v2.16.30` l'avait laissé — les 2 derniers incréments couplés (transformer Calendrier en 7-colonnes événements-only + le brancher à la nav du bas ; fusionner les tâches de l'ancienne vue "Semaine" dans "Quêtes"). Détail technique complet (fichiers, lignes, raisonnement) dans `PROJET-ETAT.md`, entrée v2.16.31. Résumé :
+- L'onglet du bas "📅 Semaine" devient "📅 Calendrier" — navigue maintenant vers `view==="calendars"` via `onGoCalendars` (même patron que "Famille"/`onGoFamily`) plutôt que de basculer un `homeTab` local.
+- `view==="calendars"` (déjà la seule vraie source d'écran calendrier, multi-enfants côte à côte) passe de "14 jours groupés par date" à une grille "7 colonnes" scrollable — même style visuel que l'ancien onglet Semaine, boutons ✏️/✕ conservés.
+- Le dernier bouton du menu Accueil ("Calendrier") retiré — même raison que "Famille" en v2.16.30, pur doublon.
+- La grille 7-colonnes de TÂCHES (ex-onglet "Semaine") a migré dans "Quêtes", derrière un nouveau toggle "✅ Aujourd'hui"/"📅 Cette semaine" (visible seulement en mode "Mes tâches" — les Rituels gardent leur flux inchangé). Les événements du calendrier qu'elle épinglait en haut de chaque colonne depuis v2.15.3 ont été retirés (ils vivent maintenant exclusivement dans Calendrier, plus de duplication).
+- Nettoyage : `DAY_PARTS`/`dayPartOf`/`upcomingOccurrences` supprimés (plus aucun appelant après la transformation de la vue calendrier).
+
+Vérifié en Chrome (serveur isolé port 5199, joueur de test `Test` existant — jamais la prod) : bottom nav affiche "Calendrier" à la place de "Semaine" ; clic → grille 7-colonnes multi-enfants, ajout/modification/suppression d'un événement récurrent hebdo testés de bout en bout (apparaît dans la bonne colonne, formulaire d'édition pré-rempli, suppression confirmée) ; onglet Quêtes → toggle "Cette semaine" affiche la grille de tâches (Colonnes/Liste, sans événements dupliqués) ; mode Rituels confirmé SANS le toggle (n'affecte que "Mes tâches") ; re-testé à 375px (mobile) — scroll horizontal propre sur les deux grilles ; zéro erreur console à chaque étape. `npm run build` propre, `v2.16.31` poussé.
+
+**Le chantier #7+#11 (restructuration nav) est maintenant complet** (5/5 incréments). Prochains gros chantiers du plan `1-ajouter-un-token-unified-milner.md` : #13 (stats historiques + concept "ligues", déjà décidé — paliers individuels non-comparatifs) et #17 (tâches en équipe entre enfants) — les deux "gros, plusieurs sessions", à traiter dans cet ordre selon le plan.
