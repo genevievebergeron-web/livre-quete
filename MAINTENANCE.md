@@ -475,3 +475,15 @@ Phase 1 : lecture `GET /api/famille` (HTTP 200) — 14 `config.bugs`, identiques
 Phase 3 : avec #1 à #10 du plan `1-ajouter-un-token-unified-milner.md` faits (voir `PROJET-ETAT.md`), il ne restait que 3 gros chantiers multi-sessions (#7/11 nav, #13 stats/ligues, #17 tâches en équipe). Repris #7+#11 (premier de l'ordre d'exécution proposé) — voir l'entrée détaillée dans `PROJET-ETAT.md` (v2.16.28) pour le détail technique complet, le raisonnement de reséquencement (renommage isolé du retrait des 3 boutons Accueil, pour ne jamais casser l'accès enfant à Famille/Calendrier/Minuterie entre deux incréments) et la vérification Chrome. `npm run build` propre, `v2.16.28` poussé.
 
 Prochain candidat naturel pour la prochaine session : suite du chantier #7+#11 (incrément 2/5 — ajouter "Famille" comme onglet de la nav du bas, actuellement un `view` séparé plutôt qu'un `homeTab` — demandera d'unifier ou de dupliquer la barre de nav sur cet écran).
+
+---
+
+## Session du 2026-08-03 (nuit, routine autonome) — Backlog #7+#11 incrément 3/5 (v2.16.30)
+
+Phase 0 : `git pull` propre (déjà à jour), `npm run build` propre. `git log` montre qu'une session précédente très récente avait déjà poussé `v2.16.29` (increment 2/5 — "Famille" ajouté à la nav du bas).
+
+Phase 1 : lecture `GET /api/famille` (HTTP 200) — 14 `config.bugs`, identiques id pour id à tous les passages précédents documentés depuis le 31 juillet, rien de nouveau. `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente, inchangés.
+
+Phase 3 : repris #7+#11 (increment 3/5 dans le séquencement reproposé en v2.16.28 — nettoyage du bloc 3-boutons Accueil). Retiré le bouton "Famille" (doublon depuis l'ajout de son onglet en v2.16.29) et déplacé le point d'accès "Minuterie" dans le sous-onglet Rituels (nouveau bouton visible même sans rituel actif, en plus du bouton existant qui ne s'affichait que rituel actif) — voir l'entrée détaillée dans `PROJET-ETAT.md` (v2.16.30) pour le détail technique complet et la vérification Chrome (desktop + mobile, avec et sans rituel actif, zéro erreur console). `npm run build` propre, `v2.16.30` poussé.
+
+Prochain candidat naturel : increments 3 (Calendrier → 7-colonnes événements-only) + 4 (fusion des tâches de Semaine dans Quêtes) du chantier #7+#11 — couplés, à faire ensemble dans une session dédiée (plus gros que les incréments précédents).

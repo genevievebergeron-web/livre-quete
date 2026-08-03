@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.29";
+const APP_VERSION = "2.16.30";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.30", date:"2026-08-03", features:[
+    "⛶ La Minuterie a déménagé dans l'onglet « Rituels » — plus facile à trouver quand tu en as besoin!",
+  ]},
   { version:"2.16.29", date:"2026-08-03", features:[
     "👨‍👩‍👧‍👦 « Famille » a maintenant sa propre place dans la barre du bas!",
   ]},
@@ -2832,6 +2835,15 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           ⛶ Minuteur plein écran (avec XP){activeRoutine.endTime?` · ${activeRoutine.endTime.replace(":","h")}`:""}
         </button>
       )}
+      {/* v2.16.30 — Backlog #7+#11 incrément 3/5 : la Minuterie n'a plus de destination indépendante
+          depuis Accueil (voir plus haut) — vit maintenant ici, dans Rituels, même en mode "🗂️ Tout"
+          (aucun rituel sélectionné) pour ne perdre aucun accès (ex: minuteur libre "Défi minuté"). */}
+      {pMode==="routine" && !activeRoutine && onGoTimer && (
+        <button onClick={()=>{SFX.click();onGoTimer(null);}}
+          style={{width:"100%",padding:"9px",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:th.accent||player.color,background:"transparent",border:`1px solid ${(th.accent||player.color)}55`,borderRadius:4,cursor:"pointer",marginTop:4}}>
+          ⛶ Minuteur plein écran
+        </button>
+      )}
       {/* Terminer la routine → retour au mode Semaine */}
       {activeRoutine && (
         <button className="btn-press" onClick={()=>{
@@ -3031,22 +3043,17 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           bouton retour "🏠 Accueil", pas une barre de nav — la nav du haut avec l'onglet 📅 est
           cachée en session enfant). Le point d'accès en double que Gen voulait retirer était
           "Mon calendrier" intégré dans l'onglet Ma semaine, pas celui-ci — retiré séparément. */}
-      {(onGoFamily||onGoCalendars||onGoTimer) && (
-      <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+      {/* v2.16.30 — Backlog #7+#11 incrément 3/5 : "Famille" retiré d'ici (redondant depuis
+          l'ajout de son propre onglet dans la nav du bas en v2.16.29) et "Minuterie" déplacé
+          dans le sous-onglet Rituels (voir plus bas, bouton "⛶ Minuteur plein écran" visible
+          avec ou sans rituel actif) — seul "Calendrier" reste ici en attendant l'incrément qui
+          le transforme en vue 7-colonnes événements-only et le branche à la nav du bas. */}
+      {onGoCalendars && (
+      <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr",gap:8}}>
         {/* v2.16.5 — Chantier 6.4 (demande de Gen) : icônes personnalisées au lieu des emojis bruts,
             même patron UIIcon que les tabs boutique (repli emoji automatique tant que le PNG n'existe pas). */}
-        {onGoFamily && (
-          <button onClick={onGoFamily} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <UIIcon name="nav_family" emoji="👨‍👩‍👧‍👦" size={22} block/>Famille</button>)}
-        {onGoCalendars && (
-          <button onClick={onGoCalendars} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <UIIcon name="nav_week" emoji="📅" size={22} block/>Calendrier</button>)}
-        {onGoTimer && (
-          // v1.86.0 (Lot 2 #6) — transmet le rituel ACTIF du dashboard (s'il y en a un) au lieu
-          // d'ouvrir la minuterie toujours "vierge" : le même rituel reste sélectionné qu'on y
-          // arrive par ici (Accueil) ou par "⛶ Minuteur plein écran" depuis l'onglet Rituels.
-          <button onClick={()=>onGoTimer(activeRoutine?.id)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <UIIcon name="nav_timer" emoji="⏱️" size={22} block/>Minuterie</button>)}
+        <button onClick={onGoCalendars} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.85vw,8px)",lineHeight:1.5,color:"#fff",background:"rgba(0,0,0,0.45)",border:`2px solid ${(pt.accent||"#888")}55`,borderRadius:10,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+          <UIIcon name="nav_week" emoji="📅" size={22} block/>Calendrier</button>
       </div>)}
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
@@ -3176,10 +3183,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           // v2.16.28 — Backlog #7+#11 increment 1/5 : "Aujourd'hui" renommé "Quêtes" (décision de
           // Gen, 1er août). v2.16.29 — increment 2/5 : "Famille" ajouté comme onglet à part
           // entière (navigue vers view==="family" via onGoFamily, pas un homeTab local — jamais
-          // "actif" au sens des autres onglets puisqu'on quitte le dashboard). Le reste de la
-          // restructuration (Calendrier 7-colonnes événements-only, retrait des 3 boutons
-          // Accueil, déplacement de Minuterie dans Rituels) reste à faire par incréments
-          // ultérieurs — voir le plan 1-ajouter-un-token-unified-milner.md §#7+#11 et PROJET-ETAT.md.
+          // "actif" au sens des autres onglets puisqu'on quitte le dashboard). v2.16.30 —
+          // increment 3/5 : bouton "Famille" retiré du bloc Accueil (redondant avec l'onglet du
+          // bas) et "Minuterie" déplacée dans le sous-onglet Rituels (avec ou sans rituel actif).
+          // Reste à faire par incréments ultérieurs : transformer Calendrier en vue 7-colonnes
+          // événements-only et le brancher à la nav du bas (remplacera l'onglet "Semaine"
+          // ci-dessous), puis fusionner les tâches de "Semaine" dans "Quêtes" via un toggle —
+          // voir le plan 1-ajouter-un-token-unified-milner.md §#7+#11 et PROJET-ETAT.md.
           const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Quêtes","nav_today"],["family","👨‍👩‍👧‍👦","Famille","nav_family"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
           return tabs.map(([k,ic,lb,icn])=>{ const isFamily=k==="family"; const on=!isFamily&&homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
             const locked=k==="shop"&&morningLocked;
