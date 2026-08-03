@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.32";
+const APP_VERSION = "2.16.33";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.33", date:"2026-08-03", features:[
+    "📊 Ton profil affiche maintenant une courbe de tes 30 derniers jours d'XP!",
+  ]},
   { version:"2.16.32", date:"2026-08-03", features:[
     "🛠️ Petite fondation technique pour les futures stats historiques (rien de visible pour toi).",
   ]},

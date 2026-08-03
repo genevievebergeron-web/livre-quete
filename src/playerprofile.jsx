@@ -6,7 +6,7 @@ import { useState } from "react";
 import { SFX } from "./sfx.js";
 import { getPlayerTheme, shopItemById } from "./themes.js";
 import { getLevelTitle, xpBar } from "./leveling.js";
-import { BADGES, rarityOf } from "./catalog.js";
+import { BADGES, rarityOf, TASK_CATALOG } from "./catalog.js";
 import { petLevel } from "./pets.js";
 import { displayName, todayStamp, streakOf } from "./shared.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
@@ -26,6 +26,29 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
   const streak = streakOf(gs.activeDays);
   const siblings = config.players.map((pl,i)=>({name:displayName(pl),xp:gameStates[i]?.xp||0,color:pl.color,isMe:pl.id===player.id})).sort((a,b)=>b.xp-a.xp);
   const maxXp = Math.max(...siblings.map(s=>s.xp),1);
+  // v2.16.33 — Backlog #13, incrément 2 : courbe XP des 30 derniers jours. Source PAR JOUR :
+  // `xpLog` (toutes sources, depuis v2.16.32) quand il a une entrée ce jour-là, sinon repli sur
+  // `completedAt` (quêtes seulement, historique pré-xpLog). Jamais les deux additionnés — un jour
+  // avec au moins 1 entrée xpLog est forcément un jour où xpLog était déjà actif, donc complet et
+  // fiable pour CE jour ; les additionner aurait compté les quêtes en double. Date tirée du SUFFIXE
+  // `#YYYY-MM-DD` du doneKey (date locale posée par todayStamp() au moment de l'action), jamais de
+  // l'ISO de completedAt (UTC — même piège que le bug v2.5.24 du reset de pièces).
+  const xpHistory = (() => {
+    const ds = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dates = [...Array(30)].map((_,i)=>{ const d=new Date(today); d.setDate(d.getDate()-(29-i)); return ds(d); });
+    const xpLogByDate = {}; (gs.xpLog||[]).forEach(e=>{ if(e&&e.date) xpLogByDate[e.date]=(xpLogByDate[e.date]||0)+(e.amount||0); });
+    const xpLogDates = new Set(Object.keys(xpLogByDate));
+    const assXp = {}; (assignments||[]).forEach(a=>{ const t=[...TASK_CATALOG,...(config.customTasks||[])].find(x=>x.id===a.taskId); assXp[a.instanceId]=t?(t.xp||0):0; });
+    const completedAtByDate = {};
+    Object.keys(gs.completedAt||{}).forEach(doneKey=>{
+      const dateStr=doneKey.split("#")[1]; if(!dateStr) return;
+      const base=doneKey.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_"));
+      completedAtByDate[dateStr]=(completedAtByDate[dateStr]||0)+(assXp[inst]||0);
+    });
+    const days = dates.map(dateStr => xpLogDates.has(dateStr) ? (xpLogByDate[dateStr]||0) : (completedAtByDate[dateStr]||0));
+    return { dates, days, todayDs: ds(today), total: days.reduce((a,b)=>a+b,0), maxDay: Math.max(1,...days) };
+  })();
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16}} onClick={onClose}>
       <div style={{background:"#111",border:`4px solid ${player.color}`,borderRadius:12,padding:20,maxWidth:380,width:"100%",boxShadow:`0 0 40px ${player.color}60`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
@@ -56,6 +79,23 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
               <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{lbl}</div>
             </div>
           ))}
+        </div>
+        {/* 📊 Courbe XP des 30 derniers jours (Backlog #13, incrément 2) */}
+        <div style={{marginBottom:14,background:"rgba(0,0,0,0.4)",border:"2px solid #33333366",borderRadius:8,padding:"10px 10px 8px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>📊 30 DERNIERS JOURS</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡{xpHistory.total}</span>
+          </div>
+          {xpHistory.total===0
+            ? <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666"}}>Pas encore d'XP sur cette période.</div>
+            : <div style={{display:"grid",gridTemplateColumns:"repeat(30,1fr)",gap:1,alignItems:"end",height:34}}>
+                {xpHistory.days.map((v,i)=>(
+                  <div key={xpHistory.dates[i]} title={`${xpHistory.dates[i].slice(5)} : ${v} XP`}
+                    style={{width:"100%",height:`${Math.max(v>0?2:1,(v/xpHistory.maxDay)*30)}px`,
+                      background:xpHistory.dates[i]===xpHistory.todayDs?player.color:`${player.color}77`,
+                      borderRadius:"1px 1px 0 0",border:xpHistory.dates[i]===xpHistory.todayDs?"1px solid #fff":"none"}}/>
+                ))}
+              </div>}
         </div>
         {myBadges.length>0&&(
           <div style={{marginBottom:12}}>
