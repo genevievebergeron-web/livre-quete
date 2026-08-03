@@ -31,6 +31,14 @@ export const streakOf = (activeDays) => {
   return n;
 };
 
+// v2.16.32 — Backlog #13 (stats historiques), fondation : journal d'XP horodaté, alimenté à
+// CHAQUE octroi (quête, boss, rituel, objectif du jour) peu importe la source — contrairement à
+// `completedAt` qui ne couvre que les quêtes normales. Plafonné à 500 entrées (même esprit que
+// `refusedKeys`/`removedCalendarIds` : borné, pas un historique infini). Ignore les montants ≤0
+// (garde-fou, ne devrait jamais arriver mais évite de polluer le journal si un appelant passe 0).
+export const appendXpLog = (xpLog, amount, source) =>
+  amount > 0 ? [...(xpLog || []), { date: todayStamp(), amount, source }].slice(-500) : (xpLog || []);
+
 export const COLORS = ["#5F87B3","#A874B0","#5CAD68","#C77B54","#D9BC5C","#D97070","#4FA8B3","#8A5A96","#C4789E","#0a0a0a","#F0F0FF"];
 
 // Lot 6 #26 — mapping ancien→nouveau pour la migration ponctuelle des couleurs de joueurs déjà

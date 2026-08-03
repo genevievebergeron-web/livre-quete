@@ -8,7 +8,7 @@ import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./ui.jsx";
-import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP, streakOf } from "./shared.js";
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP, streakOf, appendXpLog } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.31";
+const APP_VERSION = "2.16.32";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.32", date:"2026-08-03", features:[
+    "🛠️ Petite fondation technique pour les futures stats historiques (rien de visible pour toi).",
+  ]},
   { version:"2.16.31", date:"2026-08-03", features:[
     "📅 L'onglet « Semaine » s'appelle maintenant « Calendrier » — il montre tes rendez-vous et événements en 7 colonnes. Tes tâches de la semaine, elles, ont déménagé dans « Quêtes » (nouveau bouton « Cette semaine » en haut à droite)!",
   ]},
@@ -1188,6 +1191,7 @@ const mergeGS = (a, b, preferIncoming) => {
     coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
+    xpLog: [...(a.xpLog || []), ...(b.xpLog || [])].sort((x, y) => (x.date || "").localeCompare(y.date || "")).slice(-500), // v2.16.32 — non-autoritatif (juste pour un graphique), union bornée suffit
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées (sinon l'union les ré-ajoutait au portail parent)
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
@@ -1533,6 +1537,7 @@ const migrateGameState = (gs) => {
     petNickname: gs.petNickname || {}, // v2.4.2 — surnom personnalisé par familier {petId:string}
     dismissedAnnouncements: gs.dismissedAnnouncements || [], // v2.6.0 — annonces parent archivées par l'enfant
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
+    xpLog: gs.xpLog || [], // v2.16.32 — Backlog #13 : journal d'XP horodaté toutes sources (voir appendXpLog)
     refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
     refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
@@ -4943,7 +4948,7 @@ export default function App() {
       // Count tasks done today for streak badge (clés du jour: ..._player#YYYY-MM-DD)
       const today="#"+todayStamp();
       const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
-      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+(task.coins||0),completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()}};
+      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+(task.coins||0),completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()},xpLog:appendXpLog(p.xpLog,task.xp,"quete")};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount, completionCatCounts(updatedPs, cfgRef.current||config));
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).
@@ -5303,7 +5308,7 @@ export default function App() {
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
       const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou le familier a peut-être déjà accordé la victoire
-      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, xpLog:appendXpLog(n[i].xpLog,50,"boss"), owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
       const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
@@ -5337,7 +5342,7 @@ export default function App() {
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
       const alreadyClaimed = n.some(g=>g.bossClaimed===bid); // v2.5.25 — idempotence : le filet de sécurité ou une attaque de joueur a peut-être déjà accordé la victoire
-      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, xpLog:appendXpLog(n[i].xpLog,50,"boss"), owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } } // v1.74.0 — +40🪙 +50XP + badge + item ULTRA LÉGENDAIRE + notif différée à chaque enfant
       else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
       const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
@@ -5373,7 +5378,7 @@ export default function App() {
       const locked = !questsDone && totalDmg >= HPMAX-1;
       const defeated = questsDone && totalDmg >= HPMAX;
       const alreadyClaimed = n.some(g=>g.bossClaimed===bid);
-      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } }
+      if(defeated && !alreadyClaimed){ nb.defeatedAt=new Date().toISOString(); for(let i=0;i<n.length;i++){ const _it=pickUltraLegendary(); n[i]={...n[i], coins:(n[i].coins||0)+40, coinsLifetime:(n[i].coinsLifetime||0)+40, xp:(n[i].xp||0)+50, xpLog:appendXpLog(n[i].xpLog,50,"boss"), owned:[...new Set([...(n[i].owned||[]), _it.id])], badges:[...new Set([...(n[i].badges||[]),"b_boss"])], bossClaimed:bid, pendingCelebrations:[...(n[i].pendingCelebrations||[]), {id:"c_"+uid(), bossWin:{name:boss.name,emoji:boss.emoji,color:boss.color}, itemId:_it.id, itemName:_it.name, itemEmoji:_it.emoji}]}; } }
       else if(defeated && alreadyClaimed){ nb.defeatedAt = nb.defeatedAt || new Date().toISOString(); }
       const fe = (defeated && !alreadyClaimed) ? {id:"f_"+uid(),ts:Date.now(),likes:[],type:"boss",playerId:"parent",emoji:"🏆",text:`🎉 La famille a VAINCU le ${boss.name}! +40 🪙 et +50 XP pour tout le monde! 🏆`} : null;
       const ncfg={...cfgRef.current, boss:nb, feed: fe?[fe,...(cfgRef.current.feed||[])].slice(0,60):cfgRef.current.feed};
@@ -5729,7 +5734,7 @@ export default function App() {
       return;
     }
     const bonus=Math.min(40, 5*Math.max(1,(ritual?.taskIds?.length||1)));
-    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus};
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus, xpLog:appendXpLog(p.xpLog,bonus,"rituel")};
       const txt=`${displayName(player)} a complété son rituel « ${ritual.name} » en ${minutes} min! (+${bonus} XP)`;
       const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:txt};
       const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};
@@ -5771,7 +5776,7 @@ export default function App() {
     const wk=todayStamp();
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]; const dc=(p.dailyClaimed&&p.dailyClaimed.day===wk)?p.dailyClaimed:{day:wk,ids:[]};
       if(dc.ids.includes(obj.id))return gs;
-      n[playerIdx]={...p, xp:(p.xp||0)+(obj.xp||0), coins:(p.coins||0)+(obj.coins||0), coinsLifetime:(p.coinsLifetime||0)+(obj.coins||0), dailyClaimed:{day:wk,ids:[...dc.ids,obj.id]}};
+      n[playerIdx]={...p, xp:(p.xp||0)+(obj.xp||0), coins:(p.coins||0)+(obj.coins||0), coinsLifetime:(p.coinsLifetime||0)+(obj.coins||0), xpLog:appendXpLog(p.xpLog,obj.xp||0,"objectif"), dailyClaimed:{day:wk,ids:[...dc.ids,obj.id]}};
       persist(config,n); return n; });
     setTimeout(()=>{ try{ if(!CALM) spawnParticles("🎯"); SFX.epic&&SFX.epic(); }catch{} },120);
     showToast(`🎯 Objectif réussi! +${obj.xp} XP${obj.coins?` +${obj.coins} 🪙`:""}`,"#5CAD68",3500);

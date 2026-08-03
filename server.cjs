@@ -108,6 +108,7 @@ const mergeGS = (a, b, preferIncoming) => {
     coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
     completed,
     completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
+    xpLog: [...(a.xpLog||[]), ...(b.xpLog||[])].sort((x,y)=>(x.date||"").localeCompare(y.date||"")).slice(-500), // v2.16.32 — miroir du merge client, non-autoritatif (juste un graphique)
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
