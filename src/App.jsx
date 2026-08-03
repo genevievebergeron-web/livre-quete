@@ -24,7 +24,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.27";
+const APP_VERSION = "2.16.28";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +226,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.28", date:"2026-08-02", features:[
+    "🗡️ L'onglet « Aujourd'hui » s'appelle maintenant « Quêtes »!",
+  ]},
   { version:"2.16.27", date:"2026-08-02", features:[
     "🛡️ Petite amélioration technique côté serveur (rien de visible pour toi).",
   ]},
@@ -3167,7 +3170,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <div style={{display:"flex",width:"100%",maxWidth:900}}>
         {(()=>{ const acc=pt.accent||player.color; const bossActive=config.boss && !config.boss.defeatedAt;
           const morningLocked=isMorningLocked(player); // v2.16.7 — Chantier 6.6
-          const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Aujourd'hui","nav_today"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
+          // v2.16.28 — Backlog #7+#11 increment 1/5 : "Aujourd'hui" renommé "Quêtes" (décision de
+          // Gen, 1er août). Le reste de la restructuration (Famille en onglet du bas, Calendrier
+          // 7-colonnes événements-only, retrait des 3 boutons Accueil, déplacement de Minuterie
+          // dans Rituels) reste à faire par incréments ultérieurs — voir le plan
+          // 1-ajouter-un-token-unified-milner.md §#7+#11 et PROJET-ETAT.md.
+          const tabs=[["accueil","🏠","Accueil","nav_home"],["jour","✅","Quêtes","nav_today"],...(bossActive?[["boss","⚔️","BOSS","nav_boss"]]:[]),["sem","📅","Semaine","nav_week"],["shop","🛒","Boutique","nav_shop"]];
           return tabs.map(([k,ic,lb,icn])=>{ const on=homeTab===k; const isBoss=k==="boss"; const col=isBoss?"#FF5555":acc;
             const locked=k==="shop"&&morningLocked;
             return (
