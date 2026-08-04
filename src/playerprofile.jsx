@@ -40,7 +40,10 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
     const dates = [...Array(30)].map((_,i)=>{ const d=new Date(today); d.setDate(d.getDate()-(29-i)); return ds(d); });
     const xpLogByDate = {}; (gs.xpLog||[]).forEach(e=>{ if(e&&e.date) xpLogByDate[e.date]=(xpLogByDate[e.date]||0)+(e.amount||0); });
     const xpLogDates = new Set(Object.keys(xpLogByDate));
-    const assXp = {}; (assignments||[]).forEach(a=>{ const t=[...TASK_CATALOG,...(config.customTasks||[])].find(x=>x.id===a.taskId); assXp[a.instanceId]=t?(t.xp||0):0; });
+    // Backlog #17 — garde-fou défensif : une tâche teamSplit n'a jamais accordé le plein XP catalogue.
+    // En pratique ce repli ne sert qu'aux jours antérieurs à xpLog (v2.16.32), donc antérieurs à teamSplit
+    // (v2.16.35) lui-même — le cas ne peut pas survenir — mais on garde la même règle partout par cohérence.
+    const assXp = {}; (assignments||[]).forEach(a=>{ const t=[...TASK_CATALOG,...(config.customTasks||[])].find(x=>x.id===a.taskId); const raw=t?(t.xp||0):0; assXp[a.instanceId]=a.teamSplit?Math.round(raw/2):raw; });
     const completedAtByDate = {};
     Object.keys(gs.completedAt||{}).forEach(doneKey=>{
       const dateStr=doneKey.split("#")[1]; if(!dateStr) return;

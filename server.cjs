@@ -191,8 +191,10 @@ const mergeFamily = (base, incoming) => {
   const _keepTask = t => referencedTaskIds.has(t.id) || !_rmCT.has(t.id);
   const taskMap = new Map(); (bC.customTasks||[]).forEach(t => { if (_keepTask(t)) taskMap.set(t.id, t); }); (iC.customTasks||[]).forEach(t => { if (_keepTask(t) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
   const newer = preferIncoming ? incoming : base; const newerC = newer.config||{};
+  // v2.16.35 — miroir du merge client : invitations "en équipe" enfant→enfant, union-by-id + statut COLLANT
+  const teamInvites = (() => { const m=new Map(); for (const inv of [...(bC.teamInvites||[]), ...(iC.teamInvites||[])]) { if (!inv||inv.id==null) continue; const prev=m.get(inv.id); if (!prev) m.set(inv.id,{ ...inv }); else if (prev.status==="pending"&&inv.status&&inv.status!=="pending") m.set(inv.id,{ ...inv }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(inv=>inv.status==="pending"||(inv.createdAt||0)>cut).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,40); })();
   const config = {
-    ...bC, ...iC, players, assignments:[...assignMap.values()], removedAssignments, customTasks:[...taskMap.values()], removedCustomTasks,
+    ...bC, ...iC, players, assignments:[...assignMap.values()], removedAssignments, customTasks:[...taskMap.values()], removedCustomTasks, teamInvites,
     selectedRewards:_uniq([...(bC.selectedRewards||[]), ...(iC.selectedRewards||[])]),
     feed: (() => { const m=new Map(); for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); else m.set(f.id,{ ...f, likes:[...(f.likes||[])] }); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
     // v2.6.0 — miroir du merge client : quêtes de réparation 🕊️, union-by-id exactly-once

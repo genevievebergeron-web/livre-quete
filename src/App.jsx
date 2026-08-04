@@ -25,7 +25,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.34";
+const APP_VERSION = "2.16.35";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -227,6 +227,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.35", date:"2026-08-04", features:[
+    "🤝 Nouveau : fais une tâche « en équipe » avec ton frère/sœur! Invite-le/la depuis une de tes tâches — s'il/elle accepte, vous partagez l'XP et les pièces.",
+  ]},
   { version:"2.16.34", date:"2026-08-03", features:[
     "🎖️ Nouveau : ta Ligue personnelle (Bronze/Argent/Or/Diamant) apparaît dans ton profil — basée sur TES propres jours actifs, jamais un classement avec tes frères/sœurs, et ton palier ne redescend jamais!",
   ]},
@@ -1328,6 +1331,18 @@ const mergeFamily = (base, incoming) => {
   const _rmProp = new Set(removedProposals);
   const propMap = new Map();
   [...(bC.childTaskProposals || []), ...(iC.childTaskProposals || [])].forEach((p) => { if (p && p.id && !_rmProp.has(p.id)) propMap.set(p.id, p); });
+  // v2.16.35 — Backlog #17 incrément 1 : invitations "en équipe" enfant→enfant — union par id, résolution
+  // (accepté/refusé) COLLANTE une fois prise, même patron que coinOffers (sinon un appareil resté sur
+  // "pending" pourrait faire revivre une invitation déjà tranchée par l'autre enfant sur un autre appareil).
+  const teamInviteMap = new Map();
+  for (const inv of [...(bC.teamInvites || []), ...(iC.teamInvites || [])]) {
+    if (!inv || inv.id == null) continue;
+    const prevInv = teamInviteMap.get(inv.id);
+    if (!prevInv) teamInviteMap.set(inv.id, { ...inv });
+    else if (prevInv.status === "pending" && inv.status && inv.status !== "pending") teamInviteMap.set(inv.id, { ...inv });
+  }
+  const teamInvitesCutoff = Date.now() - 2 * 864e5;
+  const teamInvites = [...teamInviteMap.values()].filter(inv => inv.status === "pending" || (inv.createdAt || 0) > teamInvitesCutoff).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 40);
   const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
   const newerC = newer.config || {};
   const config = {
@@ -1340,6 +1355,7 @@ const mergeFamily = (base, incoming) => {
     removalRequests: [...reqMap.values()],
     childTaskProposals: [...propMap.values()],
     removedProposals,
+    teamInvites,
     selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
       const m = new Map();
@@ -1601,6 +1617,7 @@ const migrateSavedData = (data) => {
   if (!Array.isArray(mergedConfig.assignments)) mergedConfig.assignments = [];
   if (!Array.isArray(mergedConfig.childTaskProposals)) mergedConfig.childTaskProposals = []; // v2.5.10 (Correctif 2C)
   if (!Array.isArray(mergedConfig.removedProposals)) mergedConfig.removedProposals = [];
+  if (!Array.isArray(mergedConfig.teamInvites)) mergedConfig.teamInvites = []; // v2.16.35 — Backlog #17 : invitations "en équipe" enfant→enfant
   if (!mergedConfig.rotativeCleanupV1) { // v1.108.0 — ménage unique (demandé par Gen) : bascule vers les quêtes rotatives (Lot 7B) —
     mergedConfig.assignments = [];       // vide les anciennes assignations manuelles pour laisser toute la place à weeklyQuests
     mergedConfig.removalRequests = [];   // demandes de retrait orphelines (pointaient sur des assignations qui disparaissent)
@@ -1761,7 +1778,7 @@ const TITLE_EASTER_EGGS = [
 
 // v1.101.0 (Lot 5 #23) — memo() : App() passe maintenant des callbacks stabilisés (voir plus bas),
 // donc un re-render de App() ne force plus systématiquement un re-render de tout le dashboard.
-const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, onBossFinish, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
+const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pState, config, assignments, allTasks, allRewards, onRequestComplete, onBuy, onEquip, onChildAddTask, onChildPickTask, onChildAddRoutineTask, onRequestRemoval, onCreateTeamInvite, onRespondTeamInvite, onUpdatePseudo, onRespondOffer, showToast, onFeedPet, onPlayPet, onRenamePet, onChoosePetEvo, onDismissRefusal, onDismissAnnouncement, onBossAttack, onBossPetAttack, onBossFinish, allStates, onLogout, onOpenParentPin, onReportBug, hamOpen, onCloseHam, onUnclaimReward, onHideReward, onClaimDaily, onOpenChest, onUpdateAvatar, parentMode, playerMode, todayDayIdx, onPatchState, onChangeTheme, onDeComplete, onForceComplete, onGoFamily, onGoCalendars, onGoTimer, th, weeklyChallenge, onChallengeCheckin }) {
   const [routineBuilder, setRoutineBuilder] = useState(null); // null | {name, emoji, taskIds:[]}
   const [routineTaskModal, setRoutineTaskModal] = useState(false); // l'enfant crée sa propre tâche pour le rituel
   const [homeTab, setHomeTab] = useState("accueil"); // accueil | jour | sem | shop — barre d'onglets en bas
@@ -1778,6 +1795,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const [laterOpen, setLaterOpen] = useState(false); // v1.63.0 — accordéon « tâches planifiées » (replié par défaut)
   const [dailyGoalsOpen, setDailyGoalsOpen] = useState(false); // Backlog UX #13 — accordéon « Défi + Objectifs » (replié par défaut, sous la liste de quêtes)
   const [taskTimerFor, setTaskTimerFor] = useState(null); // Backlog UX #11 — {emoji,label} de la tâche en cours de minutage, ou null
+  const [teamPickerFor, setTeamPickerFor] = useState(null); // Backlog #17 — instanceId de la tâche pour laquelle le sélecteur de coéquipier est ouvert, ou null
   // v1.57.0 — évolution du familier équipé en attente d'un choix?
   const _eqPetId = pState.equipped?.pet;
   const _eqPetLv = petLevel((pState.petXp||{})[_eqPetId]||0);
@@ -2519,6 +2537,27 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {/* Tasks */}
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
+      {/* Backlog #17 incrément 1 — invitations "en équipe" reçues d'un frère/soeur, en attente de réponse.
+          Affichées ici (pas seulement sur la carte de la tâche, que l'invité n'a pas forcément dans SA
+          propre liste — la tâche appartient encore à l'initiateur tant que l'invitation n'est pas acceptée). */}
+      {(config.teamInvites||[]).filter(inv=>inv.toPlayerId===player.id&&inv.status==="pending").map(inv=>{
+        const fromP=(config.players||[]).find(p=>p.id===inv.fromPlayerId);
+        const invTask=allTasks.find(t=>t.id===inv.taskId);
+        if(!fromP||!invTask) return null;
+        return <div key={inv.id} style={{background:"rgba(133,205,209,0.10)",border:"3px solid #85CDD1",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#fff",lineHeight:1.35,marginBottom:8}}>🤝 <b style={{color:fromP.color}}>{displayName(fromP)}</b> t'invite à faire « {invTask.emoji} {invTask.label} » ensemble! Vous partagerez l'XP et les pièces.</div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>{SFX.click();onRespondTeamInvite&&onRespondTeamInvite(inv.id,true);}}
+              style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#0d0d0d",background:"#5CAD68",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
+              ✔ Accepter
+            </button>
+            <button onClick={()=>{SFX.click();onRespondTeamInvite&&onRespondTeamInvite(inv.id,false);}}
+              style={{flex:1,padding:"8px",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:"#ccc",background:"transparent",border:"2px solid #666",borderRadius:3,cursor:"pointer"}}>
+              ✕ Non merci
+            </button>
+          </div>
+        </div>;
+      })}
       {/* v1.85.0 (Lot 2 #7) — état vide orientant : si l'AUTRE mode a des tâches, on le dit plutôt
           que de laisser croire qu'il n'y a rien du tout ("on sait jamais où chercher") */}
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16,lineHeight:1.4}}>
@@ -2573,6 +2612,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <div key={si} style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9ED8DE",lineHeight:1.35,paddingLeft:6}}>· {s}</div>
               ))}
             </div>}
+            {/* Backlog #17 incrément 1 — badge "en équipe" une fois l'invitation acceptée (2 playerIds).
+                Les quêtes de réparation (ass.repair) ont déjà leur propre patron multi-joueurs (récompense
+                pleine pour chacun, pas partagée) — on ne les touche pas, ce badge ne concerne que teamSplit. */}
+            {ass.playerIds.length>1 && !ass.repair && (()=>{
+              const mateNames=ass.playerIds.filter(pid=>pid!==player.id).map(pid=>{ const mate=(config.players||[]).find(p=>p.id===pid); return mate?displayName(mate):null; }).filter(Boolean);
+              return mateNames.length ? <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#9ED8DE",marginBottom:5}}>🤝 En équipe avec {mateNames.join(", ")} — XP et pièces partagés</div> : null;
+            })()}
             <div style={{display:"flex",gap:6,marginBottom:done?"0":"7px",flexWrap:"wrap"}}>
               <span className="chip-cost" style={{color:"#85CDD1",borderColor:"rgba(133,205,209,0.55)",background:"rgba(133,205,209,0.10)"}}><Xp size={9}/>{task.xp} XP</span>
               <span className="chip-cost"><Coin size={9}/>{task.coins}</span>
@@ -2605,6 +2651,34 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     🗑️ Je ne veux plus de cette tâche
                   </button>;
             })()}
+            {/* Backlog #17 incrément 1 — invitation "en équipe" : seulement sur une tâche encore solo
+                (playerIds.length===1), pas les réparations (déjà multi-joueurs par nature). */}
+            {!done&&!pending&&!ass.repair&&ass.playerIds.length===1&&(config.players||[]).length>1&&(()=>{
+              const siblings=(config.players||[]).filter(p=>p.id!==player.id);
+              const outgoingPending=(config.teamInvites||[]).find(inv=>inv.instanceId===ass.instanceId&&inv.fromPlayerId===player.id&&inv.status==="pending");
+              if(outgoingPending){
+                const toName=displayName(siblings.find(s=>s.id===outgoingPending.toPlayerId)||{});
+                return <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#85CDD1",textAlign:"center",marginTop:5}}>🤝 Invitation envoyée à {toName} — en attente…</div>;
+              }
+              const outgoingDeclined=(config.teamInvites||[]).find(inv=>inv.instanceId===ass.instanceId&&inv.fromPlayerId===player.id&&inv.status==="declined");
+              return <>
+                {outgoingDeclined && <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#888",textAlign:"center",marginTop:5}}>😌 {displayName(siblings.find(s=>s.id===outgoingDeclined.toPlayerId)||{})} ne peut pas cette fois — pas grave, continue en solo!</div>}
+                {teamPickerFor===ass.instanceId
+                  ? <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
+                      {siblings.map(s=>(
+                        <button key={s.id} onClick={()=>{SFX.click();onCreateTeamInvite&&onCreateTeamInvite(ass.instanceId,s.id);setTeamPickerFor(null);}}
+                          style={{padding:"5px 9px",fontFamily:"'VT323',monospace",fontSize:13,color:"#0d0d0d",background:s.color,border:"1px solid #0d0d0d",borderRadius:3,cursor:"pointer"}}>
+                          {displayName(s)}
+                        </button>
+                      ))}
+                      <button onClick={()=>setTeamPickerFor(null)} style={{padding:"5px 9px",fontFamily:"'VT323',monospace",fontSize:13,color:"#888",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>Annuler</button>
+                    </div>
+                  : <button onClick={()=>{SFX.click();setTeamPickerFor(ass.instanceId);}}
+                      style={{width:"100%",padding:"5px",marginTop:5,fontFamily:"'VT323',monospace",fontSize:12,color:"#9ED8DE",background:"transparent",border:"1px dashed #4A8A90",borderRadius:3,cursor:"pointer"}}>
+                      🤝 Faire en équipe
+                    </button>}
+              </>;
+            })()}
             {!done&&!pending&&parentMode&&<button onClick={()=>onForceComplete(ass,player.id)}
               style={{width:"100%",padding:"6px",fontFamily:"'Press Start 2P',monospace",fontSize:"7px",
                 color:"#0d0d0d",background:"#D99248",border:"2px solid #CC6600",borderRadius:2,cursor:"pointer",marginTop:4}}>
@@ -2618,10 +2692,18 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {/* v2.6.2 — gratification instantanée : la carte en attente montre les gains RÉSERVÉS
                 (grisés — l'octroi réel reste à la validation parent, libellé explicite pour éviter
                 tout « mais j'avais déjà mes points! », cadre TOP). bounceIn = tué par .calm-mode. */}
-            {pending&&<div style={{textAlign:"center",marginTop:4,animation:"bounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1)"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>⏳ Bravo! En attente de validation…</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9a8c56",marginTop:2}}>+{task.xp} XP · +{task.coins} 🪙 réservés — ton parent valide et c'est à toi!</div>
-            </div>}
+            {pending&&(()=>{
+              // Backlog #17 — sur une tâche "en équipe" (teamSplit), le montant réservé affiché doit déjà
+              // montrer la moitié partagée (même arrondi que approvePending), sinon l'enfant voit un montant
+              // plein ici puis un montant divisé une fois validé — décalage confus, pas une vraie erreur mais
+              // une promesse non tenue à l'écran.
+              const rXp=ass.teamSplit?Math.round((task.xp||0)/2):(task.xp||0);
+              const rCoins=ass.teamSplit?Math.round((task.coins||0)/2):(task.coins||0);
+              return <div style={{textAlign:"center",marginTop:4,animation:"bounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1)"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>⏳ Bravo! En attente de validation…</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#9a8c56",marginTop:2}}>+{rXp} XP · +{rCoins} 🪙 réservés — ton parent valide et c'est à toi!</div>
+              </div>;
+            })()}
           </div>
         );
         };
@@ -2709,7 +2791,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const stamp="#"+todayStamp();
         const doneToday=(pState.completed||[]).filter(k=>k.endsWith(stamp));
         const countToday=doneToday.length;
-        const axp={}; assignments.forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); axp[a.instanceId]=t?(t.xp||0):0;});
+        // Backlog #17 — même garde-fou que le graphique hebdo de FamilyOverview : une tâche teamSplit
+        // n'accorde jamais le plein XP du catalogue (voir approvePending).
+        const axp={}; assignments.forEach(a=>{const t=allTasks.find(x=>x.id===a.taskId); const raw=t?(t.xp||0):0; axp[a.instanceId]=a.teamSplit?Math.round(raw/2):raw;});
         const xpToday=doneToday.reduce((s,k)=>{const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); return s+(axp[inst]||0);},0);
         const OBJ=[
           {id:"o3",  label:"Faire 3 quêtes",  prog:Math.min(countToday,3), goal:3,  xp:10, coins:5},
@@ -3423,7 +3507,10 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         // étaient validées — assXp ne lisait que config.assignments (l'ancien système statique), jamais
         // config.weeklyQuests.assignments (le système rotatif de garde depuis le 24 juillet), qui porte
         // désormais quasi toute l'activité réelle.
-        const assXp = {}; [...(config.assignments||[]), ...(config.weeklyQuests?.assignments||[])].forEach(a=>{ const t=(allTasks||[]).find(x=>x.id===a.taskId); assXp[a.instanceId]= t?(t.xp||0):0; });
+        // Backlog #17 — reconstruction depuis `completed` (pas de montant stocké par doneKey) : une tâche
+        // teamSplit n'a JAMAIS accordé le plein XP du catalogue (voir approvePending) — sans ce garde-fou,
+        // ce graphique afficherait le double de ce que l'enfant a réellement reçu pour une tâche partagée.
+        const assXp = {}; [...(config.assignments||[]), ...(config.weeklyQuests?.assignments||[])].forEach(a=>{ const t=(allTasks||[]).find(x=>x.id===a.taskId); const raw=t?(t.xp||0):0; assXp[a.instanceId]= a.teamSplit?Math.round(raw/2):raw; });
         const xpFor = (ps,dateStr)=> (ps.completed||[]).reduce((sum,k)=>{ if(!k.endsWith("#"+dateStr)) return sum; const inst=k.split("#")[0].slice(0,k.split("#")[0].lastIndexOf("_")); return sum + (assXp[inst]||0); },0);
         const players=config.players||[];
         const perPlayer = players.map((p,i)=>{ const ps=gameStates[i]||{completed:[]}; const days=weekDates.map(d=>xpFor(ps,d)); return {p, days, total:days.reduce((a,b)=>a+b,0)}; });
@@ -3649,7 +3736,9 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 const _allAss=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])];
                 const ass=_allAss.find(a=>a.instanceId===instanceId);
                 const task=ass?allTasks.find(t=>t.id===ass.taskId):null;
-                if(task){emoji=task.emoji;label=task.label;xp=task.xp;coins=task.coins;taskId=task.id;}
+                // Backlog #17 — même arrondi que approvePending : la file de validation parent doit annoncer
+                // le montant RÉELLEMENT accordé (moitié partagée sur une tâche teamSplit), pas le plein montant.
+                if(task){emoji=task.emoji;label=task.label;xp=ass?.teamSplit?Math.round((task.xp||0)/2):task.xp;coins=ass?.teamSplit?Math.round((task.coins||0)/2):task.coins;taskId=task.id;}
                 // Bug signalé par Gen (25 juillet) : assignation ou tâche personnalisée supprimée
                 // ENTRE le moment où l'enfant a demandé la validation et maintenant (ex: tâche perso
                 // effacée, ou semaine de garde régénérée entretemps) — le contenu original est
@@ -4936,7 +5025,10 @@ export default function App() {
     const allAss=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])];
     const ass=allAss.find(a=>a.instanceId===instanceId);
     if(!ass)return null;
-    return [...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId)||null;
+    const found=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId)||null;
+    // Backlog #17 — tâche "en équipe" (invitation acceptée) : marque à porter jusqu'à approvePending,
+    // qui divisera XP/pièces par 2 (partagés, pas doublés — voir le plan §#17).
+    return found && ass.teamSplit ? {...found, teamSplit:true} : found;
   },[config,gameStates]);
 
   // Validation parent (portail) : donne XP/pièces/badges + popup/mini-jeu
@@ -4958,19 +5050,24 @@ export default function App() {
       const p=gs[playerIdx];
       if(p.completed?.includes(doneKey))return gs;
       const prevLv=getLevel(p.xp).level;
-      const newXp=p.xp+task.xp, newCoins=p.coins+task.coins;
+      // Backlog #17 — tâche "en équipe" (teamSplit) : XP/pièces PARTAGÉS, pas doublés — chacun des 2
+      // reçoit la moitié (arrondie) à SA propre validation, contrairement aux réparations 🕊️ qui donnent
+      // la récompense pleine à chacun (patron existant, volontairement différent, voir plan §#17).
+      const grantXp=task.teamSplit?Math.round((task.xp||0)/2):(task.xp||0);
+      const grantCoins=task.teamSplit?Math.round((task.coins||0)/2):(task.coins||0);
+      const newXp=p.xp+grantXp, newCoins=p.coins+grantCoins;
       const newLv=getLevel(newXp).level;
       // Count tasks done today for streak badge (clés du jour: ..._player#YYYY-MM-DD)
       const today="#"+todayStamp();
       const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
-      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+(task.coins||0),completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()},xpLog:appendXpLog(p.xpLog,task.xp,"quete")};
+      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()},xpLog:appendXpLog(p.xpLog,grantXp,"quete")};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount, completionCatCounts(updatedPs, cfgRef.current||config));
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).
       // C'est la boucle Tamagotchi : nourris-le chaque jour pour qu'il grandisse avec tes quêtes.
       const eqPet=p.equipped?.pet;
       const petFedToday=p.lastFedDay===todayStamp();
-      if(eqPet && petFedToday){ const _g=gainPet(p,eqPet,task.xp||0); updatedPs.petXp=_g.petXp; updatedPs.petDay=_g.petDay; }
+      if(eqPet && petFedToday){ const _g=gainPet(p,eqPet,grantXp); updatedPs.petXp=_g.petXp; updatedPs.petDay=_g.petDay; }
       // Série 🔥 : marquer aujourd'hui comme jour actif (quête accomplie)
       updatedPs.activeDays=_uniq([...(p.activeDays||[]), todayStamp()]);
       const n=[...gs]; n[playerIdx]=updatedPs;
@@ -4989,13 +5086,13 @@ export default function App() {
       }
       // La célébration (popup + jeu de niveau) est DIFFÉRÉE vers l'appareil de l'enfant,
       // jouée à SA prochaine connexion — pas sur l'écran du parent qui valide.
-      const celeb={ id:"c_"+uid(), level: prevLv<newLv?newLv:null, taskEmoji:task.emoji||"✅", taskLabel:task.label||"", xp:task.xp||0, coins:task.coins||0, themeId:player.themeId||"none",
+      const celeb={ id:"c_"+uid(), level: prevLv<newLv?newLv:null, taskEmoji:task.emoji||"✅", taskLabel:task.label||"", xp:grantXp, coins:grantCoins, themeId:player.themeId||"none",
         badges:newBadgeIds.map(id=>BADGES.find(b=>b.id===id)).filter(Boolean).map(b=>({id:b.id,emoji:b.emoji,name:b.name})) };
       n[playerIdx]={...n[playerIdx], pendingCelebrations:[...(n[playerIdx].pendingCelebrations||[]), celeb]};
       const newCfg={...config, boss:bossNow, feed:feedAcc.slice(0,60)};
       setConfig(newCfg);
       persist(newCfg,n);
-      setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:task.xp,coins:task.coins}]);
+      setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:grantXp,coins:grantCoins}]);
       showToast(`✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#5CAD68",4000);
       return n;
     });
@@ -5220,9 +5317,13 @@ export default function App() {
     const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
     const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId);
     if(!task)return;
+    // Backlog #17 — même règle de partage que approvePending : une tâche teamSplit reste partagée
+    // même validée par ce raccourci parent (sinon l'override contournerait silencieusement le partage).
+    const grantXp=ass.teamSplit?Math.round((task.xp||0)/2):(task.xp||0);
+    const grantCoins=ass.teamSplit?Math.round((task.coins||0)/2):(task.coins||0);
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
       if(p.completed?.includes(doneKey))return gs;
-      n[playerIdx]={...p,xp:p.xp+task.xp,coins:p.coins+task.coins,coinsLifetime:(p.coinsLifetime||0)+(task.coins||0),
+      n[playerIdx]={...p,xp:p.xp+grantXp,coins:p.coins+grantCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,
         completed:[...new Set([...(p.completed||[]),doneKey])],
         pending:(p.pending||[]).filter(k=>k!==doneKey)};
       persist(config,n); return n; });
@@ -5433,6 +5534,37 @@ export default function App() {
     const newCfg={...config, removalRequests:[...(config.removalRequests||[]), req]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("🗑️ Demande envoyée au parent","#D9BC5C");
+  },[config,gameStates,persist,showToast]);
+
+  // v2.16.35 — Backlog #17 incrément 1 : invitation "en équipe" (enfant→enfant). L'enfant initiateur
+  // choisit une de SES tâches solo (playerIds.length===1) et un frère/soeur — l'invitation reste en
+  // attente jusqu'à ce que l'invité accepte ou refuse (voir handleRespondTeamInvite).
+  const handleCreateTeamInvite = useCallback((playerIdx, instanceId, toPlayerId)=>{
+    const fromPlayerId=config.players[playerIdx]?.id; if(!fromPlayerId||!toPlayerId||fromPlayerId===toPlayerId) return;
+    const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId); if(!ass||ass.playerIds?.length!==1) return;
+    if((config.teamInvites||[]).some(inv=>inv.instanceId===instanceId&&inv.status==="pending")) return; // déjà une invitation en cours pour cette tâche
+    const invite={id:"tinv_"+uid(), taskId:ass.taskId, instanceId, fromPlayerId, toPlayerId, status:"pending", createdAt:Date.now()};
+    const newCfg={...config, teamInvites:[...(config.teamInvites||[]), invite]};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast("🤝 Invitation envoyée!","#85CDD1");
+  },[config,gameStates,persist,showToast]);
+
+  // Réponse de l'invité : accepté → la tâche devient une assignation partagée (playerIds à 2, teamSplit:true,
+  // XP/pièces divisés à la validation — voir approvePending) ; refusé → rien ne change pour l'initiateur,
+  // qui verra une petite note douce sur sa carte de tâche.
+  const handleRespondTeamInvite = useCallback((playerIdx, inviteId, accept)=>{
+    const invite=(config.teamInvites||[]).find(i=>i.id===inviteId&&i.status==="pending"); if(!invite) return;
+    const toPlayerId=config.players[playerIdx]?.id; if(!toPlayerId||invite.toPlayerId!==toPlayerId) return;
+    let assignments=config.assignments||[];
+    if(accept){
+      assignments=assignments.map(a=>a.instanceId===invite.instanceId&&!(a.playerIds||[]).includes(toPlayerId)
+        ? {...a, playerIds:[...a.playerIds, toPlayerId], teamSplit:true}
+        : a);
+    }
+    const teamInvites=(config.teamInvites||[]).map(i=>i.id===inviteId?{...i,status:accept?"accepted":"declined"}:i);
+    const newCfg={...config, assignments, teamInvites};
+    setConfig(newCfg); persist(newCfg,gameStates);
+    showToast(accept?"🤝 Équipe formée! Vous partagez XP et pièces sur cette tâche.":"D'accord, pas de souci 😊", accept?"#5CAD68":"#888");
   },[config,gameStates,persist,showToast]);
 
   const handleApproveRemoval = useCallback((reqId)=>{
@@ -5993,6 +6125,8 @@ export default function App() {
   const onDashChildPickTask = useCallback((taskId)=>handleChildPickTask(view,taskId), [view, handleChildPickTask]);
   const onDashChildAddRoutineTask = useCallback((data)=>handleChildAddRoutineTask(view,data), [view, handleChildAddRoutineTask]);
   const onDashRequestRemoval = useCallback((instanceId)=>handleRequestRemoval(view,instanceId), [view, handleRequestRemoval]);
+  const onDashCreateTeamInvite = useCallback((instanceId,toPlayerId)=>handleCreateTeamInvite(view,instanceId,toPlayerId), [view, handleCreateTeamInvite]);
+  const onDashRespondTeamInvite = useCallback((inviteId,accept)=>handleRespondTeamInvite(view,inviteId,accept), [view, handleRespondTeamInvite]);
   const onDashUpdatePseudo = useCallback((pseudo)=>handleUpdatePseudo(view,pseudo), [view, handleUpdatePseudo]);
   const onDashFeedPet = useCallback(()=>handleFeedPet(view), [view, handleFeedPet]);
   const onDashPlayPet = useCallback(()=>handlePlayPet(view), [view, handlePlayPet]);
@@ -6376,6 +6510,8 @@ export default function App() {
             onChildPickTask={onDashChildPickTask}
             onChildAddRoutineTask={onDashChildAddRoutineTask}
             onRequestRemoval={onDashRequestRemoval}
+            onCreateTeamInvite={onDashCreateTeamInvite}
+            onRespondTeamInvite={onDashRespondTeamInvite}
             showToast={showToast}
             onUpdatePseudo={onDashUpdatePseudo}
             onRespondOffer={handleRespondOffer}
