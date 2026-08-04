@@ -9,6 +9,7 @@ import { getLevelTitle, xpBar } from "./leveling.js";
 import { BADGES, rarityOf, TASK_CATALOG } from "./catalog.js";
 import { petLevel } from "./pets.js";
 import { displayName, todayStamp, streakOf } from "./shared.js";
+import { LEAGUES, leagueOf, leagueRank, activeDaysThisWeek } from "./leagues.js";
 import { AvatarCanvas, DEFAULT_AVATAR } from "./avatar.jsx";
 
 export function PlayerProfile({ player, pState, config, gameStates, th, onClose, meId, onGiveCoins, onCreateOffer, assignments }) {
@@ -49,6 +50,11 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
     const days = dates.map(dateStr => xpLogDates.has(dateStr) ? (xpLogByDate[dateStr]||0) : (completedAtByDate[dateStr]||0));
     return { dates, days, todayDs: ds(today), total: days.reduce((a,b)=>a+b,0), maxDay: Math.max(1,...days) };
   })();
+  // v2.16.34 — Backlog #13, incrément 3 : ligue individuelle (voir src/leagues.js — non comparative,
+  // ratchet déjà appliqué en amont dans migrateGameState/mergeGS, ici juste l'affichage).
+  const myLeague = leagueOf(gs.leagueTier || "bronze");
+  const nextLeague = LEAGUES[leagueRank(myLeague.id) + 1] || null;
+  const activeThisWeek = activeDaysThisWeek(gs.activeDays);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16}} onClick={onClose}>
       <div style={{background:"#111",border:`4px solid ${player.color}`,borderRadius:12,padding:20,maxWidth:380,width:"100%",boxShadow:`0 0 40px ${player.color}60`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
@@ -96,6 +102,19 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
                       borderRadius:"1px 1px 0 0",border:xpHistory.dates[i]===xpHistory.todayDs?"1px solid #fff":"none"}}/>
                 ))}
               </div>}
+        </div>
+        {/* 🎖️ Ligue individuelle (Backlog #13, incrément 3) — jamais de comparaison entre enfants,
+            jamais de rétrogradation : le palier ne peut que monter (voir migrateGameState/mergeGS). */}
+        <div style={{marginBottom:14,background:`${myLeague.color}18`,border:`2px solid ${myLeague.color}66`,borderRadius:8,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:28}}>{myLeague.emoji}</span>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:myLeague.color}}>Ligue {myLeague.name}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#999"}}>
+              {nextLeague
+                ? `${activeThisWeek}/7 jours actifs cette semaine — encore ${Math.max(0,nextLeague.minActiveDays-activeThisWeek)} pour ${nextLeague.name} ${nextLeague.emoji}`
+                : `${activeThisWeek}/7 jours actifs — palier le plus haut atteint !`}
+            </div>
+          </div>
         </div>
         {myBadges.length>0&&(
           <div style={{marginBottom:12}}>

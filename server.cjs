@@ -152,6 +152,8 @@ const mergeGS = (a, b, preferIncoming) => {
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null,
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]),
+    // v2.16.34 — miroir du merge client (App.jsx, mergeGS) : ratchet par rang, jamais de recul.
+    leagueTier: (() => { const RANK={bronze:0,argent:1,or:2,diamant:3}; const ra=RANK[a.leagueTier]||0, rb=RANK[b.leagueTier]||0; return rb>=ra ? (b.leagueTier||"bronze") : (a.leagueTier||"bronze"); })(),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
     settings: { ...(a.settings||{}), ...(b.settings||{}) },
   };

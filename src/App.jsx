@@ -9,6 +9,7 @@ import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./ui.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, COLOR_DESATURATE_MAP, streakOf, appendXpLog } from "./shared.js";
+import { computeLeagueTier, leagueRank } from "./leagues.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -24,7 +25,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite } from "./bosses.jsx";
 
-const APP_VERSION = "2.16.33";
+const APP_VERSION = "2.16.34";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -226,6 +227,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.34", date:"2026-08-03", features:[
+    "🎖️ Nouveau : ta Ligue personnelle (Bronze/Argent/Or/Diamant) apparaît dans ton profil — basée sur TES propres jours actifs, jamais un classement avec tes frères/sœurs, et ton palier ne redescend jamais!",
+  ]},
   { version:"2.16.33", date:"2026-08-03", features:[
     "📊 Ton profil affiche maintenant une courbe de tes 30 derniers jours d'XP!",
   ]},
@@ -1250,6 +1254,9 @@ const mergeGS = (a, b, preferIncoming) => {
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
+    // v2.16.34 — Backlog #13 (ligues) : ratchet par rang, même esprit que xp/coinsLifetime — le
+    // palier ne doit jamais reculer parce qu'un appareil moins à jour a fusionné en dernier.
+    leagueTier: leagueRank(b.leagueTier) >= leagueRank(a.leagueTier) ? (b.leagueTier || "bronze") : (a.leagueTier || "bronze"),
     // Backlog #13 — même jour → max (deux appareils qui comptent la même session ne doivent jamais
     // sous-compter) ; jour différent → le plus récent (nouveau jour = compteur reparti à 0).
     sessionMinutes: (()=>{ const A=a.sessionMinutes||{}, B=b.sessionMinutes||{}; if(A.day&&A.day===B.day) return {day:A.day, minutes:Math.max(A.minutes||0,B.minutes||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
@@ -1547,6 +1554,11 @@ const migrateGameState = (gs) => {
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
     activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
+    // v2.16.34 — Backlog #13 (ligues) : recalculé à CHAQUE chargement à partir de activeDays (comme
+    // le nettoyage des orphelines plus bas), mais RATCHET — ne remplace le palier déjà stocké que si
+    // le palier mérité cette semaine est PLUS HAUT. Jamais de rétrogradation : une semaine calme
+    // après une bonne série ne fait jamais reculer l'enfant.
+    leagueTier: (() => { const computed = computeLeagueTier(gs.activeDays || []); const stored = gs.leagueTier || "bronze"; return leagueRank(computed) > leagueRank(stored) ? computed : stored; })(),
     sessionMinutes: gs.sessionMinutes || { day: null, minutes: 0 }, // Backlog #13 — budget-temps quotidien (contrôle parental)
     bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
     // v2.15.0 — calendrier purement événementiel (demande de Gen) : "devoir"/"examen" agissaient
