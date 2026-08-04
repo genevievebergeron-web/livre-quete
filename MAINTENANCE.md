@@ -516,3 +516,11 @@ Vérifié en Chrome (serveur isolé port 5199, joueur de test `Test` existant �
 Backlog repris là où `v2.16.33` l'avait laissé : dernier incrément de #13 (ligues individuelles non-comparatives, concept déjà tranché dans le plan). Détail technique complet dans `PROJET-ETAT.md`, entrée v2.16.34 — nouveau `src/leagues.js`, ratchet anti-recul dans `migrateGameState`/`mergeGS` (client + miroir `server.cjs`), affichage dans `playerprofile.jsx`. Vérifié par script Node (5 scénarios de seuils + ratchet) puis bout-en-bout en Chrome (serveur isolé port 5199, joueur de test `Test` existant, jamais la prod) : palier "Bronze" affiché par défaut, simulation de 5 jours actifs via `localStorage` → rechargement → palier "Or" ; `activeDays` ensuite vidé → rechargement → palier resté "Or" (0/7 jours actifs affichés, aucune rétrogradation, confirmé visuellement dans le popup). Zéro erreur console. `npm run build` propre, `v2.16.34` poussé.
 
 **Le chantier #13 (stats historiques + ligues) est maintenant clos en entier** (3/3 incréments). Prochain gros chantier autonome candidat : #17 (tâches en équipe entre enfants, plan `1-ajouter-un-token-unified-milner.md` §#17, déjà spécifié en détail).
+
+---
+
+## Mini-check du 2026-08-04 (nuit, routine autonome) — aucun nouveau bug, backlog autonome épuisé
+
+`git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `v2.16.35`, qui a clos #17 depuis le dernier passage documenté ici). Lecture `GET /api/famille` (HTTP 200) : 14 `config.bugs`, identiques id pour id à tous les passages précédents documentés depuis le 31 juillet — rien de nouveau. `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente d'une décision/investigation write de Gen, inchangés.
+
+Backlog : relu en entier les 2 plans (`1-ajouter-un-token-unified-milner.md` #1-#18, `le-design-de-mon-mighty-mountain.md`) — **plus aucun item 🤖 autonome non fait**. Il ne reste que #1 (sortir `FAMILY_ID` du dépôt, bloqué sur Claude in Chrome + Gen) et #2 (restitution de pièces, écriture prod bloquée par le classificateur de sécurité), tous deux déjà documentés comme bloqués. Aucun code touché cette nuit, aucun commit — voir `PROJET-ETAT.md` pour le détail.
