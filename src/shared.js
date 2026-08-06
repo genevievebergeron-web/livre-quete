@@ -219,3 +219,9 @@ export const THEMES = {
   volcano:   { name:"Volcan",    bg:"#1a0a00", primary:"#B8543A", accent:"#D99248", card:"rgba(30,10,0,0.7)", text:"#fff" },
   forest:    { name:"Forêt",     bg:"#0a1a0a", primary:"#2E7D32", accent:"#A5D6A7", card:"rgba(0,20,0,0.7)",  text:"#fff" },
 };
+
+// v2.16.37 — Backlog #15 (v2.16.26) : nombre de tâches ROTATIVES à compléter aujourd'hui pour
+// débloquer boutique/avatar, valeur par défaut quand `config.shopUnlockCount` n'est pas défini.
+// Migrée d'`App.jsx` vers ce module lors de l'extraction de `ParentPanel` (Lot 5/#24) — utilisée
+// des deux côtés (App.jsx pour le verrou côté enfant, parentpanel.jsx pour le sélecteur parent).
+export const SHOP_UNLOCK_DEFAULT = 2;
