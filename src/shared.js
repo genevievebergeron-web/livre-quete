@@ -17,6 +17,10 @@ export const fmtDateShort = (iso) => {
 
 export const uid = () => Math.random().toString(36).slice(2,9);
 
+// Dédoublonne un tableau en gardant l'ordre d'apparition. Utilisé par toutes les unions de la
+// couche de fusion (`merge.js`) et une dizaine de fois ailleurs dans `App.jsx` (tombstones).
+export const _uniq = (arr) => [...new Set(arr || [])];
+
 export const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
 // Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
