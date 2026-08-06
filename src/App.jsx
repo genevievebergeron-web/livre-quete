@@ -28,8 +28,9 @@ import { TimerView } from "./timerview.jsx";
 import { ParentPanel } from "./parentpanel.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
+import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
 
-const APP_VERSION = "2.16.38";
+const APP_VERSION = "2.16.39";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -213,6 +214,9 @@ const resolveWeekRandomTheme = (weekSeed) => {
 // ─── STORAGE ─────────────────────────────────────────────────
 // ─── CHANGELOG (affiché dans le feed famille à chaque mise à jour) ──────────
 const CHANGELOG = [
+  { version:"2.16.39", date:"2026-08-06", features:[
+    "🛠️ Petite fondation technique (rien de visible pour toi).",
+  ]},
   { version:"2.16.38", date:"2026-08-06", features:[
     "🛠️ Petite fondation technique (rien de visible pour toi).",
   ]},
@@ -1033,173 +1037,11 @@ const CHANGELOG = [
 
 // Structured for easy Supabase swap: replace save/load with async Supabase calls
 // Future: import { saveToSupabase, loadFromSupabase } from './lib/supabase.js'
-const STORE_KEY = "livre-de-quetes-v1";
-
-// ─── SYNC CLOUD (multi-appareils) ────────────────────────────
-// Deux modes, détectés automatiquement (voir SYNC.md) :
-//   1. API même-origine /api/famille — active quand l'app roule sur le serveur
-//      Node (server.cjs) avec le Postgres Canner. RIEN à configurer ici.
-//   2. Supabase — remplir SYNC_URL et SYNC_KEY ci-dessous (solution de rechange).
-// Si aucun des deux n'est disponible : sauvegarde locale seulement, comme avant.
-const SYNC_URL = "";  // (optionnel) ex: "https://abcdefgh.supabase.co"
-const SYNC_KEY = "";  // (optionnel) clé "anon public" Supabase
-const FAMILY_ID = "livre-quetes-bergeron-2026"; // identifiant unique de la famille (agit comme mot de passe — garder original)
-
-const supaEnabled = () => Boolean(SYNC_URL && SYNC_KEY);
-const supaHeaders = () => ({ apikey: SYNC_KEY, Authorization: `Bearer ${SYNC_KEY}`, "Content-Type": "application/json" });
-let LAST_SAVED_AT = null; // horodatage de la dernière sauvegarde connue localement
-// v2.15.8 (cause racine de la casse généralisée des tâches perso — voir ménage orphelines plus bas) :
-// true seulement quand load() a reçu une vraie réponse cloud (fusionnée ou seule source). false quand
-// remotePull() a échoué (serveur endormi, réseau) et qu'on est retombé sur la copie locale SEULE —
-// potentiellement périmée si cet appareil n'a pas rouvert l'app depuis un moment.
-let LAST_LOAD_SYNCED = false;
-let _pushTimer = null;
-let API_OK = null; // détection unique de l'API même-origine
-// Signale à l'UI qu'une synchro cloud vient de réussir (pour l'indicateur ☁️)
-const markSynced = () => { try { window.dispatchEvent(new CustomEvent("lq-synced")); } catch {} };
-
-// L'API même-origine est-elle là? (un déploiement statique renverrait du HTML → non)
-const apiAvailable = async () => {
-  if (API_OK !== null) return API_OK;
-  try {
-    const r = await fetch("/api/sante", { cache: "no-store" });
-    const ct = r.headers.get("content-type") || "";
-    API_OK = r.ok && ct.includes("json") && (await r.json())?.ok === true;
-  } catch { API_OK = false; }
-  return API_OK;
-};
-
-// Pousse l'état complet vers le cloud (debounce 1.5s pour regrouper les actions rapides)
-const remotePush = (data) => {
-  clearTimeout(_pushTimer);
-  _pushTimer = setTimeout(async () => {
-    try {
-      if (await apiAvailable()) {
-        // ⚠️ FUSION AVANT ÉCRITURE : on relit le cloud et on fusionne, sinon un push « brut »
-        // écrase les changements faits sur un autre appareil (ex: une validation qui « revient »).
-        let toWrite = data;
-        try {
-          const r0 = await fetch(`/api/famille?id=${encodeURIComponent(FAMILY_ID)}`, { cache: "no-store" });
-          if (r0.ok) { const cloud = (await r0.json())?.data; if (cloud && cloud.config) toWrite = mergeFamily(cloud, data); }
-        } catch {}
-        await fetch("/api/famille", { method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: FAMILY_ID, data: toWrite }) });
-        // v2.5.11 — FUSION AVANT L'ÉCRITURE LOCALE FINALE, même principe que la fusion avant écriture
-        // cloud ci-dessus : ce callback est déclenché par un setTimeout debounced (1500ms) qui peut
-        // rester "en vol" pendant plusieurs centaines de ms (2 fetch réseau successifs). Si une AUTRE
-        // action (ex: ajouter une tâche) a sauvegardé une version plus fraîche dans localStorage PENDANT
-        // ce vol, `clearTimeout` ne peut plus annuler ce callback déjà démarré — sans cette fusion, le
-        // `toWrite` (bâti sur une fermeture plus vieille) écrasait purement et simplement cette version
-        // plus fraîche, faisant "disparaître" ce qui venait d'être ajouté. Bug signalé par Antoine
-        // (« ajout de quête, ça dit que c'est ajouté, mais ça apparaît pas »), le 2026-07-25.
-        try {
-          let finalWrite = toWrite;
-          try { const cur = localStorage.getItem(STORE_KEY); if (cur) { const curData = JSON.parse(cur); if (curData?.config) finalWrite = mergeFamily(toWrite, curData); } } catch {}
-          localStorage.setItem(STORE_KEY, JSON.stringify(finalWrite));
-          LAST_SAVED_AT = finalWrite.savedAt || LAST_SAVED_AT;
-        } catch {}
-        markSynced();
-      } else if (supaEnabled()) {
-        let toWrite = data;
-        try {
-          const r0 = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: supaHeaders() });
-          if (r0.ok) { const cloud = (await r0.json())?.[0]?.data; if (cloud && cloud.config) toWrite = mergeFamily(cloud, data); }
-        } catch {}
-        await fetch(`${SYNC_URL}/rest/v1/familles?on_conflict=id`, {
-          method: "POST",
-          headers: { ...supaHeaders(), Prefer: "resolution=merge-duplicates" },
-          body: JSON.stringify({ id: FAMILY_ID, data: toWrite, saved_at: toWrite.savedAt || new Date().toISOString() }),
-        });
-        // v2.5.11 — même fusion défensive que la branche apiAvailable() ci-dessus (voir son commentaire).
-        try {
-          let finalWrite = toWrite;
-          try { const cur = localStorage.getItem(STORE_KEY); if (cur) { const curData = JSON.parse(cur); if (curData?.config) finalWrite = mergeFamily(toWrite, curData); } } catch {}
-          localStorage.setItem(STORE_KEY, JSON.stringify(finalWrite));
-          LAST_SAVED_AT = finalWrite.savedAt || LAST_SAVED_AT;
-        } catch {}
-        markSynced();
-      }
-    } catch (e) { console.warn("Sync: push échoué (mode local conservé)", e); }
-  }, 1500);
-};
-
-// Récupère l'état depuis le cloud.
-//   → objet data  : le cloud a des données
-//   → null        : le cloud est JOINT mais VIDE (aucune famille encore)  → on peut semer sans risque
-//   → PULL_FAILED : échec réseau / pas de sync  → NE PAS écraser le cloud (on garde le local et on réessaiera)
-const PULL_FAILED = Symbol("pull_failed");
-const remotePull = async () => {
-  try {
-    if (await apiAvailable()) {
-      const r = await fetch(`/api/famille?id=${encodeURIComponent(FAMILY_ID)}`, { cache: "no-store" });
-      if (!r.ok) return PULL_FAILED;
-      const d = (await r.json())?.data;
-      markSynced();
-      return d || null;
-    }
-    if (supaEnabled()) {
-      const r = await fetch(`${SYNC_URL}/rest/v1/familles?id=eq.${encodeURIComponent(FAMILY_ID)}&select=data`, { headers: supaHeaders() });
-      if (!r.ok) return PULL_FAILED;
-      const rows = await r.json();
-      markSynced();
-      return rows?.[0]?.data || null;
-    }
-  } catch { return PULL_FAILED; }
-  return PULL_FAILED; // aucune sync disponible
-};
-
-// `isNewer` — déplacée dans `src/merge.js` le 2026-08-06 (Lot 5/#24), voir l'import en tête.
-
-// ─── FUSION NON-DESTRUCTIVE (multi-appareils) ────────────────
-// Toute la couche de fusion (`_mergeCalendar`, `mergeGS`, `_mergePlayer`, `mergeFamily`) est
-// extraite dans `src/merge.js` depuis le 2026-08-06 (Lot 5/#24) — voir l'import en tête.
-// Signature de contenu (ignore savedAt) pour détecter un vrai changement
-const _famSig = (d) => { try { return JSON.stringify({ c: d?.config, g: d?.gameStates }); } catch { return Math.random() + ""; } };
-
-const save = async (data) => {
-  LAST_SAVED_AT = data.savedAt || LAST_SAVED_AT;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { console.warn("Storage save failed:", e); }
-  remotePush(data);
-};
-
-const load = async () => {
-  let local = null;
-  try { const r = localStorage.getItem(STORE_KEY); if (r) local = JSON.parse(r); } catch {}
-  const remote = await remotePull();
-  const hasRemoteData = remote && remote !== PULL_FAILED; // objet data réel
-  // Les deux existent → on FUSIONNE (rien n'est écrasé, l'XP ne peut que monter)
-  if (hasRemoteData && local) {
-    LAST_LOAD_SYNCED = true; // v2.15.8 — vraie donnée cloud reçue, assignments/customTasks à jour
-    const merged = mergeFamily(local, remote);
-    if (_famSig(merged) !== _famSig(local)) {
-      merged.savedAt = new Date().toISOString();
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(merged)); } catch {}
-      LAST_SAVED_AT = merged.savedAt;
-      remotePush(merged); // on renvoie la fusion au cloud pour converger
-      return merged;
-    }
-    LAST_SAVED_AT = local.savedAt || merged.savedAt || null;
-    return local;
-  }
-  // Seul le cloud a des données → on les prend
-  if (hasRemoteData && !local) {
-    LAST_LOAD_SYNCED = true; // v2.15.8 — idem, données cloud à jour (pas de copie locale à fusionner)
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
-    LAST_SAVED_AT = remote.savedAt || null;
-    return remote;
-  }
-  // Cloud JOINT mais VIDE (remote===null) → on peut semer le local sans risque d'écraser quoi que ce soit
-  if (remote === null && local) remotePush(local);
-  // remote===PULL_FAILED → échec réseau : on NE touche PAS au cloud, on garde le local et la boucle réessaiera.
-  // v2.15.8 (cause racine de la casse généralisée des tâches perso, 2026-07-28) : LAST_LOAD_SYNCED reste
-  // false ici — cette copie locale peut être périmée (assignments incomplets si l'appareil n'a pas
-  // rouvert l'app depuis un moment). Le ménage des tâches orphelines (plus bas) DOIT vérifier ce drapeau
-  // avant de tombstoner quoi que ce soit, sinon un simple délai réseau (serveur Canner qui se réveille,
-  // ~1-4s selon SYNC.md) suffit à faire supprimer pour toujours des tâches perso bien vivantes ailleurs.
-  LAST_LOAD_SYNCED = false;
-  LAST_SAVED_AT = local?.savedAt || null;
-  return local;
-};
+// ─── PERSISTANCE & SYNC ──────────────────────────────────────
+// Toute la couche de persistance/sync (`STORE_KEY`, `remotePush`/`remotePull`, `save`, `load`,
+// `_famSig`) est extraite dans `src/sync.js` depuis le 2026-08-06 (Lot 5/#24) — voir l'import en tête.
+// `isNewer` et la couche de fusion (`_mergeCalendar`, `mergeGS`, `_mergePlayer`, `mergeFamily`) sont
+// dans `src/merge.js` depuis la même date.
 
 // ─── DATA MIGRATION ── préserve les données des enfants entre les pushes ────
 // Ajoute les nouveaux champs sans jamais écraser les données existantes
@@ -3382,7 +3224,7 @@ export default function App() {
         // assignations créées ailleurs depuis sa dernière vraie synchro), faisant passer des tâches
         // BIEN VIVANTES pour orphelines, tombstonées pour toujours et repoussées au cloud aussitôt
         // (save() plus bas). Fix : n'agir QUE sur une synchro cloud confirmée, et inclure weeklyQuests.
-        if (LAST_LOAD_SYNCED) {
+        if (wasLastLoadSynced()) {
           const usedTaskIds=new Set([...(data.config.assignments||[]).map(a=>a.taskId), ...((data.config.weeklyQuests||{}).assignments||[]).map(a=>a.taskId)]);
           const orphans=(data.config.customTasks||[]).filter(t=>t&&t.id&&!usedTaskIds.has(t.id)).map(t=>t.id);
           if(orphans.length){
@@ -3488,10 +3330,10 @@ export default function App() {
       let local=null; try{const r=localStorage.getItem(STORE_KEY); if(r)local=JSON.parse(r);}catch{}
       // Pas de local : on adopte le remote s'il est plus récent (comportement d'origine)
       if(!local){
-        if(isNewer(remote.savedAt, LAST_SAVED_AT)){
+        if(isNewer(remote.savedAt, getLastSavedAt())){
           const data=migrateSavedData(remote);
           if(data?.config&&data?.gameStates){
-            LAST_SAVED_AT=data.savedAt;
+            setLastSavedAt(data.savedAt);
             try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch{}
             setConfig(data.config); setGameStates(data.gameStates);
           }
@@ -3510,7 +3352,7 @@ export default function App() {
         merged.savedAt=new Date().toISOString();
         const data=migrateSavedData(merged);
         if(data?.config&&data?.gameStates){
-          LAST_SAVED_AT=data.savedAt;
+          setLastSavedAt(data.savedAt);
           try{localStorage.setItem(STORE_KEY,JSON.stringify(data));}catch{}
           setConfig(data.config); setGameStates(data.gameStates);
           remotePush(data);
