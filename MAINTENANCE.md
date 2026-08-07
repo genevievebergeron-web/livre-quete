@@ -532,3 +532,23 @@ Backlog : relu en entier les 2 plans (`1-ajouter-un-token-unified-milner.md` #1-
 `git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `755d8ae`). Lecture `GET /api/famille` (HTTP 200) : 14 `config.bugs`, identiques id pour id à tous les passages précédents documentés depuis le 31 juillet — rien de nouveau, `errorLogs` vide. `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente d'une décision/investigation write de Gen, inchangés.
 
 Backlog écrit toujours épuisé pour tout ce qui est scopé à l'exception de #1/#2 (bloqués sur Gen) — repris le chantier mécanique du plan `mighty-mountain` item 24 (découpage progressif d'`App.jsx`, explicitement encore ouvert). Détail technique complet dans `PROJET-ETAT.md`, entrée v2.16.36 — `TimerView` (~139 lignes) extrait dans `src/timerview.jsx`. `App.jsx` : 6646 → 6507 lignes. Vérifié bout-en-bout en Chrome (serveur isolé port 5173, joueur de test `TestTimer` créé via l'assistant réel — `localStorage` vidé avant ET après, une trace de vraies données familiales trouvée en cache au démarrage immédiatement effacée sans y toucher, jamais la prod) : les 3 modes de la minuterie fonctionnent, minuteur 1 min lancé jusqu'au bout (disque animé, décompte, "J'ai réussi!" → toast de fin correct). Zéro erreur console. `npm run build` propre, `v2.16.36` poussé.
+
+---
+
+## Passage du 2026-08-07 (nuit, routine autonome) — aucun nouveau bug signalé, mais le JOURNAL D'ERREURS lui-même était cassé
+
+### 🐛 Bugs signalés
+`git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `82338c7`, v2.16.41). Lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-07T02:38Z) : 14 `config.bugs`, identiques id pour id à tous les passages documentés depuis le 31 juillet — rien de nouveau. `childTaskProposals`/`momentRequests`/`teamInvites`/`coinOffers` vides, `feed` (60 entrées, dernière activité réelle le 12 juillet) sans signalement neuf. `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente d'une décision/investigation write de Gen, inchangés.
+
+### 📋 Logs techniques notés — **le capteur était débranché, réparé ce passage (v2.16.42)**
+`errorLogs` était **vide**, comme à absolument tous les passages depuis sa création (v1.90.0, 21 juillet). Ce passage a arrêté de le noter comme une bonne nouvelle et a vérifié pourquoi. **Deux causes indépendantes, les deux corrigées, les deux prouvées par test avant/après** :
+
+1. **Aucun `ErrorBoundary` dans l'app** (grep : zéro `componentDidCatch`). Une erreur de rendu démontait tout l'arbre React → **page blanche muette** côté enfant. Et comme la capture d'erreurs de v1.90.0 vivait dans un `useEffect` d'`App()` (écriture via `setConfig`/`persist`), elle mourait avec l'arbre : **les erreurs qui cassent vraiment l'app ne se journalisaient jamais**. C'est cohérent avec les signalements type « rien ne se passe » / « ça ne marche pas » qui n'ont jamais eu la moindre trace technique en face.
+2. **`server.cjs` n'avait pas de miroir de merge pour `errorLogs`** (`bugs` en avait un) : les logs tombaient dans le `{...bC, ...iC}` générique, donc **un appareil poussant une config sans erreurs effaçait celles des autres**. Reproduit sur une copie isolée du serveur d'avant-correctif (port 3199, jamais la prod) : **1/5 assertions vertes avant, 5/5 après**.
+
+Corrigé par `src/errorlog.js` (file durable en `localStorage`, écrite hors React), `src/errorboundary.jsx` (écran de repli au lieu de la page blanche), la remontée en deux temps dans `App.jsx` et le miroir `errorLogs` dans `server.cjs`. Détail complet, tests et vérification navigateur : entrée `v2.16.42` de `PROJET-ETAT.md`.
+
+**⚠️ Conséquence pour les prochains passages** : jusqu'ici « `errorLogs` vide » ne voulait rien dire. À partir de maintenant, **ça veut dire quelque chose** — s'il se remplit, c'est du vrai signal à lire en priorité.
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) dans le portail parent — vérifiée non-orpheline, c'est simplement une décision en attente depuis ~10 jours. **4e passage consécutif à la relever.**

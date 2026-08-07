@@ -30,8 +30,11 @@ import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
 import { CHANGELOG } from "./changelog.js";
 import { migrateSavedData, dedupeUpdateFeed } from "./migrations.js";
+import { queueError, peekErrorQueue, dropQueuedErrors } from "./errorlog.js";
 
-const APP_VERSION = "2.16.41";
+// ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
+// plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
+export const APP_VERSION = "2.16.42";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -2173,6 +2176,11 @@ export default function App() {
   // juillet). Discret : aucune UI enfant, lisible seulement par le parent (ParentPanel, onglet Journal)
   // et par les passes de maintenance qui lisent /api/famille. Anti-spam : même erreur < 1 min ignorée
   // (évite qu'une erreur qui boucle remplisse les 80 places d'un coup).
+  // v2.16.42 — la capture passe désormais par la file DURABLE (`errorlog.js`) au lieu
+  // d'écrire directement dans config : une erreur qui casse le rendu démonte l'arbre
+  // avant que `setConfig`/`persist` aient abouti, donc les erreurs les plus graves ne
+  // se journalisaient jamais (errorLogs vide en prod depuis un mois). La file est versée
+  // dans config.errorLogs par l'effet de remontée juste en dessous.
   const lastErrRef = useRef({ key: "", ts: 0 });
   useEffect(() => {
     const logError = (message, stack, source) => {
@@ -2182,16 +2190,45 @@ export default function App() {
       lastErrRef.current = { key, ts: now };
       const cfg = cfgRef.current || {};
       const who = (() => { const v = viewRef.current; return typeof v === "number" ? (cfg.players?.[v]?.name || "?") : "?"; })();
-      const entry = { id: "err_" + uid(), ts: now, who, message: (message || "").slice(0, 300), stack: (stack || "").slice(0, 500), source: source || "", appVersion: APP_VERSION };
-      const n = { ...cfg, errorLogs: [entry, ...(cfg.errorLogs || [])].slice(0, 80) };
-      setConfig(n); persist(n, gsRef.current);
+      queueError({ id: "err_" + uid(), ts: now, who, message: (message || "").slice(0, 300), stack: (stack || "").slice(0, 500), source: source || "", appVersion: APP_VERSION });
     };
     const onError = (event) => { try { logError(event.message, event.error?.stack, event.filename); } catch {} };
     const onRejection = (event) => { try { const r = event.reason; logError(r?.message || String(r), r?.stack, "promise"); } catch {} };
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
     return () => { window.removeEventListener("error", onError); window.removeEventListener("unhandledrejection", onRejection); };
-  }, [persist]);
+  }, []);
+
+  // v2.16.42 — remontée de la file durable vers config.errorLogs (d'où elle se synchronise
+  // vers le portail parent, onglet Journal, exactement comme config.bugs). Tourne dès que
+  // la config est chargée : c'est CE passage qui récupère un plantage de rendu survenu au
+  // chargement précédent (l'ErrorBoundary l'a mis en file, l'app est morte, on le remonte
+  // au prochain démarrage sain). Puis toutes les 15 s pour les erreurs bénignes en cours
+  // de session. N'écrit rien — donc ne déclenche aucune synchro — si la file est vide.
+  //
+  // Deux temps volontaires (écrire, PUIS retirer de la file une fois l'entrée constatée
+  // dans la config) : une écriture de config peut encore être écrasée juste après par une
+  // autre (course au démarrage entre `load()` et cet effet, observée en dev). Vider la file
+  // d'avance perdrait l'erreur pour de bon ; ici le prochain tour la réécrit simplement.
+  useEffect(() => {
+    if (screen === "loading") return;
+    const flushErrors = () => {
+      const queued = peekErrorQueue();
+      if (!queued.length) return;
+      const cfg = cfgRef.current || {};
+      const known = new Set((cfg.errorLogs || []).map(e => e && e.id));
+      const landed = queued.filter(e => known.has(e.id));
+      if (landed.length) dropQueuedErrors(landed.map(e => e.id)); // confirmées → hors de la file
+      const fresh = queued.filter(e => !known.has(e.id));
+      if (!fresh.length) return;
+      const n = { ...cfg, errorLogs: [...fresh, ...(cfg.errorLogs || [])].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 80) };
+      setConfig(n); persist(n, gsRef.current);
+    };
+    flushErrors();
+    const iv = setInterval(flushErrors, 15000);
+    return () => clearInterval(iv);
+  }, [screen, persist]);
+
   // Ajoute une entrée au fil de famille (auto: quêtes, niveaux; manuel: chat)
   const pushFeed = useCallback((entry)=>{
     const cfg=cfgRef.current||{}; const fe={ id:"f_"+uid(), ts:Date.now(), likes:[], ...entry };
