@@ -9,7 +9,7 @@ import { getPlayerTheme, ALL_SHOP_ITEMS } from "./themes.js";
 import { petSpriteKey, renderPetToCtx, petPalOverride, petIsLegendary, petLevel } from "./pets.js";
 import { DEFAULT_AVATAR } from "./avatar.jsx";
 import { renderAvatarSprite } from "./sprites.jsx";
-import { displayName } from "./shared.js";
+import { displayName, todayStamp } from "./shared.js";
 
 // ─── PLATFORMER MINI-GAME (theme-aware) ─────────────────────
 export const Platformer = ({ player, onClose }) => {
@@ -109,6 +109,77 @@ export const Platformer = ({ player, onClose }) => {
   );
 };
 const darken = (hex) => { try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${Math.floor(r*0.6)},${Math.floor(g*0.6)},${Math.floor(b*0.6)})`;}catch{return "#333";} };
+
+// ─── COMBAT DE BOSS FAMILIAL ──────────────────────────────────
+// Extrait d'App.jsx le 2026-08-06 (Lot 5/#24) : toute la logique PURE du combat de boss (PV,
+// jetons, dégâts, modificateur du jour, verrou des corvées) rassemblée ici, dans le module qui
+// portait déjà `BOSSES`/`BossSprite`. Zéro composant, zéro avatar — donc entièrement hors de la
+// réserve avatar. Aucun changement de comportement — mêmes formules, mêmes commentaires.
+// Les seuils de coût côté gameplay (CHEST_ENERGY, PLAY_ENERGY…) restent volontairement dans
+// `App.jsx` : ce sont des réglages, pas de la mécanique de calcul (même choix qu'en v2.16.38).
+// Faire des quêtes = gagner des JETONS d'attaque. On les dépense (petite/grosse attaque)
+// pour enlever des PV au boss. Le boss riposte si la famille ralentit (PV de famille baissent).
+export const BOSS_DIFF = { facile:{label:"Facile",hp:40}, moyen:{label:"Moyen",hp:80}, costaud:{label:"Costaud",hp:140} };
+export const ATTACKS = {
+  petite:{ label:"Petite attaque", cost:1, dmg:1, emoji:"🗡️" },
+  grosse:{ label:"Grosse attaque", cost:3, dmg:4, emoji:"💥" }, // 3 jetons → 4 dégâts (bonus à viser gros)
+};
+export const FAMILY_HP_MAX = 100;
+export const BOSS_DRAIN_PER_H = FAMILY_HP_MAX / 36; // PV famille vidés en ~36 h sans attaque (recharge en attaquant)
+// PV de famille restants = baisse selon le temps écoulé depuis la dernière attaque
+export const familyHp = (boss, enraged=false) => {
+  if (!boss || boss.defeatedAt || !boss.lastHitTs) return FAMILY_HP_MAX;
+  const drain = BOSS_DRAIN_PER_H * (enraged ? 2 : 1); // v1.58.0 — le boss enragé vide les PV 2× plus vite
+  const h = (Date.now() - new Date(boss.lastHitTs).getTime()) / 3600000;
+  return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * drain)));
+};
+const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
+// v2.6.0 — 3e param optionnel : les quêtes de réparation 🕊️ (config.repairEvents) ajoutent leurs
+// dégâts au total du boss visé. Les events portent un dmg DÉJÀ plafonné à l'écriture (cap HPMAX-1).
+export const repairDamageFor = (repairEvents, bossId) => (repairEvents || []).reduce((s, e) => s + ((e && e.bossStartedAt === bossId) ? (e.dmg || 0) : 0), 0);
+export const bossDamageTotal = (gameStates, bossId, repairEvents) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0) + repairDamageFor(repairEvents, bossId);
+export const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
+// v2.16.4 — Chantier 6.3 : petits cœurs vintage pixel-art pour la tuile boss (remplace le mini-jeu
+// Hydre déconnecté). 1 cœur = 20% (5 cœurs total), même patron que l'ancien combat-hydre.html:312.
+export const heartsRow = (pct, count=5) => {
+  const filled = Math.max(0, Math.min(count, Math.round((pct/100)*count)));
+  return "❤️".repeat(filled) + "🖤".repeat(count-filled);
+};
+
+// v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
+// v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
+// en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
+// test du 1er juillet, jamais nettoyées) même quand le boss actif n'avait plus rien à voir avec l'Hydre.
+export const bossQuestsAllDone = (config, states) => {
+  try {
+    const todayIdx=(new Date().getDay()+6)%7, stamp=todayStamp();
+    const bossId = config?.boss?.id;
+    if(!bossId) return true; // aucun boss actif → pas de verrou
+    const prefix = "cust_"+bossId+"_";
+    const corv=(config?.assignments||[]).filter(a=>typeof a.taskId==="string" && a.taskId.startsWith(prefix) && Array.isArray(a.days) && a.days.includes(todayIdx));
+    if(!corv.length) return true; // aucune corvée pour CE boss aujourd'hui → pas de verrou
+    for(const a of corv){
+      for(const pid of (a.playerIds||[])){
+        const idx=(config.players||[]).findIndex(p=>p.id===pid);
+        if(idx<0) continue;
+        if(!((states[idx]?.completed||[]).includes(a.instanceId+"_"+pid+"#"+stamp))) return false;
+      }
+    }
+    return true;
+  } catch(e){ return true; }
+};
+// v1.58.0 — modificateur du JOUR (surprise + stratégie), déterministe par date+boss → identique sur tous les appareils
+export const BOSS_MODIFIERS = [
+  { id:"grosse",   emoji:"💥", label:"Jour des grosses", desc:"Les grosses attaques font +2 dégâts!" },
+  { id:"petite",   emoji:"🗡️", label:"Pluie de coups",   desc:"Les petites attaques font +1 dégât!" },
+  { id:"carapace", emoji:"🛡️", label:"Carapace",         desc:"Les petites rebondissent — vise les grosses!" },
+  { id:"frenesie", emoji:"⚡", label:"Frénésie",          desc:"Toutes les attaques font +1!" },
+  { id:"familier", emoji:"🐾", label:"Jour du familier",  desc:"L'attaque du familier fait DOUBLE!" },
+];
+export const bossModifierOfDay = (bossId) => { const s=todayStamp()+"#"+(bossId||""); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return BOSS_MODIFIERS[h%BOSS_MODIFIERS.length]; };
+export const bossAtkDamage = (type, mod) => { let d=ATTACKS[type]?.dmg||0; if(mod){ if(mod.id==="grosse"&&type==="grosse") d+=2; if(mod.id==="petite"&&type==="petite") d+=1; if(mod.id==="carapace"&&type==="petite") d=0; if(mod.id==="frenesie") d+=1; } return Math.max(0,d); };
+export const PET_ATTACK_COST = 3; // jetons pour lancer l'attaque du familier
+export const petAttackDamage = (petLv, legendary, mod) => { let d = 3 + Math.floor((petLv||1)/2) + Math.floor(Math.random()*3) + (legendary?3:0); if(mod&&mod.id==="familier") d*=2; return d; };
 
 // ─── BOSS DE FAMILLE — grand pool de sprites illustrés (v1.103.0) ──────
 // v1.103.0 (Lot 6, audit 2.0) — remplace les 4 silhouettes procédurales recolorées

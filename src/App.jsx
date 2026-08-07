@@ -22,7 +22,7 @@ import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 import { LoginScreen } from "./loginscreen.jsx";
 import { MiniGame } from "./minigames.jsx";
-import { BOSSES, BossSprite } from "./bosses.jsx";
+import { BOSSES, BossSprite, BOSS_DIFF, ATTACKS, FAMILY_HP_MAX, familyHp, repairDamageFor, bossDamageTotal, bossJetons, heartsRow, bossQuestsAllDone, bossModifierOfDay, bossAtkDamage, PET_ATTACK_COST, petAttackDamage } from "./bosses.jsx";
 import { TimerView } from "./timerview.jsx";
 import { ParentPanel } from "./parentpanel.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
@@ -31,7 +31,7 @@ import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, ge
 import { CHANGELOG } from "./changelog.js";
 import { migrateSavedData, dedupeUpdateFeed } from "./migrations.js";
 
-const APP_VERSION = "2.16.40";
+const APP_VERSION = "2.16.41";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -78,34 +78,8 @@ const FEED_ENERGY  = 45;   // nourrir le familier (1×/jour) en redonne
 const SHOP_ENERGY  = 15;   // acheter dans la boutique (magasiner)
 const AVATAR_ENERGY= 10;   // ouvrir le personnalisateur de perso
 // ─── COMBAT DE BOSS FAMILIAL ──────────────────────────────────
-// Faire des quêtes = gagner des JETONS d'attaque. On les dépense (petite/grosse attaque)
-// pour enlever des PV au boss. Le boss riposte si la famille ralentit (PV de famille baissent).
-const BOSS_DIFF = { facile:{label:"Facile",hp:40}, moyen:{label:"Moyen",hp:80}, costaud:{label:"Costaud",hp:140} };
-const ATTACKS = {
-  petite:{ label:"Petite attaque", cost:1, dmg:1, emoji:"🗡️" },
-  grosse:{ label:"Grosse attaque", cost:3, dmg:4, emoji:"💥" }, // 3 jetons → 4 dégâts (bonus à viser gros)
-};
-const FAMILY_HP_MAX = 100;
-const BOSS_DRAIN_PER_H = FAMILY_HP_MAX / 36; // PV famille vidés en ~36 h sans attaque (recharge en attaquant)
-// PV de famille restants = baisse selon le temps écoulé depuis la dernière attaque
-const familyHp = (boss, enraged=false) => {
-  if (!boss || boss.defeatedAt || !boss.lastHitTs) return FAMILY_HP_MAX;
-  const drain = BOSS_DRAIN_PER_H * (enraged ? 2 : 1); // v1.58.0 — le boss enragé vide les PV 2× plus vite
-  const h = (Date.now() - new Date(boss.lastHitTs).getTime()) / 3600000;
-  return Math.max(0, Math.min(FAMILY_HP_MAX, Math.round(FAMILY_HP_MAX - h * drain)));
-};
-const _bb = (gs, bossId) => (gs && gs.bossBattle && gs.bossBattle.bossId === bossId) ? gs.bossBattle : null;
-// v2.6.0 — 3e param optionnel : les quêtes de réparation 🕊️ (config.repairEvents) ajoutent leurs
-// dégâts au total du boss visé. Les events portent un dmg DÉJÀ plafonné à l'écriture (cap HPMAX-1).
-const repairDamageFor = (repairEvents, bossId) => (repairEvents || []).reduce((s, e) => s + ((e && e.bossStartedAt === bossId) ? (e.dmg || 0) : 0), 0);
-const bossDamageTotal = (gameStates, bossId, repairEvents) => (gameStates || []).reduce((s, g) => s + ((_bb(g, bossId)?.dmg) || 0), 0) + repairDamageFor(repairEvents, bossId);
-const bossJetons = (gs, bossId) => { const b = _bb(gs, bossId); return b ? Math.max(0, (b.earned || 0) - (b.spent || 0)) : 0; };
-// v2.16.4 — Chantier 6.3 : petits cœurs vintage pixel-art pour la tuile boss (remplace le mini-jeu
-// Hydre déconnecté). 1 cœur = 20% (5 cœurs total), même patron que l'ancien combat-hydre.html:312.
-const heartsRow = (pct, count=5) => {
-  const filled = Math.max(0, Math.min(count, Math.round((pct/100)*count)));
-  return "❤️".repeat(filled) + "🖤".repeat(count-filled);
-};
+// Logique pure du combat (BOSS_DIFF, ATTACKS, familyHp, bossDamageTotal, bossJetons, heartsRow…)
+// déplacée dans `src/bosses.jsx` le 2026-08-06 (Lot 5/#24) — voir l'import en tête de fichier.
 // v2.16.7 — Chantier 6.6 (demande de Gen) : verrou du matin parent-contrôlé, plage horaire fixe.
 // Heure LOCALE obligatoire (jamais toISOString — leçon v2.5.24, un bug UTC avait déjà cassé un
 // mécanisme similaire basé sur l'heure). Gère le cas où la fenêtre chevauche minuit (start>end).
@@ -144,40 +118,8 @@ const isShopLocked = (config, pState, assignments, playerId) => {
   if (need <= 0) return false; // 0 = parent a désactivé la condition
   return rotatingDoneToday(assignments, pState?.completed, playerId) < need;
 };
-// v1.76.0 — le boss actif ne peut être ACHEVÉ que si toutes ses corvées du jour sont complétées par les enfants assignés.
-// v2.5.2 (Bug boss #1) — généralisé au boss RÉELLEMENT actif (config.boss.id) au lieu du préfixe "cust_hydre_" codé
-// en dur : avant, un verrou pouvait se déclencher à cause d'anciennes tâches "cust_hydre_*" orphelines (données de
-// test du 1er juillet, jamais nettoyées) même quand le boss actif n'avait plus rien à voir avec l'Hydre.
-const bossQuestsAllDone = (config, states) => {
-  try {
-    const todayIdx=(new Date().getDay()+6)%7, stamp=todayStamp();
-    const bossId = config?.boss?.id;
-    if(!bossId) return true; // aucun boss actif → pas de verrou
-    const prefix = "cust_"+bossId+"_";
-    const corv=(config?.assignments||[]).filter(a=>typeof a.taskId==="string" && a.taskId.startsWith(prefix) && Array.isArray(a.days) && a.days.includes(todayIdx));
-    if(!corv.length) return true; // aucune corvée pour CE boss aujourd'hui → pas de verrou
-    for(const a of corv){
-      for(const pid of (a.playerIds||[])){
-        const idx=(config.players||[]).findIndex(p=>p.id===pid);
-        if(idx<0) continue;
-        if(!((states[idx]?.completed||[]).includes(a.instanceId+"_"+pid+"#"+stamp))) return false;
-      }
-    }
-    return true;
-  } catch(e){ return true; }
-};
-// v1.58.0 — modificateur du JOUR (surprise + stratégie), déterministe par date+boss → identique sur tous les appareils
-const BOSS_MODIFIERS = [
-  { id:"grosse",   emoji:"💥", label:"Jour des grosses", desc:"Les grosses attaques font +2 dégâts!" },
-  { id:"petite",   emoji:"🗡️", label:"Pluie de coups",   desc:"Les petites attaques font +1 dégât!" },
-  { id:"carapace", emoji:"🛡️", label:"Carapace",         desc:"Les petites rebondissent — vise les grosses!" },
-  { id:"frenesie", emoji:"⚡", label:"Frénésie",          desc:"Toutes les attaques font +1!" },
-  { id:"familier", emoji:"🐾", label:"Jour du familier",  desc:"L'attaque du familier fait DOUBLE!" },
-];
-const bossModifierOfDay = (bossId) => { const s=todayStamp()+"#"+(bossId||""); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return BOSS_MODIFIERS[h%BOSS_MODIFIERS.length]; };
-const bossAtkDamage = (type, mod) => { let d=ATTACKS[type]?.dmg||0; if(mod){ if(mod.id==="grosse"&&type==="grosse") d+=2; if(mod.id==="petite"&&type==="petite") d+=1; if(mod.id==="carapace"&&type==="petite") d=0; if(mod.id==="frenesie") d+=1; } return Math.max(0,d); };
-const PET_ATTACK_COST = 3; // jetons pour lancer l'attaque du familier
-const petAttackDamage = (petLv, legendary, mod) => { let d = 3 + Math.floor((petLv||1)/2) + Math.floor(Math.random()*3) + (legendary?3:0); if(mod&&mod.id==="familier") d*=2; return d; };
+// Le reste de la logique pure du combat (verrou des corvées du boss, modificateur du jour,
+// dégâts d'attaque et du familier) est dans `src/bosses.jsx` depuis le 2026-08-06 (Lot 5/#24).
 // `mergeBossBattle` — déplacée dans `src/merge.js` le 2026-08-06 (Lot 5/#24) : elle n'est
 // consommée que par `mergeGS`, elle part donc avec le reste de la couche de fusion.
 const SECRET_THEME_IDS = Object.values(PLAYER_THEMES).filter(t=>t.secret).map(t=>t.id);
