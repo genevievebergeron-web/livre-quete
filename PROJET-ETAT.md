@@ -1,5 +1,5 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-08-07 (nuit, 2e passage) — v2.16.43 (découpage du bundle : 3 écrans en `React.lazy` + préchargement au repos, -12,5 % sur le chargement initial)_
+_Mis à jour: 2026-08-07 (3e passage) — v2.16.44 (doublons de tâches perso : une seule carte par nom dans « Choisis une quête », + la dernière fuite bouchée à la source)_
 
 > ⚠️ **Rappel pour toute session (routine ou interactive) : voir `CLAUDE.md`.** Ce fichier se
 > met à jour TOUJOURS dès qu'un morceau de travail est complété — pas seulement en fin de
@@ -16,23 +16,33 @@ _Mis à jour: 2026-08-07 (nuit, 2e passage) — v2.16.43 (découpage du bundle :
 > laissée en v2.16.36. **Ne pas recommencer une 3e fois** : tant que Gen n'a pas retiré la note,
 > le découpage se fait uniquement sur du code **sans composant et sans avatar**.
 
-> 🔴 **GEN — 2 CHOSES POUR TOI, AVANT TOUT LE RESTE (7 août, 2e passage nocturne).**
-> **(1) Le disque de la machine est à ras bord : il est tombé à 168 Mo libres sur 228 Go (99 %)
-> en pleine session, puis remonté à ~400 Mo (97 %) après une purge automatique de macOS.** Ce
-> n'est pas causé par le projet — c'est l'état de la machine. Conséquences **réellement
-> constatées cette nuit**, pas théoriques : `vite` a refusé de démarrer (`ENOSPC` en écrivant son
-> fichier de config temporaire) et l'outil shell de la session n'arrivait plus à écrire ses
-> fichiers de sortie — la vérification a dû être interrompue puis reprise. **Avec cette marge,
-> la prochaine session peut retomber dedans à tout moment : plus de build, plus de serveur de
-> dev, plus de vérification en navigateur.** Gros postes repérés en lecture seule, tous dans
-> `/private/tmp` (espace temporaire, aucun processus ne les tenait, datés du 6 août) :
-> `chrome-hl-1` 195 Mo, `chrome-hl-3` 200 Mo, `chrome-hl-2b` 190 Mo,
-> `chrome-headless-profile-regitex` 171 Mo, `openclaw` 130 Mo — **~890 Mo de profils de
-> navigateur sans tête abandonnés**. La routine a **tenté** de les supprimer et **le garde-fou de
-> permissions a bloqué la commande** ; elle n'a donc rien effacé et n'a pas cherché à contourner.
-> À faire toi-même si tu es d'accord, ça débloque tout. Voir aussi `~/Library/Caches` (2,6 Go).
-> **(2) `removalRequests` : toujours la même entrée** (`rmreq_2ev8piy`, 2026-07-28) — une décision
-> parentale en attente depuis ~10 jours. **5e passage consécutif à la relever.**
+> 🔴 **GEN — 2 CHOSES POUR TOI (mis à jour le 7 août, 3e passage).**
+> **(1) `removalRequests` : toujours la même entrée** (`rmreq_2ev8piy`, 2026-07-28) — un enfant
+> demande le retrait d'une tâche, personne n'a tranché depuis ~10 jours. **6e passage consécutif
+> à la relever.** Ce n'est pas un bug : ça attend une décision parentale dans le portail.
+> **(2) Le ménage des 26 vrais doublons de `config.customTasks` en prod attend ton feu vert.**
+> `v2.16.44` (ci-dessous) les **masque** dans les sélecteurs — non destructif, rien n'est effacé —
+> mais les 26 copies restent dans les données, chacune encore référencée par une assignation
+> vivante (donc le ménage automatique des tâches orphelines ne les enlèvera jamais tout seul).
+> Les nettoyer pour de vrai = une migration qui doit **réaffecter** les assignations vers la
+> copie gardée avant de supprimer les autres. La routine ne le fait pas en autonome : ça touche
+> les vraies données des 4 enfants, et « laquelle on garde » quand deux copies ont des XP/pièces
+> différents est un choix, pas une évidence.
+>
+> ✅ **Alerte disque du 2e passage close** : le disque était tombé à 168 Mo libres (99 %) et avait
+> bloqué `vite` en `ENOSPC`. Vérifié ce passage : **103 Go libres (10 % utilisé)** — plus rien à
+> faire, `vite` et la vérification navigateur ont tourné normalement. Les ~890 Mo de profils de
+> navigateur sans tête dans `/private/tmp` mentionnés alors ont disparu d'eux-mêmes.
+>
+> **v2.16.44 (7 août, routine autonome, 3e passage) — doublons de tâches personnalisées : une seule carte par nom dans « Choisis une quête », et la dernière fuite bouchée à la source.** Phase 0 : `git pull` déjà à jour (`4a1d112`, v2.16.43), `npm run build` propre ; vérifié qu'aucun commit poussé n'était orphelin de `PROJET-ETAT` (HEAD = v2.16.43 = entrée précédente, aucun trou). Phase 1 (mini-maintenance) : lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-07T04:47Z — **exactement le même qu'au passage précédent**, donc personne n'a rouvert l'app entre les deux) — **mêmes 14 `config.bugs`**, identiques id pour id depuis le 31 juillet, `errorLogs` **vide** (2e lecture depuis que v2.16.42 a réparé le journal : toujours aucun plantage de rendu capté), `feed` 60 entrées sans signalement neuf (dernière activité réelle le 31 juillet), `childTaskProposals`/`momentRequests`/`teamInvites`/`coinOffers`/`repairEvents` tous vides : **aucun bug à corriger**, donc pas de Phase 2, et rien qui méritait une entrée `MAINTENANCE.md`.
+>
+> **Phase 3 — comment ce sujet a été trouvé.** Le backlog écrit restant est bloqué (#1/#2 sur Gen, chantier 24 sur la réserve avatar — bloc 🛑 ci-dessus, **non transgressé**). En relisant le plan `mighty-mountain`, un seul item 🤖 restait vraiment ouvert et non tranché par Gen : le **Lot 1 #3(b)** (« le catalogue de tâches personnalisées grossit à l'infini », question posée par Gen elle-même, section C du plan). En allant compter dans les vraies données plutôt que de partir sur l'idée d'origine (« archiver par ancienneté »), le problème s'est révélé **différent et plus simple** : ce ne sont pas des tâches vieilles, ce sont des **copies exactes**. Sur les **82** `customTasks` de la famille, **26 sont des doublons de libellé** — « Tâche de rituel (à renommer) » **×13**, « Tâche rituelle (à renommer) » **×7**, plus 8 paires de vraies tâches (Salle de bain, Ramasser la table, Prendre un temps bulle…). ⚠️ **L'idée « archiver par ancienneté » est à abandonner telle quelle** : ni `customTasks` ni `assignments` ne portent la moindre date, il n'y a donc **rien à backfiller** — un champ « dernière utilisation » ne commencerait à trier qu'à partir d'aujourd'hui et ne réglerait rien de l'existant.
+>
+> **Fait — 2 correctifs.** **(a) Affichage** : `dedupeTasksByLabel` (nouveau, `catalog.js`, à côté de `normLabel`) appliqué dans `TaskChooser` (`taskpickers.jsx`) — une seule carte par libellé normalisé, la **première** occurrence gagnant (donc l'entrée de `TASK_CATALOG` quand une tâche perso porte le même nom, l'ordre d'`allTasks` étant catalogue d'abord). **Rien n'est supprimé** : c'est un filtre de vue, les assignations qui pointent vers une copie masquée continuent de fonctionner. Mesuré sur les vraies données : **126 → 98 boutons (−28)** dans le sélecteur, partagé par le parent (`parentpanel.jsx`) et l'enfant. **(b) Source** : `handleChildAddRoutineTask` (`App.jsx`) était **le dernier chemin de création sans anti-doublon** — chaque tâche créée depuis le constructeur de rituel empilait une nouvelle entrée `cust_` même si le même libellé existait déjà. Même règle que `handleChildAddTask` (v1.53.0) et `handleAddCustomTask` (v1.82.0) : libellé déjà connu → on réutilise son `taskId`, mais l'assignation reste neuve (c'est bien l'entrée de SON rituel).
+>
+> **Vérifié.** (1) **Test Node autonome** (22 assertions, toutes vertes) : `dedupeTasksByLabel` — liste vide/`null`, garde la première occurrence, casse et espaces multiples ignorés (via `normLabel`), libellés différents conservés, entrée sans libellé ignorée sans exception, objets renvoyés **par référence** (pas de copie), ordre préservé ; puis **sur une copie locale des vraies données de prod** — aucun doublon restant, **toutes** les tâches de `TASK_CATALOG` survivent, **chaque libellé d'avant est encore représenté** (rien perdu, juste dédoublé), rien de `child:true` ne s'y glisse, les 28 copies masquées **existent toujours** dans `customTasks` et leurs **56 assignations vivantes résolvent encore** leur tâche ; simulation de la nouvelle règle de `handleChildAddRoutineTask` — réutilise malgré casse/espaces, nouveau libellé → nouvelle tâche, et **5 créations du même nom → 1 seule entrée**. (2) **Bout-en-bout en navigateur** (serveur `vite` isolé port 5199, données de test `AlphaTest`/`BetaTest` — contenu du `localStorage` **lu et sauvegardé AVANT** d'y toucher, jamais la prod ; aucune requête réseau vers la prod possible, le code n'appelle que `/api` en même origine) : 5 copies exactes + 1 doublon d'un libellé de catalogue semées avec une assignation vivante chacune → **portail parent → Tâches → « Choisis une quête » : 55 cartes, ZÉRO libellé en double**, « Tâche de rituel (à renommer) » réduite de 5 cartes à **1** ; la liste « TÂCHES D'AUJOURD'HUI (8) » du même onglet montre bien **les 5 assignations séparées** (elle ne doit PAS être dédoublonnée — chacune est une vraie assignation que le parent peut retirer) ; puis côté enfant, constructeur de rituel → « ➕ Créer ma propre tâche » → libellé **déjà existant** saisi → `customTasks` **reste à 6** (aurait fait 7 avant le correctif), une seule entrée « Balayer le salon » (`cust_uniq`, l'existante réutilisée), **une nouvelle assignation créée quand même** et la ligne apparaît **sélectionnée** (bordure dorée) dans le rituel en construction. **Zéro erreur console** sur tout le parcours ; données de test **restaurées à l'octet près** en fin de test (25 760 caractères, `savedAt` d'origine 07:44:17.480Z) et rechargées sans erreur. (3) `npm run build` propre, taille du bundle inchangée. `v2.16.44` poussé.
+>
+> **Reste ouvert (👤 Gen)** : la migration qui **supprime** vraiment les 26 copies en prod — voir le point (2) du bloc 🔴 ci-dessus. Tant qu'elle n'est pas faite, les doublons sont invisibles dans les sélecteurs mais toujours dans les données.
 >
 > **v2.16.43 (7 août, routine autonome, nuit, 2e passage) — découpage du bundle : `SetupWizard`/`ParentPanel`/`MiniGame` en `React.lazy`, avec préchargement au repos.** Phase 0 : `git pull` déjà à jour (`bf5a6ee`, v2.16.42), `npm run build` propre ; vérifié qu'aucun commit poussé n'était orphelin de `PROJET-ETAT` (HEAD = v2.16.42 = entrée précédente, aucun trou à combler). Phase 1 (mini-maintenance) : lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-07T04:47Z) — **mêmes 14 `config.bugs`**, identiques id pour id depuis le 31 juillet, `feed` (60 entrées, dernière activité réelle le 31 juillet) sans signalement neuf, `childTaskProposals`/`momentRequests`/`teamInvites`/`coinOffers`/`repairEvents` tous vides : **aucun bug à corriger**, donc pas de Phase 2. **`errorLogs` vide — et cette fois ça VEUT DIRE quelque chose** : c'est la première lecture depuis que v2.16.42 a réparé le journal de bout en bout, donc « vide » = aucun plantage de rendu capté chez les enfants depuis hier soir, au lieu de « capteur débranché ».
 >

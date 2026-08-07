@@ -88,7 +88,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.43";
+export const APP_VERSION = "2.16.44";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -3237,12 +3237,19 @@ export default function App() {
   // pour l'ajouter immédiatement au rituel qu'il est en train de bâtir.
   const handleChildAddRoutineTask = useCallback((playerIdx, data)=>{
     const pid=config.players[playerIdx]?.id; if(!pid||!data?.label?.trim())return null;
-    const taskId="cust_"+uid();
+    const label=data.label.trim();
+    // v2.16.44 — c'était le DERNIER chemin de création sans anti-doublon : chaque tâche créée depuis
+    // le constructeur de rituel empilait une nouvelle entrée `cust_`, même quand la même existait déjà
+    // (le catalogue perso familial est monté à 82 entrées dont 26 copies). Même règle que
+    // `handleChildAddTask` (v1.53.0) et `handleAddCustomTask` (v1.82.0) : libellé déjà connu → on
+    // réutilise son `taskId`. L'assignation, elle, est toujours neuve (c'est l'entrée de SON rituel).
+    const existing=(config.customTasks||[]).find(t=>normLabel(t.label)===normLabel(label));
+    const taskId=existing?existing.id:("cust_"+uid());
     const _dp=CHILD_DIFF_PRESETS[data.diff]||CHILD_DIFF_PRESETS.medium; // plafond anti-farm
-    const newTask={id:taskId,emoji:data.emoji||"⭐",label:data.label.trim(),xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
+    const newTask={id:taskId,emoji:data.emoji||"⭐",label,xp:_dp.xp,coins:_dp.coins,diff:data.diff||"medium",cat:"custom",child:true};
     const instanceId=uid();
     const ass={instanceId,taskId,playerIds:[pid],days:[],time:""}; // days:[] → tâche de rituel (persiste dans SON rituel)
-    const newCfg={...config, customTasks:[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
+    const newCfg={...config, customTasks:existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask], assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Tâche ajoutée à ton rituel!","#5CAD68");
     return instanceId;

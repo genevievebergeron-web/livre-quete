@@ -3,14 +3,17 @@
 // local (useState) — aucun état applicatif partagé, zéro changement de comportement.
 import { useState } from "react";
 import { SFX } from "./sfx.js";
-import { catMeta } from "./catalog.js";
+import { catMeta, dedupeTasksByLabel } from "./catalog.js";
 import { UIIcon } from "./sprites.jsx";
 
 // v1.53.0 — Sélecteur de tâches en GRILLE groupée + code couleur par étiquette.
 // L'enfant CHOISIT une tâche existante (réutilise son taskId → zéro doublon). Repli: créer la sienne.
 export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
   const acc=th?.accent||"#D9BC5C";
-  const tasks=(allTasks||[]).filter(t=>t && t.label && !t.child); // tâches curées (catalogue + parent), pas le bric-à-brac
+  // v2.16.44 — même liste curée qu'avant (catalogue + parent, pas le bric-à-brac), mais une seule
+  // entrée par libellé : les copies héritées d'avant les garde-fous anti-doublon encombraient la
+  // catégorie « Perso » (26 boutons redondants sur 73 en prod, dont 20 « Tâche de rituel (à renommer) »).
+  const tasks=dedupeTasksByLabel((allTasks||[]).filter(t=>t && t.label && !t.child));
   const order=["routine","cuisine","menage","outdoor","defi","custom"];
   const groups={}; tasks.forEach(t=>{ const c=t.cat||"custom"; (groups[c]=groups[c]||[]).push(t); });
   const cats=Object.keys(groups).sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});

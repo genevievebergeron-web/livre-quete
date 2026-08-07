@@ -166,6 +166,26 @@ export const REPAIR_PRESETS = [
 export const catMeta = (c) => CAT_META[c] || { label:"Autre", color:"#9AA0A6" };
 export const normLabel = (s) => (s||"").toLowerCase().trim().replace(/\s+/g," ");
 
+// v2.16.44 — Repli d'affichage pour les doublons de libellé déjà présents dans `config.customTasks`.
+// Les chemins de CRÉATION dédoublonnent (`normLabel`) depuis v1.53.0/v1.82.0, mais tout ce qui a été
+// créé AVANT ces garde-fous est resté : en prod, 26 des 82 tâches perso sont des copies exactes d'une
+// autre (dont 20 vieux gabarits « Tâche de rituel (à renommer) »), et le ménage automatique des tâches
+// orphelines ne peut pas les retirer — chacune est encore référencée par une assignation vivante.
+// Ce helper ne SUPPRIME rien : il ne fait que masquer les copies dans les sélecteurs, en gardant la
+// PREMIÈRE occurrence (donc l'entrée de `TASK_CATALOG` quand une tâche perso porte le même nom, l'ordre
+// d'`allTasks` étant catalogue d'abord). Les assignations qui pointent vers une copie masquée continuent
+// de fonctionner normalement — c'est un filtre de vue, pas une migration.
+export const dedupeTasksByLabel = (tasks) => {
+  const seen = new Set(); const out = [];
+  for (const t of (tasks||[])) {
+    if (!t || !t.label) continue;
+    const k = normLabel(t.label);
+    if (!k || seen.has(k)) continue;
+    seen.add(k); out.push(t);
+  }
+  return out;
+};
+
 // v1.85.0 (Lot 2 #9) — catégories de calendrier au-delà de Événement/Devoir/Examen : tout ce qui
 // n'est pas scolaire (camp de jour, match/entraînement, vaccin, intervenant à la maison…) avait
 // jusqu'ici la même icône générique 📅. `type`/`recur`/`date` restent les mêmes champs — extension

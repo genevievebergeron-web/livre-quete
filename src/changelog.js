@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.44", date:"2026-08-07", features:[
+    "🧹 La liste « Choisis une quête » ne montre plus la même tâche dix fois : une seule carte par nom.",
+  ]},
   { version:"2.16.43", date:"2026-08-07", features:[
     "⚡ L'app s'ouvre plus vite : elle ne charge plus au démarrage les écrans que tu n'utilises pas tout de suite.",
   ]},
