@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } from "react";
 import { SFX, setSfxMuted } from "./sfx.js";
 import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
@@ -12,7 +12,6 @@ import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, 
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
-import { SetupWizard } from "./setupwizard.jsx";
 import { AVATAR_PARTS, DEFAULT_AVATAR, renderAvatarToCtx, AvatarCanvas } from "./avatar.jsx";
 import { PlayerProfile } from "./playerprofile.jsx";
 import { AvatarPopup } from "./avatarpopup.jsx";
@@ -21,10 +20,8 @@ import { spawnParticles } from "./particles.js";
 import { InlineRitualTimer } from "./ritualtimer.jsx";
 import { isCustodyWeek, custodyWeekKey, generateCustodyWeekAssignments, challengeDaysCount, CHALLENGE_TIERS, carryOverUnfinishedTasks, isValidCustodyWeekKey } from "./recurring.js";
 import { LoginScreen } from "./loginscreen.jsx";
-import { MiniGame } from "./minigames.jsx";
 import { BOSSES, BossSprite, BOSS_DIFF, ATTACKS, FAMILY_HP_MAX, familyHp, repairDamageFor, bossDamageTotal, bossJetons, heartsRow, bossQuestsAllDone, bossModifierOfDay, bossAtkDamage, PET_ATTACK_COST, petAttackDamage } from "./bosses.jsx";
 import { TimerView } from "./timerview.jsx";
-import { ParentPanel } from "./parentpanel.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
@@ -32,9 +29,66 @@ import { CHANGELOG } from "./changelog.js";
 import { migrateSavedData, dedupeUpdateFeed } from "./migrations.js";
 import { queueError, peekErrorQueue, dropQueuedErrors } from "./errorlog.js";
 
+// ─── ÉCRANS CHARGÉS À LA DEMANDE (v2.16.43) ──────────────────
+// Ces trois écrans pèsent lourd (~1900 lignes cumulées) et ne s'affichent JAMAIS au démarrage :
+// l'assistant de configuration ne sert qu'au tout premier lancement, le portail parent qu'après
+// un PIN, un mini-jeu qu'après une montée de niveau. Les sortir du fichier principal allège ce
+// que le navigateur doit télécharger et exécuter AVANT de montrer quoi que ce soit à l'enfant.
+// ⚠️ Il n'y a PAS de service worker ici (`vite.config.js`: `selfDestroying:true`) — un morceau
+// chargé à la demande est donc un vrai aller-retour réseau. Pour qu'un wifi qui flanche ne
+// bloque jamais l'ouverture du portail parent ou d'un mini-jeu, `usePrefetchLazyScreens`
+// ci-dessous va les chercher en tâche de fond dès que la page est au repos, bien avant qu'on en
+// ait besoin. Si malgré tout le chargement échoue, l'`ErrorBoundary` de `main.jsx` (v2.16.42)
+// affiche l'écran de repli avec son bouton « Recharger » au lieu d'une page blanche.
+const SetupWizard = lazy(() => import("./setupwizard.jsx").then(m => ({ default: m.SetupWizard })));
+const ParentPanel = lazy(() => import("./parentpanel.jsx").then(m => ({ default: m.ParentPanel })));
+const MiniGame    = lazy(() => import("./minigames.jsx").then(m => ({ default: m.MiniGame })));
+
+// Écran d'attente pendant qu'un morceau se télécharge. Volontairement identique à l'écran
+// « ⚔️ Chargement… » du démarrage (même fond, même police, même animation) : sur une connexion
+// normale il n'apparaît que quelques dizaines de millisecondes, et sur une connexion lente
+// l'enfant voit quelque chose de familier plutôt qu'un trou blanc.
+function LazyScreenFallback(){
+  return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}>
+    <style>{GLOBAL_CSS}</style>
+    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div>
+  </div>;
+}
+
+// Même chose, mais pour les deux écrans qui s'ouvrent PAR-DESSUS le jeu (portail parent,
+// mini-jeu) : un `position:fixed` par-dessus tout, pour ne pas pousser la mise en page du
+// dashboard resté monté derrière.
+function LazyOverlayFallback(){
+  return <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(26,26,46,0.95)",display:"flex",alignItems:"center",justifyContent:"safe center"}}>
+    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div>
+  </div>;
+}
+
+// Va chercher les morceaux à la demande en tâche de fond, une seule fois, quand le navigateur
+// n'a rien de mieux à faire. `import()` met le module en cache : au vrai moment d'ouverture,
+// l'affichage est instantané et fonctionne même si le réseau est tombé entre-temps.
+// L'assistant de configuration est volontairement EXCLU : soit il est déjà affiché (premier
+// lancement), soit il ne servira jamais à cet appareil — le précharger serait du gaspillage.
+function usePrefetchLazyScreens(ready){
+  useEffect(() => {
+    if(!ready) return;
+    let cancelled = false;
+    const warm = () => {
+      if(cancelled) return;
+      // Échecs ignorés volontairement : ce n'est qu'un préchargement d'avance. Si ça rate,
+      // React refera l'`import()` au moment réel de l'affichage (avec son écran d'attente).
+      import("./parentpanel.jsx").catch(()=>{});
+      import("./minigames.jsx").catch(()=>{});
+    };
+    const ric = typeof window !== "undefined" && window.requestIdleCallback;
+    const id = ric ? window.requestIdleCallback(warm, { timeout: 4000 }) : setTimeout(warm, 2000);
+    return () => { cancelled = true; if(ric) window.cancelIdleCallback?.(id); else clearTimeout(id); };
+  }, [ready]);
+}
+
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.42";
+export const APP_VERSION = "2.16.43";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -2049,6 +2103,8 @@ const recurLabel = (e) => {
 
 export default function App() {
   const [screen, setScreen] = useState("loading"); // loading|setup|login|game
+  // v2.16.43 — précharge portail parent + mini-jeux en tâche de fond une fois le démarrage passé.
+  usePrefetchLazyScreens(screen !== "loading");
   const [config, setConfig] = useState(null);
   const [gameStates, setGameStates] = useState([]); // per-player
   const [view, setView] = useState("family"); // "family"|0|1|2|3
@@ -3626,9 +3682,9 @@ export default function App() {
     showToast("🎨 Nouveau thème activé pour la semaine!","#D9BC5C",3000);
   }, [view, config, gameStates, persist, showToast]);
   if(screen==="loading") return <div style={{minHeight:"100vh",background:"#1a1a2e",display:"flex",alignItems:"center",justifyContent:"safe center"}}><style>{GLOBAL_CSS}</style><div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,color:"#D9BC5C",animation:"pulse 1s infinite"}}>⚔️ Chargement…</div></div>;
-  if(screen==="setup") return <SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}
-    onCancel={editingBook?()=>{setEditingBook(false);setScreen("game");setParentPanel(true);}:null}/>;
-  if(screen==="login"&&!config) return <SetupWizard existing={null} onDone={handleSetupDone}/>;
+  if(screen==="setup") return <Suspense fallback={<LazyScreenFallback/>}><SetupWizard existing={editingBook?config:null} onDone={(d)=>{setEditingBook(false);handleSetupDone(d);}}
+    onCancel={editingBook?()=>{setEditingBook(false);setScreen("game");setParentPanel(true);}:null}/></Suspense>;
+  if(screen==="login"&&!config) return <Suspense fallback={<LazyScreenFallback/>}><SetupWizard existing={null} onDone={handleSetupDone}/></Suspense>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates} appVersion={APP_VERSION}
     onSelectPlayer={(idx)=>{
       // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine)
@@ -4018,6 +4074,7 @@ export default function App() {
       {/* ── MODALS ── */}
       {/* Parent Panel slide-out */}
       {parentMode && parentPanel && (
+        <Suspense fallback={<LazyOverlayFallback/>}>
         <ParentPanel
           config={config} gameStates={gameStates} parentMode={parentMode}
           actionLog={actionLog} undoStack={undoStack} players={config.players} th={th}
@@ -4057,6 +4114,7 @@ export default function App() {
           onResendAnnouncement={handleResendAnnouncement}
           onDeleteAnnouncement={handleDeleteAnnouncement}
         />
+        </Suspense>
       )}
 
       {parentPinOpen&&(
@@ -4088,7 +4146,9 @@ export default function App() {
         <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
       )}
       {miniGame&&(
-        <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} forcedType={miniGame.forcedType} isGift={miniGame.isGift} onFinish={handleMiniGameEnd}/>
+        <Suspense fallback={<LazyOverlayFallback/>}>
+          <MiniGame player={miniGame.player} playerThemeId={miniGame.playerThemeId} level={miniGame.level} forcedType={miniGame.forcedType} isGift={miniGame.isGift} onFinish={handleMiniGameEnd}/>
+        </Suspense>
       )}
       {toast&&<Toast msg={toast.msg} color={toast.color}/>}
 

@@ -552,3 +552,19 @@ Corrigé par `src/errorlog.js` (file durable en `localStorage`, écrite hors Rea
 
 ### 💡 À signaler à Gen (pas un bug)
 - [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) dans le portail parent — vérifiée non-orpheline, c'est simplement une décision en attente depuis ~10 jours. **4e passage consécutif à la relever.**
+
+---
+
+## Passage du 2026-08-07 (nuit, 2e passage, routine autonome) — première lecture d'`errorLogs` qui compte + disque hôte plein
+
+### 🐛 Bugs signalés
+`git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `bf5a6ee`, v2.16.42). Lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-07T04:47Z) : **14 `config.bugs`, identiques id pour id depuis le 31 juillet** — rien de nouveau. `childTaskProposals`/`momentRequests`/`teamInvites`/`coinOffers`/`repairEvents` tous vides, `feed` (60 entrées, dernière activité réelle le 31 juillet) sans signalement neuf. **Aucun bug à corriger, donc pas de Phase 2.** `bug_hlu9mkd` (150 pièces perdues) et `bug_56gb01a` (casque de chevalier figé) restent les 2 seuls items non-mécaniques en attente d'une décision de Gen, inchangés.
+
+### 📋 Logs techniques — `errorLogs` vide, **et pour la première fois ça veut dire quelque chose**
+C'est la première lecture depuis que v2.16.42 a réparé le journal de bout en bout (hier soir). « Vide » ne signifie donc plus « capteur débranché » mais **aucun plantage de rendu capté chez les enfants depuis le déploiement**. Rien à investiguer ce passage — mais c'est maintenant une donnée à lire pour de vrai à chaque passage, pas une ligne à cocher.
+
+### 🔴 À régler par Gen — le disque de la machine est plein (bloquant pour toutes les sessions)
+**Tombé à 168 Mo libres sur 228 Go (99 %) en pleine session, puis remonté à ~400 Mo (97 %) après une purge automatique de macOS.** Pas causé par le projet. Conséquences réellement constatées : `vite` a refusé de démarrer (`ENOSPC` en écrivant son fichier de config temporaire) et l'outil shell n'arrivait plus à écrire ses fichiers de sortie — la vérification de l'incrément de la nuit a dû être interrompue puis reprise une fois la place revenue. **Avec cette marge, la prochaine session peut retomber dedans à tout moment.** Repéré en lecture seule dans `/private/tmp` (temporaire, aucun processus ne les tenait, tous datés du 6 août) : `chrome-hl-1` 195 Mo, `chrome-hl-3` 200 Mo, `chrome-hl-2b` 190 Mo, `chrome-headless-profile-regitex` 171 Mo, `openclaw` 130 Mo — **~890 Mo de profils de navigateur sans tête abandonnés**. La routine a tenté de les supprimer, **le garde-fou de permissions a bloqué la commande** ; rien n'a été effacé et aucun contournement n'a été tenté. Voir aussi `~/Library/Caches` (2,6 Go).
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) dans le portail parent — décision en attente depuis ~10 jours. **5e passage consécutif à la relever.**

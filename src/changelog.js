@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.43", date:"2026-08-07", features:[
+    "⚡ L'app s'ouvre plus vite : elle ne charge plus au démarrage les écrans que tu n'utilises pas tout de suite.",
+  ]},
   { version:"2.16.42", date:"2026-08-07", features:[
     "🛠️ Si jamais l'app bugge, tu vois maintenant un message clair et un bouton « Recharger » au lieu d'un écran blanc.",
     "🔧 Les pépins techniques sont notés automatiquement pour le parent (portail → Journal).",
