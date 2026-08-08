@@ -88,7 +88,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.44";
+export const APP_VERSION = "2.16.45";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -3524,7 +3524,12 @@ export default function App() {
   const handleResetPlayer = useCallback((playerIdx) => {
     const player=config.players[playerIdx];
     if(!window.confirm(`Reset ${player?.name}? XP, pièces et tâches seront à 0.`))return;
-    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,coinsLifetime:0,coinsWeek:{week:custodyWeekKey()},completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
+    // v2.16.45 — `noCoinsResetV1:true` ajouté ici aussi : cet état repart SANS drapeau autrement, et
+    // un appareil resté sur une version d'avant v2.16.45 (bundle en cache, hors ligne) y verrait un
+    // `coinsWeek` sans drapeau — donc l'ancien reset hebdomadaire réarmé sur les pièces regagnées
+    // depuis. Le drapeau voyage maintenant avec l'état plutôt que d'être seulement reposé au prochain
+    // chargement. Voir le bloc d'historique en tête de `migrateGameState`.
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,coinsLifetime:0,coinsWeek:{week:custodyWeekKey()},noCoinsResetV1:true,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
     logAction(`🔄 Reset complet: ${player?.name}`,"#D97070");
     showToast(`🔄 ${player?.name} réinitialisé`,"#D97070");
   },[config,persist,logAction,showToast]);

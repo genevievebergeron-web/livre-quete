@@ -568,3 +568,30 @@ C'est la première lecture depuis que v2.16.42 a réparé le journal de bout en 
 
 ### 💡 À signaler à Gen (pas un bug)
 - [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) dans le portail parent — décision en attente depuis ~10 jours. **5e passage consécutif à la relever.**
+
+---
+
+## Passage du 2026-08-08 (routine autonome) — les pièces des 4 enfants reconstituées : `bug_hlu9mkd` enfin expliqué
+
+### 🐛 Bugs signalés
+`git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `481bc39`, v2.16.44) ; aucun commit poussé orphelin d'entrée `PROJET-ETAT` (HEAD = v2.16.44 = entrée du haut). Lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-08T13:50Z — la famille a rouvert l'app, c'est le premier `savedAt` neuf depuis trois passages) : **14 `config.bugs`, identiques id pour id depuis le 31 juillet**, `errorLogs` **vide** (3e lecture depuis la réparation du journal en v2.16.42 : toujours aucun plantage de rendu capté), `feed` 60 entrées sans signalement neuf, `childTaskProposals`/`momentRequests`/`teamInvites`/`coinOffers`/`repairEvents` tous vides. **Aucun bug NOUVEAU, donc pas de Phase 2** — mais un bug ancien a enfin trouvé sa cause, ci-dessous.
+
+### 🔴 `bug_hlu9mkd` (« J'ai perdu 150 pièces, je peux le récupérer? ») — CAUSE TROUVÉE, 8 jours après
+Ce signalement traînait « ouvert, sans cause confirmée » depuis le 31 juillet. En auditant les vraies données plutôt que le code, le constat qui a tout déclenché : **les 4 enfants sont à `coins: 0` exactement**, alors que `coinsLifetime` (jamais décrémenté) vaut 935 / 317 / 343 / 1247. Quatre soldes à zéro pile, le même jour, ce n'est pas quatre enfants qui dépensent au centime près.
+
+**Chronologie reconstituée, chaque étape vérifiable :**
+1. **28 juillet** — Gen redistribue les soldes à la main après l'incident de sync : **AE 350, Elli 161, Oli 151, DR 350** (documenté dans `PROJET-ETAT.md` et la mémoire projet). À ce moment `coinsWeek.week` vaut `2026-07-24`.
+2. **Vendredi 31 juillet** — `custodyWeekKey()` bascule de `2026-07-24` à `2026-07-31` (semaines de garde vendredi→vendredi, confirmé : les trois dates `2026-07-24`, `2026-07-31`, `2026-08-07` sont bien des vendredis). Dans `migrateGameState`, la condition `!gs.noCoinsResetV1 && !!gs.coinsWeek && storedWeek < cwk` devient vraie au chargement suivant → **`coins` remis à 0 pour les 4 enfants**. Le 31 juillet est aussi le **dernier jour d'activité réelle** dans les données (dernières complétions, dernières entrées de fil).
+3. **2 août** — v2.16.22 désactive le reset hebdomadaire via le drapeau `noCoinsResetV1`… **deux jours trop tard** : le drapeau est posé sur des états déjà à zéro, et **fige ce zéro en « solde persistant »**. Les 4 états portent aujourd'hui `noCoinsResetV1: true` et `coinsWeek.week: "2026-08-07"`.
+
+Autrement dit : **la redistribution du 28 juillet a survécu trois jours**, et le correctif censé arrêter l'hémorragie a verrouillé la perte au lieu de la réparer. Un enfant l'a signalé le jour même (`bug_hlu9mkd`) ; six passages de maintenance successifs ont relu ce signalement et conclu « rien à corriger », faute d'avoir croisé le signalement avec les soldes réels.
+
+**Vérifié aussi (pistes écartées, pour ne pas les refaire)** : ce n'est PAS de la dépense — le coût cumulé des items possédés (2676 / 2520 / 2010 / 3570 🪙) dépasse largement `coinsLifetime`, donc `owned` contient du butin de coffre et des cadeaux, et ne permet aucune déduction sur les achats. Ce n'est PAS non plus `handleResetPlayer` (action parentale explicite, derrière un `window.confirm`, jamais automatique).
+
+### 🔧 Corrigé côté code ce passage (v2.16.45) — mais **la donnée reste à réparer par Gen**
+La branche de reset était **encore atteignable** malgré `noCoinsResetV1`, par un chemin réel : `handleResetPlayer` réécrivait un état AVEC `coinsWeek` mais SANS le drapeau ; un autre appareil ouvrant ce joueur lors d'une semaine de garde ultérieure repassait `storedWeek < cwk` et effaçait les pièces regagnées entre-temps. **v2.16.45 retire la branche pour de bon** et fait voyager le drapeau avec l'état. Détail, tests et vérification navigateur : entrée `PROJET-ETAT.md` v2.16.45.
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 PRIORITAIRE — les soldes de pièces des 4 enfants sont à 0 et ne se répareront pas tout seuls.** Le code ne les effacera plus jamais (v2.16.45), mais il ne rend pas non plus ce qui a été effacé le 31 juillet. Restaurer = un `PUT /api/famille`, et **le montant est une décision de Gen, pas de la routine** (règle « équitable-pas-égal », plafond 350 déjà choisi le 28 juillet). Point de départ possible : reprendre exactement les montants du 28 juillet (AE 350, Elli 161, Oli 151, DR 350), puisque rien n'a été gagné ni dépensé depuis. **La routine n'écrit jamais en prod : rien n'a été modifié.**
+- [ ] **14 demandes de validation en attente depuis le 30-31 juillet** (6 chez le joueur 2, 8 chez le joueur 3) : des quêtes faites par les enfants, jamais validées, donc **jamais payées en XP ni en pièces**. Le portail parent les montre bien (il s'ouvre d'office sur l'onglet Validation quand il y a du retard) — mais personne ne l'a ouvert depuis. Combiné aux soldes à 0, c'est le vécu réel des enfants depuis huit jours : des quêtes faites, rien reçu, et les pièces d'avant disparues.
+- [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) — décision en attente depuis ~11 jours. **6e passage consécutif à la relever.**

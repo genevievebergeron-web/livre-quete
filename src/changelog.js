@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.45", date:"2026-08-08", features:[
+    "🪙 Tes pièces ne disparaissent plus jamais au changement de semaine. Ce qui est à toi reste à toi.",
+  ]},
   { version:"2.16.44", date:"2026-08-07", features:[
     "🧹 La liste « Choisis une quête » ne montre plus la même tâche dix fois : une seule carte par nom.",
   ]},

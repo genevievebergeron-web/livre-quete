@@ -32,19 +32,27 @@ const migratePetXpV2 = (petXp) => {
 export const migrateGameState = (gs) => {
   const hasPin = gs.pin != null;
   const oldAvatar = gs.avatar || {};
-  // v2.5.0 (Correctif 1) — reset hebdomadaire des pièces (vendredi minuit, custodyWeekKey — PAS weekKey).
-  // Si coinsWeek n'existe pas encore (premier chargement post-déploiement), on SEED sans reset immédiat :
-  // le solde actuel des 4 enfants est préservé, seul le prochain changement de semaine déclenchera un reset.
+  // v2.5.0 → v2.16.45 — HISTORIQUE DU RESET HEBDOMADAIRE DES PIÈCES, ET POURQUOI IL N'EXISTE PLUS.
+  // Le solde de pièces était remis à 0 à chaque changement de semaine de garde (vendredi minuit,
+  // `custodyWeekKey` — PAS `weekKey`). v2.16.22 (2 août) l'a désactivé via le drapeau `noCoinsResetV1`,
+  // mais en gardant la branche de reset en place « au cas où » — elle restait donc atteignable.
+  // v2.16.45 (8 août) la retire pour de bon, après avoir reconstruit ce qu'elle avait coûté en prod :
+  // les soldes que Gen avait redistribués à la main le 28 juillet (350/161/151/350) ont survécu
+  // TROIS JOURS — le vendredi 31 juillet a fait basculer `custodyWeekKey`, la branche a mis les 4
+  // enfants à 0, et v2.16.22 (2 août) a figé ce zéro en solde « persistant ». C'est très exactement
+  // le signalement `bug_hlu9mkd` (« J'ai perdu 150 pièces, je peux le récupérer? »), resté sans
+  // explication pendant huit jours. Détail complet : PROJET-ETAT.md v2.16.45.
+  // La branche était encore atteignable malgré `noCoinsResetV1` : `handleResetPlayer` (`App.jsx`)
+  // réécrit un état AVEC `coinsWeek` mais SANS le drapeau — un autre appareil ouvrant ce joueur lors
+  // d'une semaine de garde ultérieure repassait `storedWeek < cwk` et re-effaçait les pièces gagnées
+  // entre-temps. Plus de branche = plus de chemin, quel que soit l'état des drapeaux.
+  // `coinsWeek` continue d'être maintenu (stamp max) : `merge.js` le fusionne encore et de vieux
+  // clients l'écrivent toujours — on garde la donnée, on retire seulement l'effacement.
   const cwk = custodyWeekKey();
-  // v2.5.26 — reset SEULEMENT si le stamp stocké est PLUS VIEUX que la clé calculée (`<`, pas `!==`).
-  // Un stamp "futur" (ex. 2026-07-25 écrit par un vieux client UTC pas encore mis à jour) restait en
-  // prod via le merge max — avec `!==`, chaque client À JOUR (clé 2026-07-24) re-effaçait les pièces
-  // à CHAQUE chargement jusqu'au vendredi suivant. Comparaison lexicographique sûre (format YYYY-MM-DD).
+  // v2.5.26 — on conserve le stamp le PLUS RÉCENT des deux (comparaison lexicographique sûre sur
+  // `YYYY-MM-DD`) : un stamp « futur » écrit par un vieux client UTC ne doit pas être rétrogradé,
+  // sinon la guerre de stamps avec ce client repart (même raison qu'au merge, `merge.js` ~65).
   const storedWeek = gs.coinsWeek?.week || "";
-  // v2.16.22 (Chantier #2, plan du 1er-2 août) — reset hebdomadaire retiré (inéquitable, coïncidait avec
-  // les signalements « pièces perdues » type bug_hlu9mkd) : `noCoinsResetV1` fige `coins` en solde
-  // persistant dès qu'un client a migré une fois — même patron que `rotativeCleanupV1`/`petMigV2` plus haut.
-  const coinsWeekReset = !gs.noCoinsResetV1 && !!gs.coinsWeek && storedWeek < cwk;
   return {
     xp: 0, completed: [], equipped: {},
     ...gs,
@@ -55,9 +63,9 @@ export const migrateGameState = (gs) => {
     pending: gs.rotativeCleanupV1 ? (gs.pending || []) : [], // v1.108.0 — ménage unique (Gen) : vide les tâches en suspens pour la bascule vers les quêtes rotatives
     rotativeCleanupV1: true, // v1.108.0 — drapeau : ménage de transition Lot 7 appliqué (xp/coins/badges/completed/routines intacts)
     coinsLifetime: gs.coinsLifetime ?? (gs.coins || 0), // v2.5.0 — jamais réinitialisé ni décrémenté (badges Petit Trésor/Oncle Picsou), seedé depuis le solde actuel au premier déploiement
-    coins: coinsWeekReset ? 0 : (gs.coins || 0), // v2.5.0 — remis à 0 au changement de semaine de garde (vendredi minuit) ; v2.16.22 — plus jamais après la 1re migration, voir noCoinsResetV1
+    coins: gs.coins || 0, // v2.16.45 — solde purement persistant : plus AUCUN chemin ne le remet à 0 ici (voir le bloc d'historique ci-dessus)
     coinsWeek: { week: storedWeek > cwk ? storedWeek : cwk }, // v2.5.26 — garde le stamp max (cohérent avec le merge v2.5.3) pour ne pas relancer la guerre de stamps avec un vieux client
-    noCoinsResetV1: true, // v2.16.22 — drapeau : reset hebdomadaire des pièces désactivé (solde persistant désormais)
+    noCoinsResetV1: true, // v2.16.22 — drapeau conservé : de vieux clients pas encore mis à jour peuvent encore lire ce champ, et il documente l'état de bascule
     pin: gs.pin ?? null,
     mode: gs.mode ?? null,        // v1.13.0 — mode choisi par l'enfant ("routine"|"week"); null = défaut famille
     routines: gs.routines || [],  // v1.13.0 — routines créées par l'enfant: [{id,name,emoji,taskIds:[instanceId]}]
