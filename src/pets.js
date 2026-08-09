@@ -1,8 +1,12 @@
 // ─── FAMILIERS qui ÉVOLUENT + SPRITES PIXEL-ART ────────────────
 // Extrait de App.jsx (Lot 5 #24, découpage progressif) : module purement de données
-// + fonctions pures (rendu canvas, calculs de niveau) — aucune dépendance sur le
-// reste de App.jsx (todayStamp etc. restent utilisés seulement par gainPet/
-// migratePetXpV2, volontairement laissés dans App.jsx), zéro changement de comportement.
+// + fonctions pures (rendu canvas, calculs de niveau), zéro changement de comportement.
+// ⚠️ La note « todayStamp reste dans App.jsx donc gainPet aussi » était périmée :
+// `todayStamp` vit dans `shared.js` (utilitaire partagé) depuis le découpage, et
+// `shared.js` n'importe que `themes.js`/`recurring.js` — aucun cycle possible.
+// `gainPet` est donc revenue ici le 2026-08-09 (Lot 5/#24), là où vit `PET_DAILY_CAP`
+// qu'elle applique. `migratePetXpV2` est partie dans `migrations.js` le 2026-08-06.
+import { todayStamp } from "./shared.js";
 
 // Chaque familier a sa propre XP (gameState.petXp[petId]), conservée même déséquipé.
 // Le familier équipé gagne de l'XP quand l'enfant accomplit une quête.
@@ -13,6 +17,17 @@ export const petLevel = (xp) => { let lv=1; for (let i=0;i<PET_LEVELS.length;i++
 export const petStage = (xp) => PET_STAGES[Math.min(petLevel(xp)-1, PET_STAGES.length-1)];
 export const petBar   = (xp) => { const lv=petLevel(xp); if (lv >= PET_LEVELS.length) return {cur:1,needed:1,max:true}; const base=PET_LEVELS[lv-1], next=PET_LEVELS[lv]; return { cur:(xp||0)-base, needed:next-base, max:false }; };
 export const mergePetXp = (a, b) => { const out={...(a||{})}; for (const k in (b||{})) out[k]=Math.max(out[k]||0, b[k]||0); return out; };
+
+// v1.52.0 — ajoute de l'XP au familier équipé en respectant le plafond quotidien. Retourne {petXp, petDay}.
+export const gainPet = (p, petId, amount) => {
+  const cur = p.petXp || {}; const today = todayStamp();
+  const pd0 = (p.petDay && p.petDay.day === today) ? p.petDay : { day: today, xp: 0 };
+  if (!petId || !(amount > 0)) return { petXp: cur, petDay: pd0 };
+  const room = Math.max(0, PET_DAILY_CAP - (pd0.xp || 0));
+  const add = Math.min(amount, room);
+  if (add <= 0) return { petXp: cur, petDay: pd0 };
+  return { petXp: { ...cur, [petId]: (cur[petId] || 0) + add }, petDay: { day: today, xp: (pd0.xp || 0) + add } };
+};
 
 // ─── SPRITES PIXEL-ART DES FAMILIERS (v1.56.0) ───────────────
 // Chaque familier = grille 16×16 (chaîne par ligne) + palette de base. Le caractère mappe une couleur.

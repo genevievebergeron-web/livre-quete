@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense
 import { SFX, setSfxMuted } from "./sfx.js";
 import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
-import { PET_STAGES, PET_DAILY_CAP, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
+import { PET_STAGES, PET_DAILY_CAP, gainPet, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
-import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, calEventIconName, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
+import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, weeklyRewards, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, calEventIconName, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./ui.jsx";
-import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, GLOBAL_CSS, streakOf, appendXpLog, SHOP_UNLOCK_DEFAULT } from "./shared.js";
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog, SHOP_UNLOCK_DEFAULT } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -89,16 +89,10 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.46";
+export const APP_VERSION = "2.16.47";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
-// v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
-const weeklyRewards = (n=8) => {
-  const wk = todayStamp();
-  let seed = 0; for (let i=0;i<wk.length;i++) seed = (seed*31 + wk.charCodeAt(i)) >>> 0;
-  const arr = REWARD_CATALOG.map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
-  arr.sort((a,b)=>a.k-b.k);
-  return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
-};
+// `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
+// 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
@@ -106,16 +100,8 @@ const DAYS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
 
 // v1.52.0 — `migratePetXpV2`/`PET_LEVELS_OLD` sont dans `src/migrations.js` depuis le 2026-08-06
 // (Lot 5/#24) : `migrateGameState`, resté leur seul appelant, est parti dans le même module.
-// v1.52.0 — ajoute de l'XP au familier équipé en respectant le plafond quotidien. Retourne {petXp, petDay}.
-const gainPet = (p, petId, amount) => {
-  const cur = p.petXp || {}; const today = todayStamp();
-  const pd0 = (p.petDay && p.petDay.day === today) ? p.petDay : { day: today, xp: 0 };
-  if (!petId || !(amount > 0)) return { petXp: cur, petDay: pd0 };
-  const room = Math.max(0, PET_DAILY_CAP - (pd0.xp || 0));
-  const add = Math.min(amount, room);
-  if (add <= 0) return { petXp: cur, petDay: pd0 };
-  return { petXp: { ...cur, [petId]: (cur[petId] || 0) + add }, petDay: { day: today, xp: (pd0.xp || 0) + add } };
-};
+// v1.52.0 — `gainPet` (plafond quotidien d'XP du familier) est dans `src/pets.js` depuis le
+// 2026-08-09 (Lot 5/#24), avec le `PET_DAILY_CAP` qu'elle applique.
 
 // ─── ÉNERGIE / SIESTE (frein sain : on ne passe pas la journée dessus) ──────
 // L'énergie se RECHARGE toute seule avec le temps réel (pleine en ~3 h).
@@ -144,23 +130,11 @@ const AVATAR_ENERGY= 10;   // ouvrir le personnalisateur de perso
 // dégâts d'attaque et du familier) est dans `src/bosses.jsx` depuis le 2026-08-06 (Lot 5/#24).
 // `mergeBossBattle` — déplacée dans `src/merge.js` le 2026-08-06 (Lot 5/#24) : elle n'est
 // consommée que par `mergeGS`, elle part donc avec le reste de la couche de fusion.
-const SECRET_THEME_IDS = Object.values(PLAYER_THEMES).filter(t=>t.secret).map(t=>t.id);
-const RANDOM_THEME_PLAYER = { id:"random", name:"Au hasard 🎲", icon:"🎲", secret:false,
-  bg:"#0a0a14", primary:"#888", accent:"#aaa", glow:"#aaa", levels:["?","?","?","?","?"],
-  coinName:"Surprise", taskVerb:"mystérisée", winMsg:"Thème mystère activé!" };
-const RANDOM_THEME_WEEK   = { id:"random_week", name:"Semaine surprise 🎲", icon:"🎲" };
-
-// Pick a random theme for a player (seeded by player id + week)
-const resolveRandomTheme = (playerId) => {
-  const allIds = [...SECRET_THEME_IDS, ...Object.keys(PLAYER_THEMES).filter(k=>!PLAYER_THEMES[k].secret&&k!=="none")];
-  const seed = (playerId||"x").split("").reduce((a,c)=>a+c.charCodeAt(0),0) + new Date().getDay();
-  return allIds[seed % allIds.length];
-};
-const resolveWeekRandomTheme = (weekSeed) => {
-  const all = Object.keys(THEMES);
-  return all[(weekSeed||0) % all.length];
-};
-
+// Le tirage « Au hasard 🎲 » (`resolveRandomTheme`, `resolveWeekRandomTheme`) est dans
+// `src/shared.js` depuis le 2026-08-09 (Lot 5/#24), avec le reste de la sélection de thème
+// (`pickStarterThemes`/`getWeeklyFreeTheme`/`isThemeUnlocked`). Les deux cartes de sélecteur
+// `RANDOM_THEME_PLAYER`/`RANDOM_THEME_WEEK` qui vivaient ici étaient du code mort (plus aucun
+// lecteur dans le dépôt) : retirées, pas déménagées — détail dans `shared.js`.
 
 
 // ─── STORAGE ─────────────────────────────────────────────────

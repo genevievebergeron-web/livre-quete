@@ -224,6 +224,33 @@ export const THEMES = {
   forest:    { name:"Forêt",     bg:"#0a1a0a", primary:"#2E7D32", accent:"#A5D6A7", card:"rgba(0,20,0,0.7)",  text:"#fff" },
 };
 
+// ─── TIRAGE « AU HASARD 🎲 » ──────────────────────────────────
+// Migrés d'`App.jsx` le 2026-08-09 (Lot 5/#24) : c'est la suite directe de
+// `pickStarterThemes`/`getWeeklyFreeTheme`/`isThemeUnlocked` ci-dessus (toute la sélection de
+// thème vit maintenant au même endroit). Placés APRÈS `THEMES` parce que
+// `resolveWeekRandomTheme` le lit — même fichier, aucune zone morte possible à l'init.
+// Pas exporté : seul `resolveRandomTheme` juste en dessous s'en sert.
+const SECRET_THEME_IDS = Object.values(PLAYER_THEMES).filter(t=>t.secret).map(t=>t.id);
+// ⚠️ `RANDOM_THEME_PLAYER` et `RANDOM_THEME_WEEK` (les deux cartes « Au hasard 🎲 » /
+// « Semaine surprise 🎲 » du sélecteur de thème) ne sont PAS remontés ici : en les déménageant
+// on a constaté qu'aucun fichier du dépôt ne les lisait plus — le sélecteur de thème a été
+// réécrit depuis et ne les affiche nulle part. C'était donc du code mort dans `App.jsx`, retiré
+// plutôt que recopié dans un module partagé (où il aurait eu l'air d'une API à utiliser).
+// Les IDs `"random"`/`"random_week"` eux-mêmes restent bel et bien gérés à l'exécution
+// (`App.jsx` ~260, ~3524) : un joueur qui les a déjà en base continue de tomber sur un vrai
+// thème via les deux fonctions ci-dessous. Aucun comportement changé.
+
+// Pick a random theme for a player (seeded by player id + week)
+export const resolveRandomTheme = (playerId) => {
+  const allIds = [...SECRET_THEME_IDS, ...Object.keys(PLAYER_THEMES).filter(k=>!PLAYER_THEMES[k].secret&&k!=="none")];
+  const seed = (playerId||"x").split("").reduce((a,c)=>a+c.charCodeAt(0),0) + new Date().getDay();
+  return allIds[seed % allIds.length];
+};
+export const resolveWeekRandomTheme = (weekSeed) => {
+  const all = Object.keys(THEMES);
+  return all[(weekSeed||0) % all.length];
+};
+
 // v2.16.37 — Backlog #15 (v2.16.26) : nombre de tâches ROTATIVES à compléter aujourd'hui pour
 // débloquer boutique/avatar, valeur par défaut quand `config.shopUnlockCount` n'est pas défini.
 // Migrée d'`App.jsx` vers ce module lors de l'extraction de `ParentPanel` (Lot 5/#24) — utilisée

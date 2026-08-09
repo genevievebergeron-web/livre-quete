@@ -1,8 +1,13 @@
 // ─── CATALOGUE DES TÂCHES, RÉCOMPENSES ET BADGES ───────────────
 // Extrait de App.jsx (Lot 5 #24, découpage progressif) : données pures + fonctions
-// dérivées. Seule dépendance externe : getLevel (src/leveling.js) pour les badges de
-// niveau. weeklyRewards() reste dans App.jsx (dépend de todayStamp, utilitaire partagé).
+// dérivées. Dépendances externes : getLevel (src/leveling.js) pour les badges de niveau,
+// todayStamp (src/shared.js) pour la rotation quotidienne de la boutique.
+// ⚠️ La note « weeklyRewards reste dans App.jsx parce qu'elle dépend de todayStamp »
+// était périmée : `shared.js` n'importe que `themes.js`/`recurring.js`, aucun cycle
+// possible. La fonction est revenue ici le 2026-08-09 (Lot 5/#24), là où vit le
+// `REWARD_CATALOG` qu'elle tire au sort.
 import { getLevel } from "./leveling.js";
+import { todayStamp } from "./shared.js";
 
 // ─── TASK CATALOG ────────────────────────────────────────────
 export const TASK_CATALOG = [
@@ -110,6 +115,14 @@ export const REWARD_CATALOG = [
   { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90, moment:true, tier:"epique" },
   { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme", moment:true, tier:"moyenne" },
 ];
+// v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
+export const weeklyRewards = (n=8) => {
+  const wk = todayStamp();
+  let seed = 0; for (let i=0;i<wk.length;i++) seed = (seed*31 + wk.charCodeAt(i)) >>> 0;
+  const arr = REWARD_CATALOG.map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
+  arr.sort((a,b)=>a.k-b.k);
+  return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
+};
 export const REWARD_CAT_BADGE = { ecran:{label:"📱 Écran",color:"#FF8C6B"}, calme:{label:"🌙 Calme",color:"#7FD6E0"} };
 // Refonte visuelle Phase 2 — mapping "planche Petite/Moyenne/Épique" : couleur + classe utilitaire
 // (Phase 1, shared.js) pour la carte de récompense. tierOf() retombe sur les coins pour toute
