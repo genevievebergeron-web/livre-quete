@@ -147,11 +147,13 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
   );
 }
 
-export function RewardPopup({ task, player, newBadges, onClose, th }) {
+export function RewardPopup({ task, player, newBadges, onClose, th, humor }) {
   const T = th || THEMES.minecraft;
   // 1 fois sur 3, un message sarcastique — tiré au sort une seule fois par ouverture du popup,
   // pas à chaque re-render (sinon il changerait sous les yeux de l'enfant).
-  const [funnyMsg] = useState(()=> Math.random()<0.33 ? FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)] : null);
+  // v2.16.48 — respecte le réglage « 😄 Messages rigolos » de l'enfant. `humor` non fourni = actif
+  // (défaut historique du champ `settings.humor`), donc aucun appelant existant ne change de comportement.
+  const [funnyMsg] = useState(()=> (humor!==false && Math.random()<0.33) ? FUNNY_MSGS[Math.floor(Math.random()*FUNNY_MSGS.length)] : null);
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"safe center",padding:16,overflowY:"auto"}}>
       <div style={{background:`radial-gradient(circle at 50% 28%, ${T.accent}22, ${T.bg} 70%)`,border:`6px solid ${T.accent}`,borderRadius:10,padding:"clamp(18px,4vw,30px) clamp(20px,5vw,40px)",textAlign:"center",maxWidth:440,width:"90%",maxHeight:"90vh",overflowY:"auto",boxShadow:`0 0 50px ${T.accent}80`,animation:"bounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1)"}}>

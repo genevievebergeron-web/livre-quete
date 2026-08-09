@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.47";
+export const APP_VERSION = "2.16.48";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -697,12 +697,19 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             ["calm","🎬 Mode calme","Moins d'animations et de clignotements (plus doux pour les yeux)"],
             ["calmCountdown","⏱ Décompte calme","Le minuteur sans rouge ni « dépêche-toi »"],
             ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
+            ["humor","😄 Messages rigolos","Des petites blagues après une quête réussie (et un secret ou deux)"], // v2.16.48 — voir commentaire ci-dessous
             ["readableFont","🔤 Police plus lisible","Remplace les lettres « jeu vidéo » par une police plus simple à lire"], // v1.87.0 (Lot 3 #12)
             ["femTitles","👑 Titres au féminin","Héroïne, Championne, Chevalière… au lieu de Héros, Champion, Chevalier"], // v2.5.27 — branche titleF/levelsF (item #5 analyse game design)
           ].map(([key,label,desc])=>{
-            // v1.82.0 (Lot 1 #4) — "humor" retiré : c'était un réglage sans effet (aucun texte
-            // humoristique n'existe dans le code), ça promettait une fonction inexistante à l'enfant.
-            const isOn = (key==="sound") ? settings[key]!==false : !!settings[key];
+            // v1.82.0 (Lot 1 #4) — "humor" avait été RETIRÉ de cette liste : le champ existait mais
+            // aucun texte humoristique n'existait dans le code, donc le réglage promettait une
+            // fonction inexistante. v2.16.10/v2.16.11 (Backlog #12) ont livré cet humour pour de vrai
+            // (FUNNY_MSGS dans RewardPopup, TITLE_EASTER_EGGS sur le titre du header) — sans jamais
+            // rebrancher le réglage, donc l'humour était devenu impossible à couper. v2.16.48 le
+            // remet : le champ `settings.humor` n'a jamais cessé d'être persisté (défaut `true`,
+            // et `true` pour les 4 enfants en prod), donc personne ne voit son app changer.
+            // `sound` et `humor` valent `true` par défaut → testés en `!==false`, pas en booléen nu.
+            const isOn = (key==="sound"||key==="humor") ? settings[key]!==false : !!settings[key];
             return (
               <div key={key} onClick={()=>{SFX.click();setSetting(key, !isOn);}}
                 style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#5CAD68"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
@@ -3688,8 +3695,11 @@ export default function App() {
           titleTapCountRef.current+=1;
           if(titleTapCountRef.current>=7){
             titleTapCountRef.current=0;
-            SFX.epic&&SFX.epic(); spawnParticles("✨");
-            showToast(TITLE_EASTER_EGGS[Math.floor(Math.random()*TITLE_EASTER_EGGS.length)],"#D9BC5C",4500);
+            // v2.16.48 — l'easter egg fait partie de « 😄 Messages rigolos » : muet si l'enfant l'a coupé.
+            if(curSettings.humor!==false){
+              SFX.epic&&SFX.epic(); spawnParticles("✨");
+              showToast(TITLE_EASTER_EGGS[Math.floor(Math.random()*TITLE_EASTER_EGGS.length)],"#D9BC5C",4500);
+            }
           } else {
             titleTapTimerRef.current=setTimeout(()=>{titleTapCountRef.current=0;},1500);
           }
@@ -4095,7 +4105,7 @@ export default function App() {
         </div>
       )}
       {rewardPopup&&(
-        <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th}/>
+        <RewardPopup task={rewardPopup.task} player={rewardPopup.player} newBadges={rewardPopup.newBadges||[]} onClose={()=>{setRewardPopup(null);SFX.click();}} th={th} humor={curSettings.humor!==false}/>
       )}
       {miniGame&&(
         <Suspense fallback={<LazyOverlayFallback/>}>
