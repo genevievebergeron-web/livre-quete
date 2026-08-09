@@ -595,3 +595,22 @@ La branche de reset était **encore atteignable** malgré `noCoinsResetV1`, par 
 - [ ] **🔴 PRIORITAIRE — les soldes de pièces des 4 enfants sont à 0 et ne se répareront pas tout seuls.** Le code ne les effacera plus jamais (v2.16.45), mais il ne rend pas non plus ce qui a été effacé le 31 juillet. Restaurer = un `PUT /api/famille`, et **le montant est une décision de Gen, pas de la routine** (règle « équitable-pas-égal », plafond 350 déjà choisi le 28 juillet). Point de départ possible : reprendre exactement les montants du 28 juillet (AE 350, Elli 161, Oli 151, DR 350), puisque rien n'a été gagné ni dépensé depuis. **La routine n'écrit jamais en prod : rien n'a été modifié.**
 - [ ] **14 demandes de validation en attente depuis le 30-31 juillet** (6 chez le joueur 2, 8 chez le joueur 3) : des quêtes faites par les enfants, jamais validées, donc **jamais payées en XP ni en pièces**. Le portail parent les montre bien (il s'ouvre d'office sur l'onglet Validation quand il y a du retard) — mais personne ne l'a ouvert depuis. Combiné aux soldes à 0, c'est le vécu réel des enfants depuis huit jours : des quêtes faites, rien reçu, et les pièces d'avant disparues.
 - [ ] `removalRequests` contient toujours **1 demande de retrait de tâche** non traitée (`rmreq_2ev8piy`, déposée le 2026-07-28) — décision en attente depuis ~11 jours. **6e passage consécutif à la relever.**
+
+---
+
+## Passage du 2026-08-08 (nuit, 2e passage, routine autonome) — aucun bug neuf, et une bonne nouvelle : `removalRequests` est enfin vide
+
+Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-08T21:35:56Z** — encore plus frais qu'au passage de l'après-midi, l'app a été rouverte en soirée).
+
+### 🐛 Bugs traités
+- **Aucun bug nouveau.** Les 14 `config.bugs` sont identiques id pour id à ceux du 31 juillet (`bug_hlu9mkd`, `bug_ix3lmjs`, `bug_dvtx5rm`, `bug_cas8lcb`, `bug_33as986`, `bug_56gb01a`, `bug_rak8rzv`, `bug_6k7827p`, `bug_xcqtyr7`, `bug_hf01ozi`, `bug_h8r93zu`, `bug_lyr5812`, `bug_74klxs1`, `bug_k1gqpz6`) — tous déjà classés/corrigés/documentés dans les passages ci-dessus, rien à ajouter.
+- `config.errorLogs` **vide** — 4e lecture depuis la réparation du journal en v2.16.42. Toujours aucun plantage de rendu capté en prod.
+- `feed` : 60 entrées, la plus récente datant toujours du **31 juillet** (« Bon déjeuner »). Aucun message d'enfant signalant quoi que ce soit depuis.
+
+### 📋 Ce qui a changé dans les données depuis le passage de l'après-midi
+- ✅ **`removalRequests` est VIDE.** La demande `rmreq_2ev8piy` (déposée le 2026-07-28), relevée **6 passages d'affilée**, a été tranchée côté parent entre 13h50 et 21h35 aujourd'hui. **Point clos, retiré du bloc « GEN » de `PROJET-ETAT.md`.**
+- ⚠️ **Les 14 validations dormantes sont toujours là** (6 chez le joueur 2, 8 chez le joueur 3, `pending` inchangé depuis le 30-31 juillet). Quelqu'un a donc ouvert le portail parent et traité la demande de retrait **sans** traiter les validations — c'est la même app, une section différente.
+- ⚠️ **Les 4 soldes de pièces sont toujours à 0** (`coinsLifetime` 935 / 317 / 343 / 1247, intacts). Attendu : le code est réparé depuis v2.16.45, mais la donnée demande une décision de Gen. **La routine n'a rien écrit en prod.**
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 Toujours prioritaire — les soldes à 0 et les 14 validations dormantes** : voir la liste du passage précédent, inchangée sur ces deux points. Rien de neuf à ajouter, sinon qu'un passage de plus s'est écoulé.

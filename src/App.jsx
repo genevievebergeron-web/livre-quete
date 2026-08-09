@@ -23,6 +23,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { BOSSES, BossSprite, BOSS_DIFF, ATTACKS, FAMILY_HP_MAX, familyHp, repairDamageFor, bossDamageTotal, bossJetons, heartsRow, bossQuestsAllDone, bossModifierOfDay, bossAtkDamage, PET_ATTACK_COST, petAttackDamage } from "./bosses.jsx";
 import { TimerView } from "./timerview.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
+import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining } from "./gating.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
 import { CHANGELOG } from "./changelog.js";
@@ -88,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.45";
+export const APP_VERSION = "2.16.46";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 const weeklyRewards = (n=8) => {
@@ -137,44 +138,8 @@ const AVATAR_ENERGY= 10;   // ouvrir le personnalisateur de perso
 // ─── COMBAT DE BOSS FAMILIAL ──────────────────────────────────
 // Logique pure du combat (BOSS_DIFF, ATTACKS, familyHp, bossDamageTotal, bossJetons, heartsRow…)
 // déplacée dans `src/bosses.jsx` le 2026-08-06 (Lot 5/#24) — voir l'import en tête de fichier.
-// v2.16.7 — Chantier 6.6 (demande de Gen) : verrou du matin parent-contrôlé, plage horaire fixe.
-// Heure LOCALE obligatoire (jamais toISOString — leçon v2.5.24, un bug UTC avait déjà cassé un
-// mécanisme similaire basé sur l'heure). Gère le cas où la fenêtre chevauche minuit (start>end).
-const isMorningLocked = (player, now = new Date()) => {
-  const lock = player?.morningLock;
-  if (!lock?.enabled) return false;
-  const [sh, sm] = (lock.start || "06:00").split(":").map(Number);
-  const [eh, em] = (lock.end || "09:00").split(":").map(Number);
-  const cur = now.getHours() * 60 + now.getMinutes();
-  const start = sh * 60 + (sm || 0), end = eh * 60 + (em || 0);
-  return start <= end ? (cur >= start && cur < end) : (cur >= start || cur < end);
-};
-// Backlog #13 — budget-temps quotidien par enfant (contrôle parental). `dailyMinutesLimit` (config
-// joueur) : null/0 = pas de limite. `pState.sessionMinutes` accumule les minutes du jour courant
-// (voir timer dans App()) — verrouillé seulement une fois le jour ET le plafond atteints.
-const isTimeLocked = (player, pState) => {
-  const limit = player?.dailyMinutesLimit;
-  if (!limit) return false;
-  const sm = pState?.sessionMinutes;
-  if (!sm || sm.day !== todayStamp()) return false;
-  return (sm.minutes || 0) >= limit;
-};
-// v2.16.26 — Backlog #15 : accès boutique/avatar débloqué après X tâches ROTATIVES (isRecurring:true,
-// système récurrent du Lot 7 — recurring.js) complétées aujourd'hui, pas juste n'importe quelle tâche.
-// Compte les assignations distinctes (pas les XP) : 1 tâche rotative faite = 1, peu importe sa difficulté.
-// (`SHOP_UNLOCK_DEFAULT` a migré dans `shared.js` en v2.16.37 — partagé avec `parentpanel.jsx`.)
-const rotatingDoneToday = (assignments, completed, playerId) => {
-  const stamp = todayStamp();
-  const doneSet = new Set(completed || []);
-  return (assignments || []).filter(a =>
-    a.isRecurring && (a.playerIds || []).includes(playerId) && doneSet.has(a.instanceId + "_" + playerId + "#" + stamp)
-  ).length;
-};
-const isShopLocked = (config, pState, assignments, playerId) => {
-  const need = config?.shopUnlockCount ?? SHOP_UNLOCK_DEFAULT;
-  if (need <= 0) return false; // 0 = parent a désactivé la condition
-  return rotatingDoneToday(assignments, pState?.completed, playerId) < need;
-};
+// Les trois verrous d'accès (matin, budget-temps, boutique/avatar après X tâches rotatives) sont
+// dans `src/gating.js` depuis le 2026-08-08 (Lot 5/#24) — voir l'import en tête de fichier.
 // Le reste de la logique pure du combat (verrou des corvées du boss, modificateur du jour,
 // dégâts d'attaque et du familier) est dans `src/bosses.jsx` depuis le 2026-08-06 (Lot 5/#24).
 // `mergeBossBattle` — déplacée dans `src/merge.js` le 2026-08-06 (Lot 5/#24) : elle n'est
@@ -298,7 +263,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // v2.16.7 — Chantier 6.6 : verrou du matin (parent-contrôlé) — cadrage ludique, jamais "verrouillé".
   const openAvatar = ()=>{
     if(isMorningLocked(player)){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); return; }
-    if(isShopLocked(config,pState,assignments,player.id)){ const need=(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id); showToast&&showToast(`🔒 Fais encore ${need} tâche${need>1?"s":""} rotative${need>1?"s":""} aujourd'hui pour débloquer ton perso!`,"#D9BC5C",3500); return; }
+    if(isShopLocked(config,pState,assignments,player.id)){ const need=rotatingRemaining(config,pState,assignments,player.id); showToast&&showToast(`🔒 Fais encore ${need} tâche${need>1?"s":""} rotative${need>1?"s":""} aujourd'hui pour débloquer ton perso!`,"#D9BC5C",3500); return; }
     if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
@@ -1459,7 +1424,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{fontSize:34,marginBottom:8}}>🔒</div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pt.accent||player.color,marginBottom:10}}>BOUTIQUE VERROUILLÉE</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.4}}>
-            Fais encore <b style={{color:"#D9BC5C"}}>{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))}</b> tâche{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))>1?"s":""} rotative{Math.max(0,(config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT)-rotatingDoneToday(assignments,pState.completed,player.id))>1?"s":""} aujourd'hui pour débloquer la boutique!
+            {(()=>{ const left=rotatingRemaining(config,pState,assignments,player.id); const s=left>1?"s":"";
+              return <>Fais encore <b style={{color:"#D9BC5C"}}>{left}</b> tâche{s} rotative{s} aujourd'hui pour débloquer la boutique!</>; })()}
           </div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#888",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT}</div>
         </div>
