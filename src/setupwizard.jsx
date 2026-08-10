@@ -168,7 +168,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
           <span className="glow-pulse" style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,2.2vw,20px)",color:T.accent}}>LIVRE DE QUÊTES</span>
           <span className="float-y" style={{fontSize:"clamp(18px,3.5vw,32px)",animationDelay:"1.2s"}}>🛡️</span>
         </div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(13px,1.8vw,18px)",color:"#666",letterSpacing:2}}>— CONFIGURATION —</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:"clamp(13px,1.8vw,18px)",color:"var(--txt-dim,#666)",letterSpacing:2}}>— CONFIGURATION —</div>
       </div>
 
       {/* ── STEP INDICATORS + XP BAR ── */}
@@ -211,7 +211,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:T.accent,marginBottom:10}}>⏱ Heure de fin de routine</div>
               <input type="time" value={routineEnd} onChange={e=>setRoutineEnd(e.target.value)}
                 style={{background:"#111",border:`2px solid ${T.accent}`,color:T.accent,padding:"10px 14px",fontFamily:"'Press Start 2P',monospace",fontSize:16,borderRadius:4,outline:"none",width:"100%"}}/>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginTop:8}}>Le compte à rebours sera bien visible pour motiver!</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)",marginTop:8}}>Le compte à rebours sera bien visible pour motiver!</div>
             </div>
           )}
           {mode==="week" && (
@@ -233,12 +233,12 @@ export function SetupWizard({ existing, onDone, onCancel }) {
               return (
                 <div key={i} style={{...card,border:`2px solid ${pl.color}`}}>
                   <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",minWidth:50}}>JOUEUR {i+1}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",minWidth:50}}>JOUEUR {i+1}</span>
                     <input value={pl.name} onChange={e=>{ const arr=[...players]; arr[i]={...arr[i],name:e.target.value}; setPlayers(arr); }} placeholder={`Nom joueur ${i+1}`}
                       style={{flex:1,background:"#111",border:`2px solid ${pl.color}`,color:"#fff",padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:18,borderRadius:3}}/>
                   </div>
                   <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",minWidth:50}}>PSEUDO</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",minWidth:50}}>PSEUDO</span>
                     <input value={pl.pseudo||""} onChange={e=>{ const arr=[...players]; arr[i]={...arr[i],pseudo:e.target.value}; setPlayers(arr); }} placeholder={`Surnom visible (optionnel)`}
                       style={{flex:1,background:"#111",border:`2px dashed ${pl.color}55`,color:"#ccc",padding:"6px 10px",fontFamily:"'VT323',monospace",fontSize:17,borderRadius:3}}/>
                   </div>
@@ -247,7 +247,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                   </div>
                   {/* Per-player theme */}
                   <div style={{marginTop:10}}>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:7}}>🎭 THÈME PERSONNEL</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",marginBottom:7}}>🎭 THÈME PERSONNEL</div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                       {PT_LIST.map(pt=>{
                         const sel=(pl.themeId||"none")===pt.id;
@@ -274,7 +274,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             {/* Catalog left */}
             <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"62vh",overflowY:"auto",paddingRight:4,WebkitOverflowScrolling:"touch"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>CATALOGUE — cliquer pour ajouter</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:4}}>CATALOGUE — cliquer pour ajouter</div>
               {/* Category filter */}
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
                 <Btn active={catFilter==="all"} onClick={()=>setCatFilter("all")} style={{padding:"3px 7px",fontSize:7}}>Tout</Btn>
@@ -299,8 +299,8 @@ export function SetupWizard({ existing, onDone, onCancel }) {
 
             {/* Assigned right */}
             <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"62vh",overflowY:"auto",paddingRight:2,WebkitOverflowScrolling:"touch"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:4}}>TÂCHES ASSIGNÉES — glisser pour réordonner</div>
-              {assignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",textAlign:"center",marginTop:20}}>Clique sur une tâche à gauche pour l'ajouter →</div>}
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:4}}>TÂCHES ASSIGNÉES — glisser pour réordonner</div>
+              {assignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-faint,#555)",textAlign:"center",marginTop:20}}>Clique sur une tâche à gauche pour l'ajouter →</div>}
               {assignments.map(ass=>{
                 const task=allTasks.find(t=>t.id===ass.taskId);
                 if(!task)return null;
@@ -308,16 +308,16 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                   <div key={ass.instanceId} draggable onDragStart={e=>onDragStart(e,ass.instanceId)} onDragOver={e=>onDragOver(e,ass.instanceId)} onDrop={e=>onDrop(e,ass.instanceId)} onDragLeave={()=>setDragOver(null)}
                     style={{background:dragOver===ass.instanceId?`${T.accent}20`:"rgba(0,0,0,0.55)",border:`2px solid ${dragOver===ass.instanceId?T.accent:"#444"}`,borderRadius:5,padding:"8px 10px",cursor:"grab",transition:"all 0.15s"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                      <span style={{color:"#555",fontSize:12,cursor:"grab"}}>⠿</span>
+                      <span style={{color:"var(--txt-faint,#555)",fontSize:12,cursor:"grab"}}>⠿</span>
                       <span style={{fontSize:17}}>{task.emoji}</span>
                       <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.label}</span>
-                      <button onClick={()=>duplicateAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:14,padding:2}} title="Dupliquer">⧉</button>
+                      <button onClick={()=>duplicateAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"var(--txt-muted,#888)",cursor:"pointer",fontSize:14,padding:2}} title="Dupliquer">⧉</button>
                       <button onClick={()=>removeAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:2}}>×</button>
                     </div>
                     {/* Player assignment — each toggled player gets their own independent copy */}
                     <div style={{marginBottom:mode==="week"?6:4}}>
                       <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555"}}>QUI:</span>
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-faint,#555)"}}>QUI:</span>
                         {activePlayers.map(pl=>{
                           const sel=ass.playerIds.includes(pl.id);
                           return <div key={pl.id} onClick={()=>toggleAssignmentPlayer(ass.instanceId,pl.id)}
@@ -331,11 +331,11 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                           </div>;
                         })}
                         <div onClick={()=>{ const allIds=activePlayers.map(p=>p.id); const allSel=allIds.every(id=>ass.playerIds.includes(id)); setAssignments(a=>a.map(x=>x.instanceId===ass.instanceId?{...x,playerIds:allSel?[]:allIds}:x)); SFX.click(); }}
-                          style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 7px",background:"#222",color:"#888",border:"1px solid #444",borderRadius:3,cursor:"pointer"}}>
+                          style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 7px",background:"#222",color:"var(--txt-muted,#888)",border:"1px solid #444",borderRadius:3,cursor:"pointer"}}>
                           {activePlayers.every(p=>ass.playerIds.includes(p.id))?"Aucun":"Tous"}
                         </div>
                       </div>
-                      {ass.playerIds.length>1&&<div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#555",marginTop:3}}>→ {ass.playerIds.length} copies indépendantes</div>}
+                      {ass.playerIds.length>1&&<div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"var(--txt-faint,#555)",marginTop:3}}>→ {ass.playerIds.length} copies indépendantes</div>}
                     </div>
                     {/* Day assignment (week mode) */}
                     {mode==="week" && (
@@ -388,7 +388,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
           <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",marginBottom:14}}>Demandé à chaque validation. Les enfants ne le voient pas!</div>
           <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="4 chiffres"
             style={{width:"100%",background:"#111",border:`3px solid ${T.accent}`,color:"#fff",padding:"14px",fontFamily:"'Press Start 2P',monospace",fontSize:20,borderRadius:4,textAlign:"center",letterSpacing:10}}/>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:8}}>Code choisi : {pin||"—"}</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginTop:8}}>Code choisi : {pin||"—"}</div>
         </>}
 
         {/* NAV */}

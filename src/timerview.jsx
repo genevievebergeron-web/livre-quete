@@ -78,7 +78,7 @@ export function TimerView({ config, gameStates, sessionPlayer, parentMode, th, o
         <input value={taskLabel} onChange={e=>{setTaskLabel(e.target.value.slice(0,40));setRitualId(null);}} placeholder="ex: Ranger ma chambre, brosser mes dents…"
           style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"9px 11px",background:"#111",color:"#fff",border:`2px solid ${ritualId?"#333":acc}`,borderRadius:6,outline:"none"}}/>
         {routines.length>0 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",alignSelf:"center"}}>ou un rituel (donne de l'XP 🎁) :</span>
+          <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-soft,#777)",alignSelf:"center"}}>ou un rituel (donne de l'XP 🎁) :</span>
           {routines.map(r=>(<button key={r.id} onClick={()=>{setRitualId(r.id);setTaskLabel("");if(r.endTime){setMode("deadline");setEndTime(r.endTime);}SFX.click();}} style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 11px",background:ritualId===r.id?acc:"#1a1a1a",color:ritualId===r.id?"#0d0d0d":"#bbb",border:`2px solid ${ritualId===r.id?acc:"#333"}`,borderRadius:20,cursor:"pointer"}}>{r.emoji||"⏰"} {r.name}{r.endTime?` · ${r.endTime.replace(":","h")}`:""}</button>))}
         </div>}
         {/* Rappel clair : outil vs rituel */}
@@ -108,7 +108,7 @@ export function TimerView({ config, gameStates, sessionPlayer, parentMode, th, o
             <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value||"07:30")}
               style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:5,outline:"none"}}/>
           </div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Le minuteur va compter jusqu'à cette heure. À 5 minutes : « Let's go! » 🚀</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-soft,#777)"}}>Le minuteur va compter jusqu'à cette heure. À 5 minutes : « Let's go! » 🚀</div>
         </>}
         <button className="btn-press" onClick={start}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d",marginTop:4}}>
@@ -132,7 +132,7 @@ export function TimerView({ config, gameStates, sessionPlayer, parentMode, th, o
         {ritualChecklistEl}
         <button className="btn-press" onClick={succeed}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",padding:"16px",background:"#5CAD68",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>🎉 J'ai réussi!</button>
-        <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
+        <button onClick={fail} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"#1a1a1a",color:"var(--txt-muted,#888)",border:"2px solid #333",borderRadius:5,cursor:"pointer"}}>✕ Abandonner</button>
       </>)}
 
       {startTs && timeUp && (<>

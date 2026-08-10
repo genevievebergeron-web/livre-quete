@@ -19,7 +19,7 @@ const PARENT_CATS = [
   { k:"suivi",   l:"Suivi",         icon:"parent_validate", em:"📋", color:"#D99248", tabs:["valid","tasks","defis"] },
   { k:"comm",    l:"Communication", icon:"parent_annonces", em:"📣", color:"#85CDD1", tabs:["annonces","log"] },
   { k:"actions", l:"Actions",       icon:"parent_actions",  em:"⚡", color:"#D9BC5C", tabs:["actions"] },
-  { k:"compte",  l:"Compte",        icon:"parent_code",     em:"⚙️", color:"#888",    tabs:["pin","export"] },
+  { k:"compte",  l:"Compte",        icon:"parent_code",     em:"⚙️", color:"var(--txt-muted,#888)",    tabs:["pin","export"] },
 ];
 const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, actionLog, undoStack,
   allTasks, onApprovePending, onRefusePending, onAddAssignment, onAssignRoutine, onLaunchBoss, bossActive, onRemoveAssignment, onApproveRemoval, onRefuseRemoval, onClearChildTasks, onAddCustomTask,
@@ -155,13 +155,13 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           const byChild=[]; players.forEach((pl,i)=>{ const its=items.filter(x=>x.playerIdx===i); if(its.length) byChild.push({pl,i,its}); });
           return (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>DEMANDES DES ENFANTS{items.length>0?` (${items.length})`:""}</div>
-              {items.length===0&&removalReqs.length===0&&proposals.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:10}}>DEMANDES DES ENFANTS{items.length>0?` (${items.length})`:""}</div>
+              {items.length===0&&removalReqs.length===0&&proposals.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-faint,#555)",textAlign:"center",padding:20}}>Rien à valider — tout est à jour! 🎉</div>}
               {byChild.map(({pl,i,its})=>(
                 <div key={pl.id} style={{marginBottom:14}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,paddingBottom:4,borderBottom:`2px solid ${pl.color}55`}}>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pl.color}}>{displayName(pl)}</span>
-                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>{its.length} à valider</span>
+                    <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>{its.length} à valider</span>
                     <button onClick={()=>its.forEach(it=>onApprovePending(it.playerIdx,it.doneKey))}
                       style={{marginLeft:"auto",fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:"#1a3a1a",color:"#5CAD68",border:"1px solid #5CAD6855",borderRadius:3,cursor:"pointer"}}>✅ Tout valider</button>
                   </div>
@@ -245,7 +245,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         {/* TÂCHES TAB */}
         {tab==="tasks" && (
           <div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>AJOUTER UNE TÂCHE</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:10}}>AJOUTER UNE TÂCHE</div>
             {/* v1.82.0 (Lot 1 #3/B7) — grille catégorisée (TaskChooser), même composant que côté enfant,
                 au lieu d'un <select> plat qui devenait long à parcourir à mesure que le catalogue grossit. */}
             <button onClick={()=>{SFX.click();setChooserOpen(true);}}
@@ -266,7 +266,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               })}
             </div>
             {/* v1.71.0 — Quand : rituel (chaque jour, sans planif) OU planifié (jours choisis = récurrence) */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>QUAND?</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",margin:"2px 0 5px"}}>QUAND?</div>
             <div style={{display:"flex",gap:6,marginBottom:8}}>
               {[["routine","⏰ Rituel"],["week","📅 Planifié"]].map(([k,l])=>(
                 <button key={k} onClick={()=>{setAddType(k);SFX.click();}}
@@ -277,7 +277,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             </div>
             {addType==="week" && (()=>{ const eq=(dd)=>JSON.stringify([...addDays].sort((a,b)=>a-b))===JSON.stringify([...dd].sort((a,b)=>a-b)); return (
               <div style={{marginBottom:8}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:5}}>RÉCURRENCE — QUELS JOURS?</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",marginBottom:5}}>RÉCURRENCE — QUELS JOURS?</div>
                 <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
                   {[["Chaque jour",[0,1,2,3,4,5,6]],["Lun–Ven",[0,1,2,3,4]],["Fin de sem.",[5,6]]].map(([lbl,dd])=>(
                     <button key={lbl} onClick={()=>{SFX.click();setAddDays(dd);}} style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 10px",background:eq(dd)?"#D99248":"#1a1a1a",color:eq(dd)?"#0d0d0d":"#bbb",border:"2px solid #444",borderRadius:14,cursor:"pointer"}}>{lbl}</button>
@@ -291,7 +291,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               </div>
             ); })()}
             {/* v2.11.2 — moment de la journée (sectionnement "Ma journée" côté enfant) */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"2px 0 5px"}}>MOMENT DE LA JOURNÉE?</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",margin:"2px 0 5px"}}>MOMENT DE LA JOURNÉE?</div>
             <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}}>
               {[["","🕐 N'importe quand"],["matin","🌅 Matin"],["après-midi","☀️ Après-midi"],["soir","🌙 Soir"]].map(([k,l])=>(
                 <button key={k||"any"} onClick={()=>{SFX.click();setAddTime(k);}}
@@ -324,7 +324,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               const visible=tasksShowAllDays?all:all.filter(isToday);
               const hiddenCount=all.length-visible.length;
               return (<>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"6px 0 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",margin:"6px 0 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span>TÂCHES {tasksShowAllDays?"— TOUTE LA SEMAINE":"D'AUJOURD'HUI"} ({visible.length})</span>
                 </div>
                 {visible.map(ass=>{
@@ -339,14 +339,14 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                         <div style={{display:"flex",gap:6}}>
                           {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
                           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#85CDD1":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:"⏰ routine"}</span>
-                          {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏰{ass.time}</span>}
+                          {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>⏰{ass.time}</span>}
                         </div>
                       </div>
                       <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:4}}>×</button>
                     </div>
                   );
                 })}
-                <button onClick={()=>setTasksShowAllDays(s=>!s)} style={{width:"100%",fontFamily:"'VT323',monospace",fontSize:13,padding:"6px",marginTop:2,background:"transparent",border:"1px dashed #444",color:"#888",borderRadius:4,cursor:"pointer"}}>
+                <button onClick={()=>setTasksShowAllDays(s=>!s)} style={{width:"100%",fontFamily:"'VT323',monospace",fontSize:13,padding:"6px",marginTop:2,background:"transparent",border:"1px dashed #444",color:"var(--txt-muted,#888)",borderRadius:4,cursor:"pointer"}}>
                   {tasksShowAllDays ? "▲ Revenir à aujourd'hui seulement" : `▼ Voir toute la semaine${hiddenCount?` (+${hiddenCount})`:""}`}
                 </button>
               </>);
@@ -358,7 +358,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             {(config.customTasks||[]).some(t=>t.child) && (
               <div style={{marginTop:14,paddingTop:12,borderTop:"2px solid #333"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D99248",marginBottom:6}}>🧹 MÉNAGE — TÂCHES PERSO DES ENFANTS</div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:8}}>Supprime d'un coup les tâches qu'un enfant s'est inventées (les vraies tâches du catalogue ne sont pas touchées).</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:8}}>Supprime d'un coup les tâches qu'un enfant s'est inventées (les vraies tâches du catalogue ne sont pas touchées).</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {players.map((pl,i)=>{ const childTaskIds=new Set((config.customTasks||[]).filter(t=>t.child).map(t=>t.id)); const n=(config.assignments||[]).filter(a=>a.playerIds?.includes(pl.id)&&childTaskIds.has(a.taskId)).length; if(!n) return null;
                     return <button key={pl.id} onClick={()=>{ if(window.confirm(`Supprimer les ${n} tâche(s) perso de ${displayName(pl)}?`)){ onClearChildTasks&&onClearChildTasks(i); } }}
@@ -369,13 +369,13 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             )}
 
             {/* ── Assigner une routine à un enfant ───────────────── */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UN RITUEL</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",margin:"16px 0 8px",borderTop:"2px solid #333",paddingTop:12}}>🧩 ASSIGNER UN RITUEL</div>
             {(()=>{
               const child=players[rChildIdx];
               const childRoutineTasks=child?(config.assignments||[]).filter(a=>a.playerIds.includes(child.id)&&!(Array.isArray(a.days)&&a.days.length>0)):[];
               return (
                 <div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:6}}>Crée un rituel prêt pour un enfant (il pourra le lancer sans le refaire).</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:6}}>Crée un rituel prêt pour un enfant (il pourra le lancer sans le refaire).</div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                     {players.map((pl,i)=>(
                       <div key={pl.id} onClick={()=>{setRChildIdx(i);setRTaskIds([]);SFX.click();}}
@@ -384,7 +384,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   </div>
                   <input value={rName} onChange={e=>setRName(e.target.value.slice(0,16))} placeholder="Nom du rituel (ex: Matin)"
                     style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:15,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,marginBottom:8,outline:"none"}}/>
-                  {childRoutineTasks.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666",marginBottom:8}}>Cet enfant n'a pas encore de tâche de type ⏰ Rituel. Ajoute-lui-en en haut (type Routine).</div>}
+                  {childRoutineTasks.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-dim,#666)",marginBottom:8}}>Cet enfant n'a pas encore de tâche de type ⏰ Rituel. Ajoute-lui-en en haut (type Routine).</div>}
                   <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8,maxHeight:"26vh",overflowY:"auto"}}>
                     {childRoutineTasks.map(a=>{ const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null; const sel=rTaskIds.includes(a.instanceId);
                       return (
@@ -414,8 +414,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           const checkinCount = (ch) => Object.values(ch.checkins||{}).filter(Boolean).length;
           return (
             <div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>🌟 DÉFIS PERSONNELS DE LA SEMAINE</div>
-              {!inCustody && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",marginBottom:10}}>📍 Semaine de pause — les défis reprennent vendredi.</div>}
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:10}}>🌟 DÉFIS PERSONNELS DE LA SEMAINE</div>
+              {!inCustody && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-muted,#888)",marginBottom:10}}>📍 Semaine de pause — les défis reprennent vendredi.</div>}
               {players.map(pl=>{
                 const ch = challenges.find(c=>c.playerId===pl.id);
                 const n = checkinCount(ch||{});
@@ -455,8 +455,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               })}
               {inCustody && (
                 <div style={{marginTop:8,borderTop:"2px solid #333",paddingTop:12}}>
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:8}}>📅 QUÊTES RÉCURRENTES</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666"}}>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:8}}>📅 QUÊTES RÉCURRENTES</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)"}}>
                     {(config.weeklyQuests?.assignments||[]).length} tâches auto-générées pour la semaine de garde (rotation déterministe).
                   </div>
                 </div>
@@ -467,7 +467,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
 
         {/* ACTIONS TAB */}
         {tab==="actions" && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:10}}>ACTIONS GLOBALES</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:10}}>ACTIONS GLOBALES</div>
           {/* Boss de famille surprise */}
           <div style={{background:"rgba(50,18,35,0.4)",border:"2px solid #8F72CC",borderRadius:6,padding:"10px",marginBottom:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#C9B3F7",marginBottom:5}}>🐉 BOSS DE FAMILLE</div>
@@ -500,7 +500,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 <div key={i} onClick={()=>{setRepPresetIdx(i);SFX.click();}}
                   style={{padding:"7px 10px",background:repPresetIdx===i?"rgba(127,214,224,0.15)":"rgba(0,0,0,0.3)",border:`2px solid ${repPresetIdx===i?"#7FD6E0":"#333"}`,borderRadius:4,cursor:"pointer"}}>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:repPresetIdx===i?"#7FD6E0":"#999"}}>{pr.emoji} {pr.label}</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:2}}>{pr.steps.join(" · ")}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-soft,#777)",marginTop:2}}>{pr.steps.join(" · ")}</div>
                 </div>
               ))}
               <div onClick={()=>{setRepPresetIdx(-1);SFX.click();}}
@@ -556,13 +556,13 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             <PBtn onClick={()=>onSetup()} color="#333" textColor="#888" style={{flex:1}}>⚙️ Modifier le livre (joueurs, tâches…)</PBtn>
           </Row>
 
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",margin:"14px 0 8px"}}>PAR JOUEUR</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",margin:"14px 0 8px"}}>PAR JOUEUR</div>
           {players.map((pl,i)=>(
             <div key={pl.id} style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pl.color}30`,borderRadius:5,padding:"10px",marginBottom:8}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                 <div style={{width:10,height:10,borderRadius:"50%",background:pl.color,flexShrink:0}}/>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pl.color}}>{displayName(pl)}</span>
-                <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginLeft:"auto"}}>
+                <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)",marginLeft:"auto"}}>
                   ⚡{gameStates[i]?.xp||0} 🪙{gameStates[i]?.coins||0}
                 </span>
               </div>
@@ -589,7 +589,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 {pl.morningLock?.enabled && (<>
                   <input type="time" value={pl.morningLock?.start||"06:00"} onChange={e=>onSetMorningLock&&onSetMorningLock(i,{start:e.target.value})}
                     style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}/>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>à</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>à</span>
                   <input type="time" value={pl.morningLock?.end||"09:00"} onChange={e=>onSetMorningLock&&onSetMorningLock(i,{end:e.target.value})}
                     style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}/>
                 </>)}
@@ -597,7 +597,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               {/* Backlog #13 — budget-temps quotidien : frein sur la session globale (l'énergie ne
                   freine que les loisirs, pas le temps total passé connecté). */}
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6,alignItems:"center"}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>⏳ Budget-temps</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>⏳ Budget-temps</span>
                 <select value={pl.dailyMinutesLimit||""} onChange={e=>onSetDailyLimit&&onSetDailyLimit(i, e.target.value?parseInt(e.target.value,10):null)}
                   style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}>
                   <option value="">Illimité</option>
@@ -611,8 +611,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           {/* v2.16.26 — Backlog #15 : réglage global (tous les enfants), pas par enfant — plus
               simple, et les tâches rotatives sont déjà partagées entre eux par la rotation. */}
           <div style={{background:"rgba(0,0,0,0.3)",border:"2px solid #333",borderRadius:6,padding:"10px 12px",marginTop:10}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🔒 DÉBLOCAGE BOUTIQUE/AVATAR</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",marginBottom:6}}>Nombre de tâches rotatives à faire avant que la boutique et le personnalisateur se débloquent (0 = toujours ouvert).</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:6}}>🔒 DÉBLOCAGE BOUTIQUE/AVATAR</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-soft,#777)",marginBottom:6}}>Nombre de tâches rotatives à faire avant que la boutique et le personnalisateur se débloquent (0 = toujours ouvert).</div>
             <select value={config.shopUnlockCount??SHOP_UNLOCK_DEFAULT} onChange={e=>onSetShopUnlockCount&&onSetShopUnlockCount(parseInt(e.target.value,10))}
               style={{fontFamily:"'VT323',monospace",fontSize:14,padding:"4px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3}}>
               <option value={0}>Toujours débloqué</option>
@@ -630,7 +630,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
         {tab==="annonces" && <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {/* Annonces existantes */}
           {(config.announcements||[]).length===0
-            ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#666",textAlign:"center",padding:"20px 0"}}>Aucune annonce active.</div>
+            ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-dim,#666)",textAlign:"center",padding:"20px 0"}}>Aucune annonce active.</div>
             : (config.announcements||[]).map(a=>{
               // v2.15.1 — enfants ciblés qui ont fermé cette annonce (candidats au renvoi)
               const closedBy=(players||[]).filter((p,i)=>{
@@ -644,7 +644,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#aaa",marginBottom:6}}>{a.text.slice(0,80)}{a.text.length>80?"…":""}</div>
                 {closedBy.length>0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#C8942A",marginBottom:6}}>Fermée par : {closedBy.map(p=>p.name).join(", ")}</div>}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#666"}}>Expire : {a.expiresAt||"—"}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-dim,#666)"}}>Expire : {a.expiresAt||"—"}</span>
                   {closedBy.length>0 && <button onClick={()=>onResendAnnouncement&&onResendAnnouncement(a.id)}
                     style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#1a3a5a",color:"#6bb8ff",border:"2px solid #6bb8ff44",borderRadius:4,cursor:"pointer"}}>🔄 Renvoyer ({closedBy.length})</button>}
                   <button onClick={()=>onDeleteAnnouncement&&onDeleteAnnouncement(a.id)}
@@ -720,7 +720,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                   value={((annDraft.playerTasksDraft||{})[p.id]||"")}
                   onChange={e=>setAnnDraft(d=>({...d,playerTasksDraft:{...(d.playerTasksDraft||{}),[p.id]:e.target.value}}))}
                   style={{width:"100%",boxSizing:"border-box",fontFamily:"'VT323',monospace",fontSize:13,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #555",borderRadius:4,minHeight:50,resize:"vertical"}}/>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"#555"}}>Une tâche par ligne</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:"var(--txt-faint,#555)"}}>Une tâche par ligne</div>
               </div>
             ))}
             <button disabled={!annDraft.text.trim()} onClick={()=>{
@@ -766,8 +766,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                 <div key={b.id} style={{marginBottom:8,paddingBottom:6,borderBottom:"1px solid #D9924822"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.3}}>{b.text}</div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3}}>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>{b.who}</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666"}}>{new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>{b.who}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-dim,#666)"}}>{new Date(b.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
                   </div>
                 </div>
               ))}
@@ -779,14 +779,14 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             <div style={{background:"rgba(255,255,255,0.04)",border:"2px solid #444",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
               <div onClick={()=>setErrLogsOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#999"}}>🔧 LOGS TECHNIQUES ({(config.errorLogs||[]).length})</div>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{errLogsOpen?"▲":"▼"}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-dim,#666)"}}>{errLogsOpen?"▲":"▼"}</span>
               </div>
               {errLogsOpen && (config.errorLogs||[]).map(e=>(
                 <div key={e.id} style={{marginTop:8,paddingBottom:6,borderBottom:"1px solid #333"}}>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ccc",lineHeight:1.3,wordBreak:"break-word"}}>{e.message}</div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3}}>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#777"}}>{e.who} · v{e.appVersion}</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666"}}>{new Date(e.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-soft,#777)"}}>{e.who} · v{e.appVersion}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-dim,#666)"}}>{new Date(e.ts).toLocaleString("fr-CA",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
                   </div>
                 </div>
               ))}
@@ -799,7 +799,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             <div style={{background:"rgba(94,222,245,0.05)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginBottom:12}}>
               <div onClick={()=>setNewsOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>📖 NOUVEAUTÉS ({(config.updateFeedEntries||[]).length})</div>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{newsOpen?"▲":"▼"}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-dim,#666)"}}>{newsOpen?"▲":"▼"}</span>
               </div>
               {newsOpen && (config.updateFeedEntries||[]).map((entry,i)=>(
                 <div key={`update-${i}`} style={{background:"rgba(94,222,245,0.07)",border:"2px solid #85CDD155",borderRadius:6,padding:"10px 12px",marginTop:8}}>
@@ -813,14 +813,14 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           )}
           <div style={{background:"rgba(255,255,255,0.03)",border:"2px solid #333",borderRadius:6,padding:"10px 12px"}}>
             <div onClick={()=>setActionsLogOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>🕐 ACTIONS ({actionLog.length})</div>
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{actionsLogOpen?"▲":"▼"}</span>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)"}}>🕐 ACTIONS ({actionLog.length})</div>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-dim,#666)"}}>{actionsLogOpen?"▲":"▼"}</span>
             </div>
             {actionsLogOpen && (actionLog.length===0
               ? <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#444",marginTop:8}}>Aucune action encore.</div>
               : actionLog.map((entry,i)=>(
                 <div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1a1a1a",marginTop:i===0?8:0}}>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",flexShrink:0,marginTop:2}}>{entry.time}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-faint,#555)",flexShrink:0,marginTop:2}}>{entry.time}</span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:entry.color||"#aaa",lineHeight:1.3}}>{entry.msg}</span>
                 </div>
               )))}
@@ -829,8 +829,8 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
 
         {/* PIN TAB */}
         {tab==="pin" && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>CHANGER LE CODE PARENT</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:10}}>Code actuel : {config.pin}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:14}}>CHANGER LE CODE PARENT</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-dim,#666)",marginBottom:10}}>Code actuel : {config.pin}</div>
           <input type="password" inputMode="numeric" maxLength={4} value={pinVal}
             onChange={e=>setPinVal(e.target.value.replace(/\D/g,"").slice(0,4))}
             placeholder="Nouveau PIN (4 chiffres)"
@@ -845,16 +845,16 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
 
         {/* EXPORT TAB */}
         {tab==="export" && <>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:14}}>SAUVEGARDE</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",marginBottom:12,lineHeight:1.4}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:14}}>SAUVEGARDE</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-dim,#666)",marginBottom:12,lineHeight:1.4}}>
             Télécharge une copie du livre de quêtes pour le transférer sur un autre appareil ou garder une sauvegarde.
           </div>
           <PBtn onClick={onExport} color="#1a3a1a" textColor="#5CAD68" style={{width:"100%",marginBottom:10}}>
             📤 Télécharger la sauvegarde
           </PBtn>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Restaurer une sauvegarde :</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginBottom:8}}>Restaurer une sauvegarde :</div>
           <label style={{display:"block",padding:"10px",background:"#111",border:"2px dashed #444",
-            borderRadius:3,cursor:"pointer",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",textAlign:"center"}}>
+            borderRadius:3,cursor:"pointer",fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",textAlign:"center"}}>
             📥 Choisir le fichier de sauvegarde
             <input type="file" accept=".json" onChange={e=>e.target.files[0]&&onImport(e.target.files[0])} style={{display:"none"}}/>
           </label>

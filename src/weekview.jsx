@@ -10,7 +10,7 @@ export function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx })
     <div style={{overflowX:"auto",paddingBottom:8}}>
       <div style={{display:"grid",gridTemplateColumns:`120px repeat(7,1fr)`,gap:2,minWidth:700}}>
         {/* Header */}
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555",display:"flex",alignItems:"center",justifyContent:"safe center"}}>TÂCHE</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-faint,#555)",display:"flex",alignItems:"center",justifyContent:"safe center"}}>TÂCHE</div>
         {DAYS_SHORT.map((d,i)=>(
           <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"#888",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
             {d}{i===todayDayIdx&&<div style={{fontSize:5,color:th.accent,marginTop:2}}>▲</div>}
@@ -44,7 +44,7 @@ export function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx })
                     return (
                       <div key={pid} onClick={()=>!done&&onCompleteTask(ass,pid,dayIdx)}
                         style={{background:done?`${pl.color}30`:"rgba(0,0,0,0.5)",border:`2px solid ${done?pl.color:"#333"}`,borderRadius:3,padding:"3px 4px",cursor:done?"default":"pointer",marginBottom:2,textAlign:"center",transition:"all 0.15s"}} title={displayName(pl)}>
-                        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:done?pl.color:"#555"}}>{done?"✓":displayName(pl).slice(0,3)}</div>
+                        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:done?pl.color:"var(--txt-faint,#555)"}}>{done?"✓":displayName(pl).slice(0,3)}</div>
                       </div>
                     );
                   })}

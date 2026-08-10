@@ -76,7 +76,7 @@ export const migrateGameState = (gs) => {
     // la fusion. Même patron que removedProposals/removedAssignments.
     removedRoutineIds: gs.removedRoutineIds || [],
     activeRoutineId: gs.activeRoutineId ?? null, // routine en cours (null = aucune / toutes)
-    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, femTitles:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12; femTitles: v2.5.27)
+    settings: { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, femTitles:false, highContrast:false, ...(gs.settings||{}) }, // v1.16.0 — réglages d'accessibilité par enfant (fontScale/readableFont: v1.87.0, Lot 3 #12; femTitles: v2.5.27; highContrast: v2.16.49, Lot 3 #12)
     hiddenRewards: gs.hiddenRewards || [], // v1.23.0 — récompenses cachées cette semaine
     hiddenWeek: gs.hiddenWeek ?? null,
     dailyClaimed: gs.dailyClaimed || { day:null, ids:[] }, // v1.28.0 — objectifs du jour réclamés

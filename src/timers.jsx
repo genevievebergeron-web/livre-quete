@@ -67,7 +67,7 @@ export function TaskTimerModal({ task, accent, onClose }) {
       <div style={{background:"#1a1a2e",border:`3px solid ${accent}`,borderRadius:10,padding:20,width:"min(360px,92vw)",display:"flex",flexDirection:"column",gap:12,alignItems:"center"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accent}}>⏱ {task.emoji} {task.label}</div>
-          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
+          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#333",color:"var(--txt-muted,#888)",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
         </div>
         {!startTs && (<>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>Combien de minutes? <b style={{color:accent}}>{targetMin} min</b></div>
@@ -82,7 +82,7 @@ export function TaskTimerModal({ task, accent, onClose }) {
           <TimeTimerDisc progress={remaining/totalMs} color={accent} urgent={lowTime}/>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(30px,7vw,48px)",color:lowTime?"#D98C8C":"#fff",letterSpacing:2,animation:lowTime?"pulse 0.6s infinite":"none"}}>{timeUp?"⏰":`${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`}</div>
           {timeUp && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:accent,textAlign:"center",lineHeight:1.4}}>Temps écoulé! Appuie sur « ✔ J'AI FAIT ÇA! » sur ta carte quand c'est prêt.</div>}
-          <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:12,background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>✕ Fermer</button>
+          <button onClick={onClose} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:12,background:"#1a1a1a",color:"var(--txt-muted,#888)",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>✕ Fermer</button>
         </>)}
       </div>
     </div>

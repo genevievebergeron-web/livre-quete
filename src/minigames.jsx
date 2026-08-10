@@ -509,7 +509,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
       </>)}
 
       {phase === "play" && (<>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",letterSpacing:2}}>TOUR {round+1}/{ROUNDS} · SCORE {score}</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",letterSpacing:2}}>TOUR {round+1}/{ROUNDS} · SCORE {score}</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,width:240}}>
           {Array.from({length:9}, (_,i) => (
             <button key={i} onClick={()=>handleHit(i)}
@@ -518,7 +518,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
             </button>
           ))}
         </div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#555"}}>Réflexes de champion!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-faint,#555)"}}>Réflexes de champion!</div>
       </>)}
 
       {phase === "done" && (<>
@@ -526,7 +526,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:14,color:pt.accent,letterSpacing:3}}>{stars}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#ddd"}}>{msg}</div>
         {bonusXp > 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#D9BC5C",textShadow:"0 0 8px #D9BC5C"}}>+{bonusXp} XP · +{bonusCoins} 🪙</div>}
-        {bonusXp === 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#555"}}>Pas de bonus cette fois...</div>}
+        {bonusXp === 0 && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-faint,#555)"}}>Pas de bonus cette fois...</div>}
         <button onClick={()=>onFinish(bonusXp,bonusCoins)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8}}>CONTINUER ▶</button>
       </>)}
     </div>
@@ -588,7 +588,7 @@ export function MiniGame({ player, playerThemeId, level, onFinish, forcedType, i
             {minigameTierRow(g)}
           </button>
         ))}
-        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
+        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"var(--txt-dim,#666)",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
       </div>
     );
   }
@@ -607,7 +607,7 @@ export function MiniGame({ player, playerThemeId, level, onFinish, forcedType, i
           ✅ JE SUIS PRÊT!
         </button>
         {!forced && <button onClick={()=>{SFX.click&&SFX.click();setPhase("choice");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#1a1a1a",color:pt.accent,border:`2px solid ${pt.accent}`,cursor:"pointer",borderRadius:3}}>🔀 Changer de jeu</button>}
-        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#666",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
+        <button onClick={()=>onFinish(0)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"var(--txt-dim,#666)",border:"2px solid #444",cursor:"pointer",borderRadius:3}}>Passer</button>
       </div>
     );
   }

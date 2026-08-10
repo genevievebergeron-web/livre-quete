@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.49", date:"2026-08-10", features:[
+    "🌗 Nouveau réglage « Contraste fort » dans ⚙️ Mes réglages : éclaircit les petits textes gris et les cadres, si tu les trouves difficiles à lire. C'est éteint au départ, et ça ne change aucune couleur importante (l'or des prix, le rouge, le vert restent pareils).",
+  ]},
   { version:"2.16.48", date:"2026-08-09", features:[
     "😄 Nouveau réglage « Messages rigolos » dans ⚙️ Mes réglages : si les blagues après une quête ne te tentent pas, tu peux les éteindre. C'est allumé au départ.",
   ]},

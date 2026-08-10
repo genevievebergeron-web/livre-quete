@@ -66,12 +66,12 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
           <div style={{flex:1}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:player.color,marginBottom:4}}>{displayName(player)}</div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:th.accent}}>Niv.{lt.level} — {lt.title}</div>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#666"}}>{gs.xp||0} XP</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-dim,#666)"}}>{gs.xp||0} XP</div>
           </div>
         </div>
         <div style={{marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>Prochain niveau</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>Prochain niveau</span>
             <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>{pct}%</span>
           </div>
           <div style={{height:14,background:"#0d2010",border:"2px solid #1a3820",borderRadius:3,overflow:"hidden"}}>
@@ -85,18 +85,18 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
             <div key={lbl} style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:6,padding:"8px 4px",textAlign:"center"}}>
               <div style={{fontSize:18,marginBottom:2}}>{icon}</div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#fff"}}>{val}</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{lbl}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)"}}>{lbl}</div>
             </div>
           ))}
         </div>
         {/* 📊 Courbe XP des 30 derniers jours (Backlog #13, incrément 2) */}
         <div style={{marginBottom:14,background:"rgba(0,0,0,0.4)",border:"2px solid #33333366",borderRadius:8,padding:"10px 10px 8px"}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>📊 30 DERNIERS JOURS</span>
+            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)"}}>📊 30 DERNIERS JOURS</span>
             <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡{xpHistory.total}</span>
           </div>
           {xpHistory.total===0
-            ? <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666"}}>Pas encore d'XP sur cette période.</div>
+            ? <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)"}}>Pas encore d'XP sur cette période.</div>
             : <div style={{display:"grid",gridTemplateColumns:"repeat(30,1fr)",gap:1,alignItems:"end",height:34}}>
                 {xpHistory.days.map((v,i)=>(
                   <div key={xpHistory.dates[i]} title={`${xpHistory.dates[i].slice(5)} : ${v} XP`}
@@ -121,7 +121,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
         </div>
         {myBadges.length>0&&(
           <div style={{marginBottom:12}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🏅 BADGES</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:6}}>🏅 BADGES</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{myBadges.map(b=><span key={b.id} title={b.name} style={{fontSize:24}}>{b.emoji}</span>)}</div>
           </div>
         )}
@@ -129,7 +129,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
         {(()=>{ const owned=(gs.owned||[]).map(shopItemById).filter(Boolean); if(!owned.length) return null; const eqi=gs.equipped||{};
           return (
             <div style={{marginBottom:14}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🎒 INVENTAIRE ({owned.length})</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:6}}>🎒 INVENTAIRE ({owned.length})</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {owned.map(it=>{ const isEq=eqi[it.slot]===it.id; const rar=rarityOf(it.cost);
                   const petLvl = it.slot==="pet" ? petLevel((gs.petXp||{})[it.id]||0) : null;
@@ -148,7 +148,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
         })()}
         {siblings.length>1&&(
           <div style={{marginBottom:14}}>
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:6}}>🏆 CLASSEMENT FAMILLE</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:6}}>🏆 CLASSEMENT FAMILLE</div>
             {siblings.map((s,rank)=>(
               <div key={s.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                 <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#D9BC5C":"#666",width:14}}>#{rank+1}</span>
@@ -156,7 +156,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
                 <div style={{flex:2,height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${Math.round(s.xp/maxXp*100)}%`,background:s.isMe?s.color:"#444",transition:"width 0.8s ease"}}/>
                 </div>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",width:34,textAlign:"right"}}>{s.xp}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",width:34,textAlign:"right"}}>{s.xp}</span>
               </div>
             ))}
           </div>

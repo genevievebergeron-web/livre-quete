@@ -1,5 +1,5 @@
 # Livre de Quêtes — État du projet
-_Mis à jour: 2026-08-09 — v2.16.48 (le réglage « 😄 Messages rigolos » remis dans ⚙️ Mes réglages : l'humour livré en v2.16.10/v2.16.11 n'avait jamais été rebranché au champ `settings.humor`, donc impossible à couper. **Le chantier 24 n'a toujours pas de candidat autonome** : voir « Prochaine session » dans l'entrée v2.16.47)_
+_Mis à jour: 2026-08-10 — v2.16.49 (nouveau réglage « 🌗 Contraste fort » dans ⚙️ Mes réglages : **le dernier tiers de l'item accessibilité texte (Lot 3 #12) est livré, l'item est CLOS**. Au passage, ce passage a d'abord dû réparer un build cassé laissé par une session interactive et adopter son travail non commité. **Le chantier 24 n'a toujours pas de candidat autonome** : voir « Prochaine session » dans l'entrée v2.16.47)_
 
 > ⚠️ **Rappel pour toute session (routine ou interactive) : voir `CLAUDE.md`.** Ce fichier se
 > met à jour TOUJOURS dès qu'un morceau de travail est complété — pas seulement en fin de
@@ -16,8 +16,10 @@ _Mis à jour: 2026-08-09 — v2.16.48 (le réglage « 😄 Messages rigolos » r
 > laissée en v2.16.36. **Ne pas recommencer une 3e fois** : tant que Gen n'a pas retiré la note,
 > le découpage se fait uniquement sur du code **sans composant et sans avatar**.
 
-> 🔴 **GEN — 3 CHOSES POUR TOI (revérifié le 9 août : rien n'a bougé, `savedAt` prod identique au 8 août 21h35 — personne n'a rouvert l'app depuis. Les points (0) et (2) t'attendent toujours ; le (1) reste clos).**
-> **(0) NOUVEAU ET PRIORITAIRE — les pièces des 4 enfants sont à 0, et on sait enfin pourquoi.**
+> 🔴 **GEN — 2 CHOSES POUR TOI (revérifié le 10 août, et cette fois LES DONNÉES ONT BOUGÉ — voir `MAINTENANCE.md`, passage du 10 août).**
+> **Ce qui a changé depuis le 9 août** : l'app a resservi le **9 août** (3 quêtes accomplies, après 9 jours de silence), **les 14 validations dormantes ont été traitées** (`pending` vide chez les 4 enfants — **point CLOS**), et **3 enfants sur 4 ont de nouveau des pièces** : `coins` **12 / 0 / 33 / 30**.
+> ⚠️ **Mais ce sont des gains NEUFS, pas une restauration** : `coinsLifetime` monte de +12 / +0 / +33 / +30, exactement les soldes actuels — **rien** des montants du 28 juillet n'est revenu. Et 🔴 **`Le GOAT!!!` est toujours à 0, avec +0 de gain — c'est précisément l'enfant qui a signalé `bug_hlu9mkd` (« J'ai perdu 150 pièces »)**. Le point (0) ci-dessous reste donc entier.
+> **(0) TOUJOURS PRIORITAIRE — les pièces effacées le 31 juillet ne sont pas revenues, et on sait pourquoi elles étaient parties.**
 > `bug_hlu9mkd` (« J'ai perdu 150 pièces, je peux le récupérer? »), ouvert depuis le 31 juillet, a
 > enfin sa cause : **ta redistribution du 28 juillet (AE 350, Elli 161, Oli 151, DR 350) a survécu
 > trois jours.** Le vendredi 31 juillet a fait basculer la semaine de garde, l'ancien reset
@@ -27,17 +29,15 @@ _Mis à jour: 2026-08-09 — v2.16.48 (le réglage « 😄 Messages rigolos » r
 > **Le code est réparé** (`v2.16.45` : plus aucun chemin ne peut effacer un solde), **mais la donnée
 > ne se répare pas toute seule.** Restaurer les soldes = un `PUT /api/famille`, et le montant est
 > **ta décision, pas celle de la routine** (règle « équitable-pas-égal », plafond 350 déjà tranché
-> le 28 juillet). Point de départ le plus simple : remettre exactement les montants du 28 juillet,
-> puisque rien n'a été gagné ni dépensé depuis. **La routine n'a rien écrit en prod.**
-> **Au passage** : **14 demandes de validation dorment depuis le 30-31 juillet** (6 + 8 chez deux
-> enfants) — des quêtes faites, jamais validées, donc jamais payées. Le portail parent les affiche
-> d'office, mais personne ne l'a ouvert depuis. Vu des enfants, ça fait huit jours de quêtes faites
-> sans rien recevoir, en plus des pièces disparues.
+> le 28 juillet). ⚠️ **Attention, ce n'est plus « rien n'a été gagné ni dépensé depuis »** : depuis
+> le 9 août, trois enfants ont regagné 12 / 33 / 30 pièces. Une restauration doit donc **s'ajouter**
+> aux soldes actuels (ou les remplacer sciemment), pas les écraser à l'aveugle. **La routine n'a
+> rien écrit en prod.**
 >
-> **(1) ✅ CLOS — `removalRequests` est vide.** La demande `rmreq_2ev8piy` (2026-07-28), relevée
-> 6 passages d'affilée, a été tranchée côté parent entre le 8 août 13h50 et 21h35. Plus rien à
-> faire ici. **Mais les 14 validations dormantes du paragraphe (0) ci-dessus, elles, sont toujours
-> là** (vérifié au 2e passage du 8 août) — c'est le même portail, une section différente.
+> **(1) ✅ CLOS — `removalRequests` est vide** (demande `rmreq_2ev8piy` tranchée le 8 août), **et
+> les 14 validations dormantes aussi** : `pending` est vide chez les 4 enfants depuis le 9-10 août,
+> les quêtes du 30-31 juillet ont enfin été validées et payées. Plus rien en attente dans le
+> portail parent.
 > **(2) Le ménage des 26 vrais doublons de `config.customTasks` en prod attend ton feu vert.**
 > `v2.16.44` (ci-dessous) les **masque** dans les sélecteurs — non destructif, rien n'est effacé —
 > mais les 26 copies restent dans les données, chacune encore référencée par une assignation
@@ -51,6 +51,22 @@ _Mis à jour: 2026-08-09 — v2.16.48 (le réglage « 😄 Messages rigolos » r
 > bloqué `vite` en `ENOSPC`. Vérifié ce passage : **103 Go libres (10 % utilisé)** — plus rien à
 > faire, `vite` et la vérification navigateur ont tourné normalement. Les ~890 Mo de profils de
 > navigateur sans tête dans `/private/tmp` mentionnés alors ont disparu d'eux-mêmes.
+>
+> **v2.16.49 (10 août, routine autonome, nuit) — Nouveau réglage « 🌗 Contraste fort » : le DERNIER TIERS de l'item accessibilité texte (Lot 3 #12) est livré, l'item est CLOS. Ce passage a d'abord dû réparer un `npm run build` cassé et adopter le travail non commité d'une session interactive.**
+>
+> ⚠️ **Phase 0 — le dépôt était dans un état inhabituel, à lire avant tout le reste.** `git pull` déjà à jour (`1bb420f`, v2.16.48) et `PROJET-ETAT` sans trou (HEAD = v2.16.48 = entrée ci-dessous). **Mais `npm run build` ÉCHOUAIT** — `src/shared.js (124:74): Expected a semicolon` — et `git status` montrait **15 fichiers modifiés non commités**, datés du 9 août 06h22 (donc ~16 h d'inactivité : session abandonnée, pas une session concurrente en cours ; il y avait aussi un `git stash` « correctif-3-in-progress + concurrent-session-setupwizard-wip » laissé de côté, **non touché**). La cause du build cassé : un **accent grave dans un commentaire CSS** (`` `var(--txt-muted,#888)` ``) posé **à l'intérieur du littéral template `GLOBAL_CSS`**, ce qui **fermait la chaîne** au milieu du fichier. Un seul caractère retiré → build propre. **Leçon à retenir pour toute session** : dans `shared.js`, les commentaires à l'intérieur de `GLOBAL_CSS` sont dans un template literal — **jamais d'accent grave dedans**, même pour citer du code.
+>
+> **Ce que contenait ce travail abandonné, et pourquoi il a été adopté plutôt que jeté.** C'était la **fondation** du « contraste fort » : 4 variables CSS (`--txt-muted/-soft/-dim/-faint`, valeurs `#888/#777/#666/#555` — **identiques à ce qu'elles remplacent**), la règle `.high-contrast` qui les remonte, et **172 substitutions** de gris en dur vers `var(--txt-*,#repli)` à travers 14 fichiers. Mais **rien ne posait la classe et aucun réglage n'existait** : la moitié du travail, invisible pour l'utilisateur, et un build rouge en prime. **Avant d'y toucher, les 172 substitutions ont été vérifiées mécaniquement** (script : ré-appliquer la transformation inverse sur chaque ligne `+` et comparer à la ligne `-` correspondante) → **172/172 identiques, 0 divergence** : aucun autre changement ne se cachait dedans, c'est bien un no-op visuel prouvé, pas supposé. D'où la décision de le finir plutôt que de le stasher.
+>
+> **Fait (la moitié manquante).** (1) `shared.js` — l'accent grave retiré du commentaire. (2) `App.jsx` ~701 — bascule `["highContrast","🌗 Contraste fort","Éclaircit les petits textes gris et les cadres, pour mieux les distinguer"]` ajoutée dans « Mes réglages », après « 🔤 Police plus lisible » (même item d'accessibilité). Défaut **`false`** → **personne ne voit son app changer** à la mise en ligne. (3) `App.jsx` ~3684 — la classe se pose sur **`game-root`**, pas sur le conteneur de l'écran enfant comme `readable-font` : `.high-contrast` **ne repeint rien elle-même**, elle **redéfinit des variables CSS**, et une variable ne descend qu'aux descendants du nœud qui la déclare — sur la racine elle atteint aussi le header et les popups `position:fixed` (vérifié : **aucun `createPortal` dans le dépôt**, donc tout le DOM de l'app est bien sous `game-root`). Le raisonnement est écrit en commentaire au-dessus. (4) `migrations.js` ~79 + les 2 objets de réglages par défaut d'`App.jsx` — `highContrast:false` ajouté. (5) `changelog.js` + `APP_VERSION` → `2.16.49`.
+>
+> **Pourquoi cette portée-là, et pas « augmenter le contraste partout ».** Le réglage ne touche **que** la rampe de gris du texte **secondaire** et les 2 tokens de bordure neutres. **Les couleurs qui portent du sens ne bougent pas** : accent du thème, or des prix, `DIFF_COLOR`, rouge d'alerte, vert de réussite. Écarté explicitement : un `filter:contrast()` sur la racine — ça créerait un bloc contenant et **casserait tous les popups `position:fixed`**. Le contraste avait justement été laissé de côté en `v1.87.0` comme « plus risqué sans itération visuelle » ; borner la portée aux variables est ce qui rend le risque nul par construction.
+>
+> **Vérifié.** (1) **Les 172 substitutions prouvées no-op** (script d'équivalence ci-dessus, 172/172). (2) **Bout-en-bout en navigateur** (serveur `vite` isolé port 5199, données de test `AlphaTest`/`BetaTest` — jamais la prod ; aucun proxy `/api` dans `vite.config.js`, donc aucune écriture prod possible) : login enfant → PIN → dashboard → ⚙️ Mes réglages — la bascule apparaît à sa place, stylée comme les autres, **OFF** par défaut (captures avant/après prises) ; touchée → passe **ON**, `game-root` devient `game-root vignette-bg high-contrast`, et `settings.highContrast:true` est bien persisté en `localStorage`. (3) **Mesure du résultat, pas juste de la classe** : un texte secondaire réel (« Fais une quête pour démarrer ta série! ») passe de `rgb(119,119,119)` à `rgb(194,194,208)` — d'environ **3,5:1 (sous le seuil AA)** à **~11:1** sur le fond de carte. (4) **Migration vérifiée sur données existantes** : les deux joueurs de test, créés avant ce réglage, ressortent avec `highContrast:false` sans que rien d'autre bouge. (5) **Zéro erreur console** sur tout le parcours ; captures de l'accueil enfant dans les deux états — l'or, le vert et le rouge du BOSS sont inchangés. (6) `npm run build` propre. `v2.16.49` poussé.
+>
+> **Ce qui reste, honnêtement.** Sur ~276 gris en dur au départ, **173 sont passés en variables et ~103 restent nus** : ce sont presque tous des ternaires d'état (`tab===k?"#0d0d0d":"#888"` sur les onglets/boutons **inactifs**), des couleurs de toast passées en argument JS, et des replis sémantiques (`p.color||"#888"`). **Conséquence visible** : en contraste fort, les libellés d'onglets inactifs restent au gris d'origine pendant que le reste du texte secondaire s'éclaircit. Non traité **volontairement** — les élargir demande de distinguer au cas par cas ce qui est « du texte secondaire » de ce qui est « un état désactivé », et ça ne se fait pas mécaniquement comme les 172 premières. **Candidat propre pour une prochaine session autonome**, avec la même méthode de preuve.
+>
+> **Phase 1 (mini-maintenance) — pour une fois, les données ont bougé.** Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-10T12:20:42Z**) : **premier passage depuis le 31 juillet où l'instantané de prod n'est pas identique au précédent**. **Aucun bug nouveau** (mêmes 14 `config.bugs`, aucun depuis le 31 juillet), `errorLogs` **vide** (7e lecture, mais la première qui porte sur des sessions réellement jouées — les six précédentes relisaient le même instantané dormant). **Donc pas de Phase 2.** Ce qui a changé, documenté en détail dans `MAINTENANCE.md` (passage du 10 août) et répercuté dans le bloc 🔴 GEN en tête : l'app a resservi le 9 août, **les 14 validations dormantes sont payées** (point clos), **3 enfants sur 4 ont de nouveau des pièces** — mais ce sont des **gains neufs**, la restauration des soldes du 28 juillet reste à faire, et **l'enfant qui avait signalé la perte est le seul encore à 0**.
 >
 > **v2.16.48 (9 août, routine autonome, nuit, 2e passage) — Le réglage « 😄 Messages rigolos » remis dans ⚙️ Mes réglages : depuis v2.16.10/v2.16.11, l'humour existait pour de vrai mais était impossible à couper.** Phase 0 : `git pull` déjà à jour (`430b119`, v2.16.47), `npm run build` propre ; vérifié qu'aucun commit poussé n'était orphelin de `PROJET-ETAT` (HEAD = v2.16.47 = entrée ci-dessous, aucun trou). Phase 1 (mini-maintenance) : lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-08T21:35:56.772Z — identique aux deux passages précédents**, donc toujours personne n'a rouvert l'app depuis le 8 août 21h35) — **mêmes 14 `config.bugs`**, identiques id pour id depuis le 31 juillet, `errorLogs` **vide** (6e lecture depuis la réparation du journal en v2.16.42), `feed` inchangé (60 entrées, dernière activité réelle le 31 juillet), `removalRequests`/`momentRequests`/`childTaskProposals`/`teamInvites`/`coinOffers`/`repairEvents` tous vides. **Aucun bug NOUVEAU, donc pas de Phase 2, et rien qui méritait une entrée `MAINTENANCE.md`** (l'état est identique à celui déjà documenté au passage précédent — le redocumenter serait du bruit). Les deux points ouverts pour Gen sont **inchangés** : 4 soldes de pièces à 0 et **14 validations dormantes** — la routine n'écrit rien en prod.
 >

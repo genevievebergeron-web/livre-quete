@@ -156,7 +156,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
       {mode === "who" && (
         <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:24,color:"#666",marginBottom:36}}>Tu es...?</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:24,color:"var(--txt-dim,#666)",marginBottom:36}}>Tu es...?</div>
           <div style={{display:"flex",gap:16,justifyContent:"center"}}>
             {[["🧒","Enfant","#85CDD1",()=>{SFX.click();setMode("child-select");}],
               ["👨‍👩","Parent","#D99248",()=>{SFX.click();setMode("parent");setPpPin("");setPinError(false);}]
@@ -183,7 +183,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
         <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:0}}>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,2.2vw,13px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:6}}>⚔️ MON LIVRE DE QUÊTES</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#888"}}>Ton guide d'aventurier·ère</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"var(--txt-muted,#888)"}}>Ton guide d'aventurier·ère</div>
           </div>
 
           <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
@@ -239,7 +239,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
       {mode === "child-select" && (
         <div style={{textAlign:"center",width:"100%",maxWidth:380}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,2.5vw,15px)",color:"#D9BC5C",textShadow:"3px 3px 0 #0d0d0d,0 0 20px #D9BC5C80",marginBottom:10}}>⚔️ MON LIVRE DE QUÊTES</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"#666",marginBottom:20}}>Qui es-tu?</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:22,color:"var(--txt-dim,#666)",marginBottom:20}}>Qui es-tu?</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
             {(config?.players||[]).map((pl, i) => {
               const psi = gameStates[i] || {};
@@ -278,8 +278,8 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
           {obStep === "theme" && (
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>🎨 TON THÈME · ÉTAPE 1/4</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Touche l'univers que tu préfères</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginBottom:20}}>⏳ Ce thème dure toute la semaine — choisis bien!</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"var(--txt-muted,#888)",marginBottom:4}}>Touche l'univers que tu préfères</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)",marginBottom:20}}>⏳ Ce thème dure toute la semaine — choisis bien!</div>
               <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
                 {(player.starterThemes||[player.themeId||"none"]).map(tid=>{
                   const t = getPlayerTheme(tid);
@@ -308,8 +308,8 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
           {obStep === "avatar" && (
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>👾 TON AVATAR · ÉTAPE 2/4</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:4}}>Crée ton personnage 8-bit</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#666",marginBottom:12}}>Touche un onglet (Cheveux, Peau…) puis touche ce que tu aimes.</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"var(--txt-muted,#888)",marginBottom:4}}>Crée ton personnage 8-bit</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-dim,#666)",marginBottom:12}}>Touche un onglet (Cheveux, Peau…) puis touche ce que tu aimes.</div>
               <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
                 <AvatarCanvas avatarDef={draftAvatar} bodyColor={getPlayerTheme(draftTheme||"none").charBodyColor||accentColor} size={80}
                   style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
@@ -390,8 +390,8 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
           {obStep === "pseudo" && (
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:6}}>✏️ TON SURNOM · ÉTAPE 3/4</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#888",marginBottom:6}}>Comment veux-tu t'appeler?</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:20}}>Ton vrai nom reste privé pour tes parents.</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"var(--txt-muted,#888)",marginBottom:6}}>Comment veux-tu t'appeler?</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginBottom:20}}>Ton vrai nom reste privé pour tes parents.</div>
               <input
                 value={draftPseudo}
                 onChange={e=>setDraftPseudo(e.target.value.slice(0,16))}
@@ -418,7 +418,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:accentColor,marginBottom:4}}>
                 {obStep==="pin-create" ? "CRÉE TON CODE SECRET · ÉTAPE 4/4" : "CONFIRME TON CODE · ÉTAPE 4/4"}
               </div>
-              {obStep==="pin-create"&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>Choisis 4 chiffres faciles à retenir pour TOI. C'est ton code pour entrer dans ton compte.</div>}
+              {obStep==="pin-create"&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginBottom:12}}>Choisis 4 chiffres faciles à retenir pour TOI. C'est ton code pour entrer dans ton compte.</div>}
               <PinDots value={obPin} error={pinError} color={accentColor}/>
               <PinKeypad
                 onDigit={handleObPinDigit}
@@ -438,10 +438,10 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
               style={{border:`3px solid ${accentColor}`,borderRadius:8}}/>
           </div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:accentColor,marginBottom:4}}>{displayName(player)}</div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888",marginBottom:16,lineHeight:1.8}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:16,lineHeight:1.8}}>
             {!ps.pin ? (confirmStep ? "CONFIRME TON CODE" : "CRÉE TON CODE SECRET") : "TON CODE SECRET"}
           </div>
-          {!ps.pin&&!confirmStep&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:12}}>Choisis 4 chiffres que tu n'oublies pas...</div>}
+          {!ps.pin&&!confirmStep&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginBottom:12}}>Choisis 4 chiffres que tu n'oublies pas...</div>}
           <PinDots value={pPin} error={pinError} color={accentColor}/>
           <PinKeypad
             onDigit={handlePlayerDigit}

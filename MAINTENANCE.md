@@ -614,3 +614,26 @@ Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-08T21:35:56Z** — enc
 
 ### 💡 À signaler à Gen (pas un bug)
 - [ ] **🔴 Toujours prioritaire — les soldes à 0 et les 14 validations dormantes** : voir la liste du passage précédent, inchangée sur ces deux points. Rien de neuf à ajouter, sinon qu'un passage de plus s'est écoulé.
+
+---
+
+## Passage du 2026-08-10 (nuit, routine autonome) — après 9 jours de silence, l'app a resservi : les 14 validations dormantes sont payées, 3 enfants sur 4 ont de nouveau des pièces
+
+Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-10T12:20:42Z**). **Premier passage depuis le 31 juillet où les données de prod BOUGENT** : les six passages précédents lisaient tous exactement le même instantané (`savedAt` figé au 2026-08-08T21:35:56Z).
+
+### 🐛 Bugs traités
+- **Aucun bug nouveau.** Toujours les mêmes 14 `config.bugs`, identiques id pour id depuis le 31 juillet. Le plus récent (`bug_hlu9mkd`, « J'ai perdu 150 pièces ») date du 2026-07-31T11:59Z — **aucun signalement depuis, y compris pendant la reprise d'usage du 9 août**.
+- `config.errorLogs` **vide** — 7e lecture depuis la réparation du journal en `v2.16.42`. Toujours aucun plantage de rendu capté en prod, cette fois sur des sessions réellement jouées (les lectures précédentes portaient toutes sur le même instantané dormant, donc ne prouvaient pas grand-chose).
+- Aucun message d'enfant signalant un souci dans le fil familial.
+
+### 📋 Ce qui a changé dans les données (le vrai contenu de ce passage)
+- ✅ **Les 14 validations dormantes sont TRAITÉES.** `pending` est maintenant **vide pour les 4 enfants** (c'était 6 + 8 chez deux d'entre eux, immobiles depuis le 30-31 juillet). Quelqu'un a ouvert le portail parent et les a passées.
+- ✅ **3 enfants sur 4 ont de nouveau des pièces** : `coins` **12 / 0 / 33 / 30** (c'était 0 / 0 / 0 / 0 depuis le 31 juillet).
+- **Ces pièces sont bien des gains neufs, pas une restauration** : `coinsLifetime` passe de **935 / 317 / 343 / 1247** à **947 / 317 / 376 / 1277**, soit **+12 / +0 / +33 / +30** — exactement les soldes actuels. Autrement dit, chaque enfant a **strictement ce qu'il a gagné depuis**, et **rien** des soldes du 28 juillet (350 / 161 / 151 / 350) n'a été remis. **Le point (0) du bloc GEN reste donc entièrement ouvert.**
+- 🔴 **`Le GOAT!!!` est toujours à 0 pièce, et à +0 de gain.** C'est **l'enfant qui a signalé `bug_hlu9mkd`** (« J'ai perdu 150 pièces, je peux le récupérer? »). Pour lui, dix jours plus tard, rien n'a bougé du tout : ni restauration, ni gain neuf. C'est le seul des quatre dans ce cas.
+- **L'usage a repris le 9 août** : le fil familial montre 3 quêtes accomplies le 2026-08-09 vers 14h24-14h25 UTC (« menage table » et « Être gentil avec mon frère » par `je suis le gote`, « Salle de bain » par `URSUL LE GOAT`), après un trou complet du 31 juillet au 9 août. Le fil est plafonné à 60 entrées et roule : sa plus ancienne entrée est maintenant du 12 juillet.
+- `removalRequests` / `momentRequests` / `childTaskProposals` / `teamInvites` / `coinOffers` / `repairEvents` : tous **vides**. Rien de neuf à arbitrer.
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 Reste ouvert — la restauration des soldes du 28 juillet.** Le code est réparé depuis `v2.16.45` (plus aucun chemin ne peut effacer un solde) et les nouveaux gains se cumulent normalement, ce qui se voit enfin sur de vraies données. Mais les montants effacés le 31 juillet **ne sont pas revenus** : c'est toujours un `PUT /api/famille` à faire, avec un montant qui reste **ta décision**. **La routine n'a rien écrit en prod.**
+- ✅ **Point clos — les 14 validations dormantes.** Plus rien en attente côté portail parent. Retiré du bloc « GEN » de `PROJET-ETAT.md`.

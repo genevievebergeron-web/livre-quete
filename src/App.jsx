@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.48";
+export const APP_VERSION = "2.16.49";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -217,7 +217,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const _petPendingTier = _eqPetId ? petPendingTier(_eqPetEvo, _eqPetLv) : 0;
   const [chestReveal, setChestReveal] = useState(null); // {item,dup,chest,refund}
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
+  const settings = pState.settings || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, highContrast:false };
   const setSetting = (key,val)=> onPatchState && onPatchState({ settings: { ...settings, [key]:val } });
   const [shopTab, setShopTab] = useState("rewards");
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -428,7 +428,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div onClick={e=>e.stopPropagation()} style={{background:pt.bg||"#1a1a2e",borderLeft:`3px solid ${pt.accent||player.color}`,width:"min(280px,82vw)",height:"100%",padding:16,display:"flex",flexDirection:"column",gap:10,overflowY:"auto",boxShadow:"-6px 0 24px rgba(0,0,0,0.5)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:pt.accent||player.color}}>☰ Menu</div>
-              <button onClick={()=>onCloseHam&&onCloseHam()} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>onCloseHam&&onCloseHam()} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
             </div>
             {[
               ["⚙️ Mes réglages", ()=>{onCloseHam&&onCloseHam();setSettingsOpen(true);}],
@@ -452,11 +452,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto",maxWidth:640,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||player.color}}>🗄️ Archives — aujourd'hui</div>
-              <button onClick={()=>setArchivesOpen(false)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>setArchivesOpen(false)} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
             </div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:8}}>Tes quêtes complétées aujourd'hui ({rows.length}) :</div>
-            {rows.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:18}}>Rien encore aujourd'hui. Fais une quête! 💪</div>}
-            {rows.map((r,i)=>{ const m=r.cat?catMeta(r.cat):null; return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#5CAD68",flex:1}}>{r.label}{m?<span style={{color:m.color,fontSize:13}}> · {m.label}</span>:""}</span>{r.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{r.time}</span>}<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✅</span></div>); })}
+            <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-muted,#888)",marginBottom:8}}>Tes quêtes complétées aujourd'hui ({rows.length}) :</div>
+            {rows.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-faint,#555)",textAlign:"center",padding:18}}>Rien encore aujourd'hui. Fais une quête! 💪</div>}
+            {rows.map((r,i)=>{ const m=r.cat?catMeta(r.cat):null; return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",background:"rgba(0,0,0,0.4)",border:"1px solid #2a2a2a",borderRadius:6,marginBottom:5}}><span style={{fontSize:18}}>{r.emoji}</span><span style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#5CAD68",flex:1}}>{r.label}{m?<span style={{color:m.color,fontSize:13}}> · {m.label}</span>:""}</span>{r.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>{r.time}</span>}<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✅</span></div>); })}
             <button onClick={()=>setArchivesOpen(false)} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"13px",marginTop:8,background:pt.accent||player.color,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer"}}>← Retour</button>
           </div>
         );
@@ -466,7 +466,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2600,display:"flex",flexDirection:"column",padding:16,overflowY:"auto",maxWidth:640,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#D99248"}}>🐛 J'ai trouvé un bug</div>
-            <button onClick={()=>{setBugOpen(false);setBugText("");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+            <button onClick={()=>{setBugOpen(false);setBugText("");}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
           </div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:6}}>Explique ce qui ne marche pas — ton parent va le recevoir :</div>
           <textarea value={bugText} onChange={e=>setBugText(e.target.value.slice(0,300))} autoFocus placeholder="ex: quand je clique sur..., il se passe..."
@@ -510,7 +510,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           {/* v1.81.0 — ancré sur la vraie géométrie du corps (EquippedGear), voir plus haut */}
           <EquippedGear eq={eq} items={allShopItemsFlat} size={72} avatarDef={pState.avatar}/>
           {eq.pet   && (petSpriteKey(eq.pet) ? <div style={{position:"absolute",bottom:-8,left:-10,pointerEvents:"none"}}><PetSprite itemId={eq.pet} size={30}/></div> : <span style={{position:"absolute",bottom:-8,left:-6,fontSize:18,pointerEvents:"none"}}>{allShopItemsFlat.find(i=>i.id===eq.pet)?.emoji}</span>)}
-          <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#555",whiteSpace:"nowrap"}}>✏️ Modifier</div>
+          <div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-faint,#555)",whiteSpace:"nowrap"}}>✏️ Modifier</div>
         </div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,14px)",color:player.color,marginBottom:3}}>{displayName(player)}</div>
@@ -572,7 +572,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {/* Série */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#D99248":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#777"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"var(--txt-soft,#777)"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
             </div>
             {/* Backlog #13 — budget-temps quotidien : discret, visible seulement si un parent l'a configuré */}
             {player.dailyMinutesLimit ? (()=>{
@@ -581,7 +581,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return (
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⏳ Temps aujourd'hui</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>⏳ Temps aujourd'hui</span>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:pctT>=100?"#D97070":"#888"}}>{used}/{limit} min</span>
                   </div>
                   <div style={{height:6,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
@@ -613,9 +613,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                       }
                     </div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#bbb",margin:"1px 0 3px"}}>🐾 {petStage(xp)} {napping?"· 💤 fait la sieste":""}</div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>XP familier</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>XP familier</div>
                     <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",margin:"1px 0 4px"}}><div style={{height:"100%",width:pctp+"%",background:acc}}/></div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#888"}}>⚡ Énergie {cur}%</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>⚡ Énergie {cur}%</div>
                     <div style={{height:7,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden",marginTop:1}}><div style={{height:"100%",width:cur+"%",background:eColor,transition:"width 0.6s"}}/></div>
                   </div>
                 </div>
@@ -664,9 +664,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2500,display:"flex",flexDirection:"column",padding:16,overflowY:"auto",maxWidth:640,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:pt.accent||player.color}}>⚙️ Mes réglages</div>
-            <button onClick={()=>{SFX.click();setSettingsOpen(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+            <button onClick={()=>{SFX.click();setSettingsOpen(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
           </div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",marginBottom:10}}>Ajuste l'app comme tu l'aimes. Touche pour activer ou désactiver.</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-muted,#888)",marginBottom:10}}>Ajuste l'app comme tu l'aimes. Touche pour activer ou désactiver.</div>
 
           {/* Mon profil — l'enfant change SON pseudo et SON code secret */}
           <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${pt.accent||player.color}`,borderRadius:6,padding:12,marginBottom:12}}>
@@ -699,6 +699,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             ["focus","🎯 Une tâche à la fois","Voir seulement la prochaine quête, pas toute la liste"],
             ["humor","😄 Messages rigolos","Des petites blagues après une quête réussie (et un secret ou deux)"], // v2.16.48 — voir commentaire ci-dessous
             ["readableFont","🔤 Police plus lisible","Remplace les lettres « jeu vidéo » par une police plus simple à lire"], // v1.87.0 (Lot 3 #12)
+            ["highContrast","🌗 Contraste fort","Éclaircit les petits textes gris et les cadres, pour mieux les distinguer"], // v2.16.49 (Lot 3 #12, dernier tiers)
             ["femTitles","👑 Titres au féminin","Héroïne, Championne, Chevalière… au lieu de Héros, Champion, Chevalier"], // v2.5.27 — branche titleF/levelsF (item #5 analyse game design)
           ].map(([key,label,desc])=>{
             // v1.82.0 (Lot 1 #4) — "humor" avait été RETIRÉ de cette liste : le champ existait mais
@@ -715,7 +716,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#5CAD68"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
                 <div style={{flex:1}}>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isOn?(pt.accent||"#fff"):"#999"}}>{label}</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{desc}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)"}}>{desc}</div>
                 </div>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#5CAD68"):"#333",color:isOn?"#0d0d0d":"#888",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
               </div>
@@ -750,12 +751,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:2500,display:"flex",flexDirection:"column",padding:16,overflowY:"auto",maxWidth:640,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.4vw,12px)",color:pt.accent||player.color}}>🎨 Choisis ton thème</div>
-              <button onClick={()=>{SFX.click();setThemePicker(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>{SFX.click();setThemePicker(false);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
             </div>
             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:canChange?"#9fe":"#FFA94D",marginBottom:4,lineHeight:1.3}}>
               {canChange ? "Touche un thème débloqué pour le choisir. Il dure toute la semaine 🗓️" : "Tu as déjà choisi ton thème cette semaine. Tu pourras en changer lundi prochain! 🗓️"}
             </div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:4}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)",marginBottom:4}}>🔒 Les autres thèmes se débloquent en gagnant de l'XP.{nextLocked?` Prochain : ${nextLocked.icon} ${nextLocked.name} à ${nextLocked.xpUnlock} XP (tu as ${pState.xp} XP).`:" Tu les as tous débloqués! 🏆"}</div>
             {weeklyFreeTheme && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#D9BC5C",marginBottom:10}}>🎲 Thème de la semaine gratuit : {weeklyFreeTheme.icon} {weeklyFreeTheme.name} — débloqué pour tout le monde, sans XP!</div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
               {list.map(t=>{
@@ -882,7 +883,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         <div style={{background:"rgba(0,0,0,0.6)",border:`3px solid ${th.accent||player.color}`,borderRadius:6,padding:12,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:th.accent||player.color}}>{routineBuilder.editId?"✏️ Modifier mon rituel":"🌟 Mon nouveau rituel"}</div>
-            <button onClick={()=>{SFX.click();setRoutineBuilder(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>✕</button>
+            <button onClick={()=>{SFX.click();setRoutineBuilder(null);}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"5px 9px",background:"#1a1a1a",color:"var(--txt-muted,#888)",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>✕</button>
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {["🌅","🌙","☀️","🌆","⭐","🏃","🦷","📚"].map(em=>(
@@ -893,14 +894,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <input value={routineBuilder.name} onChange={e=>setRoutineBuilder(b=>({...b,name:e.target.value.slice(0,16)}))} placeholder="Nom (ex: Matin, Soir...)"
             style={{fontFamily:"'VT323',monospace",fontSize:16,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>⏰ Heure de fin (optionnel) :</span>
+            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>⏰ Heure de fin (optionnel) :</span>
             <input type="time" value={routineBuilder.endTime||""} onChange={e=>setRoutineBuilder(b=>({...b,endTime:e.target.value}))}
               style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"5px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
           </div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb"}}>👇 Touche les tâches que tu VEUX faire dans ce rituel.</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777"}}>Une tâche choisie devient verte avec un ✅. Touche encore pour l'enlever.</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-soft,#777)"}}>Une tâche choisie devient verte avec un ✅. Touche encore pour l'enlever.</div>
           <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:"32vh",overflowY:"auto"}}>
-            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888"}}>Tu n'as pas encore de tâche de rituel. Touche « ➕ Créer ma propre tâche » plus bas pour en ajouter une! 👇</div>}
+            {routineMine.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-muted,#888)"}}>Tu n'as pas encore de tâche de rituel. Touche « ➕ Créer ma propre tâche » plus bas pour en ajouter une! 👇</div>}
             {routineMine.map(a=>{
               const t=allTasks.find(x=>x.id===a.taskId); if(!t)return null;
               const sel=routineBuilder.taskIds.includes(a.instanceId);
@@ -924,7 +925,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             onCreate={(data)=>{ const newId = onChildAddRoutineTask && onChildAddRoutineTask(data); if(newId) setRoutineBuilder(b=>({...b, taskIds:[...b.taskIds, newId]})); setRoutineTaskModal(false); }}/>}
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{SFX.click();setRoutineBuilder(null);}}
-              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>Annuler</button>
+              style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px",background:"#1a1a1a",color:"var(--txt-muted,#888)",border:"2px solid #333",borderRadius:4,cursor:"pointer"}}>Annuler</button>
             <button className="btn-press" disabled={!routineBuilder.name.trim()||routineBuilder.taskIds.length===0}
               onClick={()=>{
                 const name=routineBuilder.name.trim(); if(!name||routineBuilder.taskIds.length===0)return;
@@ -956,8 +957,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
       {homeTab==="jour" && !(pMode==="week" && jourView==="week") && (<>
       {/* Tasks */}
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"var(--txt-muted,#888)",borderBottom:"2px solid #333",paddingBottom:3}}>📋 MES QUÊTES — {pMode==="week"?`AUJOURD'HUI (${DAYS_SHORT[todayDayIdx]}) 📅`:(activeRoutine?`${activeRoutine.emoji||"⏰"} ${activeRoutine.name.toUpperCase()}`:"RITUEL ⏰")}</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-faint,#555)",marginBottom:2}}>Quand c'est fait, appuie sur le bouton — tes parents valideront et tu recevras ton XP!</div>
       {/* Backlog #17 incrément 1 — invitations "en équipe" reçues d'un frère/soeur, en attente de réponse.
           Affichées ici (pas seulement sur la carte de la tâche, que l'invité n'a pas forcément dans SA
           propre liste — la tâche appartient encore à l'initiateur tant que l'invitation n'est pas acceptée). */}
@@ -981,7 +982,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       })}
       {/* v1.85.0 (Lot 2 #7) — état vide orientant : si l'AUTRE mode a des tâches, on le dit plutôt
           que de laisser croire qu'il n'y a rien du tout ("on sait jamais où chercher") */}
-      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:16,lineHeight:1.4}}>
+      {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-faint,#555)",textAlign:"center",padding:16,lineHeight:1.4}}>
         {pMode==="week"
           ? (weekMine.length ? "Rien de prévu aujourd'hui! 🎉"
              : routineMine.length ? <>Pas de tâches planifiées, mais tu as des <b style={{color:"#aaa"}}>rituels ⏰</b> — touche « Rituels » ci-dessus!</>
@@ -1022,7 +1023,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 Mes tâches, alors que la carte elle-même est bien filtrée à aujourd'hui — seul le
                 badge mentait. Le header de section dit déjà « AUJOURD'HUI », donc plus besoin d'un
                 badge jour ici : ne garder que l'heure du moment (matin/soir/etc.), le cas échéant. */}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",marginBottom:3}}>{ass.time?`⏰ ${ass.time}`:""}</div>
             <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:5}}>
               <span className="icon-tile" style={{width:36,height:36,flex:"0 0 36px"}}><UIIcon name={"task_"+task.id} emoji={task.emoji} size={26} block/></span>
               <span style={{fontWeight:900,fontSize:"clamp(12px,1.4vw,14px)",color:"#fff",lineHeight:1.3,flex:1}}>{task.label}</span>
@@ -1068,7 +1069,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return reqPending
                 ? <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#FFA94D",textAlign:"center",marginTop:5}}>🗑️ Retrait demandé — en attente du parent…</div>
                 : <button onClick={()=>{ if(window.confirm(`Demander à retirer « ${task.label} » de tes tâches?`)){ SFX.click(); onRequestRemoval&&onRequestRemoval(ass.instanceId); } }}
-                    style={{width:"100%",padding:"5px",marginTop:5,fontFamily:"'VT323',monospace",fontSize:12,color:"#888",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>
+                    style={{width:"100%",padding:"5px",marginTop:5,fontFamily:"'VT323',monospace",fontSize:12,color:"var(--txt-muted,#888)",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>
                     🗑️ Je ne veux plus de cette tâche
                   </button>;
             })()}
@@ -1083,7 +1084,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               }
               const outgoingDeclined=(config.teamInvites||[]).find(inv=>inv.instanceId===ass.instanceId&&inv.fromPlayerId===player.id&&inv.status==="declined");
               return <>
-                {outgoingDeclined && <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#888",textAlign:"center",marginTop:5}}>😌 {displayName(siblings.find(s=>s.id===outgoingDeclined.toPlayerId)||{})} ne peut pas cette fois — pas grave, continue en solo!</div>}
+                {outgoingDeclined && <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"var(--txt-muted,#888)",textAlign:"center",marginTop:5}}>😌 {displayName(siblings.find(s=>s.id===outgoingDeclined.toPlayerId)||{})} ne peut pas cette fois — pas grave, continue en solo!</div>}
                 {teamPickerFor===ass.instanceId
                   ? <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
                       {siblings.map(s=>(
@@ -1092,7 +1093,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                           {displayName(s)}
                         </button>
                       ))}
-                      <button onClick={()=>setTeamPickerFor(null)} style={{padding:"5px 9px",fontFamily:"'VT323',monospace",fontSize:13,color:"#888",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>Annuler</button>
+                      <button onClick={()=>setTeamPickerFor(null)} style={{padding:"5px 9px",fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",background:"transparent",border:"1px dashed #444",borderRadius:3,cursor:"pointer"}}>Annuler</button>
                     </div>
                   : <button onClick={()=>{SFX.click();setTeamPickerFor(ass.instanceId);}}
                       style={{width:"100%",padding:"5px",marginTop:5,fontFamily:"'VT323',monospace",fontSize:12,color:"#9ED8DE",background:"transparent",border:"1px dashed #4A8A90",borderRadius:3,cursor:"pointer"}}>
@@ -1192,7 +1193,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         if(settings.focus && undoneAll.length>1){
           const next=allTasks.find(t=>t.id===undoneAll[1].taskId);
           cards.push(
-            <div key="first-then" style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px dashed #444",borderRadius:6,fontFamily:"'VT323',monospace",fontSize:14,color:"#777",flexWrap:"wrap"}}>
+            <div key="first-then" style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px dashed #444",borderRadius:6,fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-soft,#777)",flexWrap:"wrap"}}>
               <span>👉 Ensuite:</span>
               {next && <UIIcon name={"task_"+next.id} emoji={next.emoji} size={16}/>}
               <span style={{color:"#aaa"}}>{next?next.label:"?"}</span>
@@ -1314,7 +1315,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                 {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
                 {dayTasks.length===0 && (
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:4}}>🌿 Libre</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginTop:4}}>🌿 Libre</div>
                 )}
                 {dayTasks.slice(0,MAXT).map(a=>{
                   const t=allTasks.find(x=>x.id===a.taskId); if(!t) return null;
@@ -1327,7 +1328,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     </div>
                   );
                 })}
-                {dayTasks.length>MAXT && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#777",marginTop:3}}>+{dayTasks.length-MAXT} autres quêtes</div>}
+                {dayTasks.length>MAXT && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-soft,#777)",marginTop:3}}>+{dayTasks.length-MAXT} autres quêtes</div>}
               </div>
             );
           })}
@@ -1339,7 +1340,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <button onClick={()=>{ if(SFX.click)SFX.click(); setLaterOpen(o=>!o); }}
             style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
             <span>{laterOpen?"▼":"▶"} 📅 Tâches planifiées</span>
-            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>{laterWeek.length}</span>
+            <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>{laterWeek.length}</span>
           </button>
           {laterOpen && <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:5,opacity:0.85}}>
             {laterWeek.map(ass=>{ const t=allTasks.find(x=>x.id===ass.taskId); if(!t)return null;
@@ -1408,13 +1409,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             {(()=>{ const left=rotatingRemaining(config,pState,assignments,player.id); const s=left>1?"s":"";
               return <>Fais encore <b style={{color:"#D9BC5C"}}>{left}</b> tâche{s} rotative{s} aujourd'hui pour débloquer la boutique!</>; })()}
           </div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#888",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"var(--txt-muted,#888)",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT}</div>
         </div>
       ) : (<>
       {/* Shop */}
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
-      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"#888",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}><UIIcon name="nav_shop" emoji="🛒" size={11}/> BOUTIQUE — {pState.coins} <Coin size={11}/></div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#777",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginTop:6,marginBottom:2}}>Dépense tes pièces pour des accessoires et de vraies récompenses — les quêtes difficiles en rapportent plus!</div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:"var(--txt-muted,#888)",borderBottom:"2px solid #333",paddingBottom:3,marginTop:0}}><UIIcon name="nav_shop" emoji="🛒" size={11}/> BOUTIQUE — {pState.coins} <Coin size={11}/></div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-soft,#777)",margin:"2px 0"}}>Touche un item pour l'acheter avec tes pièces 🪙. Gagne des pièces en faisant tes quêtes!</div>
 
       {/* 🎁 Coffres mystères */}
       {(()=>{ const cur=currentEnergy(pState); if(cur>=CHEST_ENERGY) return null; const m=minsToEnergy(pState,CHEST_ENERGY);
@@ -1483,8 +1484,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   </div>
                 ))}
               </div>; })()}
-            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
-            {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#666",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:2}}>🎲 Les récompenses changent chaque semaine — profites-en!</div>
+            {myRewards.length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-dim,#666)",textAlign:"center",padding:"10px 6px"}}>Pas de récompenses cette semaine.</div>}
             {/* Refonte visuelle Phase 2 — sections Petite/Moyenne/Épique (planche de tiers) au lieu
                 d'une liste plate ; l'or ne reste que sur le prix 🪙 et le bouton Acheter. */}
             {["petite","moyenne","epique"].map(tk=>{
@@ -1580,7 +1581,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {/* ── BADGE SHELF ─────────────────────────────────────── */}
       <div style={{marginTop:8,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"12px 14px",border:`2px solid ${pt.accent||"#444"}33`}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:pt.accent||"#D9BC5C",marginBottom:4}}>🏅 BADGES</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#555",marginBottom:8}}>Appuie sur un badge pour voir comment le gagner — certains sont secrets! 🕵️</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginBottom:8}}>Appuie sur un badge pour voir comment le gagner — certains sont secrets! 🕵️</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {BADGES.filter(b=>b.type==="general"||b.type===resolvedThemeId).map(b=>{
             const earned=(pState.badges||[]).includes(b.id);
@@ -1604,13 +1605,13 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <span style={{fontSize:24,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</span>
               <div style={{flex:1}}>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#D9BC5C"):"#aaa"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",lineHeight:1.3}}>{b.desc}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)",lineHeight:1.3}}>{b.desc}</div>
               </div>
-              <button onClick={()=>setBadgeInfo(null)} style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:14}}>✕</button>
+              <button onClick={()=>setBadgeInfo(null)} style={{background:"none",border:"none",color:"var(--txt-faint,#555)",cursor:"pointer",fontSize:14}}>✕</button>
             </div>
           );
         })()}
-        {(pState.badges||[]).length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#555",marginTop:6}}>Complète des quêtes pour débloquer des badges!</div>}
+        {(pState.badges||[]).length===0&&<div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-faint,#555)",marginTop:6}}>Complète des quêtes pour débloquer des badges!</div>}
       </div>
       </>)}
 
@@ -1635,7 +1636,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <BossSprite boss={boss} size={104} style={{filter:won?"grayscale(0.7) opacity(0.7)":"none"}}/>
               {boss.forest && <div style={{fontSize:20,letterSpacing:8,marginTop:2,opacity:0.85}}>🌲🌳🌲</div>}
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:boss.color||"#FF5555",marginTop:8}}>{boss.emoji} {boss.name}</div>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888",margin:"8px 0 2px"}}>PV DU BOSS</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)",margin:"8px 0 2px"}}>PV DU BOSS</div>
               <div style={{height:18,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:hpPct+"%",background:"linear-gradient(90deg,#D97070,#D9BC5C)",transition:"width 0.5s"}}/></div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>{hpLeft} / {hpMax} PV {won?"✓":""}</div>
             </div>
@@ -1649,11 +1650,11 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <AvatarCanvas avatarDef={pState.avatar||DEFAULT_AVATAR} bodyColor={pt.charBodyColor||player.color} size={48} mood={dashboardMood}/>
               <div style={{flex:1}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>PV boss</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>PV boss</span>
                   <span style={{fontSize:15,letterSpacing:1}}>{heartsRow(hpPct)}</span>
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>PV famille</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>PV famille</span>
                   <span style={{fontSize:15,letterSpacing:1}}>{heartsRow(fhp)}</span>
                 </div>
               </div>
@@ -1664,12 +1665,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             </div>}
             {enraged && <div style={{background:"#3a0e0e",border:"2px solid #D97070",borderRadius:8,padding:"7px 10px",textAlign:"center",fontFamily:"'VT323',monospace",fontSize:15,color:"#FF8888"}}>🔥 Le boss ENRAGE! Il vide les PV de la famille 2× plus vite — achevez-le!</div>}
             <div>
-              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#D97070":"#5CAD68"}}>{fhp}%</span></div>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>❤️ PV DE LA FAMILLE</span><span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:fhp<30?"#D97070":"#5CAD68"}}>{fhp}%</span></div>
               <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:3,overflow:"hidden",marginTop:2}}><div style={{height:"100%",width:fhp+"%",background:fhp<30?"#D97070":"#5CAD68",transition:"width 0.5s"}}/></div>
               {!won && fhp<40 && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#FF8888",marginTop:5,lineHeight:1.3}}>⚠️ Le boss reprend des forces! Faites des quêtes et attaquez vite pour défendre la famille!</div>}
             </div>
             {won ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:"#5CAD68",textAlign:"center",padding:16}}>🏆 BOSS VAINCU!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:16}}>Bravo toute la famille! 🎉</span></div> : (<>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#D9BC5C",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"#888"}}>1 jeton par quête validée</span></div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#ddd",textAlign:"center"}}>Tu as <b style={{color:"#D9BC5C",fontSize:20}}>{myJetons}</b> jeton{myJetons>1?"s":""} d'attaque ⚡<br/><span style={{fontSize:13,color:"var(--txt-muted,#888)"}}>1 jeton par quête validée</span></div>
               <div style={{display:"flex",gap:8}}>
                 {atkBtn("petite",`${boss.atkEmoji?.petite||"🗡️"} Petite`,`1 jeton · −${bossAtkDamage("petite",mod)} PV`, myJetons>=1)}
                 {atkBtn("grosse",`${boss.atkEmoji?.grosse||"💥"} Grosse`,`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
@@ -1688,7 +1689,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                   ⚔️ COUP DE GRÂCE
                 </button>
               </div>}
-              {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#888",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
+              {myJetons<1 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-muted,#888)",textAlign:"center"}}>Va faire des quêtes (onglet ✅ Aujourd'hui) pour gagner des jetons d'attaque! 💪</div>}
             </>)}
           </div>
         );
@@ -1892,7 +1893,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
               {/* Progress */}
               <div style={{marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>Quêtes</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>Quêtes</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:player.color}}>{myDone}/{myTotal}</span>
                 </div>
                 <div style={{height:10,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden"}}>
@@ -1942,7 +1943,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
         return (
           <div style={{marginTop:6,background:"rgba(0,0,0,0.4)",border:`2px solid ${th.accent}33`,borderRadius:8,padding:"12px 12px"}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:th.accent,marginBottom:8}}>📊 PROGRÈS DE LA SEMAINE</div>
-            {!anyXp && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Pas encore d'XP cette semaine. Faites des quêtes pour remplir le graphique! 💪</div>}
+            {!anyXp && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-soft,#777)"}}>Pas encore d'XP cette semaine. Faites des quêtes pour remplir le graphique! 💪</div>}
             {anyXp && perPlayer.map(({p,days,total})=>(
               <div key={p.id} style={{marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
@@ -1976,7 +1977,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
           <button onClick={()=>{ if(chatText.trim()){ onPostChat&&onPostChat(chatText.trim()); setChatText(""); SFX.click(); } }}
             style={{flexShrink:0,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"8px 12px",background:th.accent,color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:"pointer"}}>Envoyer</button>
         </div>
-        {(config.feed||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#777"}}>Rien encore. Les accomplissements de chacun s'afficheront ici! 🌟</div>}
+        {(config.feed||[]).length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-soft,#777)"}}>Rien encore. Les accomplissements de chacun s'afficheront ici! 🌟</div>}
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"40vh",overflowY:"auto"}}>
           {(()=>{ // Regroupe les quêtes consécutives d'un même enfant pour éviter le flood
             const src=config.feed||[]; const grouped=[];
@@ -2002,7 +2003,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
             grouped.forEach(f=>{ const dl=dayLabel(f.ts); if(dl!==lastDay){ out.push({__dayHeader:true,label:dl,key:"day_"+dl+"_"+f.ts}); lastDay=dl; } out.push(f); });
             return out;
           })().map(f=>{
-            if(f.__dayHeader) return <div key={f.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#666",textTransform:"uppercase",margin:"8px 0 2px",paddingBottom:3,borderBottom:"1px solid #2a2a2a"}}>{f.label}</div>;
+            if(f.__dayHeader) return <div key={f.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-dim,#666)",textTransform:"uppercase",margin:"8px 0 2px",paddingBottom:3,borderBottom:"1px solid #2a2a2a"}}>{f.label}</div>;
             const liked=(f.likes||[]).includes(meId);
             // Lot 6 #28 — accent de couleur par type d'événement (même sémantique que le reste de l'app :
             // vert=quête, cyan=niveau/XP, or=badge, rouge=boss, orange=rituel) pour distinguer d'un coup d'œil.
@@ -2015,7 +2016,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   {f.type==="chat"
                     ? <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#eee",lineHeight:1.25}}><b style={{color:feedColor(f.playerId)}}>{feedName(f.playerId)}:</b> {f.text}</div>
                     : <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#ddd",lineHeight:1.25}}>{f.text}</div>}
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#666",marginTop:2}}>{timeAgo(f.ts)}</div>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-dim,#666)",marginTop:2}}>{timeAgo(f.ts)}</div>
                 </div>
                 <button onClick={()=>{onLike&&onLike(f.id);SFX.click();}}
                   style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#D98C8C":"#888",border:`1px solid ${liked?"#D98C8C":"#444"}`,borderRadius:14,cursor:"pointer"}}>
@@ -3544,7 +3545,7 @@ export default function App() {
   // Mode effectif : chaque enfant choisit le sien (routine|week). Vue famille/parent = accueil Semaine (pas de gros chrono rouge).
   const effectiveMode = typeof view==="number" ? (gameStates[view]?.mode || config?.mode || "routine") : "week";
   // Réglages d'accessibilité de l'enfant affiché → pilotent son/animations/décompte
-  const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false };
+  const curSettings = (typeof view==="number" ? gameStates[view]?.settings : null) || { sound:true, calm:false, calmCountdown:false, humor:true, focus:false, fontScale:1, readableFont:false, highContrast:false };
   setSfxMuted(curSettings.sound === false);
   setCalm(curSettings.calm);
   // Le décompte de routine ne s'affiche que pour un enfant en mode routine, et seulement dans une fenêtre du matin
@@ -3677,7 +3678,12 @@ export default function App() {
   const currentPlayerState = currentPlayerView!==null ? gameStates[currentPlayerView] : null;
 
   return (
-    <div className={"game-root vignette-bg"+(CALM?" calm-mode":"")} style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
+    // v2.16.49 (Lot 3 #12, dernier tiers) — « contraste fort » se pose ICI, sur la racine, et pas
+    // sur le conteneur de l'écran enfant comme `readable-font` : la classe ne repeint rien
+    // elle-même, elle REDÉFINIT des variables CSS (--txt-*/--b-*), et une variable ne descend
+    // qu'aux descendants du nœud qui la déclare. Sur la racine, elle atteint aussi les popups
+    // `position:fixed` (qui restent des descendants DOM de game-root) et le header.
+    <div className={"game-root vignette-bg"+(CALM?" calm-mode":"")+(curSettings.highContrast?" high-contrast":"")} style={{minHeight:"100vh",background:th.bg,position:"relative",overflowX:"hidden"}}>
       <style>{GLOBAL_CSS+`
         .nav-btn:hover{opacity:0.85;}
         .task-card:hover{transform:translateY(-1px);}
@@ -3705,7 +3711,7 @@ export default function App() {
           }
         }}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,12px)",color:th.accent}}>{currentPlayer ? `⚔️ Les quêtes de ${displayName(currentPlayer)}` : (sessionPlayer!=null && config.players[sessionPlayer] ? `⚔️ Les quêtes de ${displayName(config.players[sessionPlayer])}` : "⚔️ LIVRE DE QUÊTES")}</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)"}}>{effectiveMode==="routine"?"Mode Rituel ⏰":"Mode Semaine 📅"} — {th.name}</div>
         </div>
         {/* Clock (discrète : heure:minute, sans clignotement) — composant isolé, v1.94.0 */}
         <HeaderClock style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.6vw,14px)",color:"#7aa"}}/>
@@ -3730,7 +3736,7 @@ export default function App() {
               style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 14px",background:"#222",color:th.accent,border:`2px solid ${th.accent}66`,borderRadius:3,cursor:"pointer"}} title="Menu">☰ Menu</button>
           ) : (
             <button onClick={()=>{SFX.click();setParentMode(false);setSessionPlayer(null);setParentPanel(false);setParentPinOpen(false);setView("family");setScreen("login");}}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Déconnexion">🚪</button>
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"8px 10px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:3,cursor:"pointer"}} title="Déconnexion">🚪</button>
           )}
         </div>
       </div>
@@ -3741,11 +3747,11 @@ export default function App() {
       {/* ── DAY PROGRESS ── */}
       <div style={{maxWidth:900,margin:"0 auto",padding:"6px 12px",background:"rgba(0,0,0,0.55)",borderBottom:"2px solid #333"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{effectiveMode==="routine"?"6h00":"Lun"}</span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>{effectiveMode==="routine"?"6h00":"Lun"}</span>
           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:th.accent}}>
             {effectiveMode==="routine"?"⏱ Progression":"📅 Semaine — "+DAYS_SHORT[todayDayIdx]}
           </span>
-          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{effectiveMode==="routine"?config.routineEnd:"Dim"}</span>
+          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>{effectiveMode==="routine"?config.routineEnd:"Dim"}</span>
         </div>
         <div style={{height:12,background:"#111",border:"2px solid #333",borderRadius:2,overflow:"hidden",position:"relative"}}>
           <div style={{height:"100%",width:dayPct+"%",background:`linear-gradient(90deg,${th.primary},${th.accent})`,transition:"width 1s ease",position:"relative",overflow:"hidden"}}>
@@ -3868,13 +3874,13 @@ export default function App() {
                       {myCalForm.recur==="weekly" && <select value={myCalForm.day} onChange={e=>setMyCalForm(f=>({...f,day:+e.target.value}))}
                         style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4}}>{DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>}
                       <div>
-                        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:2}}>Heure (optionnel)</div>
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:2}}>Heure (optionnel)</div>
                         <input type="time" value={myCalForm.time} onChange={e=>setMyCalForm(f=>({...f,time:e.target.value}))}
                           style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none"}}/>
                       </div>
                       {parentMode && myCalForm.editId==null && (
                         <div>
-                          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#888",marginBottom:4}}>Pour quel enfant?</div>
+                          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:4}}>Pour quel enfant?</div>
                           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                             {config.players.map(pl=>{ const sel=myCalTargets.includes(pl.id); return (
                               <div key={pl.id} onClick={()=>setMyCalTargets(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
@@ -3913,7 +3919,7 @@ export default function App() {
                         return (
                           <div key={stamp} style={{flex:"0 0 auto",width:128,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${p.color}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
                             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?p.color:"#999",marginBottom:4}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
-                            {dayEvents.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555"}}>🌿 Rien</div>}
+                            {dayEvents.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-faint,#555)"}}>🌿 Rien</div>}
                             {dayEvents.map(e=>{
                               const editable = parentMode || (mine && (e.type||"evenement")==="evenement");
                               return (
@@ -3923,7 +3929,7 @@ export default function App() {
                                     <span style={{fontFamily:"'VT323',monospace",fontSize:12,lineHeight:"13px",color:"#9fd8db",flex:1,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical"}}>{e.time?`${e.time} · `:""}{e.label}</span>
                                   </div>
                                   {editable && <div style={{display:"flex",gap:6,marginTop:2,alignSelf:"flex-end"}}>
-                                    <button onClick={()=>startEdit(e,i)} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:11,lineHeight:1,padding:0}}>✏️</button>
+                                    <button onClick={()=>startEdit(e,i)} style={{background:"none",border:"none",color:"var(--txt-muted,#888)",cursor:"pointer",fontSize:11,lineHeight:1,padding:0}}>✏️</button>
                                     <button onClick={()=>deleteEntry(e.id,i)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:12,lineHeight:1,padding:0}}>✕</button>
                                   </div>}
                                 </div>

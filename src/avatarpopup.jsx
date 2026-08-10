@@ -34,7 +34,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             scrollable (ligne juste au-dessus) tout en gardant le même espacement visuel. */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:5,background:pt.bg||"#1a1a2e",marginTop:-20,marginLeft:-20,marginRight:-20,paddingTop:20,paddingLeft:20,paddingRight:20,paddingBottom:10}}>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:pt.accent||"#D9BC5C"}}>{displayName(player)} — Mon Perso</div>
-          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#333",color:"#888",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
+          <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"5px 10px",background:"#333",color:"var(--txt-muted,#888)",border:"2px solid #555",borderRadius:3,cursor:"pointer"}}>✕</button>
         </div>
 
         {/* Preview */}
@@ -51,7 +51,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
             <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#D9BC5C",marginBottom:4}}>{getLevelTitle(pState.xp,player.themeId,pState.settings?.femTitles).title}</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1"}}>⚡ {pState.xp} XP</div>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginTop:3}}>🪙 {pState.coins} {pt.coinName||"pièces"}</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#555",marginTop:4}}>Items équipés: {Object.entries(eq).filter(([k,v])=>v&&k!=="deco").length}</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-faint,#555)",marginTop:4}}>Items équipés: {Object.entries(eq).filter(([k,v])=>v&&k!=="deco").length}</div>
           </div>
         </div>
 
@@ -85,7 +85,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                   style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"8px 4px",background:avatarDef.skin===s.id?`${s.color}30`:"rgba(0,0,0,0.4)",border:`3px solid ${avatarDef.skin===s.id?s.color:"#333"}`,borderRadius:5,cursor:locked?"default":"pointer",opacity:locked?0.45:1,boxShadow:avatarDef.skin===s.id?`0 0 10px ${s.color}80`:"none"}}>
                   <div style={{width:28,height:28,background:s.color,borderRadius:4,border:"2px solid #0d0d0d",filter:locked?"grayscale(0.6)":"none"}}/>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{locked?"🔒 ":""}{s.label}</span>
-                  {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#777"}}>Boutique ✨</span>}
+                  {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"var(--txt-soft,#777)"}}>Boutique ✨</span>}
                 </div>
               );})}
             </div>
@@ -139,7 +139,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                     style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 6px",background:sel?`${col}30`:"rgba(0,0,0,0.4)",border:`3px solid ${sel?col:"#333"}`,borderRadius:5,cursor:locked?"default":"pointer",opacity:locked?0.45:1,boxShadow:sel&&p.color?`0 0 10px ${col}60`:"none"}}>
                     <span style={{fontSize:26,filter:locked?"grayscale(0.7)":"none"}}>{p.emoji}</span>
                     <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc"}}>{locked?"🔒 ":""}{p.label}</span>
-                    {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"#777"}}>Boutique ✨</span>}
+                    {locked && <span style={{fontFamily:"'VT323',monospace",fontSize:10,color:"var(--txt-soft,#777)"}}>Boutique ✨</span>}
                   </div>
                 );
               })}
@@ -179,7 +179,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
               </div>
               {hasPlaced && (
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888"}}>✋ Glisse tes meubles pour les replacer</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>✋ Glisse tes meubles pour les replacer</span>
                   {hasCustomPos && (
                     <button onClick={()=>{ SFX.click(); onUpdateHouse && onUpdateHouse({ ...house, pos:{} }); }}
                       style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#aaa",background:"rgba(0,0,0,0.4)",border:"1px solid #444",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>
@@ -189,12 +189,12 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                 </div>
               )}
               {usable.length===0 && (
-                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:12,lineHeight:1.4}}>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-muted,#888)",textAlign:"center",padding:12,lineHeight:1.4}}>
                   Ta chambre est aux couleurs de ton thème! 🏠<br/>Achète des meubles et des décorations dans la Boutique (onglet 🏠 Maison) pour la rendre unique.
                 </div>
               )}
               {usable.length>0 && <>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>MES DÉCORATIONS — touche pour placer/retirer</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)"}}>MES DÉCORATIONS — touche pour placer/retirer</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {usable.map(d=>{
                     const placed = isPlaced(d);
@@ -220,7 +220,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
 
         {/* INVENTORY TAB */}
         {tab==="inventory" && <>
-          {allOwned.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#555",textAlign:"center",padding:20}}>Ton inventaire est vide — achète des items dans la boutique!</div>}
+          {allOwned.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-faint,#555)",textAlign:"center",padding:20}}>Ton inventaire est vide — achète des items dans la boutique!</div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
             {allOwned.map(item=>{
               const isEq = item.slot && eq[item.slot]===item.id;
@@ -251,7 +251,7 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
           const eqPet = ownedPets.find(p=>p.id===eq.pet);
           return (
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {ownedPets.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#888",textAlign:"center",padding:18,lineHeight:1.4}}>Tu n'as pas encore de familier! 🐾<br/>Achètes-en un dans la boutique 🛒, puis il grandira chaque fois que tu accomplis une quête.</div>}
+              {ownedPets.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-muted,#888)",textAlign:"center",padding:18,lineHeight:1.4}}>Tu n'as pas encore de familier! 🐾<br/>Achètes-en un dans la boutique 🛒, puis il grandira chaque fois que tu accomplis une quête.</div>}
               {/* Vedette : le familier équipé, en grand, avec sa progression */}
               {eqPet && (()=>{ const xp=petXp[eqPet.id]||0; const lv=petLevel(xp); const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
                 const sz=64+lv*6; const _evo=(pState.petEvo||{})[eqPet.id]; const _leg=petIsLegendary(_evo,lv); // il grossit en évoluant
@@ -265,14 +265,14 @@ export function AvatarPopup({ player, pState, onClose, onUpdateAvatar, onEquip, 
                     <div style={{height:14,background:"#111",border:"2px solid #333",borderRadius:4,overflow:"hidden",margin:"8px 0 4px"}}>
                       <div style={{height:"100%",width:pctp+"%",background:`linear-gradient(90deg,${acc},#85CDD1)`,transition:"width 0.8s ease"}}/>
                     </div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#888"}}>{bar.max?`${xp} XP — évolution complète!`:`${bar.cur}/${bar.needed} XP vers Niv.${lv+1}`}</div>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-muted,#888)"}}>{bar.max?`${xp} XP — évolution complète!`:`${bar.cur}/${bar.needed} XP vers Niv.${lv+1}`}</div>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#7aa",marginTop:6}}>Ton familier gagne de l'XP à chaque quête validée 🌟</div>
                   </div>
                 );
               })()}
               {/* Tous mes familiers — touche pour équiper (chacun garde son niveau) */}
               {ownedPets.length>0 && <>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#888"}}>MES FAMILIERS</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)"}}>MES FAMILIERS</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {ownedPets.map(p=>{ const xp=petXp[p.id]||0; const lv=petLevel(xp); const isEq=eq.pet===p.id; const bar=petBar(xp); const pctp=bar.max?100:Math.round(bar.cur/bar.needed*100);
                     return (

@@ -26,7 +26,7 @@ export function TaskChooser({ allTasks, onPick, onCreateOwn, onClose, th }){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.93)",zIndex:2600,display:"flex",flexDirection:"column",padding:"calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))",overflowY:"auto",maxWidth:720,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc}}>➕ Choisis une quête</div>
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
       </div>
       {/* Backlog UX #9 — dupliqué en haut : évite de faire défiler toutes les catégories juste pour créer sa propre tâche */}
       <button onClick={onCreateOwn} style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",padding:"10px",marginBottom:14,background:"rgba(0,0,0,0.4)",border:`2px dashed ${acc}`,color:acc,borderRadius:6,cursor:"pointer"}}>✏️ Je ne trouve pas — créer ma propre tâche</button>
@@ -76,7 +76,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2600,display:"flex",flexDirection:"column",padding:"calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))",overflowY:"auto",maxWidth:640,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.2vw,11px)",color:acc}}>{title}</div>
-        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"#888",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
+        <button onClick={onClose} style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"6px 12px",background:"#222",color:"var(--txt-muted,#888)",border:"2px solid #444",borderRadius:4,cursor:"pointer"}}>✕</button>
       </div>
       <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#bbb",marginBottom:4}}>Nom de la quête :</div>
       <input value={label} autoFocus onChange={e=>setLabel(e.target.value.slice(0,40))} placeholder="ex: Ranger ma chambre"
@@ -120,7 +120,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
         </div>
       </>)}
       <div style={{display:"flex",gap:8}}>
-        <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"#888",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
+        <button onClick={onClose} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"14px",background:"#1a1a1a",color:"var(--txt-muted,#888)",border:"2px solid #333",borderRadius:6,cursor:"pointer"}}>← Retour</button>
         <button className="btn-press" disabled={!label.trim()} onClick={()=>{ if(label.trim()){ onCreate({label:label.trim(),emoji,diff,...(scopeOptions?{scope,timeOfDay}:{})}); } }}
           style={{flex:2,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",padding:"14px",background:label.trim()?acc:"#333",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:6,cursor:"pointer",opacity:label.trim()?1:0.5,boxShadow:"2px 2px 0 #0d0d0d"}}>
           ✅ {confirmLabel}

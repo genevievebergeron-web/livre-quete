@@ -121,7 +121,7 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
           {[0,1,2,3].map(i=><div key={i} style={{width:20,height:20,borderRadius:"50%",border:`3px solid ${T.accent}`,background:i<buf.length?T.accent:"transparent",boxShadow:i<buf.length?`0 0 10px ${T.accent}`:"none",transition:"all 0.15s"}}/>)}
         </div>
         {err && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D97070",marginBottom:4,animation:"shake 0.4s ease"}}>❌ Code incorrect!</div>}
-        {failCount>=2&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",marginBottom:6,textAlign:"center"}}>{FUNNY_PIN_MSGS[Math.min(failCount-2,FUNNY_PIN_MSGS.length-1)]}</div>}
+        {failCount>=2&&<div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)",marginBottom:6,textAlign:"center"}}>{FUNNY_PIN_MSGS[Math.min(failCount-2,FUNNY_PIN_MSGS.length-1)]}</div>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
           {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
             <button key={k} className="btn-press" onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
@@ -141,7 +141,7 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"10px 0",width:"100%",maxWidth:200,display:"block",margin:"0 auto 10px",background:buf.length===4?T.accent:"#222",color:buf.length===4?"#0d0d0d":"#444",border:`3px solid ${buf.length===4?T.accent:"#333"}`,cursor:buf.length===4?"pointer":"not-allowed",borderRadius:4,boxShadow:buf.length===4?`0 0 12px ${T.accent}80`:"none",transition:"all 0.15s"}}>
           ✅ VALIDER
         </button>
-        <button onClick={onCancel} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"#888",border:"2px solid #555",cursor:"pointer",borderRadius:2}}>Annuler</button>
+        <button onClick={onCancel} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:"#333",color:"var(--txt-muted,#888)",border:"2px solid #555",cursor:"pointer",borderRadius:2}}>Annuler</button>
       </div>
     </div>
   );
@@ -170,7 +170,7 @@ export function RewardPopup({ task, player, newBadges, onClose, th, humor }) {
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(12px,2vw,20px)",color:"#D9BC5C"}}>+{task.coins} 🪙</div>
         </div>
         {player && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:player.color,marginBottom:14}}>Bravo {displayName(player)}! 🎉</div>}
-        {funnyMsg && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#888",fontStyle:"italic",marginBottom:14,maxWidth:340,marginLeft:"auto",marginRight:"auto",lineHeight:1.35}}>{funnyMsg}</div>}
+        {funnyMsg && <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)",fontStyle:"italic",marginBottom:14,maxWidth:340,marginLeft:"auto",marginRight:"auto",lineHeight:1.35}}>{funnyMsg}</div>}
         {newBadges&&newBadges.length>0&&(
           <div style={{background:"rgba(0,0,0,0.4)",borderRadius:6,padding:"10px 14px",marginBottom:14}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:8}}>🏅 BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""}!</div>
