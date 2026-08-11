@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.51", date:"2026-08-11", features:[
+    "⚡ L'app se rouvre plus vite après une mise à jour. Avant, chaque nouvelle version te faisait tout retélécharger; maintenant la grosse pièce commune reste gardée sur ton appareil. Rien ne change à ce que tu vois.",
+  ]},
   { version:"2.16.50", date:"2026-08-10", features:[
     "🌗 « Contraste fort » va maintenant jusqu'au bout : les noms des onglets que tu n'as pas choisis (la barre du bas, les onglets de la Boutique…) s'éclaircissent eux aussi. Avant, ils restaient gris pâle pendant que le reste du texte devenait plus lisible.",
   ]},
