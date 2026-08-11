@@ -176,7 +176,7 @@ function MiniGameRunner({ pt, level, onFinish }) {
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>🏃</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>RUNNER!{"\n"}Saute les obstacles, ramasse les pièces!{"\n"}ESPACE ou TAP pour sauter</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-pale,#aaa)",textAlign:"center",lineHeight:2.2}}>RUNNER!{"\n"}Saute les obstacles, ramasse les pièces!{"\n"}ESPACE ou TAP pour sauter</div>
         <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>COURIR! 🏃</button>
       </>)}
 
@@ -415,7 +415,7 @@ function MiniGamePacman({ pt, level, onFinish }) {
       {phase === "intro" && (<>
         <div style={{fontSize:36}}>👻</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:pt.accent,textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>PAC-QUEST!{"\n"}Mange les pellets, évite le fantôme!{"\n"}Flèches ou WASD</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-pale,#aaa)",textAlign:"center",lineHeight:2.2}}>PAC-QUEST!{"\n"}Mange les pellets, évite le fantôme!{"\n"}Flèches ou WASD</div>
         <button onClick={startGame} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 👾</button>
       </>)}
 
@@ -504,7 +504,7 @@ function MiniGameWhack({ pt, level, onFinish }) {
       {phase === "intro" && (<>
         <div style={{fontSize:40}}>{TARGET}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent,textAlign:"center",textShadow:`0 0 12px ${pt.accent}`}}>NIVEAU {level}!</div>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#aaa",textAlign:"center",lineHeight:2.2}}>Mini-jeu!{"\n"}Tape les {TARGET} le plus vite possible!</div>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-pale,#aaa)",textAlign:"center",lineHeight:2.2}}>Mini-jeu!{"\n"}Tape les {TARGET} le plus vite possible!</div>
         <button onClick={start} style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"12px 24px",background:pt.primary,color:"#0d0d0d",border:"none",borderRadius:6,cursor:"pointer",marginTop:8,boxShadow:`0 0 16px ${pt.primary}80`}}>JOUER! 🎮</button>
       </>)}
 
@@ -614,7 +614,7 @@ export function MiniGame({ player, playerThemeId, level, onFinish, forcedType, i
   if (phase === "countdown") {
     return (
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:3000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",gap:12,padding:16,overflowY:"auto",boxSizing:"border-box"}}>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"#aaa"}}>{INFO.icon} {INFO.name}</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:20,color:"var(--txt-pale,#aaa)"}}>{INFO.icon} {INFO.name}</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:count>0?"clamp(44px,12vw,90px)":"clamp(30px,9vw,64px)",color:count>0?"#fff":"#5CAD68",textShadow:`0 0 30px ${pt.glow}`,animation:"bounceIn 0.3s ease"}}>
           {count>0 ? count : "GO!"}
         </div>

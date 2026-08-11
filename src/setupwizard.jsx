@@ -137,7 +137,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
   // Styles
   const card = { background:T.card, border:`2px solid ${T.accent}40`, borderRadius:8, padding:"16px 18px" };
   const Btn = ({active,children,onClick,style={},...p}) => (
-    <button className="btn-press" onClick={()=>{SFX.click();onClick?.();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",padding:"8px 14px",background:active?T.accent:"#222",color:active?"#0d0d0d":"#888",border:`2px solid ${active?T.accent:"#444"}`,borderRadius:3,cursor:"pointer",boxShadow:active?`3px 3px 0 #0d0d0d,0 0 10px ${T.accent}50`:"2px 2px 0 #0d0d0d",transition:"all 0.1s",...style}} {...p}>{children}</button>
+    <button className="btn-press" onClick={()=>{SFX.click();onClick?.();}} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,0.9vw,9px)",padding:"8px 14px",background:active?T.accent:"#222",color:active?"#0d0d0d":"var(--txt-muted,#888)",border:`2px solid ${active?T.accent:"#444"}`,borderRadius:3,cursor:"pointer",boxShadow:active?`3px 3px 0 #0d0d0d,0 0 10px ${T.accent}50`:"2px 2px 0 #0d0d0d",transition:"all 0.1s",...style}} {...p}>{children}</button>
   );
 
   const canProceed = () => {
@@ -202,7 +202,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
               <div key={k} onClick={()=>{setMode(k);SFX.click();}} style={{border:`3px solid ${mode===k?T.accent:"#444"}`,borderRadius:6,padding:16,cursor:"pointer",background:mode===k?`${T.accent}15`:"rgba(0,0,0,0.4)",boxShadow:mode===k?`0 0 16px ${T.accent}50`:"none",transition:"all 0.15s"}}>
                 <div style={{fontSize:34,marginBottom:8}}>{icon}</div>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,11px)",color:mode===k?T.accent:"#ccc",marginBottom:8}}>{title}</div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa",lineHeight:1.4}}>{desc}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)",lineHeight:1.4}}>{desc}</div>
               </div>
             ))}
           </div>
@@ -217,7 +217,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
           {mode==="week" && (
             <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(0,0,0,0.15)",border:`2px solid ${T.accent}44`,borderRadius:6,padding:12}}>
               <div style={{fontSize:20}}>💾</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Progression sauvegardée automatiquement — les badges ne sont jamais perdus!</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)"}}>Progression sauvegardée automatiquement — les badges ne sont jamais perdus!</div>
             </div>
           )}
         </>}
@@ -226,7 +226,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
         {step===1 && <>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,13px)",color:T.accent}}>👥 Joueurs</div>
-            {players.length < 6 && <Btn active={false} onClick={()=>{ setPlayers(p=>[...p,{id:uid(),name:"",pseudo:"",color:COLORS[p.length]||"#888",themeId:"none",starterThemes:pickStarterThemes()}]); }}>➕ Ajouter</Btn>}
+            {players.length < 6 && <Btn active={false} onClick={()=>{ setPlayers(p=>[...p,{id:uid(),name:"",pseudo:"",color:COLORS[p.length]||"var(--txt-muted,#888)",themeId:"none",starterThemes:pickStarterThemes()}]); }}>➕ Ajouter</Btn>}
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {players.map((pl,i)=>{
@@ -257,7 +257,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                           title={!unlocked?`🔒 Déblocable à ${pt.xpUnlock} XP`:""}
                           style={{display:"flex",alignItems:"center",gap:5,padding:"5px 9px",background:sel?`${pt.accent}22`:unlocked?"rgba(0,0,0,0.4)":"rgba(0,0,0,0.2)",border:`2px solid ${sel?pt.accent:unlocked?"#333":"#222"}`,borderRadius:4,cursor:unlocked?"pointer":"not-allowed",boxShadow:sel?`0 0 10px ${pt.glow}50`:"none",opacity:unlocked?1:0.4,transition:"all 0.15s"}}>
                           <span style={{fontSize:16}}>{unlocked?pt.icon:"🔒"}</span>
-                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:sel?pt.accent:unlocked?"#666":"#444"}}>{pt.name}{!unlocked?` (${pt.xpUnlock}xp)`:""}</span>
+                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:sel?pt.accent:unlocked?"var(--txt-dim,#666)":"#444"}}>{pt.name}{!unlocked?` (${pt.xpUnlock}xp)`:""}</span>
                         </div>;
                       })}
                     </div>
@@ -322,7 +322,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                           const sel=ass.playerIds.includes(pl.id);
                           return <div key={pl.id} onClick={()=>toggleAssignmentPlayer(ass.instanceId,pl.id)}
                             style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"4px 8px",
-                              background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",
+                              background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"var(--txt-faint,#555)",
                               border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer",
                               boxShadow:sel?`0 0 8px ${pl.color}60`:"none",transition:"all 0.12s",
                               display:"flex",alignItems:"center",gap:4}}>
@@ -342,7 +342,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
                         {DAYS_SHORT.map((d,i)=>(
                           <div key={i} onClick={()=>toggleAssignmentDay(ass.instanceId,i)}
-                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"2px 5px",background:ass.days.includes(i)?T.accent:"#222",color:ass.days.includes(i)?"#0d0d0d":"#555",border:`1px solid ${ass.days.includes(i)?T.accent:"#444"}`,borderRadius:2,cursor:"pointer"}}>
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"2px 5px",background:ass.days.includes(i)?T.accent:"#222",color:ass.days.includes(i)?"#0d0d0d":"var(--txt-faint,#555)",border:`1px solid ${ass.days.includes(i)?T.accent:"#444"}`,borderRadius:2,cursor:"pointer"}}>
                             {d}
                           </div>
                         ))}
@@ -371,7 +371,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                   style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:sel?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.3)",border:`2px solid ${sel?T.accent:"#444"}`,borderRadius:5,cursor:"pointer",boxShadow:sel?`0 0 8px ${T.accent}40`:"none",transition:"all 0.15s"}}>
                   <span style={{fontSize:26}}>{r.emoji}</span>
                   <div style={{flex:1}}>
-                    <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:sel?"#fff":"#aaa"}}>{r.label}</div>
+                    <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:sel?"#fff":"var(--txt-pale,#aaa)"}}>{r.label}</div>
                     <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙 {r.coins} pièces</div>
                   </div>
                   <div style={{width:22,height:22,borderRadius:3,border:`3px solid ${sel?T.accent:"#555"}`,background:sel?T.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"safe center",color:"#0d0d0d",fontSize:14,fontWeight:"bold"}}>{sel?"✓":""}</div>
@@ -385,7 +385,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
         {/* ── STEP 4: PIN ── */}
         {step===4 && <>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.3vw,12px)",color:T.accent,marginBottom:14}}>🔐 Code secret parent</div>
-          <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",marginBottom:14}}>Demandé à chaque validation. Les enfants ne le voient pas!</div>
+          <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"var(--txt-pale,#aaa)",marginBottom:14}}>Demandé à chaque validation. Les enfants ne le voient pas!</div>
           <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="4 chiffres"
             style={{width:"100%",background:"#111",border:`3px solid ${T.accent}`,color:"#fff",padding:"14px",fontFamily:"'Press Start 2P',monospace",fontSize:20,borderRadius:4,textAlign:"center",letterSpacing:10}}/>
           <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginTop:8}}>Code choisi : {pin||"—"}</div>

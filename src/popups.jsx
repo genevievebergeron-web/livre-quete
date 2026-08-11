@@ -125,7 +125,7 @@ export function PinPad({ pin, label, onSuccess, onCancel, th }) {
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:200,margin:"0 auto 14px"}}>
           {["1","2","3","4","5","6","7","8","9","⌫","0","✕"].map(k=>(
             <button key={k} className="btn-press" onClick={()=>press(k==="⌫"||k==="✕"?"del":k)}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"#888":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #0d0d0d"}}>
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:k==="⌫"||k==="✕"?9:14,padding:11,background:"#222",border:"3px solid #555",color:k==="⌫"||k==="✕"?"var(--txt-muted,#888)":"#fff",cursor:"pointer",borderRadius:4,boxShadow:"3px 3px 0 #0d0d0d"}}>
               {k}
             </button>
           ))}

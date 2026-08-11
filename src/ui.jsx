@@ -46,7 +46,7 @@ export function TaskCheck({ text }) {
   const [done, setDone] = useState(false);
   return (
     <div onClick={()=>setDone(!done)} style={{cursor:"pointer",padding:"4px 0",display:"flex",gap:8,alignItems:"flex-start",
-      color:done?"#555":"#ddd",textDecoration:done?"line-through":"none",fontSize:14,lineHeight:1.4}}>
+      color:done?"var(--txt-faint,#555)":"#ddd",textDecoration:done?"line-through":"none",fontSize:14,lineHeight:1.4}}>
       <span style={{flexShrink:0,fontSize:16}}>{done?"✅":"⬜"}</span>
       <span>{text}</span>
     </div>

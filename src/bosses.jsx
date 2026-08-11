@@ -98,7 +98,7 @@ export const Platformer = ({ player, onClose }) => {
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.5vw,14px)",color:pt.accent,textShadow:`0 0 16px ${pt.glow}`}}>
         {pt.icon} LEVEL UP — Mini-Niveau! {pt.icon}
       </div>
-      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#aaa"}}>Flèches / Espace — Ramasse les {pt.coinName}s!</div>
+      <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-pale,#aaa)"}}>Flèches / Espace — Ramasse les {pt.coinName}s!</div>
       <canvas ref={canvasRef} style={{border:`4px solid ${pt.accent}`,borderRadius:4,maxWidth:"100%",boxShadow:`0 0 30px ${pt.glow}`}}/>
       <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:pt.accent}}>
         {pt.platformItems[0]} ×{collected} ramassés!

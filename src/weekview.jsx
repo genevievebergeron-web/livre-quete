@@ -12,7 +12,7 @@ export function WeekView({ config, gameState, onCompleteTask, th, todayDayIdx })
         {/* Header */}
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-faint,#555)",display:"flex",alignItems:"center",justifyContent:"safe center"}}>TÂCHE</div>
         {DAYS_SHORT.map((d,i)=>(
-          <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"#888",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
+          <div key={i} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:i===todayDayIdx?th.accent:"var(--txt-muted,#888)",padding:"6px 4px",textAlign:"center",background:i===todayDayIdx?`${th.accent}20`:"transparent",borderRadius:3,border:i===todayDayIdx?`2px solid ${th.accent}60`:"none"}}>
             {d}{i===todayDayIdx&&<div style={{fontSize:5,color:th.accent,marginTop:2}}>▲</div>}
           </div>
         ))}

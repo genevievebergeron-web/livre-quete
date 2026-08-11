@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.50", date:"2026-08-10", features:[
+    "🌗 « Contraste fort » va maintenant jusqu'au bout : les noms des onglets que tu n'as pas choisis (la barre du bas, les onglets de la Boutique…) s'éclaircissent eux aussi. Avant, ils restaient gris pâle pendant que le reste du texte devenait plus lisible.",
+  ]},
   { version:"2.16.49", date:"2026-08-10", features:[
     "🌗 Nouveau réglage « Contraste fort » dans ⚙️ Mes réglages : éclaircit les petits textes gris et les cadres, si tu les trouves difficiles à lire. C'est éteint au départ, et ça ne change aucune couleur importante (l'or des prix, le rouge, le vert restent pareils).",
   ]},

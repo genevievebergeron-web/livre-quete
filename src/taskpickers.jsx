@@ -92,7 +92,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {DIFFS.map(([k,l,sub])=>(
           <button key={k} onClick={()=>{SFX.click();setDiff(k);}}
-            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 4px",lineHeight:1.5,background:diff===k?acc:"#1a1a1a",color:diff===k?"#0d0d0d":"#999",border:`2px solid ${diff===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+            style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 4px",lineHeight:1.5,background:diff===k?acc:"#1a1a1a",color:diff===k?"#0d0d0d":"var(--txt-mild,#999)",border:`2px solid ${diff===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
             {l}<br/><span style={{fontFamily:"'VT323',monospace",fontSize:11}}>{sub}</span>
           </button>
         ))}
@@ -104,7 +104,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
         <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
           {TIMES_OF_DAY.map(([k,l])=>(
             <button key={k||"any"} onClick={()=>{SFX.click();setTimeOfDay(k);}}
-              style={{flex:"1 1 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 6px",background:timeOfDay===k?acc:"#1a1a1a",color:timeOfDay===k?"#0d0d0d":"#999",border:`2px solid ${timeOfDay===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
+              style={{flex:"1 1 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"9px 6px",background:timeOfDay===k?acc:"#1a1a1a",color:timeOfDay===k?"#0d0d0d":"var(--txt-mild,#999)",border:`2px solid ${timeOfDay===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>
               {l}
             </button>
           ))}
@@ -113,7 +113,7 @@ export function CustomTaskModal({ title="Nouvelle quête", confirmLabel="Créer"
         <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
           {SCOPES.map(([k,l,sub])=>(
             <button key={k} onClick={()=>{SFX.click();setScope(k);}}
-              style={{display:"flex",flexDirection:"column",alignItems:"flex-start",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 11px",background:scope===k?acc:"#1a1a1a",color:scope===k?"#0d0d0d":"#999",border:`2px solid ${scope===k?acc:"#333"}`,borderRadius:5,cursor:"pointer",textAlign:"left"}}>
+              style={{display:"flex",flexDirection:"column",alignItems:"flex-start",fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 11px",background:scope===k?acc:"#1a1a1a",color:scope===k?"#0d0d0d":"var(--txt-mild,#999)",border:`2px solid ${scope===k?acc:"#333"}`,borderRadius:5,cursor:"pointer",textAlign:"left"}}>
               {l}<span style={{fontFamily:"'VT323',monospace",fontSize:12,marginTop:3,fontWeight:"normal"}}>{sub}</span>
             </button>
           ))}

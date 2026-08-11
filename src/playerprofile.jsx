@@ -112,7 +112,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
           <span style={{fontSize:28}}>{myLeague.emoji}</span>
           <div style={{flex:1}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:myLeague.color}}>Ligue {myLeague.name}</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#999"}}>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-mild,#999)"}}>
               {nextLeague
                 ? `${activeThisWeek}/7 jours actifs cette semaine — encore ${Math.max(0,nextLeague.minActiveDays-activeThisWeek)} pour ${nextLeague.name} ${nextLeague.emoji}`
                 : `${activeThisWeek}/7 jours actifs — palier le plus haut atteint !`}
@@ -151,8 +151,8 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:6}}>🏆 CLASSEMENT FAMILLE</div>
             {siblings.map((s,rank)=>(
               <div key={s.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#D9BC5C":"#666",width:14}}>#{rank+1}</span>
-                <span style={{fontFamily:"'VT323',monospace",fontSize:16,color:s.isMe?s.color:"#aaa",flex:1,minWidth:50}}>{s.name}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:rank===0?"#D9BC5C":"var(--txt-dim,#666)",width:14}}>#{rank+1}</span>
+                <span style={{fontFamily:"'VT323',monospace",fontSize:16,color:s.isMe?s.color:"var(--txt-pale,#aaa)",flex:1,minWidth:50}}>{s.name}</span>
                 <div style={{flex:2,height:8,background:"#111",border:"1px solid #333",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${Math.round(s.xp/maxXp*100)}%`,background:s.isMe?s.color:"#444",transition:"width 0.8s ease"}}/>
                 </div>
@@ -165,7 +165,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
         {canTrade && (
           <div style={{background:"rgba(255,215,0,0.07)",border:"2px solid #D9BC5C55",borderRadius:8,padding:"10px 12px",marginBottom:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginBottom:6}}>🎁 DONNER DES PIÈCES</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>Tu as {myCoins} 🪙. Choisis combien donner à {displayName(player)} :</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-pale,#aaa)",marginBottom:8}}>Tu as {myCoins} 🪙. Choisis combien donner à {displayName(player)} :</div>
             <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
               {[5,10,25].map(v=>(
                 <button key={v} disabled={v>myCoins} onClick={()=>setGiveAmt(v)}
@@ -180,7 +180,7 @@ export function PlayerProfile({ player, pState, config, gameStates, th, onClose,
             {/* 📨 Demander des pièces (offre que le frère doit accepter) */}
             <div style={{borderTop:"1px solid #D9BC5C33",marginTop:10,paddingTop:8}}>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#85CDD1",marginBottom:6}}>📨 DEMANDER DES PIÈCES</div>
-              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:8}}>{displayName(player)} a {gs.coins||0} 🪙. Demande-lui un montant — il devra accepter.</div>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-pale,#aaa)",marginBottom:8}}>{displayName(player)} a {gs.coins||0} 🪙. Demande-lui un montant — il devra accepter.</div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                 {[5,10,25].map(v=>(
                   <button key={v} onClick={()=>setReqAmt(v)}

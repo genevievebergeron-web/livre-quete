@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.49";
+export const APP_VERSION = "2.16.50";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -376,7 +376,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       <div style={{minHeight:"60vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"safe center",padding:24,textAlign:"center"}}>
         <div style={{fontSize:56,marginBottom:14}}>🛌</div>
         <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(11px,1.8vw,15px)",color:th.accent,marginBottom:10}}>C'EST L'HEURE DE LA PAUSE!</div>
-        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"#aaa",maxWidth:320,lineHeight:1.4,marginBottom:22}}>Tu as atteint ton temps de jeu pour aujourd'hui. Demande à un parent si tu veux continuer un peu.</div>
+        <div style={{fontFamily:"'VT323',monospace",fontSize:18,color:"var(--txt-pale,#aaa)",maxWidth:320,lineHeight:1.4,marginBottom:22}}>Tu as atteint ton temps de jeu pour aujourd'hui. Demande à un parent si tu veux continuer un peu.</div>
         <button className="btn-press" onClick={()=>{SFX.click();setTimeUnlockOpen(true);}}
           style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,padding:"12px 22px",background:th.accent,color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:8,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d"}}>
           🔓 Déverrouiller
@@ -489,9 +489,9 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               letterSpacing:0.3,textAlign:"center",lineHeight:1.3,fontFamily:"'Press Start 2P',monospace"}}>{a.title}</div>}
             <div style={{fontSize:15,lineHeight:1.5,fontFamily:"'VT323',monospace",color:"#eee"}}>{a.emoji} {a.text}</div>
             {a.countdownTo && <AnnouncementCountdown target={a.countdownTo} label={a.countdownLabel} doneText={a.countdownDoneText}/>}
-            {(a.sharedTasks||[]).length>0 && <><div style={{marginTop:12,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>{a.sharedTasksLabel || (a.countdownTo ? "AVANT 10H30 :" : "À FAIRE :")}</div>
+            {(a.sharedTasks||[]).length>0 && <><div style={{marginTop:12,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"var(--txt-pale,#aaa)",letterSpacing:0.5}}>{a.sharedTasksLabel || (a.countdownTo ? "AVANT 10H30 :" : "À FAIRE :")}</div>
               {(a.sharedTasks||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
-            {((a.playerTasks||{})[player.id]||[]).length>0 && <><div style={{marginTop:10,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#aaa",letterSpacing:0.5}}>{a.playerTasksLabel || "TES MISSIONS (dans la journée) :"}</div>
+            {((a.playerTasks||{})[player.id]||[]).length>0 && <><div style={{marginTop:10,fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"var(--txt-pale,#aaa)",letterSpacing:0.5}}>{a.playerTasksLabel || "TES MISSIONS (dans la journée) :"}</div>
               {((a.playerTasks||{})[player.id]||[]).map((t,i)=><TaskCheck key={i} text={t}/>)}</>}
             <button onClick={()=>{if(SFX.click)SFX.click();onDismissAnnouncement&&onDismissAnnouncement(a.id);}}
               style={{marginTop:12,padding:"8px 16px",borderRadius:8,fontFamily:"'Press Start 2P',monospace",
@@ -516,7 +516,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(10px,1.4vw,14px)",color:player.color,marginBottom:3}}>{displayName(player)}</div>
           {isRandomUnrevealed
             ? <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#D9BC5C",marginBottom:5}}>❓ THÈME MYSTÈRE</div>
-            : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"#aaa",marginBottom:5,textShadow:`0 0 8px ${pt.glow}60`}}>Niv.{lvTitle.level} — {lvTitle.title}</div>
+            : <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:pt.accent||"var(--txt-pale,#aaa)",marginBottom:5,textShadow:`0 0 8px ${pt.glow}60`}}>Niv.{lvTitle.level} — {lvTitle.title}</div>
           }
           {isRandomUnrevealed && <button className="btn-press" onClick={()=>{setThemeRevealed(true);SFX.epic();spawnParticles("🎲");}}
             style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 12px",background:"linear-gradient(90deg,#D97070,#D9BC5C,#44FF44)",color:"#0d0d0d",border:"3px solid #0d0d0d",borderRadius:3,cursor:"pointer",boxShadow:"3px 3px 0 #0d0d0d",marginBottom:4}}>
@@ -571,7 +571,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:10}}>
             {/* Série */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#D99248":"#666"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:streak>0?"#D99248":"var(--txt-dim,#666)"}}>🔥 Série : {streak} jour{streak>1?"s":""}</div>
               <div style={{fontFamily:"'VT323',monospace",fontSize:12,color:"var(--txt-soft,#777)"}}>{streak>0?"Fais une quête chaque jour!":"Fais une quête pour démarrer ta série!"}</div>
             </div>
             {/* Backlog #13 — budget-temps quotidien : discret, visible seulement si un parent l'a configuré */}
@@ -582,7 +582,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>⏳ Temps aujourd'hui</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:pctT>=100?"#D97070":"#888"}}>{used}/{limit} min</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:pctT>=100?"#D97070":"var(--txt-muted,#888)"}}>{used}/{limit} min</span>
                   </div>
                   <div style={{height:6,background:"#111",border:"1px solid #333",borderRadius:3,overflow:"hidden"}}>
                     <div style={{height:"100%",width:pctT+"%",background:pctT>=100?"#D97070":"#85CDD1",transition:"width 0.6s"}}/>
@@ -624,14 +624,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={(e)=>{e.stopPropagation();onFeedPet&&onFeedPet();}} disabled={fedToday}
-                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#5CAD68",color:fedToday?"#555":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:fedToday?"#1a1a1a":"#5CAD68",color:fedToday?"var(--txt-faint,#555)":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:fedToday?"default":"pointer",opacity:fedToday?0.6:1}}>🍖 Nourrir</button>
                   <button onClick={(e)=>{e.stopPropagation();if(capReached)return;onPlayPet&&onPlayPet();}} disabled={napping||capReached}
-                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:(napping||capReached)?"#1a1a1a":acc,color:(napping||capReached)?"#777":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:(napping||capReached)?"default":"pointer",opacity:(napping||capReached)?0.6:1}}>{capReached?"🌙 Demain":napping?"💤 Sieste":"🎾 Jouer"}</button>
+                    style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"10px",background:(napping||capReached)?"#1a1a1a":acc,color:(napping||capReached)?"var(--txt-soft,#777)":"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:5,cursor:(napping||capReached)?"default":"pointer",opacity:(napping||capReached)?0.6:1}}>{capReached?"🌙 Demain":napping?"💤 Sieste":"🎾 Jouer"}</button>
                 </div>
               </>); })() : (
                 <div onClick={openAvatar} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
                   <div style={{fontSize:40,opacity:0.5}}>🐾</div>
-                  <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒, nourris-le chaque jour et il évoluera avec tes quêtes!</div>
+                  <div style={{flex:1,fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)"}}>Pas de familier équipé. Achètes-en un à la boutique 🛒, nourris-le chaque jour et il évoluera avec tes quêtes!</div>
                 </div>
               )}
           </div>
@@ -671,14 +671,14 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           {/* Mon profil — l'enfant change SON pseudo et SON code secret */}
           <div style={{background:"rgba(0,0,0,0.5)",border:`2px solid ${pt.accent||player.color}`,borderRadius:6,padding:12,marginBottom:12}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:pt.accent||player.color,marginBottom:8}}>🙂 Mon profil</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:3}}>Mon pseudo</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-pale,#aaa)",marginBottom:3}}>Mon pseudo</div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
               <input value={pseudoDraft} onChange={e=>setPseudoDraft(e.target.value.slice(0,16))} placeholder={player.pseudo||player.name||"Mon pseudo"}
                 style={{flex:1,fontFamily:"'VT323',monospace",fontSize:16,padding:"8px 10px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none"}}/>
               <button onClick={()=>{ if(pseudoDraft.trim()){ SFX.click(); onUpdatePseudo&&onUpdatePseudo(pseudoDraft.trim()); setProfileMsg("✅ Pseudo changé!"); setPseudoDraft(""); } }}
                 style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"0 14px",background:pseudoDraft.trim()?(pt.accent||player.color):"#333",color:"#0d0d0d",border:"2px solid #0d0d0d",borderRadius:4,cursor:"pointer",opacity:pseudoDraft.trim()?1:0.5}}>✅</button>
             </div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",marginBottom:3}}>Mon code secret (4 chiffres)</div>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-pale,#aaa)",marginBottom:3}}>Mon code secret (4 chiffres)</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               <input type="password" inputMode="numeric" maxLength={4} value={pinDraft} onChange={e=>setPinDraft(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="Nouveau"
                 style={{width:92,fontFamily:"'Press Start 2P',monospace",fontSize:13,padding:"9px 6px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:4,outline:"none",textAlign:"center",letterSpacing:3}}/>
@@ -715,10 +715,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <div key={key} onClick={()=>{SFX.click();setSetting(key, !isOn);}}
                 style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",background:"rgba(0,0,0,0.5)",border:`2px solid ${isOn?(pt.accent||"#5CAD68"):"#333"}`,borderRadius:6,marginBottom:8,cursor:"pointer"}}>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isOn?(pt.accent||"#fff"):"#999"}}>{label}</div>
+                  <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,9px)",color:isOn?(pt.accent||"#fff"):"var(--txt-mild,#999)"}}>{label}</div>
                   <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)"}}>{desc}</div>
                 </div>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#5CAD68"):"#333",color:isOn?"#0d0d0d":"#888",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"6px 10px",borderRadius:20,background:isOn?(pt.accent||"#5CAD68"):"#333",color:isOn?"#0d0d0d":"var(--txt-muted,#888)",minWidth:54,textAlign:"center"}}>{isOn?"ON":"OFF"}</div>
               </div>
             );
           })}
@@ -772,8 +772,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                       border:`3px solid ${current?t.accent:isWeeklyFree?"#D9BC5C":unlocked?"#555":"#2a2a2a"}`,borderRadius:8,
                       cursor:selectable?"pointer":"default",opacity:unlocked?1:0.5,boxShadow:current?`0 0 14px ${t.glow||t.accent}50`:"none"}}>
                     <span style={{fontSize:30,filter:unlocked?"none":"grayscale(1)"}}>{t.icon}</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:current?t.accent:unlocked?"#ddd":"#666",textAlign:"center",lineHeight:1.3}}>{t.name}</span>
-                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#5CAD68":unlocked?(t.accent||"#D9BC5C"):"#777"}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",color:current?t.accent:unlocked?"#ddd":"var(--txt-dim,#666)",textAlign:"center",lineHeight:1.3}}>{t.name}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:current?"#5CAD68":unlocked?(t.accent||"#D9BC5C"):"var(--txt-soft,#777)"}}>
                       {current?"✅ ACTUEL":isWeeklyFree&&unlocked?"🎲 Gratuit!":unlocked?"Choisir":`🔒 ${t.xpUnlock} XP`}
                     </span>
                   </button>
@@ -814,7 +814,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         return (
           <div style={{background:"rgba(0,0,0,0.5)",border:"2px solid #85CDD1",borderRadius:6,padding:"10px 13px",marginBottom:4,textAlign:"center"}}>
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,8px)",color:"#85CDD1",marginBottom:5}}>📍 SEMAINE CHEZ L'AUTRE PARENT</div>
-            <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#aaa",lineHeight:1.3}}>
+            <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"var(--txt-pale,#aaa)",lineHeight:1.3}}>
               Tes quêtes de la maison reprennent vendredi!{daysUntilFri===1?" (demain)":` (dans ${daysUntilFri} jours)`}
             </div>
           </div>
@@ -830,7 +830,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           <button onClick={onClick}
             style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(7px,1vw,10px)",padding:"12px 8px",
               display:"flex",flexDirection:"column",alignItems:"center",gap:4,lineHeight:1.3,
-              background:active?acc:"rgba(0,0,0,0.4)",color:active?"#0d0d0d":"#aaa",
+              background:active?acc:"rgba(0,0,0,0.4)",color:active?"#0d0d0d":"var(--txt-pale,#aaa)",
               border:`3px solid ${active?acc:"#333"}`,borderRadius:8,cursor:"pointer",
               boxShadow:active?`0 0 14px ${acc}55`:"none",transition:"all 0.15s"}}>
             <span>{label}</span>
@@ -951,7 +951,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           {[["today","✅ Aujourd'hui"],["week","📅 Cette semaine"]].map(([v,l])=>{
             const active = jourView===v;
             return <button key={v} onClick={()=>{ SFX.click&&SFX.click(); setJourView(v); }}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"#777",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"var(--txt-soft,#777)",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
           })}
         </div>
       )}
@@ -985,10 +985,10 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {myAssignments.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-faint,#555)",textAlign:"center",padding:16,lineHeight:1.4}}>
         {pMode==="week"
           ? (weekMine.length ? "Rien de prévu aujourd'hui! 🎉"
-             : routineMine.length ? <>Pas de tâches planifiées, mais tu as des <b style={{color:"#aaa"}}>rituels ⏰</b> — touche « Rituels » ci-dessus!</>
+             : routineMine.length ? <>Pas de tâches planifiées, mais tu as des <b style={{color:"var(--txt-pale,#aaa)"}}>rituels ⏰</b> — touche « Rituels » ci-dessus!</>
              : "Aucune quête de semaine pour l'instant. Demande à un parent d'en ajouter (type 📅 Semaine).")
           : (activeRoutine ? "Ce rituel est vide. Modifie-le ou crée-en un nouveau."
-             : weekMine.length ? <>Pas de rituels, mais tu as des <b style={{color:"#aaa"}}>tâches planifiées 📋</b> — touche « Mes tâches » ci-dessus!</>
+             : weekMine.length ? <>Pas de rituels, mais tu as des <b style={{color:"var(--txt-pale,#aaa)"}}>tâches planifiées 📋</b> — touche « Mes tâches » ci-dessus!</>
              : "Aucune quête de routine pour l'instant. Demande à un parent d'en ajouter (type ⏰ Rituel).")}
       </div>}
       {(()=>{ const _dk=a=>a.instanceId+"_"+player.id+"#"+todayStamp(); const undone=myAssignments.filter(a=>!pState.completed?.includes(_dk(a)));
@@ -997,7 +997,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         // rouge, contrairement au décompte) quand il reste peu de tâches — les transitions sont
         // difficiles pour TSA/TDAH, un signal clair "tu y es presque" aide à anticiper la fin.
         if(!settings.focus && myAssignments.length>=3 && undone.length>0 && undone.length<=2){
-          return <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa",textAlign:"center",padding:"6px 4px"}}>
+          return <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)",textAlign:"center",padding:"6px 4px"}}>
             🌟 Encore {undone.length} tâche{undone.length>1?"s":""}, tu y es presque!
           </div>;
         }
@@ -1046,7 +1046,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               <span className="chip-cost"><Coin size={9}/>{task.coins}</span>
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff),border:`1px solid ${DIFF_COLOR(task.diff)}40`,padding:"1px 4px"}}>{task.diff.toUpperCase()}</span>
               {/* Backlog UX #12 — temps approximatif, dérivé du palier de difficulté (~8/18/25/30 min) */}
-              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#999",border:"1px solid #444",padding:"1px 4px"}}>⏱️~{estMinOf(task.diff)}min</span>
+              <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"var(--txt-mild,#999)",border:"1px solid #444",padding:"1px 4px"}}>⏱️~{estMinOf(task.diff)}min</span>
               {task.cat && (()=>{ const m=catMeta(task.cat); return <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:m.color,background:`${m.color}1A`,border:`1px solid ${m.color}55`,padding:"1px 4px"}}>{m.label}</span>; })()}
             </div>
             {!done&&!pending&&<div style={{display:"flex",gap:6}}>
@@ -1158,7 +1158,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     padding:"11px 12px",background:open?`${acc}22`:"rgba(0,0,0,0.45)",
                     color:allDone?"#5CAD68":"#fff",border:`2px solid ${open?acc:"#333"}`,borderRadius:8,cursor:"pointer"}}>
                   <span>{open?"▼":"▶"} {g.label}</span>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:allDone?"#5CAD68":"#888"}}>{allDone?"✅ ":""}{doneN}/{g.items.length}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:15,color:allDone?"#5CAD68":"var(--txt-muted,#888)"}}>{allDone?"✅ ":""}{doneN}/{g.items.length}</span>
                 </button>
                 {open && <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8,marginBottom:4}}>{g.items.map(renderCard)}</div>}
               </div>
@@ -1168,7 +1168,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         const _done=a=>pState.completed?.includes(a.instanceId+"_"+player.id+"#"+todayStamp());
         const undoneAll = myAssignments.filter(a=>!_done(a)); // v1.88.0 — nommé pour réutilisation (D'abord→Ensuite)
         const list = settings.focus ? undoneAll.slice(0,1) : undoneAll; // v1.60.0 — les quêtes validées quittent la liste → Archives
-        if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#5CAD68",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
+        if(list.length===0 && myAssignments.length>0) return <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(8px,1.1vw,10px)",color:"#5CAD68",textAlign:"center",padding:16,lineHeight:1.6}}>🎉 Tout est fait pour aujourd'hui!<br/><span style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)"}}>Tes quêtes finies sont rangées dans 🗄️ Archives (menu ☰).</span></div>;
         // v2.11.2 — « Ma journée » sectionnée Matin/Après-midi/Soir en mode Semaine (pas en mode
         // Rituel : les rituels ont déjà leurs propres noms temporels, ni en mode focus : 1 seule
         // carte, rien à sectionner). Réparation reste hors sections, toujours en tête (patron v2.6.0).
@@ -1183,7 +1183,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           ].filter(s=>s.items.length>0);
           const out=[...repairCards];
           sections.forEach(s=>{
-            out.push(<div key={"sec-"+s.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:th.accent||"#888",marginTop:10,marginBottom:2}}>{s.label}</div>);
+            out.push(<div key={"sec-"+s.key} style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.8vw,8px)",color:th.accent||"var(--txt-muted,#888)",marginTop:10,marginBottom:2}}>{s.label}</div>);
             out.push(...s.items.map(renderCard));
           });
           return out;
@@ -1196,7 +1196,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div key="first-then" style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"rgba(0,0,0,0.3)",border:"1px dashed #444",borderRadius:6,fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-soft,#777)",flexWrap:"wrap"}}>
               <span>👉 Ensuite:</span>
               {next && <UIIcon name={"task_"+next.id} emoji={next.emoji} size={16}/>}
-              <span style={{color:"#aaa"}}>{next?next.label:"?"}</span>
+              <span style={{color:"var(--txt-pale,#aaa)"}}>{next?next.label:"?"}</span>
             </div>
           );
         }
@@ -1227,7 +1227,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
         return (
           <div style={{marginTop:6}}>
             <button onClick={()=>{ if(SFX.click)SFX.click(); setDailyGoalsOpen(o=>!o); }}
-              style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"var(--txt-mild,#999)",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
               <span>{dailyGoalsOpen?"▼":"▶"} 🎯 Défi &amp; objectifs du jour</span>
               {readyToClaim>0 && <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#5CAD68"}}>🎁 {readyToClaim}</span>}
             </button>
@@ -1295,7 +1295,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
           {[["cols","🗓️ Colonnes"],["liste","📋 Liste"]].map(([v,l])=>{
             const active = (settings.weekCols!==false) === (v==="cols");
             return <button key={v} onClick={()=>{ SFX.click&&SFX.click(); onPatchState&&onPatchState({settings:{...settings, weekCols:v==="cols"}}); }}
-              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"#777",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
+              style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 7px",background:active?"#85CDD1":"#1a1a1a",color:active?"#0d0d0d":"var(--txt-soft,#777)",border:`1px solid ${active?"#85CDD1":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>;
           })}
         </div>
       </div>
@@ -1312,7 +1312,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             const MAXT=5;
             return (
               <div key={stamp} style={{flex:"0 0 auto",width:138,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${acc}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"#999",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?acc:"var(--txt-mild,#999)",marginBottom:2}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                 {isToday && <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#0d0d0d",background:acc,borderRadius:2,padding:"2px 4px",display:"inline-block",marginBottom:4}}>AUJOURD'HUI</div>}
                 {dayTasks.length===0 && (
                   <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-faint,#555)",marginTop:4}}>🌿 Libre</div>
@@ -1338,7 +1338,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       {settings.weekCols===false && pMode==="week" && laterWeek.length>0 && (
         <div style={{marginTop:6}}>
           <button onClick={()=>{ if(SFX.click)SFX.click(); setLaterOpen(o=>!o); }}
-            style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"#999",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
+            style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"left",fontFamily:"'Press Start 2P',monospace",fontSize:7,lineHeight:1.4,color:"var(--txt-mild,#999)",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:6,padding:"9px 11px",cursor:"pointer"}}>
             <span>{laterOpen?"▼":"▶"} 📅 Tâches planifiées</span>
             <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)"}}>{laterWeek.length}</span>
           </button>
@@ -1347,7 +1347,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               return (
                 <div key={ass.instanceId} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 9px",background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a2a",borderRadius:4}}>
                   <UIIcon name={"task_"+t.id} emoji={t.emoji} size={15}/>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#aaa",flex:1}}>{t.label}</span>
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-pale,#aaa)",flex:1}}>{t.label}</span>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#85CDD1"}}>{ass.days.map(d=>DAYS_SHORT[d]).join(" ")}</span>
                 </div>
               );
@@ -1466,7 +1466,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             fontSize:6/padding:4px 7px ne l'étaient pas assez). */}
         <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
           {Object.entries(SHOP_TABS).map(([k,l])=>{ const [em,txt]=splitEmojiLabel(l); return (
-            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{display:"inline-flex",alignItems:"center",gap:6,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 14px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"#aaa",border:`2px solid ${shopTab===k?"#D9BC5C":"#444"}`,borderRadius:20,cursor:"pointer",transition:"all 0.12s"}}>{em&&<UIIcon name={SHOP_TAB_ICONS[k]} emoji={em} size={18}/>}{txt}</button>
+            <button key={k} onClick={()=>{setShopTab(k);SFX.click();}} style={{display:"inline-flex",alignItems:"center",gap:6,fontFamily:"'Press Start 2P',monospace",fontSize:8,padding:"9px 14px",background:shopTab===k?"#D9BC5C":"#222",color:shopTab===k?"#0d0d0d":"var(--txt-pale,#aaa)",border:`2px solid ${shopTab===k?"#D9BC5C":"#444"}`,borderRadius:20,cursor:"pointer",transition:"all 0.12s"}}>{em&&<UIIcon name={SHOP_TAB_ICONS[k]} emoji={em} size={18}/>}{txt}</button>
           );})}
         </div>
         {shopTab==="rewards" && (
@@ -1559,7 +1559,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                       : <ItemSprite itemId={item.id} emoji={item.emoji} size={30} style={{fontSize:20}}/>}
                   </span>
                   <span style={{fontFamily:"'VT323',monospace",fontSize:12,color:"#ccc",display:"block",marginBottom:2,lineHeight:1.1}}>{item.name}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"#888":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ · retirer":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):<>{iPrice} <Coin size={9}/></>}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:equipped?"#5CAD68":owned?"var(--txt-muted,#888)":"#D9BC5C"}}>{equipped?"✅ ÉQUIPÉ · retirer":owned?(item.slot==="skin"?"✨ Débloqué":isDeco?"🏠 Mon Perso":"Équiper"):<>{iPrice} <Coin size={9}/></>}</span>
                 </div>
               );
             })}
@@ -1591,7 +1591,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 onClick={()=>{SFX.click();setBadgeInfo(showing?null:b.id);}}
                 style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,width:60,opacity:earned?1:showing?0.7:0.3,transition:"opacity 0.3s",cursor:"pointer",borderRadius:6,outline:showing?`2px solid ${pt.accent||"#D9BC5C"}`:"none",padding:2}}>
                 <BadgeIcon badge={b} earned={earned} size={40}/>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#D9BC5C"):"#666",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:11,color:earned?(pt.accent||"#D9BC5C"):"var(--txt-dim,#666)",textAlign:"center",lineHeight:1.2,maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
               </div>
             );
           })}
@@ -1604,7 +1604,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
             <div style={{marginTop:8,background:"rgba(0,0,0,0.5)",border:`2px solid ${earned?(pt.accent||"#D9BC5C"):"#444"}`,borderRadius:6,padding:"8px 12px",display:"flex",gap:10,alignItems:"center"}}>
               <span style={{fontSize:24,filter:earned?"none":"grayscale(1)"}}>{b.emoji}</span>
               <div style={{flex:1}}>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#D9BC5C"):"#aaa"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:earned?(pt.accent||"#D9BC5C"):"var(--txt-pale,#aaa)"}}>{earned?b.name:"🔒 Pas encore gagné"}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"var(--txt-muted,#888)",lineHeight:1.3}}>{b.desc}</div>
               </div>
               <button onClick={()=>setBadgeInfo(null)} style={{background:"none",border:"none",color:"var(--txt-faint,#555)",cursor:"pointer",fontSize:14}}>✕</button>
@@ -1676,7 +1676,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 {atkBtn("grosse",`${boss.atkEmoji?.grosse||"💥"} Grosse`,`3 jetons · −${bossAtkDamage("grosse",mod)} PV`, myJetons>=3)}
               </div>
               <button className="btn-press" onClick={()=>{ if(SFX.click)SFX.click(); onBossPetAttack&&onBossPetAttack(); }}
-                style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#D9BC5C":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#0d0d0d":"#999",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
+                style={{width:"100%",fontFamily:"'Press Start 2P',monospace",fontSize:8,lineHeight:1.5,padding:"12px 6px",background:(_petReady&&myJetons>=PET_ATTACK_COST)?"#D9BC5C":"#2a2418",color:(_petReady&&myJetons>=PET_ATTACK_COST)?"#0d0d0d":"var(--txt-mild,#999)",border:"2px solid #0d0d0d",borderRadius:6,cursor:"pointer",boxShadow:"2px 2px 0 #0d0d0d"}}>
                 🐾 Attaque du familier<br/><span style={{fontFamily:"'VT323',monospace",fontSize:12}}>{PET_ATTACK_COST} jetons · dégâts selon ton familier{_petReady?"":" — nourris-le, niv.4+"}</span>
               </button>
               {/* v2.16.20 — Coup de grâce : dès 70%+ de dégâts (hpPct<=30, même seuil que le mode
@@ -1727,7 +1727,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                 }}
                 style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"9px 2px 11px",background:on?`${col}22`:(isBoss?"#FF55550F":"transparent"),border:"none",borderTop:on?`3px solid ${col}`:"3px solid transparent",cursor:"pointer",opacity:locked?0.5:1}}>
                 <span style={{fontSize:20,lineHeight:0,filter:on?"none":"grayscale(0.3) opacity(0.8)",animation:isBoss?"pulse 1.4s infinite":"none"}}><UIIcon name={icn} emoji={ic} size={20} block/></span>
-                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"#888")}}>{locked?"🚪":lb}</span>
+                <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(5px,1vw,7px)",color:on?col:(isBoss?"#FF8888":"var(--txt-muted,#888)")}}>{locked?"🚪":lb}</span>
               </button>
             );
           });
@@ -1887,7 +1887,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   style={{border:`3px solid ${player.color}`,borderRadius:5}}/>
                 <div>
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(9px,1.2vw,12px)",color:player.color}}>{displayName(player)}</div>
-                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"#aaa"}}>Niv.{getLevelTitle(ps.xp,player.themeId).level} — {getLevelTitle(ps.xp,player.themeId,ps.settings?.femTitles).title}</div>
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:"var(--txt-pale,#aaa)"}}>Niv.{getLevelTitle(ps.xp,player.themeId).level} — {getLevelTitle(ps.xp,player.themeId,ps.settings?.femTitles).title}</div>
                 </div>
               </div>
               {/* Progress */}
@@ -1954,7 +1954,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   {days.map((v,di)=>(
                     <div key={di} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%"}}>
                       <div style={{width:"100%",height:`${Math.max(3,(v/maxDay)*38)}px`,background:weekDates[di]===todayDs?p.color:`${p.color}99`,borderRadius:"2px 2px 0 0",border:weekDates[di]===todayDs?`1px solid #fff`:"none"}} title={`${v} XP`}/>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:weekDates[di]===todayDs?th.accent:"#666",marginTop:2}}>{custodyDayLabels[di]}</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:weekDates[di]===todayDs?th.accent:"var(--txt-dim,#666)",marginTop:2}}>{custodyDayLabels[di]}</span>
                     </div>
                   ))}
                 </div>
@@ -2019,7 +2019,7 @@ const FamilyOverview = memo(function FamilyOverview({ config, gameStates, allTas
                   <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-dim,#666)",marginTop:2}}>{timeAgo(f.ts)}</div>
                 </div>
                 <button onClick={()=>{onLike&&onLike(f.id);SFX.click();}}
-                  style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#D98C8C":"#888",border:`1px solid ${liked?"#D98C8C":"#444"}`,borderRadius:14,cursor:"pointer"}}>
+                  style={{flexShrink:0,fontFamily:"'VT323',monospace",fontSize:15,padding:"4px 8px",background:liked?"#3a1a1a":"transparent",color:liked?"#D98C8C":"var(--txt-muted,#888)",border:`1px solid ${liked?"#D98C8C":"#444"}`,borderRadius:14,cursor:"pointer"}}>
                   {liked?"❤️":"🤍"} {(f.likes||[]).length||""}
                 </button>
               </div>
@@ -3718,7 +3718,7 @@ export default function App() {
         {/* Indicateur de synchro cloud */}
         {syncedAt>0 && (()=>{ const fresh=(now.getTime()-syncedAt)<40000;
           return <div title={fresh?"Progression synchronisée sur tous les appareils":"En attente de synchro…"}
-            style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#5CAD68":"#666",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
+            style={{fontFamily:"'VT323',monospace",fontSize:13,color:fresh?"#5CAD68":"var(--txt-dim,#666)",whiteSpace:"nowrap"}}>☁️{fresh?" ✓":" …"}</div>; })()}
         {/* Contrôles header */}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {parentMode ? (<>
@@ -3765,15 +3765,15 @@ export default function App() {
       {!(sessionPlayer!=null && !parentMode) &&
       <div style={{display:"flex",gap:0,maxWidth:900,margin:"0 auto",background:"rgba(0,0,0,0.6)",borderBottom:"2px solid #333",overflowX:"auto"}}>
         <button onClick={()=>{setView("family");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="family"?th.accent:"transparent",color:view==="family"?"#0d0d0d":"var(--txt-muted,#888)",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           👨‍👩‍👧‍👦 Famille
         </button>
         <button onClick={()=>{setView("calendars");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="calendars"?th.accent:"transparent",color:view==="calendars"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="calendars"?th.accent:"transparent",color:view==="calendars"?"#0d0d0d":"var(--txt-muted,#888)",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           📅 Calendriers
         </button>
         <button onClick={()=>{setView("timer");SFX.click();}} className="nav-btn"
-          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view==="timer"?th.accent:"transparent",color:view==="timer"?"#0d0d0d":"var(--txt-muted,#888)",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           ⏱ Minuterie
         </button>
         {/* Un enfant connecté ne voit QUE son onglet. Le parent voit tout le monde.
@@ -3782,7 +3782,7 @@ export default function App() {
             XP/pièces se fait dans le tiroir MODE PARENT → Actions. */}
         {(config.players||[]).map((pl,i)=>({pl,i})).filter(({i})=> parentMode || sessionPlayer===null || sessionPlayer===i).map(({pl,i})=>(
           <button key={pl.id} onClick={()=>{setView(i);SFX.click();}} className="nav-btn"
-            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#0d0d0d":"#888",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
+            style={{fontFamily:"'Press Start 2P',monospace",fontSize:"clamp(6px,0.9vw,8px)",padding:"9px 14px",background:view===i?pl.color:"transparent",color:view===i?"#0d0d0d":"var(--txt-muted,#888)",border:"none",borderRight:"2px solid #333",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,borderBottom:view===i?`3px solid ${pl.color}`:"none"}}>
             {parentMode?"👁️ Voir ":""}{displayName(pl)}
           </button>
         ))}
@@ -3856,7 +3856,7 @@ export default function App() {
                       {TYPE_OPTIONS.length>1 && <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {TYPE_OPTIONS.map(([v,l])=>(
                           <button key={v} onClick={()=>{setMyCalForm(f=>({...f,type:v}));SFX.click();}}
-                            style={{flex:"1 0 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 8px",background:myCalForm.type===v?th.accent:"#1a1a1a",color:myCalForm.type===v?"#0d0d0d":"#888",border:`2px solid ${myCalForm.type===v?th.accent:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                            style={{flex:"1 0 auto",fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"6px 8px",background:myCalForm.type===v?th.accent:"#1a1a1a",color:myCalForm.type===v?"#0d0d0d":"var(--txt-muted,#888)",border:`2px solid ${myCalForm.type===v?th.accent:"#333"}`,borderRadius:3,cursor:"pointer"}}>
                             {l}
                           </button>
                         ))}
@@ -3866,7 +3866,7 @@ export default function App() {
                       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                         {[["none","Une date"],["weekly","Chaque semaine"],["daily","Chaque jour"]].map(([v,l])=>(
                           <button key={v} onClick={()=>{setMyCalForm(f=>({...f,recur:v}));SFX.click();}}
-                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:myCalForm.recur===v?"#D99248":"#1a1a1a",color:myCalForm.recur===v?"#0d0d0d":"#888",border:`2px solid ${myCalForm.recur===v?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
+                            style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 8px",background:myCalForm.recur===v?"#D99248":"#1a1a1a",color:myCalForm.recur===v?"#0d0d0d":"var(--txt-muted,#888)",border:`2px solid ${myCalForm.recur===v?"#D99248":"#333"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>
                         ))}
                       </div>
                       {myCalForm.recur==="none" && <input type="date" value={myCalForm.date} onChange={e=>setMyCalForm(f=>({...f,date:e.target.value}))}
@@ -3883,7 +3883,7 @@ export default function App() {
                           <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:4}}>Pour quel enfant?</div>
                           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                             {config.players.map(pl=>{ const sel=myCalTargets.includes(pl.id); return (
-                              <div key={pl.id} onClick={()=>setMyCalTargets(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"#555",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
+                              <div key={pl.id} onClick={()=>setMyCalTargets(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"var(--txt-faint,#555)",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>
                             ); })}
                           </div>
                         </div>
@@ -3918,7 +3918,7 @@ export default function App() {
                         const isToday=k===0;
                         return (
                           <div key={stamp} style={{flex:"0 0 auto",width:128,scrollSnapAlign:"start",background:"rgba(0,0,0,0.35)",border:isToday?`2px solid ${p.color}`:"1px solid #2a2a2a",borderRadius:6,padding:"7px 7px 9px",boxSizing:"border-box"}}>
-                            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?p.color:"#999",marginBottom:4}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
+                            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:isToday?p.color:"var(--txt-mild,#999)",marginBottom:4}}>{DAYS_SHORT[dIdx]} {dt.getDate()}</div>
                             {dayEvents.length===0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-faint,#555)"}}>🌿 Rien</div>}
                             {dayEvents.map(e=>{
                               const editable = parentMode || (mine && (e.type||"evenement")==="evenement");

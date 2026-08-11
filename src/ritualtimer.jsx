@@ -24,7 +24,7 @@ export function InlineRitualTimer({ endTime, accent }){
     <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${acc}55`,borderRadius:10,padding:12,marginTop:6}}>
       <div style={{display:"flex",gap:5,marginBottom:8}}>
         {[["down","⏳ Minuterie"],["deadline","⏰ Heure butoir"],["up","⏱ Chrono"]].map(([k,l])=>(
-          <button key={k} onClick={()=>{ if(SFX.click)SFX.click(); setMode(k); setRunning(false); setSecs(0); }} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:6,lineHeight:1.4,padding:"7px 3px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#0d0d0d":"#888",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{l}</button>
+          <button key={k} onClick={()=>{ if(SFX.click)SFX.click(); setMode(k); setRunning(false); setSecs(0); }} style={{flex:1,fontFamily:"'Press Start 2P',monospace",fontSize:6,lineHeight:1.4,padding:"7px 3px",background:mode===k?acc:"#1a1a1a",color:mode===k?"#0d0d0d":"var(--txt-muted,#888)",border:`2px solid ${mode===k?acc:"#333"}`,borderRadius:5,cursor:"pointer"}}>{l}</button>
         ))}
       </div>
       {!running && mode==="down" && (

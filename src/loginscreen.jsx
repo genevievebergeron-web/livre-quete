@@ -207,7 +207,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
               <span style={{fontSize:22,flexShrink:0,marginTop:2}}>{icon}</span>
               <div>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C",marginBottom:4}}>{title}</div>
-                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"#aaa",lineHeight:1.45}}>{desc}</div>
+                <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-pale,#aaa)",lineHeight:1.45}}>{desc}</div>
               </div>
             </div>
           ))}
@@ -286,7 +286,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
                   const sel = draftTheme === tid;
                   return (
                     <button key={tid} onClick={()=>{SFX.click();setDraftTheme(tid);}}
-                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"14px 16px",background:sel?`${t.primary}30`:"rgba(0,0,0,0.7)",color:sel?t.accent:"#888",border:`3px solid ${sel?t.accent:"#333"}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"all 0.15s",boxShadow:sel?`0 0 16px ${t.accent}40`:"none"}}>
+                      style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,padding:"14px 16px",background:sel?`${t.primary}30`:"rgba(0,0,0,0.7)",color:sel?t.accent:"var(--txt-muted,#888)",border:`3px solid ${sel?t.accent:"#333"}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"all 0.15s",boxShadow:sel?`0 0 16px ${t.accent}40`:"none"}}>
                       <span style={{fontSize:28}}>{t.icon}</span>
                       <span style={{flex:1}}>{t.name}</span>
                       {sel&&<span style={{fontSize:16}}>✓</span>}
@@ -319,7 +319,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
               <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}>
                 {AVATAR_PARTS.build.map(b=>(
                   <button key={b.id} onClick={()=>{setDraftAvatar(d=>({...d,build:b.id}));SFX.click();}}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:(draftAvatar.build||"bd_ado")===b.id?accentColor:"#1a1a1a",color:(draftAvatar.build||"bd_ado")===b.id?"#0d0d0d":"#888",border:`2px solid ${(draftAvatar.build||"bd_ado")===b.id?accentColor:"#333"}`,borderRadius:4,cursor:"pointer"}}>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"7px 14px",background:(draftAvatar.build||"bd_ado")===b.id?accentColor:"#1a1a1a",color:(draftAvatar.build||"bd_ado")===b.id?"#0d0d0d":"var(--txt-muted,#888)",border:`2px solid ${(draftAvatar.build||"bd_ado")===b.id?accentColor:"#333"}`,borderRadius:4,cursor:"pointer"}}>
                     {b.emoji} {b.label}
                   </button>
                 ))}
@@ -327,7 +327,7 @@ export function LoginScreen({ config, gameStates, onSelectPlayer, onParentLogin,
               <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:10,flexWrap:"wrap"}}>
                 {[["hair","Cheveux"],["skin","Peau"],["eyes","Yeux"],["mouth","Bouche"]].map(([k,l])=>(
                   <button key={k} onClick={()=>{setAvatarTab(k);SFX.click();}}
-                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:avatarTab===k?accentColor:"#1a1a1a",color:avatarTab===k?"#0d0d0d":"#666",border:`2px solid ${avatarTab===k?accentColor:"#333"}`,borderRadius:3,cursor:"pointer"}}>
+                    style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"5px 8px",background:avatarTab===k?accentColor:"#1a1a1a",color:avatarTab===k?"#0d0d0d":"var(--txt-dim,#666)",border:`2px solid ${avatarTab===k?accentColor:"#333"}`,borderRadius:3,cursor:"pointer"}}>
                     {l}
                   </button>
                 ))}

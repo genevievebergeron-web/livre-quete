@@ -123,8 +123,14 @@ export const GLOBAL_CSS = `
        identiques aux #888/#777/#666/#555 qu'elles remplacent → no-op visuel tant que la classe
        .high-contrast n'est pas posée. Toujours utilisées avec un repli, var(--txt-muted,#888) :
        GLOBAL_CSS n'est pas injecté sur tous les écrans (cf. LazyOverlayFallback), et une var
-       absente rendrait la déclaration invalide (texte qui hériterait d'une couleur au hasard). */
+       absente rendrait la déclaration invalide (texte qui hériterait d'une couleur au hasard).
+       v2.16.50 — la rampe s'étend vers le HAUT (--txt-mild/#999, --txt-pale/#aaa) : v2.16.49
+       n'avait centralisé que les 4 gris sombres, si bien que les libellés d'onglets INACTIFS
+       (Boutique, accueil enfant), eux en #aaa/#999, restaient au gris d'origine pendant que
+       le reste du texte secondaire s'éclaircissait. Ordre à préserver si ces valeurs bougent :
+       faint < dim < soft < muted < mild < pale, dans les DEUX blocs. */
     --txt-muted:#888; --txt-soft:#777; --txt-dim:#666; --txt-faint:#555;
+    --txt-mild:#999; --txt-pale:#aaa;
     --elev1:0 2px 0 #0d0d0d, inset 0 1px 0 rgba(255,255,255,0.06);
     --elev2:0 4px 0 #0d0d0d, 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
     /* Refonte Phase 7 (28-07) — profondeur "maquette" : fond très sombre, tuiles en dégradé,
@@ -149,7 +155,7 @@ export const GLOBAL_CSS = `
      bordure, donc la portée est bornée par construction aux textes secondaires et aux cadres
      neutres. Les couleurs porteuses de sens ne bougent pas. Pas de filter/contrast() sur la
      racine : ça créerait un bloc contenant et casserait tous les popups position:fixed. */
-  .high-contrast{--txt-muted:#c9c9d6;--txt-soft:#c2c2d0;--txt-dim:#b4b4c4;--txt-faint:#a0a0b2;--b-soft:#6e6e86;--b-mid:#9a9ab2;}
+  .high-contrast{--txt-muted:#c9c9d6;--txt-soft:#c2c2d0;--txt-dim:#b4b4c4;--txt-faint:#a0a0b2;--txt-mild:#d0d0dc;--txt-pale:#d8d8e4;--b-soft:#6e6e86;--b-mid:#9a9ab2;}
   .pixel-border-gold{border:4px solid var(--gold)!important;box-shadow:0 0 0 2px #0d0d0d,0 0 28px #D9BC5C45,4px 4px 0 #0d0d0d!important;border-radius:4px!important}
   /* Refonte visuelle Phase 1 (26-07) — fondations : tokens + classes utilitaires, patron
      ".readable-font" (classe + !important bat l'inline). NO-OP tant qu'aucun className n'est
