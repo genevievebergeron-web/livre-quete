@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.51";
+export const APP_VERSION = "2.16.52";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2135,7 +2135,12 @@ export default function App() {
             .map(v=>CHANGELOG.find(c=>c.version===v))
             .filter(Boolean)
             .map(c=>({ type:"update", version:c.version, features:c.features, ts:new Date().toISOString() }));
-          setConfig(cfg=>({...cfg, updateFeedEntries: dedupeUpdateFeed([...(cfg.updateFeedEntries||[]),...newEntries])})); // v2.5.29 — fini l'accumulation sans plafond (2,35 Mo en prod)
+          // v2.5.29 — fini l'accumulation sans plafond (2,35 Mo en prod).
+          // v2.16.52 — l'ordre de cette concaténation n'a plus d'importance : `dedupeUpdateFeed`
+          // classe par position dans le CHANGELOG et garde les 30 plus récentes (avant, la queue
+          // de la liste gagnait, donc ce bloc — trié du plus récent au plus vieux — faisait garder
+          // les versions les plus VIEILLES).
+          setConfig(cfg=>({...cfg, updateFeedEntries: dedupeUpdateFeed([...(cfg.updateFeedEntries||[]),...newEntries])}));
         }
         // Les tâches en attente d'hier restent simplement dans la file
         // "À valider" du portail parent (plus de modal en libre-service).

@@ -121,20 +121,50 @@ export const migrateGameState = (gs) => {
 };
 
 // v2.5.29 — garde une seule entrée changelog par version (la plus récente), plafonnée aux 30
-// dernières, en préservant l'ordre. Utilisé au chargement (migrateSavedData) ET à l'ajout (~5127).
+// dernières. Utilisé au chargement (migrateSavedData) ET à l'ajout (~5127).
+//
+// v2.16.52 — le plafond gardait la MAUVAISE moitié de la liste. `newChangelogVersions` suit
+// l'ordre du CHANGELOG (plus récent EN TÊTE) et `App.jsx` ajoute ce bloc À LA FIN de la liste
+// existante ; `.slice(-30)` gardait donc la queue du bloc, c'est-à-dire les 30 versions les PLUS
+// VIEILLES de l'app. Constaté en prod le 2026-08-11 : les 30 entrées de `updateFeedEntries`
+// étaient exactement 1.26.0 → 1.2.0 (juin 2026), alors que l'app tournait en 2.16.51. Le portail
+// parent (« 📖 NOUVEAUTÉS ») n'a donc JAMAIS montré une seule nouveauté récente.
+// Fix : on classe par position dans le CHANGELOG (0 = plus récent) et on garde les 30 plus
+// récentes, rangées de la plus récente à la plus vieille — l'ordre d'affichage du portail, qui
+// parcourt le tableau tel quel. Les versions absentes du CHANGELOG (trop vieilles, retirées du
+// fichier) tombent en fin de classement et sortent les premières.
+// v2.16.52 — union de l'ancien emplacement (racine de `data`) et du nouveau (`config`), pour que
+// la bascule ne fasse pas ré-annoncer tout le changelog aux appareils déjà à jour.
+const mergedSeen = (data) => {
+  const fromConfig = (data.config || {}).seenVersions;
+  const fromRoot = data.seenVersions;
+  if (!Array.isArray(fromConfig)) return Array.isArray(fromRoot) ? fromRoot : [];
+  if (!Array.isArray(fromRoot)) return fromConfig;
+  return [...new Set([...fromConfig, ...fromRoot])];
+};
+
 export const dedupeUpdateFeed = (list) => {
+  const rank = new Map(CHANGELOG.map((c, i) => [c.version, i]));
+  const rankOf = (v) => (rank.has(v) ? rank.get(v) : 1e9);
   const seen = new Set(); const out = [];
-  for (let i = (list || []).length - 1; i >= 0; i--) {
-    const e = list[i];
+  for (const e of (list || [])) {
     if (!e || !e.version || seen.has(e.version)) continue;
-    seen.add(e.version); out.unshift(e);
+    seen.add(e.version); out.push(e);
   }
-  return out.slice(-30);
+  out.sort((a, b) => rankOf(a.version) - rankOf(b.version));
+  return out.slice(0, 30);
 };
 
 export const migrateSavedData = (data) => {
   if (!data) return null;
-  const seenVersions = data.seenVersions || [];
+  // v2.16.52 — `seenVersions` (versions du changelog déjà annoncées) vivait à la RACINE de `data`,
+  // hors de `config` — et `persist()` (App.jsx) ne sauvegarde QUE `{config, gameStates, savedAt}`.
+  // La liste était donc effacée dès la première sauvegarde suivant le chargement, sur l'appareil
+  // lui-même : à chaque ouverture, TOUT le changelog repassait pour « nouveau ». C'est ce qui
+  // réhorodatait les 30 entrées de prod à la milliseconde du dernier enregistrement. Elle vit
+  // désormais dans `config` (donnée familiale comme les autres, donc persistée et fusionnée), en
+  // reprenant au passage l'ancienne valeur racine quand elle est encore là.
+  const seenVersions = mergedSeen(data);
   const newVersions = CHANGELOG.map(c=>c.version).filter(v=>!seenVersions.includes(v));
   // Merge stored config, then apply defaults for missing/undefined fields
   const mergedConfig = { ...(data.config || {}) };
@@ -231,6 +261,16 @@ export const migrateSavedData = (data) => {
   // v2.5.29 — updateFeedEntries s'accumulait SANS plafond ni dédoublonnage (~5127) : chaque appareil
   // ré-ajoutait ses entrées changelog → 2,35 Mo observés en prod, poussés à CHAQUE sync par chaque
   // appareil (et payload familial > MAX_BODY 2 Mo du serveur). Nettoyage au chargement + à l'ajout.
+  // v2.16.52 — ménage unique : les données en prod portent la liste bâtie par l'ancien plafond
+  // (versions 1.2.0 → 1.26.0, cf. `dedupeUpdateFeed`). Le seul dédoublonnage ne suffit PAS à les
+  // réparer sur un appareil dont `seenVersions` couvre déjà tout le changelog : rien de neuf n'y
+  // est réinjecté, donc la liste resterait figée sur ces vieilles versions pour toujours. On la
+  // rebâtit donc une fois à partir du CHANGELOG (30 plus récentes, avec leur VRAIE date de sortie
+  // plutôt qu'un horodatage « maintenant » refabriqué à chaque chargement).
+  if (!mergedConfig.updateFeedRebuildV1) {
+    mergedConfig.updateFeedEntries = CHANGELOG.slice(0, 30).map(c => ({ type:"update", version:c.version, features:c.features, ts:c.date }));
+    mergedConfig.updateFeedRebuildV1 = true;
+  }
   mergedConfig.updateFeedEntries = dedupeUpdateFeed(mergedConfig.updateFeedEntries);
   const migratedGameStates = (data.gameStates || []).map(migrateGameState).map(gs => {
     let next = gs;
@@ -260,7 +300,11 @@ export const migrateSavedData = (data) => {
   });
   return {
     ...data,
-    config: mergedConfig,
+    // v2.16.52 — `seenVersions` est maintenant DANS `config` (voir plus haut) : c'est le seul
+    // moyen qu'il survive à `persist()`, qui ne sauvegarde que `{config, gameStates, savedAt}`.
+    // La copie racine reste écrite pour qu'un appareil resté sur une version antérieure au
+    // 2026-08-11 continue de la lire pendant la transition.
+    config: { ...mergedConfig, seenVersions: [...seenVersions, ...newVersions] },
     gameStates: migratedGameStates,
     seenVersions: [...seenVersions, ...newVersions],
     newChangelogVersions: newVersions,

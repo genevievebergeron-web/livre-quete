@@ -637,3 +637,28 @@ Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-10T12:20:42Z**). **Pre
 ### 💡 À signaler à Gen (pas un bug)
 - [ ] **🔴 Reste ouvert — la restauration des soldes du 28 juillet.** Le code est réparé depuis `v2.16.45` (plus aucun chemin ne peut effacer un solde) et les nouveaux gains se cumulent normalement, ce qui se voit enfin sur de vraies données. Mais les montants effacés le 31 juillet **ne sont pas revenus** : c'est toujours un `PUT /api/famille` à faire, avec un montant qui reste **ta décision**. **La routine n'a rien écrit en prod.**
 - ✅ **Point clos — les 14 validations dormantes.** Plus rien en attente côté portail parent. Retiré du bloc « GEN » de `PROJET-ETAT.md`.
+
+---
+
+## Passage du 2026-08-11 (nuit, 2e passage, routine autonome) — aucun bug SIGNALÉ nouveau, mais un vrai bug trouvé dans les données : « Nouveautés » affichait juin depuis toujours
+
+Lecture `GET /api/famille` (HTTP 200, `savedAt` **2026-08-11T04:27:13Z**).
+
+### 🐛 Bugs signalés
+- **Aucun bug nouveau.** Toujours les mêmes 14 `config.bugs`, identiques id pour id depuis le 31 juillet ; le plus récent (`bug_hlu9mkd`) date du 2026-07-31T11:59Z. Tous déjà classés dans les passages précédents.
+- `config.errorLogs` **vide** — 10e lecture depuis la réparation du journal en `v2.16.42`. Aucun plantage de rendu capté en prod.
+- `feed` : 60 entrées, la plus récente toujours du **9 août** (3 quêtes). Aucun message d'enfant signalant un souci.
+- `removalRequests` / `momentRequests` / `childTaskProposals` / `teamInvites` / `coinOffers` / `repairEvents` : tous **vides**. `pending` vide chez les 4 enfants.
+
+### 🔴 Bug trouvé DANS LES DONNÉES (personne ne l'avait signalé) — corrigé en `v2.16.52`
+En survolant les champs de `config` plutôt que seulement `bugs`/`errorLogs`/`feed`, `updateFeedEntries` ne collait pas : **30 entrées, versions `1.26.0` → `1.2.0` (juin 2026), sur une app en 2.16.51**, et les 30 portant **toutes le même `ts` à la milliseconde** (`04:27:13.162Z`, 88 ms avant le `savedAt`). Autrement dit, la page « 📖 NOUVEAUTÉS » du portail parent (Communication → Journal) n'a **jamais** montré une seule nouveauté récente — et sa liste était refabriquée en entier à **chaque ouverture de l'app**.
+
+Deux défauts qui se cachaient l'un l'autre :
+1. **Le plafond gardait la mauvaise moitié.** `dedupeUpdateFeed` finissait par `.slice(-30)`, alors que les nouvelles entrées sont ajoutées **à la fin** dans l'ordre du `CHANGELOG` (plus récent en tête) : la queue, c'est les 30 versions **les plus vieilles**.
+2. **`seenVersions` ne survivait à aucune sauvegarde.** Il vivait à la **racine** de `data`, hors de `config`, et `persist()` ne sauvegarde que `{config, gameStates, savedAt}` : la liste des versions déjà annoncées était effacée **par l'appareil lui-même**, donc les 239 versions repassaient pour « nouvelles » à chaque chargement. Ce n'était pas un problème de cloud.
+
+Corrigé en `v2.16.52` (tri par position dans le `CHANGELOG` + `seenVersions` déplacé dans `config` + union dans les deux `mergeFamily` + ménage unique qui rebâtit la liste avec les vraies dates de sortie). Détail, 28 assertions sur la vraie donnée de prod et vérification navigateur : entrée `PROJET-ETAT.md` v2.16.52. **La réparation se fait toute seule au prochain chargement de l'app — la routine n'a rien écrit en prod.**
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 Toujours ouvert — la restauration des soldes du 28 juillet.** Inchangé depuis le passage du 10 août : `coins` **12 / 0 / 33 / 30**, `coinsLifetime` **947 / 317 / 376 / 1277**, strictement identiques. `Le GOAT!!!` (l'enfant qui a signalé `bug_hlu9mkd`) est toujours à **0 pièce et +0 de gain**. Le code est réparé depuis `v2.16.45` ; le montant à restaurer reste ta décision.
+- 💡 **Méthode qui a payé ce passage** : lire **tous** les champs de `config` en prod, pas seulement ceux où les enfants écrivent. `announcements`, `weeklyQuests` et `weeklyChallenge` n'ont jamais été audités de cette façon.

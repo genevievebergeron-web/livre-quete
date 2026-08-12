@@ -225,7 +225,13 @@ const mergeFamily = (base, incoming) => {
       const cMap = new Map(); for (const c of [...(a.challenges||[]),...(b.challenges||[])]) { if (!c?.playerId) continue; if (!cMap.has(c.playerId)) cMap.set(c.playerId, {...c}); else { const ex=cMap.get(c.playerId); cMap.set(c.playerId, {...b.challenges?.find(x=>x.playerId===c.playerId)||ex, checkins:{...ex.checkins,...c.checkins}}); } } return {...b, challenges:[...cMap.values()]}; })(),
     custodySchedule: newerC.custodySchedule || bC.custodySchedule || iC.custodySchedule,
   };
-  return { ...newer, config, gameStates, savedAt: preferIncoming ? incoming.savedAt : base.savedAt };
+  // v2.16.52 — même union que le `mergeFamily` du client (src/merge.js) : `seenVersions` (versions
+  // du changelog déjà annoncées) est passé dans `config`, et le spread naïf `{...bC,...iC}` en
+  // ferait une dernière-écriture-gagne. Les deux moitiés de la fusion doivent rester cohérentes,
+  // sinon le serveur défait ce que le client garde.
+  const seenVersions = _uniq([...(bC.seenVersions || []), ...(iC.seenVersions || []), ...(base.seenVersions || []), ...(incoming.seenVersions || [])]);
+  config.seenVersions = seenVersions;
+  return { ...newer, config, gameStates, seenVersions, savedAt: preferIncoming ? incoming.savedAt : base.savedAt };
 };
 
 // ── Helpers HTTP ──────────────────────────────────────────────

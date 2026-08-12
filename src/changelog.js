@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.52", date:"2026-08-11", features:[
+    "📖 La page « Nouveautés » du portail parent montrait encore les nouveautés de juin (versions 1.2 à 1.26) et jamais les récentes. Elle affiche maintenant les 30 dernières versions, la plus récente en haut.",
+  ]},
   { version:"2.16.51", date:"2026-08-11", features:[
     "⚡ L'app se rouvre plus vite après une mise à jour. Avant, chaque nouvelle version te faisait tout retélécharger; maintenant la grosse pièce commune reste gardée sur ton appareil. Rien ne change à ce que tu vois.",
   ]},

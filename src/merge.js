@@ -323,5 +323,13 @@ export const mergeFamily = (base, incoming) => {
       return { weekKey, challenges:[...cm.values()] };
     })(),
   };
-  return { ...newer, config, gameStates, savedAt: isNewer(incoming.savedAt, base.savedAt) ? incoming.savedAt : base.savedAt };
+  // v2.16.52 — `seenVersions` (versions du changelog déjà annoncées) est passé dans `config`, où
+  // il survit à `persist()`. Le spread naïf `{...bC,...iC}` en ferait une dernière-écriture-gagne :
+  // un appareil qui n'a pas encore vu les dernières versions effacerait la liste de l'autre et
+  // ferait ré-annoncer tout le changelog partout. Union explicite, dans les deux emplacements
+  // (racine incluse) le temps que tous les appareils soient passés en 2.16.52+ : une version
+  // annoncée une fois l'est pour toujours, quel que soit l'appareil qui l'a vue.
+  const seenVersions = _uniq([...(bC.seenVersions || []), ...(iC.seenVersions || []), ...(base.seenVersions || []), ...(incoming.seenVersions || [])]);
+  config.seenVersions = seenVersions;
+  return { ...newer, config, gameStates, seenVersions, savedAt: isNewer(incoming.savedAt, base.savedAt) ? incoming.savedAt : base.savedAt };
 };
