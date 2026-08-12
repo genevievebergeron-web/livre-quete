@@ -26,7 +26,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
   onApproveProposal, onRefuseProposal,
   onClose, onExitParent, onUndo, onReset, onResetPlayer, onAdjustXP, onAdjustCoins, onSetMorningLock, onSetDailyLimit, onSetShopUnlockCount, onChangePin,
   onExport, onImport, onSetup, players, th, onUpdateChallenge,
-  onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone }) {
+  onCreateAnnouncement, onDeleteAnnouncement, onResendAnnouncement, onCreateRepairQuest, onPlanMoment, onMarkMomentDone, showToast }) {
   const nbPending = gameStates.reduce((s,gs)=>s+(gs.pending||[]).length,0);
   const removalReqs = config.removalRequests||[]; // v1.83.0 (Lot 1 #B6)
   const proposals = config.childTaskProposals||[]; // v2.5.10 (Correctif 2C)
@@ -642,19 +642,40 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
             ? <div style={{fontFamily:"'VT323',monospace",fontSize:16,color:"var(--txt-dim,#666)",textAlign:"center",padding:"20px 0"}}>Aucune annonce active.</div>
             : (config.announcements||[]).map(a=>{
               // v2.15.1 — enfants ciblés qui ont fermé cette annonce (candidats au renvoi)
+              // v2.16.54 — …SAUF ceux qui ont déjà un renvoi ouvert. Avant, `closedBy` ne regardait
+              // que `dismissedAnnouncements` de CETTE annonce — une liste qui ne rétrécit jamais (la
+              // fusion cloud en fait une union increvable). Le bouton « 🔄 Renvoyer (2) » restait donc
+              // affiché à l'identique après un renvoi réussi : aucun retour visuel, et 5 copies de la
+              // même annonce dans les données de prod. Un enfant ne compte plus comme « à renvoyer »
+              // tant qu'il a une copie vivante non fermée ; il y revient s'il ferme aussi celle-là.
+              const today=todayStamp();
+              const openResends=(config.announcements||[]).filter(x=>x.resendOf===a.id && (!x.expiresAt || x.expiresAt>=today));
               const closedBy=(players||[]).filter((p,i)=>{
                 const gs=gameStates[i];
                 if(!gs||!(gs.dismissedAnnouncements||[]).includes(a.id)) return false;
-                return a.targetAll || (a.targetPlayerIds||[]).includes(p.id);
+                if(!(a.targetAll || (a.targetPlayerIds||[]).includes(p.id))) return false;
+                return !openResends.some(r=>(r.targetPlayerIds||[]).includes(p.id) && !(gs.dismissedAnnouncements||[]).includes(r.id));
               });
               return (
               <div key={a.id} style={{background:"rgba(180,120,0,0.12)",border:"2px solid #C8942A55",borderRadius:8,padding:"10px 12px"}}>
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD54F",marginBottom:4}}>{a.emoji} {a.title||a.text.slice(0,40)}</div>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFD54F",marginBottom:4}}>{a.resendOf?"🔄 ":""}{a.emoji} {a.title||a.text.slice(0,40)}</div>
                 <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-pale,#aaa)",marginBottom:6}}>{a.text.slice(0,80)}{a.text.length>80?"…":""}</div>
+                {a.resendOf && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#6bb8ff",marginBottom:6}}>Renvoi de l'annonce ci-dessus</div>}
                 {closedBy.length>0 && <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"#C8942A",marginBottom:6}}>Fermée par : {closedBy.map(p=>p.name).join(", ")}</div>}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-dim,#666)"}}>Expire : {a.expiresAt||"—"}</span>
-                  {closedBy.length>0 && <button onClick={()=>onResendAnnouncement&&onResendAnnouncement(a.id)}
+                  {/* v2.16.54 — une annonce périmée n'est plus visible par personne : le dire, au lieu
+                      de laisser une date brute que l'œil ne compare pas à la date du jour. C'est ce
+                      qui a rendu invisibles les 4 renvois du 29 juillet (tous nés expirés). */}
+                  <span style={{fontFamily:"'VT323',monospace",fontSize:13,color:(a.expiresAt&&a.expiresAt<today)?"#ff6b6b":"var(--txt-dim,#666)"}}>
+                    {(a.expiresAt&&a.expiresAt<today)?`⏳ Expirée le ${a.expiresAt} — plus visible`:`Expire : ${a.expiresAt||"—"}`}
+                  </span>
+                  {/* Pas de renvoi sur un renvoi : tout pend de l'original, sinon on empile des
+                      copies de copies (c'est comme ça que « Départ: 8:00! » est monté à 6 entrées). */}
+                  {!a.resendOf && closedBy.length>0 && <button onClick={()=>{
+                      if(!onResendAnnouncement) return;
+                      const n=onResendAnnouncement(a.id);
+                      showToast && showToast(n>0?`🔄 Renvoyée à ${n} enfant${n>1?"s":""}!`:"Déjà renvoyée — rien de plus à faire.", n>0?"#5CAD68":"#D99248");
+                    }}
                     style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#1a3a5a",color:"#6bb8ff",border:"2px solid #6bb8ff44",borderRadius:4,cursor:"pointer"}}>🔄 Renvoyer ({closedBy.length})</button>}
                   <button onClick={()=>onDeleteAnnouncement&&onDeleteAnnouncement(a.id)}
                     style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"5px 8px",background:"#5a1a1a",color:"#ff6b6b",border:"2px solid #ff6b6b44",borderRadius:4,cursor:"pointer"}}>🗑 Supprimer</button>

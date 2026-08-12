@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.54", date:"2026-08-12", features:[
+    "🔄 Le bouton « Renvoyer » d'une annonce (portail parent) fonctionne enfin comme prévu : l'annonce redevient visible pour les enfants même si sa date était passée, un message confirme l'envoi, et le bouton disparaît une fois le renvoi fait au lieu de rester là et d'empiler des copies.",
+  ]},
   { version:"2.16.53", date:"2026-08-12", features:[
     "🌟 Dans le portail parent, le compte de jours du défi de la semaine (« 3/7 jours ») additionnait aussi les coches des semaines d'avant. Il ne compte plus que la semaine en cours, comme les sept pastilles juste en dessous.",
   ]},

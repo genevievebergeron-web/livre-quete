@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.53";
+export const APP_VERSION = "2.16.54";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2596,17 +2596,38 @@ export default function App() {
   },[config,gameStates,persist]);
   // v2.15.1 — renvoyer une annonce aux enfants qui l'ont fermée (copie ciblée, nouvel id —
   // seule façon fiable de la faire réapparaître : dismissedAnnouncements est une union entre appareils)
+  //
+  // v2.16.54 — deux défauts trouvés dans les données de prod du 12 août, qui se nourrissaient l'un
+  // l'autre : `config.announcements` portait SIX copies quasi identiques de « Départ: 8:00! »
+  // (`n1ywe2h` + 5 copies des 28-29 juillet). Reconstitution :
+  //   (1) La copie héritait de `expiresAt` TEL QUEL. L'original expirait le 28 juillet ; les copies
+  //       faites le 29 naissaient donc déjà expirées, et le filtre côté enfant
+  //       (`expiresAt >= todayStamp()`) les écartait aussitôt — un renvoi qui ne renvoyait rien.
+  //   (2) Rien ne changeait côté parent après un clic : `closedBy` se calcule sur
+  //       `dismissedAnnouncements` de l'ORIGINAL, qui ne bouge évidemment jamais (et que la fusion
+  //       traite en union increvable). Le bouton « 🔄 Renvoyer (2) » restait donc là, identique,
+  //       sans le moindre retour visuel — le réflexe humain étant de recliquer.
+  // Fix : la copie est prolongée jusqu'à aujourd'hui si elle serait née expirée, elle est marquée
+  // `resendOf` (lien vers l'original), et un enfant qui a déjà un renvoi OUVERT n'en reçoit pas un
+  // deuxième. Le bouton disparaît donc tout seul, et réapparaît si l'enfant referme aussi le renvoi.
   const handleResendAnnouncement = useCallback((announcementId)=>{
-    const orig=(config.announcements||[]).find(a=>a.id===announcementId);
+    const anns=config.announcements||[];
+    const orig=anns.find(a=>a.id===announcementId);
     if(!orig) return 0;
+    const today=todayStamp();
+    const rootId=orig.resendOf||announcementId; // jamais de copie de copie : tout pend de l'original
+    const openResends=anns.filter(a=>a.resendOf===rootId && (!a.expiresAt || a.expiresAt>=today));
     const dismissedBy=(config.players||[]).filter((p,i)=>{
       const gs=gameStates[i];
       if(!gs||!(gs.dismissedAnnouncements||[]).includes(announcementId)) return false;
-      return orig.targetAll || (orig.targetPlayerIds||[]).includes(p.id);
+      if(!(orig.targetAll || (orig.targetPlayerIds||[]).includes(p.id))) return false;
+      // renvoi déjà en cours et pas encore fermé par cet enfant → ne pas en refabriquer un
+      return !openResends.some(r=>(r.targetPlayerIds||[]).includes(p.id) && !(gs.dismissedAnnouncements||[]).includes(r.id));
     }).map(p=>p.id);
     if(!dismissedBy.length) return 0;
-    const copy={...orig, id:uid(), targetAll:false, targetPlayerIds:dismissedBy, createdAt:todayStamp()};
-    const newCfg={...config, announcements:[...(config.announcements||[]), copy]};
+    const copy={...orig, id:uid(), resendOf:rootId, targetAll:false, targetPlayerIds:dismissedBy,
+      createdAt:today, expiresAt:(orig.expiresAt && orig.expiresAt>=today)?orig.expiresAt:today};
+    const newCfg={...config, announcements:[...anns, copy]};
     setConfig(newCfg); persist(newCfg, gameStates);
     return dismissedBy.length;
   },[config,gameStates,persist]);
@@ -4084,7 +4105,7 @@ export default function App() {
           onSetup={onParentPanelSetup}
           onUpdateChallenge={handleUpdateChallenge}
           onCreateAnnouncement={handleCreateAnnouncement}
-          onResendAnnouncement={handleResendAnnouncement}
+          onResendAnnouncement={handleResendAnnouncement} showToast={showToast}
           onDeleteAnnouncement={handleDeleteAnnouncement}
         />
         </Suspense>
