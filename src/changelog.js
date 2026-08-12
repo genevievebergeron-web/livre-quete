@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.55", date:"2026-08-12", features:[
+    "✔️ Fini les quêtes en double dans ta journée : « Bon déjeuner », « Sac à dos » ou « Vider ma boîte à lunch » apparaissaient 3, 4, parfois 5 fois, chacune avec sa propre case à cocher. Il n'en reste qu'une seule par quête, et cocher fonctionne du premier coup.",
+    "🛠️ Côté parent : le catalogue de l'assistant affiche « ✓ déjà ajoutée » avant qu'on reclique, et le portail marque les copies exactes qui restent à supprimer.",
+  ]},
   { version:"2.16.54", date:"2026-08-12", features:[
     "🔄 Le bouton « Renvoyer » d'une annonce (portail parent) fonctionne enfin comme prévu : l'annonce redevient visible pour les enfants même si sa date était passée, un message confirme l'envoi, et le bouton disparaît une fois le renvoi fait au lieu de rester là et d'empiler des copies.",
   ]},

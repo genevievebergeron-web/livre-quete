@@ -7,7 +7,7 @@
 
 import { useState, memo } from "react";
 import { SFX } from "./sfx.js";
-import { REPAIR_PRESETS } from "./catalog.js";
+import { REPAIR_PRESETS, assignmentGroupKey } from "./catalog.js";
 import { Countdown } from "./timers.jsx";
 import { UIIcon, Coin, Xp } from "./sprites.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, todayStamp, SHOP_UNLOCK_DEFAULT } from "./shared.js";
@@ -323,10 +323,23 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
               const isToday=ass=>!(Array.isArray(ass.days)&&ass.days.length>0) || ass.days.includes(todayDayIdx);
               const visible=tasksShowAllDays?all:all.filter(isToday);
               const hiddenCount=all.length-visible.length;
+              // v2.16.55 — les copies exactes sont MARQUÉES ici (jamais masquées) : le portail parent est
+              // la seule surface qui peut réellement les supprimer, et l'enfant, lui, ne voit plus qu'une
+              // carte par assignation distincte. Rang 2, 3, 4… = les copies en trop, avec leur « × ».
+              const rank=new Map(); const seenKey=new Map();
+              for(const a of all){ const k=assignmentGroupKey(a);
+                const n=(seenKey.get(k)||0)+1; seenKey.set(k,n); rank.set(a.instanceId,n); }
+              const extra=[...seenKey.values()].reduce((s,n)=>s+Math.max(0,n-1),0);
               return (<>
                 <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",margin:"6px 0 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span>TÂCHES {tasksShowAllDays?"— TOUTE LA SEMAINE":"D'AUJOURD'HUI"} ({visible.length})</span>
                 </div>
+                {extra>0 && (
+                  <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#D9BC5C",background:"rgba(217,188,92,0.10)",border:"1px solid #D9BC5C55",borderRadius:4,padding:"7px 9px",marginBottom:8,lineHeight:1.35}}>
+                    ⚠️ {extra} assignation{extra>1?"s":""} en double dans le livre (copies exactes : même tâche, même enfant, mêmes jours).
+                    Les enfants n'en voient plus qu'une seule, mais elles restent ici : touche le « × » des lignes marquées « copie » pour faire le ménage pour de bon.
+                  </div>
+                )}
                 {visible.map(ass=>{
                   const task=allTasks.find(t=>t.id===ass.taskId);
                   const assignees=players.filter(p=>ass.playerIds.includes(p.id));
@@ -340,6 +353,7 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
                           {assignees.map(p=><span key={p.id} style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:p.color}}>{displayName(p)}</span>)}
                           <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:(Array.isArray(ass.days)&&ass.days.length>0)?"#85CDD1":"#FFA94D"}}>{(Array.isArray(ass.days)&&ass.days.length>0)?`📅 ${ass.days.map(d=>DAYS_SHORT[d]).join(" ")}`:"⏰ routine"}</span>
                           {ass.time&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"var(--txt-muted,#888)"}}>⏰{ass.time}</span>}
+                          {(rank.get(ass.instanceId)||1)>1&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,color:"#D9BC5C"}}>⚠️ copie {rank.get(ass.instanceId)}</span>}
                         </div>
                       </div>
                       <button onClick={()=>onRemoveAssignment(ass.instanceId)} style={{background:"none",border:"none",color:"#D97070",cursor:"pointer",fontSize:16,padding:4}}>×</button>

@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { SFX } from "./sfx.js";
 import { PT_LIST } from "./themes.js";
-import { TASK_CATALOG, REWARD_CATALOG, CAT_LABELS, DIFF_COLOR } from "./catalog.js";
+import { TASK_CATALOG, REWARD_CATALOG, CAT_LABELS, DIFF_COLOR, assignmentKey } from "./catalog.js";
 import { uid, COLORS, THEMES, GLOBAL_CSS, isThemeUnlocked, pickStarterThemes, displayName, DAYS_SHORT } from "./shared.js";
 
 export function SetupWizard({ existing, onDone, onCancel }) {
@@ -57,14 +57,32 @@ export function SetupWizard({ existing, onDone, onCancel }) {
   const allTasks = [...TASK_CATALOG, ...customTasks];
   const allRewards = [...REWARD_CATALOG, ...customRewards];
 
+  // v2.16.55 — c'est ICI qu'ont été fabriquées les 67 assignations en double de la prod. Le catalogue
+  // de gauche n'a jamais montré qu'une tâche était DÉJÀ ajoutée, et la colonne de droite fait des
+  // centaines de lignes : recliquer « Bon déjeuner » pour vérifier ajoutait une 2e ligne identique,
+  // pour les quatre enfants d'un coup (`playerIds` = tout le monde, éclaté en une copie par enfant
+  // au `finish()`). Résultat en prod : « Sac à dos (MDP) » ×3-4 et « Vider ma boîte à lunch » ×5 chez
+  // chaque enfant. Deux garde-fous, aucun changement de capacité : la ligne du catalogue affiche
+  // maintenant son compte, et un ajout strictement identique (même tâche, mêmes jours, même heure,
+  // mêmes enfants) ne crée plus de copie — le bouton « ⧉ » de la colonne de droite reste le chemin
+  // explicite quand on veut vraiment deux lignes de la même tâche.
+  const [dupHint, setDupHint] = useState(null); // taskId refusé, pour le retour visuel
   const addAssignment = (taskId) => {
     SFX.click();
-    setAssignments(a => [...a, {
+    const fresh = {
       instanceId: uid(), taskId,
       playerIds: activePlayers.map(p=>p.id),
       days: mode === "week" ? [0] : [],
       time: "",
-    }]);
+    };
+    const sameSet = (x,y) => x.length===y.length && [...x].sort().join()===[...y].sort().join();
+    setAssignments(a => {
+      const clash = a.some(x => x.taskId===fresh.taskId
+        && assignmentKey(x)===assignmentKey(fresh)
+        && sameSet(x.playerIds||[], fresh.playerIds));
+      if (clash) { setDupHint(taskId); setTimeout(()=>setDupHint(h=>h===taskId?null:h), 2200); return a; }
+      return [...a, fresh];
+    });
   };
   const removeAssignment = (iid) => { SFX.click(); setAssignments(a => a.filter(x=>x.instanceId!==iid)); };
   const duplicateAssignment = (iid) => { SFX.click(); setAssignments(a => { const src=a.find(x=>x.instanceId===iid); if(!src)return a; return [...a,{...src,instanceId:uid()}]; }); };
@@ -280,8 +298,14 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                 <Btn active={catFilter==="all"} onClick={()=>setCatFilter("all")} style={{padding:"3px 7px",fontSize:7}}>Tout</Btn>
                 {Object.entries(CAT_LABELS).map(([k,l])=><Btn key={k} active={catFilter===k} onClick={()=>setCatFilter(k)} style={{padding:"3px 7px",fontSize:7}}>{l}</Btn>)}
               </div>
-              {allTasks.filter(t=>catFilter==="all"||t.cat===catFilter).map(task=>(
-                <div key={task.id} onClick={()=>addAssignment(task.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.5)",border:"2px solid #333",borderRadius:4,cursor:"pointer",transition:"border 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent} onMouseLeave={e=>e.currentTarget.style.borderColor="#333"}>
+              {allTasks.filter(t=>catFilter==="all"||t.cat===catFilter).map(task=>{
+                // v2.16.55 — la ligne dit maintenant si la tâche est déjà dans la colonne de droite
+                // (et combien de fois). Sans ça, la seule façon de le savoir était de faire défiler
+                // des centaines de lignes — d'où les reclics et les doublons.
+                const already=assignments.filter(a=>a.taskId===task.id).length;
+                const refused=dupHint===task.id;
+                return (
+                <div key={task.id} onClick={()=>addAssignment(task.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(0,0,0,0.5)",border:`2px solid ${refused?"#D9BC5C":already?"#5CAD68":"#333"}`,borderRadius:4,cursor:"pointer",transition:"border 0.15s",opacity:already?0.72:1}} onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent} onMouseLeave={e=>e.currentTarget.style.borderColor=refused?"#D9BC5C":already?"#5CAD68":"#333"}>
                   <span style={{fontSize:20}}>{task.emoji}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#ddd",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{task.label}</div>
@@ -289,11 +313,14 @@ export function SetupWizard({ existing, onDone, onCancel }) {
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#85CDD1"}}>⚡{task.xp}</span>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C"}}>🪙{task.coins}</span>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:DIFF_COLOR(task.diff)}}>{task.diff}</span>
+                      {already>0 && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#5CAD68"}}>✓ déjà ajoutée{already>1?` ×${already}`:""}</span>}
                     </div>
                   </div>
-                  <span style={{color:T.accent,fontSize:16,fontWeight:"bold"}}>+</span>
+                  {refused
+                    ? <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#D9BC5C",textAlign:"right",lineHeight:1.5}}>déjà là —<br/>« ⧉ » à droite<br/>pour une 2e</span>
+                    : <span style={{color:already?"#5CAD68":T.accent,fontSize:16,fontWeight:"bold"}}>{already?"✓":"+"}</span>}
                 </div>
-              ))}
+              );})}
               <button onClick={addCustomTask} style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,padding:"8px",background:"rgba(0,0,0,0.4)",border:`2px dashed ${T.accent}60`,color:T.accent,borderRadius:4,cursor:"pointer",marginTop:4}}>+ Tâche personnalisée</button>
             </div>
 

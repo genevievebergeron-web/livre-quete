@@ -4,7 +4,7 @@ import { CALM, setCalm } from "./calm.js";
 import { PLAYER_THEMES, THEME_XP_UNLOCK, PT_LIST, getPlayerTheme, BASE_SHOP_ITEMS, shopItemById, ULTRA_ITEMS, pickUltraLegendary } from "./themes.js";
 import { PET_STAGES, PET_DAILY_CAP, gainPet, petLevel, petStage, petBar, mergePetXp, PET_SPRITES, PET_SPRITE_KEY, petSpriteKey, ITEM_SPRITES, renderItemToCtx, PET_ELEMENTS, PET_ELEMENT_KEYS, petTierForLevel, petActiveElement, petIsLegendary, petFormLabel, petPalOverride, petPendingTier, petEvoOptions } from "./pets.js";
 import { LEVELS, getLevel, getLevelTitle, xpBar } from "./leveling.js";
-import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, weeklyRewards, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, calEventIconName, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges } from "./catalog.js";
+import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, weeklyRewards, REWARD_CAT_BADGE, REWARD_TIERS, tierOf, RARITIES, rarityOf, PRICE_MULT, baseCost, priceOf, DIFF_PRESETS, CHILD_DIFF_PRESETS, CAT_META, catMeta, normLabel, CAL_TYPES, calEventIcon, calEventIconName, REFUS_MSGS, refusMsg, BADGES, completionCatCounts, checkBadges, dedupeAssignments, assignmentKey } from "./catalog.js";
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./ui.jsx";
@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.54";
+export const APP_VERSION = "2.16.55";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -287,7 +287,18 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
     prevBossClaimedRef.current=pState.bossClaimed;
   },[pState.bossClaimed]);
   const pMode = playerMode || config.mode || "routine";
-  const allMine = assignments.filter(a=>a.playerIds.includes(player.id));
+  // v2.16.55 — une seule carte par assignation réellement distincte. Les 67 copies exactes déjà
+  // présentes en prod (voir `dedupeAssignments`, catalog.js) donnaient à l'enfant 3 à 5 cases à
+  // cocher pour la MÊME tâche : cocher l'une n'éteint pas les autres (la clé de complétion contient
+  // l'`instanceId`). Filtre de vue seulement — rien n'est supprimé, et les `instanceId` cités par
+  // ses rituels sont ceux qu'on garde en priorité pour qu'un rituel ne perde jamais une entrée.
+  const ritualInstIds = useMemo(()=>{
+    const s=new Set(); for(const r of (pState.routines||[])) for(const id of (r.taskIds||[])) s.add(id); return s;
+  },[pState.routines]);
+  const allMine = useMemo(
+    ()=>dedupeAssignments(assignments.filter(a=>a.playerIds.includes(player.id)), ritualInstIds),
+    [assignments, player.id, ritualInstIds]
+  );
   const isWeekAss = (a)=> Array.isArray(a.days) && a.days.length>0;
   const routineMine = allMine.filter(a=>!isWeekAss(a));
   const weekMine = allMine.filter(isWeekAss);
@@ -2835,12 +2846,21 @@ export default function App() {
     if(!taskId||!playerIds?.length)return;
     // assType: "week" → tâche planifiée (jours choisis = récurrence hebდo par jour); sinon → routine (sans jour)
     const days = assType==="week" ? ((Array.isArray(customDays)&&customDays.length)?[...customDays].sort((a,b)=>a-b):[0,1,2,3,4]) : [];
-    const newAss = playerIds.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:time||"",createdAt:Date.now()}));
+    // v2.16.55 — même garde-fou que l'assistant : un enfant qui a DÉJÀ exactement cette assignation
+    // (même tâche, mêmes jours, même heure) n'en reçoit pas une 2e. Chaque copie était une case à
+    // cocher de plus dans sa journée, sans aucun moyen de le voir d'ici.
+    const existingKeys = new Set();
+    for (const a of (config.assignments||[])) for (const pid of (a.playerIds||[])) existingKeys.add(pid+"§"+assignmentKey(a));
+    const probe = {taskId,days,time:time||""};
+    const fresh = playerIds.filter(pid=>!existingKeys.has(pid+"§"+assignmentKey(probe)));
+    const skipped = playerIds.length - fresh.length;
+    const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
+    if(!fresh.length){ showToast(`✓ ${task?.label||"Cette tâche"} est déjà assignée à ${playerIds.length>1?"ces enfants":"cet enfant"}.`,"#85CDD1",3500); return; }
+    const newAss = fresh.map(pid=>({instanceId:uid(),taskId,playerIds:[pid],days,time:time||"",createdAt:Date.now()}));
     const newCfg={...config,assignments:[...(config.assignments||[]),...newAss]};
     setConfig(newCfg); persist(newCfg,gameStates);
-    const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===taskId);
-    logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${playerIds.length} joueur${playerIds.length>1?"s":""})`,"#5CAD68");
-    showToast("➕ Tâche ajoutée!","#5CAD68");
+    logAction(`➕ Tâche ajoutée: ${task?.label||taskId} (${fresh.length} joueur${fresh.length>1?"s":""}${skipped?`, ${skipped} déjà assigné${skipped>1?"s":""}`:""})`,"#5CAD68");
+    showToast(skipped?`➕ Tâche ajoutée! (${skipped} l'avai${skipped>1?"en":""}t déjà)`:"➕ Tâche ajoutée!","#5CAD68");
   },[config,gameStates,persist,logAction,showToast]);
 
   // v2.6.0 — Quête de réparation 🕊️ (chantier approuvé le 25 juillet) : le PARENT crée une tâche

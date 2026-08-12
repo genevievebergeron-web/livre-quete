@@ -199,6 +199,54 @@ export const dedupeTasksByLabel = (tasks) => {
   return out;
 };
 
+// v2.16.55 — Même problème que ci-dessus, un cran plus haut : ce ne sont plus les TÂCHES qui sont
+// en double dans le catalogue, ce sont les ASSIGNATIONS. En prod, `config.assignments` porte 317
+// entrées dont 67 sont des copies exactes d'une autre (même tâche, même enfant, mêmes jours, même
+// heure) : « Bon déjeuner » ×3-4, « Sac à dos (MDP) » ×3-4, « Vider ma boîte à lunch » ×5… chez les
+// quatre enfants. Chaque copie est une CARTE DE PLUS dans la journée de l'enfant, avec sa propre
+// case à cocher (la clé de complétion est bâtie sur `instanceId`) — il doit donc cocher « Prendre ma
+// douche » trois fois, ou en laisser deux allumées toute la journée.
+//
+// `assignmentKey` sert aux deux usages : masquer les copies côté enfant, et les MARQUER côté parent
+// (le portail parent est la seule surface qui peut vraiment les supprimer — on n'y masque rien).
+// `isRecurring` fait partie de la clé pour que les quêtes auto de la semaine de garde
+// (`weeklyQuests.assignments`) ne se confondent jamais avec une assignation manuelle identique.
+export const assignmentKey = (a) => [
+  a?.taskId || "",
+  (Array.isArray(a?.days) ? [...a.days].sort((x,y)=>x-y) : []).join("-"),
+  a?.time || "",
+  a?.oneDay || "",
+  a?.teamSplit ? "1" : "",
+  a?.repair ? "1" : "",
+  a?.isRecurring ? "1" : "",
+].join("|");
+
+// ⚠️ `assignmentKey` ne contient PAS `playerIds` : c'est la clé du « quoi / quand », et les appelants
+// qui raisonnent par enfant (portail parent, `handleAddAssignment`) ajoutent eux-mêmes la dimension
+// joueur, parce qu'une assignation d'équipe `["a","b"]` donne bel et bien sa carte à l'enfant `a`.
+// Le regroupement de `dedupeAssignments`, lui, ajoute l'ensemble des joueurs : sans ça, deux quêtes
+// auto de la semaine (même tâche, même jour, deux binômes différents) se replieraient l'une sur l'autre.
+export const assignmentGroupKey = (a) =>
+  (Array.isArray(a?.playerIds) ? [...a.playerIds].sort() : []).join(",") + "§" + assignmentKey(a);
+
+// Ne SUPPRIME rien : filtre de vue. `preferIds` (les `instanceId` cités par les rituels de l'enfant)
+// décide quelle copie survit, pour qu'un rituel ne perde jamais son entrée au profit d'une copie
+// orpheline. À défaut, la première occurrence est gardée.
+export const dedupeAssignments = (list, preferIds) => {
+  const prefer = preferIds instanceof Set ? preferIds : new Set(preferIds||[]);
+  const byKey = new Map();
+  for (const a of (list||[])) {
+    if (!a || !a.instanceId) continue;
+    const k = assignmentGroupKey(a);
+    const kept = byKey.get(k);
+    if (!kept) { byKey.set(k, a); continue; }
+    // une copie déjà gardée : on ne remplace que si la nouvelle est citée par un rituel et pas l'autre
+    if (prefer.has(a.instanceId) && !prefer.has(kept.instanceId)) byKey.set(k, a);
+  }
+  const keep = new Set([...byKey.values()].map(a=>a.instanceId));
+  return (list||[]).filter(a => a && keep.has(a.instanceId));
+};
+
 // v1.85.0 (Lot 2 #9) — catégories de calendrier au-delà de Événement/Devoir/Examen : tout ce qui
 // n'est pas scolaire (camp de jour, match/entraînement, vaccin, intervenant à la maison…) avait
 // jusqu'ici la même icône générique 📅. `type`/`recur`/`date` restent les mêmes champs — extension
