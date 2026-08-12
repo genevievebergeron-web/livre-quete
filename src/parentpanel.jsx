@@ -12,7 +12,7 @@ import { Countdown } from "./timers.jsx";
 import { UIIcon, Coin, Xp } from "./sprites.jsx";
 import { DAYS_SHORT, fmtDateShort, displayName, todayStamp, SHOP_UNLOCK_DEFAULT } from "./shared.js";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
-import { isCustodyWeek, custodyWeekKey } from "./recurring.js";
+import { isCustodyWeek, custodyWeekKey, challengeDaysCount } from "./recurring.js";
 
 // v2.16.24 — Backlog #8/9 : 8 onglets à plat regroupés en 4 catégories.
 const PARENT_CATS = [
@@ -411,7 +411,16 @@ const ParentPanel = memo(function ParentPanel({ config, gameStates, parentMode, 
           const cwk = custodyWeekKey();
           const inCustody = isCustodyWeek();
           const challenges = config.weeklyChallenge?.challenges || [];
-          const checkinCount = (ch) => Object.values(ch.checkins||{}).filter(Boolean).length;
+          // v2.16.53 — le compteur « n/7 jours » additionnait TOUTES les coches jamais faites, sans
+          // égard à la semaine : `checkins` n'est jamais purgé (la fusion cloud en fait même une UNION
+          // increvable, voir merge.js), donc les coches des semaines précédentes s'empilaient. Constaté
+          // dans les données de prod du 12 août : les défis portaient encore 3 coches du 25-27 juillet,
+          // affichées « 3/7 jours ⭐ » pour la semaine du 7 août — juste au-dessus des sept pastilles
+          // J1..J7 toutes vides, qui elles ont toujours été calculées sur `cwk`. Le moteur de paliers
+          // (App.jsx) compte lui aussi par semaine (`challengeDaysCount`) : le parent voyait donc un
+          // chiffre qui ne correspondait ni aux pastilles ni à ce qui est réellement payé, et qui
+          // pouvait dépasser 7 (12/7…) en s'accumulant. Même fonction que le moteur, une seule vérité.
+          const checkinCount = (ch) => challengeDaysCount(ch.checkins, cwk);
           return (
             <div>
               <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"var(--txt-muted,#888)",marginBottom:10}}>🌟 DÉFIS PERSONNELS DE LA SEMAINE</div>

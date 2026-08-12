@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.53", date:"2026-08-12", features:[
+    "🌟 Dans le portail parent, le compte de jours du défi de la semaine (« 3/7 jours ») additionnait aussi les coches des semaines d'avant. Il ne compte plus que la semaine en cours, comme les sept pastilles juste en dessous.",
+  ]},
   { version:"2.16.52", date:"2026-08-11", features:[
     "📖 La page « Nouveautés » du portail parent montrait encore les nouveautés de juin (versions 1.2 à 1.26) et jamais les récentes. Elle affiche maintenant les 30 dernières versions, la plus récente en haut.",
   ]},

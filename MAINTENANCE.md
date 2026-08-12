@@ -662,3 +662,34 @@ Corrigé en `v2.16.52` (tri par position dans le `CHANGELOG` + `seenVersions` d�
 ### 💡 À signaler à Gen (pas un bug)
 - [ ] **🔴 Toujours ouvert — la restauration des soldes du 28 juillet.** Inchangé depuis le passage du 10 août : `coins` **12 / 0 / 33 / 30**, `coinsLifetime` **947 / 317 / 376 / 1277**, strictement identiques. `Le GOAT!!!` (l'enfant qui a signalé `bug_hlu9mkd`) est toujours à **0 pièce et +0 de gain**. Le code est réparé depuis `v2.16.45` ; le montant à restaurer reste ta décision.
 - 💡 **Méthode qui a payé ce passage** : lire **tous** les champs de `config` en prod, pas seulement ceux où les enfants écrivent. `announcements`, `weeklyQuests` et `weeklyChallenge` n'ont jamais été audités de cette façon.
+
+---
+
+## Passage du 2026-08-12 (routine nocturne autonome)
+
+### 🌐 Lecture de l'API de production
+- **Accessible** (HTTP 200), `savedAt` **2026-08-12T02:35:11Z** — l'app a resservi ce soir. Lecture seule, **aucune écriture en prod**.
+
+### 🐛 Bugs signalés par les enfants
+- **Aucun nouveau.** Toujours les mêmes **14** `config.bugs`, identiques id pour id depuis le 31 juillet (`bug_hlu9mkd` le plus récent), tous déjà classés lors des passages précédents. Dernier message du fil famille : **9 août**.
+
+### 📋 Logs techniques
+- `config.errorLogs` **vide** — 11e lecture depuis que le journal a été réparé (`v2.16.42`), donc un vide qui veut enfin dire quelque chose.
+
+### ✅ Vérification du correctif de la veille
+- `updateFeedEntries` en prod : **30 entrées, `2.16.52` en tête → `2.16.23` en queue**, plus une seule version de juin. Le correctif `v2.16.52` a bien pris sur la vraie donnée, tout seul, au chargement suivant.
+
+### 🔍 Intégrité des données (aucun problème)
+- **0** assignation orpheline (`cust_` pointant une tâche perso inexistante) sur 317, **0** assignation pointant un joueur inconnu, 4 `gameStates` alignés sur 4 joueurs.
+
+### 🔴 Bug trouvé DANS LES DONNÉES (personne ne l'avait signalé) — corrigé en `v2.16.53`
+La piste laissée par le passage du 11 août (« auditer `weeklyChallenge` ») a payé du premier coup. Dans les données : `weeklyChallenge.weekKey` = **`2026-07-24`** alors que `weeklyQuests.generatedForWeek` = **`2026-08-07`**. Le défi perso ne se régénère jamais — voulu, ce n'est pas le bug. En remontant le fil, par contre :
+
+`parentpanel.jsx` comptait les jours du défi avec `Object.values(ch.checkins||{}).filter(Boolean).length`, soit **toutes les coches jamais faites**, sans égard à la semaine. Or `checkins` n'est jamais purgé, et la fusion cloud en fait une **UNION volontairement increvable** (`merge.js`) : ça s'empile indéfiniment. Résultat lu en prod : le portail parent affichait **« 3/7 jours ⭐ », « 2/7 », « 1/7 »** pour la semaine du 7 août, **juste au-dessus des sept pastilles J1..J7 toutes vides** (elles, calculées sur la semaine en cours), pendant que le moteur de paliers d'`App.jsx` comptait, lui aussi, par semaine. Trois lectures du même défi, deux vérités — et un chiffre qui finit par **dépasser 7** (12/7, 15/7…) à mesure que les semaines s'ajoutent.
+
+Corrigé en `v2.16.53` : `checkinCount` appelle `challengeDaysCount(ch.checkins, cwk)`, la fonction du moteur de paliers. Rien n'est effacé (les purger serait annulé par l'UNION de la fusion) — les vieilles coches sont simplement ignorées hors de leur semaine. Vérifié sur la vraie donnée téléchargée : **3/7 → 0/7**, **2/7 → 0/7**, **0/7 → 0/7**, **1/7 → 0/7**, ce qui colle enfin aux pastilles et à `challengeTiers`. Détail : entrée `PROJET-ETAT.md` v2.16.53.
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 Toujours ouvert — la restauration des soldes du 28 juillet.** Inchangé depuis le 9 août : `coins` **12 / 0 / 33 / 30**, `coinsLifetime` **947 / 317 / 376 / 1277**. `Le GOAT!!!` (l'enfant qui a signalé `bug_hlu9mkd`) est toujours à **0 pièce et +0 de gain**. Le code est réparé depuis `v2.16.45` ; le montant à restaurer reste ta décision.
+- [ ] **👤 Décision de conception à trancher — le défi perso ne se réinitialise jamais.** Le texte du **24 juillet** est encore présenté aux enfants comme « DÉFI DE LA SEMAINE », trois semaines plus tard. Deux options : (a) le laisser persister jusqu'à ce qu'un parent le change (comportement actuel), ou (b) le remettre à zéro à chaque semaine de garde comme les quêtes récurrentes, quitte à afficher « Défi à venir… » tant que rien n'est écrit. La routine n'a pas tranché toute seule.
+- 💡 **La méthode a encore payé, deux passages de suite** : lire **tous** les champs de `config` en prod trouve des bugs que personne ne signale. Reste jamais audité de cette façon : `announcements` (9 entrées, dont plusieurs textes identiques), `selectedRewards`, `customRewards`, `boss`.
