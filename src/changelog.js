@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.57", date:"2026-08-13", features:[
+    "🎁 Dans la boutique, onglet Récompenses : quand tu tapes sur une récompense que tu ne peux pas prendre, l'appli te dit enfin pourquoi. Avant, il ne se passait absolument rien — ni son ni message. Maintenant : « il t'en manque 25 » si c'est les pièces, ou « reviens dans ~20 min » si ton héros se repose.",
+    "🔒 Et une récompense que tu ne peux pas prendre tout de suite s'affiche grisée avec un cadenas, comme partout ailleurs dans le jeu — au lieu de montrer « Acheter » en or et de refuser après coup.",
+  ]},
   { version:"2.16.56", date:"2026-08-12", features:[
     "🎁 La boutique respecte enfin les récompenses cochées par le parent. Elle tirait dans le catalogue complet et ignorait la page « Récompenses » de l'assistant : ce soir encore, 4 des 8 récompenses offertes aux enfants étaient des récompenses qui avaient été décochées.",
     "🛠️ Côté parent : décocher une récompense tient maintenant après une synchro (avant, l'autre appareil la remettait), et les récompenses maison créées avec « + Récompense personnalisée » peuvent enfin apparaître en boutique. Une récompense à 0 pièce n'y va jamais — elle serait gratuite à l'infini.",

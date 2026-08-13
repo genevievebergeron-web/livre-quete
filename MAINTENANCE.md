@@ -4,6 +4,30 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-13 (routine autonome, nuit)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 238 ko, `savedAt` `2026-08-13T02:35:44Z`. **Aucune écriture.**
+
+### 🐛 Bugs traités
+- **Rien de neuf à traiter.** `config.errorLogs` **vide** (et depuis `v2.16.42` un journal vide veut dire « aucune erreur », plus « le journal est cassé »). `config.bugs` **inchangé à 14 entrées**, la plus récente datant du **31 juillet** — aucun signalement d'enfant depuis 13 jours. Fil de famille sans message neuf depuis le 9 août. `pending` vide chez les 4 enfants, `removalRequests`/`coinOffers`/`momentRequests`/`repairEvents`/`teamInvites`/`childTaskProposals` tous vides.
+- **Les 3 signalements avatar/maison encore ouverts dans `bugs` (27-30 juillet) n'ont pas été touchés** — ils tombent dans la **réserve avatar** (bloc 🛑 de `PROJET-ETAT.md`) : « changer les yeux ne marche pas », « un nouveau masque met toujours un casque de chevalier », « je peux pas déplacer les choses de ma maison ». À faire avec Gen, pas en autonome.
+- **Deux autres relus et déjà couverts** : « le coffre se recharge très vite parfois » et « familier peut jouer à l'infini » → tous deux dans le correctif d'énergie multi-appareils déjà livré (`changelog.js` : « les coffres ne se rechargent plus aussi vite »). « Je pèse sur Maison/Spécial et rien ne se passe » → `v2.15.7`… **sur les onglets cosmétiques seulement**, d'où le correctif `v2.16.57` de cette nuit sur l'onglet Récompenses.
+
+### 📋 Audit de données — 5 champs jamais audités, tous SAINS
+Première fois en 5 nuits que la méthode « auditer un champ de `config` contre la donnée réelle » ne sort **aucun** bug. C'est une information en soi : les champs à fort volume sont désormais couverts. Résultats, pour que la prochaine session ne les refasse pas :
+
+1. **`removedCustomTasks` (145) + `removedAssignments` (335)** — les deux listes de pierres tombales sont plus longues que les listes vivantes (83 tâches, 317 assignations), ce qui avait l'air suspect. **Sain** : 335/335 et 145/145 uniques, zéro assignation vivante tombstonée, et les **58 tâches tombstonées encore dans `customTasks` sont les 58 qu'une assignation vivante référence encore** — exactement ce que `_keepTask` de `merge.js` (correctif 2A, `v2.5.0`) est censé garder pour éviter les orphelines. **Zéro zombie** (tâche supprimée sans assignation mais toujours là) et **zéro assignation orpheline**.
+2. **`pendingCelebrations`** — 13 fêtes en file (2 / 0 / 6 / 5). **Sain, et instructif** : ce sont les fêtes différées de quêtes validées par le parent pendant que l'enfant n'était pas connecté, consommées à sa prochaine ouverture (`consumeCelebrations`). Preuve croisée : les totaux de pièces de chaque file valent **exactement** les soldes regagnés le 9 août — 8+4 = **12**, 5+5+5+8+5+5 = **33**, 5+5+5+5+10 = **30**. Donc les pièces sont bien créditées, seule la fête attend — et **les 3 enfants n'ont pas ouvert l'app depuis le 9 août**.
+3. **`xpLog`** — 500 / **0** / 500 / 500. Le 0 (Elli) intriguait avec 2659 XP au compteur. **Sain** : `playerprofile.jsx:53` retombe sur `completedAt` pour tout jour sans entrée `xpLog`, et Elli n'a rien complété depuis l'ajout du journal (`v2.16.32`) — c'est le même enfant qui affiche +0 pièce le 9 août.
+4. **`dailyClaimed`** — clés `day` au format jour local (`todayStamp`), cohérentes avec le lecteur (`App.jsx:1239`). La variable locale s'appelle `wk` dans `handleClaimDaily` (nom trompeur, comportement correct).
+5. **`customRewards` / `selectedRewards`** — contre-vérification du correctif de la veille (`v2.16.56`) : les 4 `rw_hydre_*` à `cost:0` sont bien **exclues** de la boutique par le filtre `baseCost(r) > 0`. À noter pour Gen, **sans conséquence visible** : `selectedRewards` porte 20 ids dont **7 fantômes** (`rw01`…`rw06`, `rw09`) — écrits par l'ancien pré-cochage de l'assistant, jamais par un clic de Gen, et corrigés à la source par `v2.16.56`. Le bassin réel de la boutique est donc de **9 récompenses pour un tirage de 8** : le tirage quotidien ne fait plus tourner qu'un seul item par jour. Ce n'est **pas** un bug (9 cochées = 9 offertes, l'assistant affiche bien 9 cases cochées sur 17), mais si Gen trouve la boutique figée, **la réponse est là** : cocher plus de récompenses à l'étape 3 de l'assistant relance la variété.
+
+### 📋 Champs de `config` encore jamais audités
+`feed` (60), `seenVersions` (243), `updateFeedEntries` (30, seulement inspecté sous l'angle de la taille en `v2.14.1`), `boss`, plus côté joueur : `owned`/`badges` contre les catalogues, `refusals` (vide partout alors que `refusedKeys` compte 11-28 entrées — **candidat « champ écrit jamais lu »**), `hiddenWeek`, `calendar`, `routines`.
+
+---
+
 ## Passage du 2026-07-21
 
 ### 🐛 Bugs traités

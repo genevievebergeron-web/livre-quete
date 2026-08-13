@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.56";
+export const APP_VERSION = "2.16.57";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -1512,9 +1512,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     const rPrice=priceOf(r);
                     const canBuy=pState.coins>=rPrice;
                     const bought=pState.boughtRewards?.includes(r.id);
+                    // v2.16.57 — les DEUX manques de cet onglet, corrigés ici (la grille cosmétique
+                    // juste en dessous, App.jsx ~1561, avait déjà les deux depuis v2.15.7 — jamais
+                    // reportés sur l'onglet Récompenses, celui des récompenses de la vraie vie) :
+                    //  1. clic sans pièces = silence TOTAL (ni son ni message). La grille cosmétique
+                    //     dit « il t'en manque X ». Ici l'enfant tape et rien ne répond.
+                    //  2. l'énergie n'était pas regardée : une récompense payable s'affichait
+                    //     « Acheter » en or plein contraste, puis handleBuy la refusait avec le
+                    //     message générique « la boutique rouvre dans ~X min », sans lien visible
+                    //     avec la carte tapée — exactement le motif de plainte de v2.15.7
+                    //     (« je pèse et rien ne se passe »), l'énergie étant le même pool pour
+                    //     boutique + Mon Perso + coffres.
+                    const rHasEnergy = currentEnergy(pState) >= SHOP_ENERGY;
+                    const rLocked = !bought && (!canBuy || !rHasEnergy);
                     return (
-                      <div key={r.id} onClick={()=>canBuy&&!bought&&onBuy(r,player.id)} className={bought?"":T2.cls}
-                        style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(0,0,0,0.4)",border:bought?"2px solid #5CAD68":undefined,borderRadius:4,cursor:canBuy&&!bought?"pointer":"default",opacity:!canBuy&&!bought?0.4:1}}>
+                      <div key={r.id} onClick={()=>{ if(bought) return;
+                          if(!canBuy){ SFX.click&&SFX.click(); showToast(`🪙 Pas assez de pièces! Il t'en manque ${rPrice-(pState.coins||0)}.`,"#D98C8C",2600); return; }
+                          if(!rHasEnergy){ SFX.click&&SFX.click(); const m=minsToEnergy(pState,SHOP_ENERGY); showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour cette récompense!`,"#85CDD1",3000); return; }
+                          onBuy(r,player.id); }} className={bought?"":T2.cls}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(0,0,0,0.4)",border:bought?"2px solid #5CAD68":undefined,borderRadius:4,cursor:bought?"default":rLocked?"not-allowed":"pointer",opacity:rLocked?0.4:1}}>
                         <span className="icon-tile" style={{width:38,height:38,flex:"0 0 38px"}}><UIIcon name={r.id} emoji={r.emoji} size={26} block/></span>
                         <div style={{flex:1}}>
                           <div style={{fontFamily:"'VT323',monospace",fontSize:15,color:bought?"#5CAD68":"#ddd",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -1523,8 +1539,8 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                           </div>
                           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:bought?"#5CAD68":"#D9BC5C"}}>{bought?"RÉCLAMÉ!":<>{rPrice} <Coin size={9}/></>}</div>
                         </div>
-                        {!bought&&canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
-                        {!bought&&!canBuy&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}><UIIcon name="lock" emoji="🔒" size={12} style={{opacity:0.6}}/></span>}
+                        {!bought&&!rLocked&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:"#D9BC5C"}}>Acheter</span>}
+                        {rLocked&&<span style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,color:"#444"}}><UIIcon name="lock" emoji="🔒" size={12} style={{opacity:0.6}}/></span>}
                         {bought&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
                           <button onClick={(e)=>{e.stopPropagation();SFX.click();onUnclaimReward&&onUnclaimReward(r);}}
                             style={{fontFamily:"'Press Start 2P',monospace",fontSize:5,padding:"4px 6px",background:"rgba(0,0,0,0.6)",color:"#D99248",border:"1px solid #D99248",borderRadius:3,cursor:"pointer",whiteSpace:"nowrap"}}>↩️ J'ai changé d'idée</button>
