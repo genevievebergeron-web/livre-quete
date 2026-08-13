@@ -8,7 +8,11 @@ import { TASK_CATALOG, CAT_LABELS, DIFF_COLOR, estMinOf, REWARD_CATALOG, weeklyR
 import { Countdown, HeaderClock, TimeTimerDisc, TaskTimerModal } from "./timers.jsx";
 import { PetSprite, ItemSprite, HELD_WEAPON_IDS, AVATAR_EQUIP_ANCHORS, equipAnchorStyle, EquippedGear, badgeSymbol, renderBadgeToCtx, BadgeIcon, CHESTS, pickFromChest, renderChestToCtx, ChestSprite, UIIcon, Coin, Xp } from "./sprites.jsx";
 import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./ui.jsx";
-import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog, SHOP_UNLOCK_DEFAULT } from "./shared.js";
+// v2.16.60 — `SHOP_UNLOCK_DEFAULT` n'est plus importé ici : le seul site d'App.jsx qui l'utilisait
+// (le dénominateur « 0/2 » de la boutique verrouillée) passe maintenant par `rotatingNeed`, qui
+// plafonne le seuil au nombre de rotatives réellement proposées. `parentpanel.jsx` (le sélecteur du
+// réglage) et `gating.js` continuent de l'importer depuis `shared.js`.
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -23,7 +27,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { BOSSES, BossSprite, BOSS_DIFF, ATTACKS, FAMILY_HP_MAX, familyHp, repairDamageFor, bossDamageTotal, bossJetons, heartsRow, bossQuestsAllDone, bossModifierOfDay, bossAtkDamage, PET_ATTACK_COST, petAttackDamage } from "./bosses.jsx";
 import { TimerView } from "./timerview.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
-import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining } from "./gating.js";
+import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining, rotatingNeed } from "./gating.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
 import { CHANGELOG } from "./changelog.js";
@@ -89,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.59";
+export const APP_VERSION = "2.16.60";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -237,7 +241,7 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // v2.16.7 — Chantier 6.6 : verrou du matin (parent-contrôlé) — cadrage ludique, jamais "verrouillé".
   const openAvatar = ()=>{
     if(isMorningLocked(player)){ showToast&&showToast("🚪 Les autres salles du Livre se réveillent après tes tâches du matin!","#D9BC5C",3500); return; }
-    if(isShopLocked(config,pState,assignments,player.id)){ const need=rotatingRemaining(config,pState,assignments,player.id); showToast&&showToast(`🔒 Fais encore ${need} tâche${need>1?"s":""} rotative${need>1?"s":""} aujourd'hui pour débloquer ton perso!`,"#D9BC5C",3500); return; }
+    if(isShopLocked(config,pState,assignments,player.id,myAssignments)){ const need=rotatingRemaining(config,pState,assignments,player.id,myAssignments); showToast&&showToast(`🔒 Fais encore ${need} tâche${need>1?"s":""} rotative${need>1?"s":""} aujourd'hui pour débloquer ton perso!`,"#D9BC5C",3500); return; }
     if(currentEnergy(pState)<AVATAR_ENERGY){ const m=minsToEnergy(pState,AVATAR_ENERGY); showToast&&showToast(`😴 Ton héros se repose… reviens dans ~${m} min pour changer de look!`,"#85CDD1",3500); return; }
     onPatchState&&onPatchState({energy:Math.max(0,currentEnergy(pState)-AVATAR_ENERGY),energyTs:new Date().toISOString()});
     setAvatarOpen(true);
@@ -1444,15 +1448,18 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
       )}
 
       </>)}
-      {homeTab==="shop" && (isShopLocked(config,pState,assignments,player.id) ? (
+      {homeTab==="shop" && (isShopLocked(config,pState,assignments,player.id,myAssignments) ? (
         <div style={{background:"rgba(0,0,0,0.4)",border:`2px solid ${pt.accent||player.color}55`,borderRadius:10,padding:20,textAlign:"center",marginTop:8}}>
           <div style={{fontSize:34,marginBottom:8}}>🔒</div>
           <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:pt.accent||player.color,marginBottom:10}}>BOUTIQUE VERROUILLÉE</div>
           <div style={{fontFamily:"'VT323',monospace",fontSize:17,color:"#ccc",lineHeight:1.4}}>
-            {(()=>{ const left=rotatingRemaining(config,pState,assignments,player.id); const s=left>1?"s":"";
+            {(()=>{ const left=rotatingRemaining(config,pState,assignments,player.id,myAssignments); const s=left>1?"s":"";
               return <>Fais encore <b style={{color:"#D9BC5C"}}>{left}</b> tâche{s} rotative{s} aujourd'hui pour débloquer la boutique!</>; })()}
           </div>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"var(--txt-muted,#888)",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{config?.shopUnlockCount??SHOP_UNLOCK_DEFAULT}</div>
+          {/* v2.16.60 — le dénominateur affichait le réglage brut du parent (2) même quand l'enfant
+              n'avait qu'une seule rotative dans sa journée : il montre maintenant le seuil réellement
+              exigé, celui qu'il est possible d'atteindre. */}
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"var(--txt-muted,#888)",marginTop:10}}>{rotatingDoneToday(assignments,pState.completed,player.id)}/{rotatingNeed(config,myAssignments)}</div>
         </div>
       ) : (<>
       {/* Shop */}

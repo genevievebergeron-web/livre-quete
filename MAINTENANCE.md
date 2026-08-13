@@ -4,6 +4,31 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-13 (routine autonome, nuit, 4e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 240 ko, `savedAt` `2026-08-13T08:36:01Z`. **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**, `config.bugs` **inchangé** (14 entrées, la plus récente du 31 juillet), `feed` sans message neuf (dernière entrée du 24 juillet), `removalRequests`/`momentRequests`/`coinOffers`/`teamInvites`/`childTaskProposals`/`repairEvents`/`removedProposals` tous vides, `pending` vide chez les 4 enfants. **Aucun signalement neuf — 4e nuit propre d'affilée.** Pas de Phase 2.
+- Soldes `coins` **12 / 0 / 33 / 30** et `coinsLifetime` **947 / 317 / 376 / 1277** inchangés depuis le 9 août. Le bloc 🔴 GEN de `PROJET-ETAT.md` reste valable mot pour mot.
+
+### 🔍 Trois pistes ouvertes puis refermées SANS bug — à ne pas re-auditer
+Consignées parce qu'un audit qui sort propre coûte le même temps la deuxième fois.
+1. **Le modificateur de boss du jour (`bossModifierOfDay`, `bosses.jsx`) est SAIN.** Ouvert par ressemblance avec la `v2.16.59` : même famille de tirage « déterministe par date », même hachage `h*31 + code` à la base. Mais ici la date n'est **pas** en fin de chaîne (`"2026-08-13#yeti_white"`), donc chaque caractère de date est encore multiplié par 31^k avant la fin — la graine bouge vraiment d'un jour à l'autre. **Rejoué sur 365 jours × 8 boss** : les 5 modificateurs sortent tous, répartition 67 à 81 sur 365. Rien à corriger. La leçon de la `v2.16.59` (rejouer la fonction plutôt que lire la formule) a servi **dans les deux sens** : elle a confirmé un bug la veille, elle innocente celui-ci.
+2. **L'énergie (`energy.js`) est SAINE.** `energyTs` traîne au 31 juillet / 8-10 août selon l'enfant avec des valeurs stockées de 40 à 65, ce qui ressemble à un compteur figé — mais `currentEnergy` ajoute le temps écoulé depuis `energyTs` (100 % en 3 h) : les quatre enfants sont à **100 %** aujourd'hui. La valeur stockée n'est pas censée être lue telle quelle.
+3. **`sessionMinutes` : anomalie réelle, mais sans conséquence.** Olivier porte `{day:"2026-08-08", minutes:465}` (7 h 45) là où les trois autres ont 2 minutes — c'est du **temps réel écoulé** avec l'onglet resté ouvert, exactement ce que le commentaire du minuteur annonce (« minutes RÉELLES écoulées, pas des ticks »). Surtout : **aucun joueur n'a de `dailyMinutesLimit`**, donc `isTimeLocked` répond toujours `false` et le budget-temps (Backlog #13) est **inactif en prod**. À reconsidérer seulement si Gen active un plafond — un compteur qui tourne pendant qu'un onglet dort le rendrait injuste.
+
+### 🔒 Le vrai bug de la nuit — trouvé deux fonctions plus bas dans `gating.js`
+`isShopLocked` exigeait des tâches **rotatives** qui, certains jours, n'existent nulle part. Mesures : `config.assignments` = 317 entrées dont **0 rotative** ; les 155 rotatives vivent toutes dans `config.weeklyQuests`, effacé une semaine sur deux, et invisibles en mode Rituel ⏰. Depuis la `v2.16.26` (2 août), **aucun des 4 enfants n'a complété une seule rotative** (clés `wq_*` de `completed` : 40/8/2/4, **toutes du 24 au 30 juillet**). Détail complet, preuves et correctif dans l'entrée `v2.16.60` de `PROJET-ETAT.md`.
+
+**Méthode qui a payé, à réutiliser** : compter ce que l'enfant peut **atteindre**, pas seulement ce qui est stocké. Le champ était sain (`weeklyQuests` avait bien ses 155 entrées, `generatedForWeek` à jour) ; c'est le croisement « ce que la règle exige » × « ce que l'écran propose » qui a sorti le bug.
+
+### 📋 Champs de `config` / `gameStates` encore jamais audités après ce passage
+`removedProposals` (vide), `seenVersions` (246), `hiddenRewards`, `refundedRewards`, `dismissedAnnouncements`, `removedRoutineIds`, `calendar` (14/24/13/10 par enfant), `refusedKeys` (28/11/22/22), `owned`, `badges`, `activeDays`, `challengeTiers`, `house`, `equipped`, `petEvo`/`petXp`/`petNickname`, `leagueTier`.
+
+---
+
 ## Passage du 2026-08-13 (routine autonome, nuit, 3e passage)
 
 ### 🌐 Lecture de l'API de production

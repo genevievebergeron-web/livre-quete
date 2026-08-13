@@ -49,16 +49,39 @@ export const rotatingDoneToday = (assignments, completed, playerId) => {
   ).length;
 };
 
-export const isShopLocked = (config, pState, assignments, playerId) => {
-  const need = config?.shopUnlockCount ?? SHOP_UNLOCK_DEFAULT;
-  if (need <= 0) return false; // 0 = parent a désactivé la condition
+// v2.16.60 — le verrou exigeait des quêtes rotatives que l'enfant n'avait PAS dans sa journée.
+// Deux situations, mesurées sur la donnée de prod, où le compteur restait bloqué à 0/2 pour
+// toujours : (a) en mode « rituel », les quêtes rotatives ne sont jamais affichées (elles portent
+// toutes un `days` non vide, donc elles vivent dans `weekMine`, que le mode rituel écarte) — deux
+// des quatre enfants sont dans ce mode ; (b) une semaine sur deux, hors semaine de garde,
+// `config.weeklyQuests` est mis à null et le tableau de bord ne reçoit AUCUNE rotative — pour les
+// quatre enfants cette fois. Dans les deux cas, la consigne « fais encore 2 tâches rotatives »
+// désignait des quêtes qui n'existaient nulle part.
+//
+// Correctif : on n'exige jamais plus de rotatives qu'il y en a RÉELLEMENT dans la journée que
+// l'enfant a sous les yeux. `visible` = la liste affichée (`myAssignments` du tableau de bord,
+// donc déjà filtrée par mode, par jour et dédoublonnée) — 0 rotative visible = pas de verrou.
+// La décision de Gen (Backlog #15 : débloquer après X rotatives) est intacte : dès qu'une semaine
+// de garde donne 3 à 10 rotatives par jour et par enfant, le seuil de 2 s'applique comme avant.
+export const rotatingAvailableToday = (visible) => (visible || []).filter(a => a.isRecurring).length;
+
+// Seuil réellement exigé aujourd'hui = min(réglage du parent, rotatives réellement proposées).
+export const rotatingNeed = (config, visible) => {
+  const want = config?.shopUnlockCount ?? SHOP_UNLOCK_DEFAULT;
+  if (want <= 0) return 0; // 0 = parent a désactivé la condition
+  return Math.min(want, rotatingAvailableToday(visible));
+};
+
+export const isShopLocked = (config, pState, assignments, playerId, visible) => {
+  const need = rotatingNeed(config, visible);
+  if (need <= 0) return false;
   return rotatingDoneToday(assignments, pState?.completed, playerId) < need;
 };
 
 // Combien de tâches rotatives il reste à faire avant le déblocage (0 = déjà débloqué).
 // Ce calcul était réécrit à la main sur 4 sites d'appel dans `App.jsx`, dont un qui le refaisait
 // trois fois de suite dans la même phrase pour accorder les pluriels — d'où ce helper.
-export const rotatingRemaining = (config, pState, assignments, playerId) => {
-  const need = config?.shopUnlockCount ?? SHOP_UNLOCK_DEFAULT;
+export const rotatingRemaining = (config, pState, assignments, playerId, visible) => {
+  const need = rotatingNeed(config, visible);
   return Math.max(0, need - rotatingDoneToday(assignments, pState?.completed, playerId));
 };
