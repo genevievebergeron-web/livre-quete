@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { SFX } from "./sfx.js";
 import { PT_LIST } from "./themes.js";
-import { TASK_CATALOG, REWARD_CATALOG, CAT_LABELS, DIFF_COLOR, assignmentKey } from "./catalog.js";
+import { TASK_CATALOG, REWARD_CATALOG, DEFAULT_SELECTED_REWARDS, CAT_LABELS, DIFF_COLOR, assignmentKey } from "./catalog.js";
 import { uid, COLORS, THEMES, GLOBAL_CSS, isThemeUnlocked, pickStarterThemes, displayName, DAYS_SHORT } from "./shared.js";
 
 export function SetupWizard({ existing, onDone, onCancel }) {
@@ -25,7 +25,11 @@ export function SetupWizard({ existing, onDone, onCancel }) {
   // Task assignments: array of { instanceId, taskId, playerIds:[], days:[], time:"" }
   const [assignments, setAssignments] = useState([]);
   // Reward selection
-  const [selectedRewards, setSelectedRewards] = useState(new Set(["rw01","rw02","rw03","rw04","rw05"]));
+  // v2.16.56 — les défauts étaient "rw01".."rw05" : des ids qui n'ont JAMAIS existé dans REWARD_CATALOG
+  // (le catalogue est en "rw_ecran"/"rw_dessert"/...). Une famille neuve qui traversait l'étape 3 sans
+  // rien cocher enregistrait donc une sélection de 5 ids fantômes — invisible tant que la boutique
+  // ignorait `selectedRewards`, mais boutique vide dès que la v2.16.56 se met à la respecter.
+  const [selectedRewards, setSelectedRewards] = useState(new Set(DEFAULT_SELECTED_REWARDS));
   // Custom tasks / rewards
   const [customTasks, setCustomTasks] = useState([]);
   const [customRewards, setCustomRewards] = useState([]);
@@ -46,7 +50,7 @@ export function SetupWizard({ existing, onDone, onCancel }) {
       setTheme(existing.theme || "minecraft");
       setPin(existing.pin || "1146");
       setAssignments(existing.assignments || []);
-      setSelectedRewards(new Set(existing.selectedRewards || ["rw01","rw02","rw03"]));
+      setSelectedRewards(new Set(existing.selectedRewards?.length ? existing.selectedRewards : DEFAULT_SELECTED_REWARDS));
       setCustomTasks(existing.customTasks || []);
       setCustomRewards(existing.customRewards || []);
     }

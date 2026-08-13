@@ -115,11 +115,32 @@ export const REWARD_CATALOG = [
   { id:"rw_esclave", emoji:"🧞", label:"Ton parent est ton esclave 30 minutes",coins:90, moment:true, tier:"epique" },
   { id:"rw_bain",    emoji:"🛁", label:"Bain spécial mousse + chandelles",     coins:40, cat:"calme", moment:true, tier:"moyenne" },
 ];
+// v2.16.56 — Pré-cochage de l'étape 3 de l'assistant : de VRAIS ids du catalogue ci-dessus, un par
+// tranche de prix, aucun "moment" à planifier (le parent ajoute ceux-là en connaissance de cause).
+export const DEFAULT_SELECTED_REWARDS = ["rw_ecran","rw_dessert","rw_dejsoup","rw_bonbon","rw_debarrasse","rw_servi","rw_musique","rw_ricochet"];
+// v2.16.56 — Bassin de tirage de la boutique : ce que le PARENT a coché à l'étape 3 de l'assistant
+// (`config.selectedRewards`) plus ses récompenses maison (`config.customRewards`). Avant, la boutique
+// tirait en dur dans REWARD_CATALOG : les décochages du parent n'avaient aucun effet et ses récompenses
+// maison n'apparaissaient jamais nulle part.
+//   • `selectedRewards` absent/vide → tout le catalogue (familles d'avant l'assistant, rétrocompat).
+//   • une liste qui ne désigne QUE des ids inconnus (ex. les vieux "rw01".."rw09" jamais présents dans
+//     REWARD_CATALOG) → tout le catalogue aussi, plutôt qu'une boutique vide.
+//   • coût ≤ 0 → jamais mis en boutique : une récompense gratuite se réclame en boucle. C'est le cas des
+//     4 "rw_hydre_*" (données de test du 1er juillet, `cost:0`/`coins:0`) encore en prod.
+export const shopRewardPool = (config) => {
+  const all = [...REWARD_CATALOG, ...((config?.customRewards) || [])].filter(r => r && r.id && baseCost(r) > 0);
+  const sel = config?.selectedRewards;
+  if (!Array.isArray(sel) || !sel.length) return all;
+  const keep = new Set(sel);
+  const picked = all.filter(r => keep.has(r.id));
+  return picked.length ? picked : all;
+};
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
-export const weeklyRewards = (n=8) => {
+// v2.16.56 — `pool` : le bassin ci-dessus. Défaut = REWARD_CATALOG (comportement historique).
+export const weeklyRewards = (n=8, pool=REWARD_CATALOG) => {
   const wk = todayStamp();
   let seed = 0; for (let i=0;i<wk.length;i++) seed = (seed*31 + wk.charCodeAt(i)) >>> 0;
-  const arr = REWARD_CATALOG.map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
+  const arr = (pool||[]).map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
   arr.sort((a,b)=>a.k-b.k);
   return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
 };

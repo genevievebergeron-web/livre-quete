@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.56", date:"2026-08-12", features:[
+    "🎁 La boutique respecte enfin les récompenses cochées par le parent. Elle tirait dans le catalogue complet et ignorait la page « Récompenses » de l'assistant : ce soir encore, 4 des 8 récompenses offertes aux enfants étaient des récompenses qui avaient été décochées.",
+    "🛠️ Côté parent : décocher une récompense tient maintenant après une synchro (avant, l'autre appareil la remettait), et les récompenses maison créées avec « + Récompense personnalisée » peuvent enfin apparaître en boutique. Une récompense à 0 pièce n'y va jamais — elle serait gratuite à l'infini.",
+  ]},
   { version:"2.16.55", date:"2026-08-12", features:[
     "✔️ Fini les quêtes en double dans ta journée : « Bon déjeuner », « Sac à dos » ou « Vider ma boîte à lunch » apparaissaient 3, 4, parfois 5 fois, chacune avec sa propre case à cocher. Il n'en reste qu'une seule par quête, et cocher fonctionne du premier coup.",
     "🛠️ Côté parent : le catalogue de l'assistant affiche « ✓ déjà ajoutée » avant qu'on reclique, et le portail marque les copies exactes qui restent à supprimer.",

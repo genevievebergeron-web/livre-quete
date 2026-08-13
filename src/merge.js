@@ -220,7 +220,18 @@ export const mergeFamily = (base, incoming) => {
     childTaskProposals: [...propMap.values()],
     removedProposals,
     teamInvites,
-    selectedRewards: _uniq([...(bC.selectedRewards || []), ...(iC.selectedRewards || [])]),
+    // v2.16.56 — Récompenses cochées par le parent : DERNIÈRE ÉCRITURE GAGNE, plus une union.
+    // L'union rendait tout décochage impossible : dès qu'un appareil resynchronisait, sa copie
+    // remettait la récompense retirée. C'est une SÉLECTION (un choix de parent), pas un journal
+    // d'événements — même patron que `pin`/`mode`/`routineEnd` juste plus bas. Une liste vide ou
+    // absente ne peut pas écraser une liste réelle (sinon un appareil jamais passé par l'assistant
+    // effacerait la sélection de la famille).
+    selectedRewards: (() => {
+      const n = newerC.selectedRewards, o = (newer === base ? iC : bC).selectedRewards;
+      if (Array.isArray(n) && n.length) return _uniq(n);
+      if (Array.isArray(o) && o.length) return _uniq(o);
+      return [];
+    })(),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
       const m = new Map();
       for (const f of [...(bC.feed || []), ...(iC.feed || [])]) {
