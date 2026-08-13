@@ -247,21 +247,42 @@ export const assignmentKey = (a) => [
 // joueur, parce qu'une assignation d'équipe `["a","b"]` donne bel et bien sa carte à l'enfant `a`.
 // Le regroupement de `dedupeAssignments`, lui, ajoute l'ensemble des joueurs : sans ça, deux quêtes
 // auto de la semaine (même tâche, même jour, deux binômes différents) se replieraient l'une sur l'autre.
-export const assignmentGroupKey = (a) =>
-  (Array.isArray(a?.playerIds) ? [...a.playerIds].sort() : []).join(",") + "§" + assignmentKey(a);
+// `identity` (optionnel) remplace le `taskId` dans la clé — voir `dedupeAssignments` ci-dessous.
+export const assignmentGroupKey = (a, identity) =>
+  (Array.isArray(a?.playerIds) ? [...a.playerIds].sort() : []).join(",") + "§"
+  + (identity===undefined ? assignmentKey(a) : assignmentKey({ ...a, taskId: identity }));
 
-// Ne SUPPRIME rien : filtre de vue. `preferIds` (les `instanceId` cités par les rituels de l'enfant)
-// décide quelle copie survit, pour qu'un rituel ne perde jamais son entrée au profit d'une copie
-// orpheline. À défaut, la première occurrence est gardée.
-export const dedupeAssignments = (list, preferIds) => {
+// v2.16.58 — Troisième couche du MÊME problème, et la seule qui restait ouverte côté enfant.
+// v2.16.44 masque les libellés en double dans les SÉLECTEURS (`dedupeTasksByLabel`) ; v2.16.55 masque
+// les assignations en double dans la JOURNÉE de l'enfant — mais uniquement quand c'est le même
+// `taskId`. Or les 26 copies de tâches perso que v2.16.44 documente ont chacune leur PROPRE `taskId`
+// avec le même libellé : la clé de regroupement ne les voyait pas, et les cases restaient là.
+// Mesuré en prod le 13 août sur les 317 assignations réelles, APRÈS la dédup v2.16.55 : Elli avait
+// encore 71 cases de routine dont 29 redondantes — 13 « Tâche de rituel (à renommer) » + 7 « Tâche
+// rituelle (à renommer) » (de vieux gabarits jamais renommés) + 9 paires de vraies tâches ; les trois
+// autres enfants, 16 redondantes chacun. Le remède est le même qu'aux deux couches précédentes :
+// `labelOf` (taskId → libellé) fait basculer la clé du `taskId` vers le LIBELLÉ normalisé, donc deux
+// tâches distinctes portant le même nom, le même jour, à la même heure, pour le même enfant, ne
+// donnent plus qu'une case. Sans `labelOf`, comportement identique à v2.16.55 (les autres appelants
+// d'`assignmentGroupKey`, dont le marquage du portail parent, ne changent pas).
+//
+// Ne SUPPRIME rien : filtre de vue. `preferIds` décide quelle copie survit — les `instanceId` cités
+// par les rituels de l'enfant, ET (v2.16.58) ceux déjà cochés aujourd'hui, pour qu'un repli tout neuf
+// ne fasse jamais disparaître une case que l'enfant venait de cocher. À défaut, la première garde.
+export const dedupeAssignments = (list, preferIds, labelOf) => {
   const prefer = preferIds instanceof Set ? preferIds : new Set(preferIds||[]);
+  const identityOf = (a) => {
+    if (typeof labelOf !== "function") return undefined;
+    const l = normLabel(labelOf(a?.taskId));
+    return l ? "label:" + l : (a?.taskId || "");
+  };
   const byKey = new Map();
   for (const a of (list||[])) {
     if (!a || !a.instanceId) continue;
-    const k = assignmentGroupKey(a);
+    const k = assignmentGroupKey(a, identityOf(a));
     const kept = byKey.get(k);
     if (!kept) { byKey.set(k, a); continue; }
-    // une copie déjà gardée : on ne remplace que si la nouvelle est citée par un rituel et pas l'autre
+    // une copie déjà gardée : on ne remplace que si la nouvelle est prioritaire et pas l'autre
     if (prefer.has(a.instanceId) && !prefer.has(kept.instanceId)) byKey.set(k, a);
   }
   const keep = new Set([...byKey.values()].map(a=>a.instanceId));

@@ -4,6 +4,37 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-13 (routine autonome, nuit, 2e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 238 ko, `savedAt` `2026-08-13T04:38:41Z`. **Aucune écriture.**
+
+### 🐛 Bugs traités
+- **Rien de neuf.** `config.errorLogs` **vide**, `config.bugs` **inchangé à 14 entrées** (id pour id), la plus récente toujours du **31 juillet**. Fil de famille sans message neuf depuis le **25 juillet**. Les 14 bugs ont tous déjà leur trace dans ce fichier ou dans `PROJET-ETAT.md` — vérifié un par un.
+- **Trois d'entre eux ont quand même servi** : `bug_74klxs1` (« jai cree une tache est elle est nule par »), `bug_hf01ozi` (« ajout de quête, ça dit c'Est ajouté, mais ça apparait pas ») et `bug_k1gqpz6` (« Je peut pas ajouter dotre tache ») pointent tous les trois vers `config.customTasks` — c'est ce qui a désigné le champ à auditer cette nuit.
+
+### 📋 Audit de `config.customTasks` (83 entrées, 10,5 ko) — le champ est SAIN, ce que les enfants VOIENT ne l'est pas
+Le point craint par les 3 bugs ci-dessus est **propre** : **0 assignation orpheline** sur les 472 assignations (317 manuelles + 155 quêtes auto) — aucun `taskId` ne pointe dans le vide. La cause racine réparée par `v2.15.8` ne récidive pas, et le garde-fou `_keepTask` de `merge.js` tient (les 58 tâches tombstonées encore présentes sont exactement celles qu'une assignation vivante référence).
+
+**Mais en reconstruisant ce que chaque enfant voit vraiment** — le vrai `dedupeAssignments` rejoué sur les 317 assignations réelles, comme après `v2.16.55` :
+
+| Enfant | Cases de routine | dont redondantes |
+|---|---|---|
+| Elli Le Pickle | 71 | **29** (13 × « Tâche de rituel (à renommer) », 7 × « Tâche rituelle (à renommer) », 9 paires) |
+| Antoine DR | 55 | 16 |
+| Antoine Emery | 47 | 16 |
+| Olivierdumontrocheleau | 43 | 16 |
+
+**302 cartes affichées pour 235 quêtes réelles.** Cause : les copies de tâches perso ont chacune **leur propre `taskId`** avec le même libellé, et la clé de regroupement de `v2.16.55` contient le `taskId`. → correctif `v2.16.58` (bascule de la clé sur le libellé normalisé), détail complet dans `PROJET-ETAT.md`.
+
+**Ce qui reste après le correctif, et qui demande une décision** : **un** libellé en double par enfant, « Vider ma boîte à lunch », parce qu'il existe en assignation **solo** (`tc06`) *et* en assignation **familiale** (`cust_x67g679`, les 4 enfants). L'ensemble des joueurs fait partie de la clé volontairement depuis `v2.16.55` — le retirer côté enfant se défend, mais renverse une décision écrite. **Pas fait en autonome.**
+
+**Deux autres constats notés sans action** (aucune conséquence visible aujourd'hui) :
+- `removedCustomTasks` porte **145 ids pour 83 tâches** : ~62 pierres tombales désignent des tâches qui n'existent plus nulle part. Inoffensif (la liste est plafonnée à 1000), mais ça veut dire que le seul écrivain de ce champ est le **ménage automatique des orphelines** — il n'existe **aucune suppression explicite** de tâche perso qui pose un tombstone.
+- **Trou latent dans `merge.js`** : `referencedTaskIds` (le `_keepTask` qui empêche de supprimer une tâche encore assignée) est calculé sur `config.assignments` **seulement**, alors que le ménage des orphelines d'`App.jsx` inclut `weeklyQuests.assignments` depuis `v2.15.8`. Une tâche perso référencée **uniquement** par une quête auto de la semaine et déjà tombstonée serait donc supprimée à la fusion. **Aucun cas en prod aujourd'hui** (0 quête auto vise une tâche perso), d'où l'absence de correctif — mais c'est le prochain endroit à regarder si des quêtes de la semaine de garde disparaissent.
+
+---
+
 ## Passage du 2026-08-13 (routine autonome, nuit)
 
 ### 🌐 Lecture de l'API de production

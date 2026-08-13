@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.58", date:"2026-08-13", features:[
+    "✔️ Encore des quêtes en double, et cette fois c'était le NOM qui comptait : « Salle de bain », « Prendre une collation », « Me changer »… revenaient deux fois dans ta journée, et « Tâche de rituel (à renommer) » jusqu'à vingt fois. C'étaient des tâches différentes portant le même nom — la correction de la semaine dernière ne pouvait pas les voir. Il n'en reste qu'une par nom.",
+    "🕐 Une même tâche prévue à deux moments différents (les dents le matin ET le soir) reste bien deux cases : c'est le nom PLUS l'heure PLUS le jour qui comptent.",
+    "✅ Et si tu avais déjà coché une case aujourd'hui, c'est celle-là qui reste — ta coche ne disparaît pas avec la mise à jour.",
+  ]},
   { version:"2.16.57", date:"2026-08-13", features:[
     "🎁 Dans la boutique, onglet Récompenses : quand tu tapes sur une récompense que tu ne peux pas prendre, l'appli te dit enfin pourquoi. Avant, il ne se passait absolument rien — ni son ni message. Maintenant : « il t'en manque 25 » si c'est les pièces, ou « reviens dans ~20 min » si ton héros se repose.",
     "🔒 Et une récompense que tu ne peux pas prendre tout de suite s'affiche grisée avec un cadenas, comme partout ailleurs dans le jeu — au lieu de montrer « Acheter » en or et de refuser après coup.",

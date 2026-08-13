@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.57";
+export const APP_VERSION = "2.16.58";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -292,12 +292,27 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // cocher pour la MÊME tâche : cocher l'une n'éteint pas les autres (la clé de complétion contient
   // l'`instanceId`). Filtre de vue seulement — rien n'est supprimé, et les `instanceId` cités par
   // ses rituels sont ceux qu'on garde en priorité pour qu'un rituel ne perde jamais une entrée.
+  // v2.16.58 — le regroupement passe du `taskId` au LIBELLÉ (3e arg `labelOf`) : les vieilles copies
+  // de tâches perso ont chacune leur propre `taskId`, donc v2.16.55 ne les voyait pas. Et les cases
+  // DÉJÀ COCHÉES aujourd'hui rejoignent `ritualInstIds` dans les `instanceId` prioritaires, pour que
+  // le jour de la mise à jour aucun enfant ne voie une case qu'il venait de cocher se volatiliser.
   const ritualInstIds = useMemo(()=>{
     const s=new Set(); for(const r of (pState.routines||[])) for(const id of (r.taskIds||[])) s.add(id); return s;
   },[pState.routines]);
+  const keptInstIds = useMemo(()=>{
+    const s=new Set(ritualInstIds);
+    const suffix="_"+player.id+"#"+todayStamp();
+    for(const k of [...(pState.completed||[]), ...(pState.pending||[])])
+      if(typeof k==="string" && k.endsWith(suffix)) s.add(k.slice(0, k.length-suffix.length));
+    return s;
+  },[ritualInstIds, pState.completed, pState.pending, player.id]);
+  const labelOfTask = useMemo(()=>{
+    const m=new Map((allTasks||[]).map(t=>[t.id,t.label]));
+    return (id)=>m.get(id)||"";
+  },[allTasks]);
   const allMine = useMemo(
-    ()=>dedupeAssignments(assignments.filter(a=>a.playerIds.includes(player.id)), ritualInstIds),
-    [assignments, player.id, ritualInstIds]
+    ()=>dedupeAssignments(assignments.filter(a=>a.playerIds.includes(player.id)), keptInstIds, labelOfTask),
+    [assignments, player.id, keptInstIds, labelOfTask]
   );
   const isWeekAss = (a)=> Array.isArray(a.days) && a.days.length>0;
   const routineMine = allMine.filter(a=>!isWeekAss(a));
