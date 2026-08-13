@@ -6,7 +6,7 @@
 // `shared.js` n'importe que `themes.js`/`recurring.js` — aucun cycle possible.
 // `gainPet` est donc revenue ici le 2026-08-09 (Lot 5/#24), là où vit `PET_DAILY_CAP`
 // qu'elle applique. `migratePetXpV2` est partie dans `migrations.js` le 2026-08-06.
-import { todayStamp } from "./shared.js";
+import { todayStamp, mixSeed } from "./shared.js";
 
 // Chaque familier a sa propre XP (gameState.petXp[petId]), conservée même déséquipé.
 // Le familier équipé gagne de l'XP quand l'enfant accomplit une quête.
@@ -187,9 +187,14 @@ export const petFormLabel = (evo, lv) => { const el=petActiveElement(evo); if(pe
 export const petPalOverride = (evo) => { const el=petActiveElement(evo); return el?PET_ELEMENTS[el].pal:null; };
 export const petPendingTier = (evo, lv) => { const t=petTierForLevel(lv); for(let i=1;i<=t;i++){ if(!(evo&&evo[i])) return i; } return 0; };
 // 2 options élémentaires tirées de façon DÉTERMINISTE (par petId+tier → mêmes options sur tous les appareils), hors déjà choisis
+// v2.16.59 — même défaut de tirage que la boutique (voir `mixSeed`, shared.js) : la graine de
+// "petId#1" et celle de "petId#2" ne diffèrent que de 1 (seul le dernier caractère change), donc
+// le palier ne changeait PAS l'ordre du tirage — l'enfant descendait une liste figée, propre à son
+// familier. Le déterminisme est conservé tel quel : même familier + même palier → mêmes options
+// sur tous les appareils, et un élément déjà choisi n'est jamais reproposé (`taken`).
 export const petEvoOptions = (petId, tier, evo) => {
   const taken=new Set([evo&&evo[1],evo&&evo[2],evo&&evo[3]].filter(Boolean));
   const avail=PET_ELEMENT_KEYS.filter(k=>!taken.has(k));
   let seed=0; const s=(petId||"x")+"#"+tier; for(let i=0;i<s.length;i++) seed=(seed*31+s.charCodeAt(i))>>>0;
-  return avail.map((k,i)=>({k,r:((seed+i*2654435761)>>>0)})).sort((a,b)=>a.r-b.r).slice(0,2).map(x=>x.k);
+  return avail.map((k,i)=>({k,r:mixSeed(seed+i*2654435761)})).sort((a,b)=>a.r-b.r).slice(0,2).map(x=>x.k);
 };

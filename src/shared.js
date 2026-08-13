@@ -23,6 +23,27 @@ export const _uniq = (arr) => [...new Set(arr || [])];
 
 export const todayStamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
+// v2.16.59 — Mélangeur d'avalanche (finaliseur murmur3), pour les tirages « déterministes mais
+// qui doivent varier » du jeu : la boutique du jour (catalog.js) et les options d'évolution du
+// familier (pets.js). Les deux classaient leurs éléments par la clé « graine + i * 2654435761 ».
+// Ajouter la MÊME graine à tous les éléments ne peut changer leur ordre que si l'addition
+// déborde 2^32 pour certains et pas pour d'autres. Or l'écart minimal entre deux clés du
+// catalogue de récompenses est de 147 926 525, alors que la graine d'une date ne bouge que de
+// UN d'un jour au lendemain (graine = graine*31 + code du caractère, et seul le dernier
+// caractère de "2026-08-13" change) : l'ordre ne pouvait jamais bouger. Mesuré sur les 365
+// jours de 2026 : la boutique sortait UN SEUL et même tirage, tous les jours de l'année.
+// Ce mélangeur redonne à la clé sa vraie dépendance à la graine (un bit d'entrée changé →
+// environ la moitié des bits de sortie changés), sans rien enlever au déterminisme : même
+// jour (ou même familier) → même tirage sur tous les appareils, comme avant.
+export const mixSeed = (x) => {
+  let h = (x | 0) >>> 0;                 // ToUint32 : la clé peut dépasser 2^32 avant mélange
+  h = (h ^ (h >>> 16)) >>> 0;
+  h = Math.imul(h, 2246822507) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  h = Math.imul(h, 3266489909) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+};
+
 // Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
 export const streakOf = (activeDays) => {
   const set = new Set(activeDays || []);

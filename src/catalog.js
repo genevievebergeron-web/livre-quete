@@ -7,7 +7,7 @@
 // possible. La fonction est revenue ici le 2026-08-09 (Lot 5/#24), là où vit le
 // `REWARD_CATALOG` qu'elle tire au sort.
 import { getLevel } from "./leveling.js";
-import { todayStamp } from "./shared.js";
+import { todayStamp, mixSeed } from "./shared.js";
 
 // ─── TASK CATALOG ────────────────────────────────────────────
 export const TASK_CATALOG = [
@@ -137,10 +137,14 @@ export const shopRewardPool = (config) => {
 };
 // v1.54.0 — Sélection ALÉATOIRE par JOUR (reset de la boutique chaque jour) — déterministe via la date
 // v2.16.56 — `pool` : le bassin ci-dessus. Défaut = REWARD_CATALOG (comportement historique).
+// v2.16.59 — le tirage n'a JAMAIS tourné : la clé « seed + i*2654435761 » ne réordonnait rien
+// quand la graine ne bougeait que de 1 par jour (démonstration complète sur `mixSeed`, shared.js).
+// Sur les 365 jours de 2026, la boutique sortait un seul et même tirage — alors que l'écran dit
+// aux enfants « 🎲 Les récompenses changent chaque semaine ». `mixSeed` répare le tirage.
 export const weeklyRewards = (n=8, pool=REWARD_CATALOG) => {
   const wk = todayStamp();
   let seed = 0; for (let i=0;i<wk.length;i++) seed = (seed*31 + wk.charCodeAt(i)) >>> 0;
-  const arr = (pool||[]).map((r,i)=>({r, k:((seed + i*2654435761) >>> 0)}));
+  const arr = (pool||[]).map((r,i)=>({r, k: mixSeed(seed + i*2654435761)}));
   arr.sort((a,b)=>a.k-b.k);
   return arr.slice(0, Math.min(n, arr.length)).map(x=>x.r);
 };

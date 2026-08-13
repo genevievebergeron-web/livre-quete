@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.59", date:"2026-08-13", features:[
+    "🎲 La boutique dit « les récompenses changent » depuis toujours… et elle n'a jamais changé. Le tirage du jour sortait exactement les mêmes récompenses, dans le même ordre, tous les jours de l'année. C'est réparé : à partir de maintenant la boutique se renouvelle vraiment chaque jour.",
+    "🎁 Une récompense que tu as déjà prise reste affichée même si le tirage du jour ne la ressort pas — avec ses boutons « J'ai changé d'idée » et « ✓ Cacher ». Si une récompense payée avait disparu de ton écran, elle est de retour.",
+    "🐣 Même correction pour les évolutions de ton familier : les deux éléments proposés ne suivaient plus une liste figée d'un palier à l'autre.",
+  ]},
   { version:"2.16.58", date:"2026-08-13", features:[
     "✔️ Encore des quêtes en double, et cette fois c'était le NOM qui comptait : « Salle de bain », « Prendre une collation », « Me changer »… revenaient deux fois dans ta journée, et « Tâche de rituel (à renommer) » jusqu'à vingt fois. C'étaient des tâches différentes portant le même nom — la correction de la semaine dernière ne pouvait pas les voir. Il n'en reste qu'une par nom.",
     "🕐 Une même tâche prévue à deux moments différents (les dents le matin ET le soir) reste bien deux cases : c'est le nom PLUS l'heure PLUS le jour qui comptent.",

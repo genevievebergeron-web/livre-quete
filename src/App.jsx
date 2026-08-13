@@ -89,7 +89,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.58";
+export const APP_VERSION = "2.16.59";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -390,7 +390,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // v2.16.56 — le tirage part du bassin choisi par le parent (étape 3 de l'assistant : cases cochées
   // + récompenses maison), plus de REWARD_CATALOG en dur. Voir shopRewardPool (catalog.js).
   const _rwPool = shopRewardPool(config);
-  const myRewards = weeklyRewards(_rwPool.length, _rwPool).filter(r=>!_hiddenRw.includes(r.id)).slice(0,8);
+  const _rwDrawn = weeklyRewards(_rwPool.length, _rwPool).filter(r=>!_hiddenRw.includes(r.id)).slice(0,8);
+  // v2.16.59 — une récompense DÉJÀ ACHETÉE reste affichée même quand le tirage du jour ne la sort
+  // pas. Cette grille est le SEUL endroit du jeu qui montre `boughtRewards` : c'est là que vivent
+  // « RÉCLAMÉ! », « ↩️ J'ai changé d'idée » et « ✓ Cacher ». Tant que le tirage était figé (cf.
+  // `mixSeed`), une récompense achetée restait à l'écran par accident ; le réparer l'aurait fait
+  // disparaître dès le lendemain, sans aucune autre surface pour la retrouver. Le défaut existait
+  // déjà pour toute récompense achetée sous une AUTRE sélection de parent : en prod ce soir, Elli
+  // a payé « Manger un bonbon » (rw_bonbon) et la carte n'est nulle part sur son écran, parce que
+  // le bassin actuel (`selectedRewards`) ne la contient plus. On repêche dans `allRewards`
+  // (catalogue + récompenses maison), pas dans le bassin, sinon le repêchage aurait le même trou.
+  const _rwBought = (pState.boughtRewards||[])
+    .filter(id => !_hiddenRw.includes(id) && !_rwDrawn.some(r=>r.id===id))
+    .map(id => (allRewards||[]).find(r=>r.id===id))
+    .filter(Boolean);
+  const myRewards = [..._rwBought, ..._rwDrawn];
   const allShopItemsFlat = [
     ...SHOP_ITEMS.hats, ...SHOP_ITEMS.armors, ...SHOP_ITEMS.pets,
     ...(pt.shopCategory?.items||[]),

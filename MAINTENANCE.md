@@ -4,6 +4,34 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-13 (routine autonome, nuit, 3e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 239 ko, `savedAt` `2026-08-13T06:37:36Z`. **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**, `config.bugs` **inchangé** (14 entrées, la plus récente du 31 juillet), fil familial sans message neuf, `removalRequests`/`momentRequests`/`coinOffers`/`teamInvites`/`childTaskProposals`/`repairEvents` tous vides, `pending` vide chez les 4 enfants. **Aucun signalement neuf — 3e nuit propre d'affilée.** Pas de Phase 2.
+- Repère utile : la dernière activité **réelle** de la famille est le **9 août** (dernière entrée `feed` et dernière date `xpLog` des 4 enfants concordent). Les `savedAt` postérieurs sont des chargements, pas du jeu.
+
+### ⚠️ Correction d'une conclusion du passage précédent (2e passage du 13 août, point 5)
+Le passage précédent avait écrit, à propos du bassin de 9 récompenses pour un tirage de 8 : « le tirage quotidien ne fait plus tourner qu'un seul item par jour » et « ce n'est **pas** un bug ». **Les deux sont faux, et c'est mesuré, pas argumenté.** Le tirage ne tournait pas d'un item par jour : il ne tournait **pas du tout**. Sur les 365 jours de 2026, `weeklyRewards` sort **un seul et même ensemble, dans le même ordre** — avec le bassin de prod (9) comme avec le catalogue complet (17). La cause n'a rien à voir avec la sélection de Gen : la clé de tri `(graine + i*2654435761) >>> 0` ne réordonne rien quand la graine ne bouge que de **1** d'un jour au lendemain (`graine*31 + code du caractère`, seul le dernier caractère de « 2026-08-13 » change) alors que l'écart minimal entre deux clés est de **147 926 525**. Corrigé en `v2.16.59` (`mixSeed`, finaliseur murmur3). **Leçon de méthode** : le passage précédent a déduit le comportement du tirage en lisant la formule ; il suffisait de la faire tourner sur 365 dates pour voir qu'elle ne bougeait jamais. Quand une conclusion porte sur ce que l'enfant **verra**, la rejouer sur des données vaut mieux que la raisonner.
+
+### 📋 Audit de `config.customRewards` (4 entrées) — le champ est sain, la chaîne en aval ne l'était pas
+1. **`customRewards`** — 4 récompenses « butin de l'Hydre » à `cost:0`/`coins:0` (données de test du 1er juillet), toutes cochées dans `selectedRewards`. **Correctement écartées** de la boutique par `baseCost(r) > 0` (`shopRewardPool`), conclusion du passage précédent confirmée. Aucun parent ne peut en refabriquer aujourd'hui : `addCustomReward` force `20` quand la saisie vaut 0.
+2. **Les 7 ids fantômes, avec une précision qui change leur statut.** Le passage précédent les attribuait à « l'ancien pré-cochage de l'assistant, jamais un clic de Gen ». Vérifié dans l'historique git : le pré-cochage d'avant `v1.21.0` valait `["rw01".."rw05"]` (et `["rw01","rw02","rw03"]` en repli). Or la prod porte **`rw06` et `rw09` en plus** — « Choix du jeu vidéo » et « Skin Minecraft au choix » dans le catalogue de l'époque. Ces deux-là **n'ont jamais fait partie d'aucun défaut** : ils ont été cochés par quelqu'un. Autrement dit, **deux récompenses réellement choisies par Gen ne sont plus offertes à personne depuis la `v1.21.0`**, qui a renommé le catalogue en ids sémantiques (`rw_ecran`, `rw_depanneur`…) sans migrer `selectedRewards`. Inerte jusqu'à la `v2.16.56`, qui a rendu `selectedRewards` autoritaire.
+3. **Pourquoi la routine ne les remappe pas d'elle-même.** Faire correspondre « 5$ au dépanneur » (150 pièces) à « Choix d'un achat au dépanneur » (70) ou « Collation sucrée » à « Manger un bonbon », c'est **deviner** ce que Gen voulait offrir, et au passage en changer le prix. C'est son choix. **Le vrai geste est côté écran** : rouvrir l'étape 3 de l'assistant et cocher ce qu'elle veut. En attendant, aucun effet visible : ces ids ne retirent rien, ils n'ajoutent simplement pas.
+4. **`boughtRewards` n'a qu'une seule surface d'affichage** — la grille de l'onglet 🎁 Récompenses, avec « RÉCLAMÉ! », « ↩️ J'ai changé d'idée » et « ✓ Cacher ». Une récompense achetée puis sortie du bassin devient donc **introuvable**. Cas vivant en prod : Elli a payé **« Manger un bonbon »** (`rw_bonbon`, dans `boughtRewards`, absent de `hiddenRewards`) et la carte n'est nulle part sur son écran. Réparé en `v2.16.59` (repêchage depuis `allRewards`), garde-fou **indissociable** du correctif de rotation : sans lui, débloquer le tirage aurait fait disparaître les achats dès le lendemain.
+
+### 📋 Autres champs passés au crible ce passage — tous sains
+- **`feed`** (60) — cohérent : la plus récente est du 9 août, les types (`task`/`badge`/`ritual`/`catchup`/`chat`/`boss`) sont tous connus, plafond respecté.
+- **`customTasks`** (83) — **0 tâche orpheline** (toutes référencées par une assignation). 58 des 83 figurent aussi dans `removedCustomTasks` : c'est le **filet de la `v2.5.0`** qui joue son rôle (`_keepTask` garde une tâche tombstonée tant qu'une assignation vivante la référence), résidu historique du bug de la `v2.15.8`, sans effet aujourd'hui.
+- **`players`** (4), **`boss`** — rien d'anormal. Le Yéti est en vie depuis le 24 juillet, dernier coup le 31 juillet, cohérent avec l'arrêt d'activité du 9 août.
+
+### 📋 Champs de `config` encore jamais audités
+`seenVersions` (245), plus côté joueur : `owned`/`badges` contre les catalogues, `refusals` (vide partout alors que `refusedKeys` compte 11-28 entrées — **candidat « champ écrit jamais lu »**, toujours ouvert), `hiddenWeek`, `calendar`, `routines`.
+
+---
+
 ## Passage du 2026-08-13 (routine autonome, nuit, 2e passage)
 
 ### 🌐 Lecture de l'API de production
