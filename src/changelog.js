@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.63", date:"2026-08-14", features:[
+    "⏰ Le rituel que tu choisis reste choisi. Avant, si tu prenais « 🌙 Soir » et que tu allais voir « 📋 Mes tâches » deux secondes, revenir sur « ⏰ Rituels » te ramenait au rituel du matin — sans rien dire.",
+    "🗂️ Ça marche aussi pour la puce « Tout », et ton choix tient jusqu'à ta prochaine connexion.",
+  ]},
   { version:"2.16.62", date:"2026-08-14", features:[
     "🪙 Une récompense déjà remboursée pouvait être remboursée encore, et redonner toutes ses pièces une fois par semaine, sans jamais avoir été rachetée. Un remboursement compte maintenant pour l'achat qu'il annule : une seule fois par achat.",
     "🛒 Si tu rachètes vraiment la même récompense plus tard, tu peux évidemment changer d'idée à nouveau — ça, ça n'a pas changé.",

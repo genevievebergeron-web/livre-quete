@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.62";
+export const APP_VERSION = "2.16.63";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -913,9 +913,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
               {/* v1.85.0 (Lot 2 #8) — "📋 Mes tâches" au lieu de "🏠 Semaine" : évite la collision
                   d'icône avec l'onglet du bas "🏠 Accueil" (deux 🏠 pour deux choses différentes)
                   et le mot "Semaine" déjà pris par l'onglet du bas "📅 Semaine" (calendrier). */}
-              {seg(pMode==="week","📋 Mes tâches","planifiées cette semaine",()=>{ if(pMode!=="week"){SFX.click();onPatchState({mode:"week",activeRoutineId:null});} })}
+              {/* v2.16.63 — le choix de rituel SURVIT à un aller-retour par « Mes tâches ». Avant, ce
+                  bouton remettait `activeRoutineId` à null, et le bouton d'à côté re-sélectionnait
+                  toujours `myRoutines[0]` (le rituel du matin) : un enfant qui avait choisi « 🌙 Soir »
+                  puis jeté un oeil à sa semaine revenait sur le matin, sans que rien ne le dise.
+                  Ce nettoyage ne servait à rien — `activeRoutine` (plus haut) est DÉJÀ neutralisé par
+                  `pMode==="routine"`, donc l'id conservé est simplement ignoré en mode Semaine. */}
+              {seg(pMode==="week","📋 Mes tâches","planifiées cette semaine",()=>{ if(pMode!=="week"){SFX.click();onPatchState({mode:"week"});} })}
               {seg(pMode==="routine","⏰ Rituels",myRoutines.length?`${myRoutines.length} rituel${myRoutines.length>1?"s":""}`:"à créer",()=>{
-                if(pMode!=="routine"){ SFX.click(); onPatchState({mode:"routine",activeRoutineId: myRoutines[0]?.id || null}); }
+                if(pMode!=="routine"){
+                  SFX.click();
+                  // On ne repart du premier rituel QUE si le dernier choix ne désigne plus rien
+                  // (rituel supprimé, ou aucun choix encore fait). "all" = la puce « 🗂️ Tout ».
+                  const keep = pState.activeRoutineId==="all" || myRoutines.some(r=>r.id===pState.activeRoutineId);
+                  onPatchState(keep ? {mode:"routine"} : {mode:"routine",activeRoutineId: myRoutines[0]?.id || null});
+                }
               })}
             </div>
             {/* Niveau 2 : quel rituel (visible seulement en mode Rituels) */}
@@ -928,8 +940,12 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
                     {r.emoji||"⏰"} {r.name}
                   </button>
                 ); })}
-                {routineMine.length>0 && (()=>{ const on=!pState.activeRoutineId; return (
-                  <button onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:null});}}
+                {/* v2.16.63 — « Tout » vaut maintenant "all" et non plus null, pour que ce choix-là
+                    aussi se retienne. Partout où l'écran dérive `activeRoutine`, un `find()` sur "all"
+                    ne trouve rien et rend exactement le même `undefined` qu'avant : comportement
+                    identique, mais on distingue « l'enfant a choisi Tout » de « aucun choix fait ». */}
+                {routineMine.length>0 && (()=>{ const on=!activeRoutine; return (
+                  <button onClick={()=>{SFX.click();onPatchState({mode:"routine",activeRoutineId:"all"});}}
                     style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"7px 12px",whiteSpace:"nowrap",
                       background:on?acc:"#1a1a1a",color:on?"#0d0d0d":"#bbb",border:`2px solid ${on?acc:"#333"}`,borderRadius:20,cursor:"pointer",fontWeight:on?700:400}}>
                     🗂️ Tout
@@ -3795,8 +3811,10 @@ export default function App() {
   if(screen==="login"&&!config) return <Suspense fallback={<LazyScreenFallback/>}><SetupWizard existing={null} onDone={handleSetupDone}/></Suspense>;
   if(screen==="login") return <LoginScreen config={config} gameStates={gameStates} appVersion={APP_VERSION}
     onSelectPlayer={(idx)=>{
-      // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine)
-      setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],mode:"week",activeRoutineId:null}; persist(config,n); return n; });
+      // À la connexion, l'enfant arrive sur l'écran d'accueil Semaine (pas au milieu d'une routine).
+      // v2.16.63 — `mode:"week"` suffit pour ça ; on ne jette plus son dernier rituel choisi, sinon
+      // « ⏰ Rituels » le renvoie au matin à chaque ouverture de session.
+      setGameStates(gs=>{ const n=[...gs]; if(n[idx]) n[idx]={...n[idx],mode:"week"}; persist(config,n); return n; });
       setSessionPlayer(idx); setParentMode(false); setView(idx); setScreen("game"); SFX.click();
       // Jouer les fêtes différées (quêtes validées par le parent sur un autre appareil)
       consumeCelebrations(idx);

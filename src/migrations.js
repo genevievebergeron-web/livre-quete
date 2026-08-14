@@ -293,7 +293,10 @@ export const migrateSavedData = (data) => {
       const cleaned = next.routines
         .map(r => ({ ...r, taskIds: (r.taskIds || []).filter(id => validInstanceIdsForCleanup.has(id)) }))
         .filter(r => r.taskIds.length > 0);
-      const activeStillThere = cleaned.some(r => r.id === next.activeRoutineId);
+      // v2.16.63 — "all" (puce « 🗂️ Tout ») est un choix valide qui ne désigne aucun rituel : sans
+      // cette exception, ce nettoyage le remettait à null à CHAQUE chargement et l'enfant reperdait
+      // son choix, exactement ce que la v2.16.63 corrige côté écran.
+      const activeStillThere = next.activeRoutineId === "all" || cleaned.some(r => r.id === next.activeRoutineId);
       next = { ...next, routines: cleaned, activeRoutineId: activeStillThere ? next.activeRoutineId : null };
     }
     return next;
