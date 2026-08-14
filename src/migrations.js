@@ -6,7 +6,7 @@
 // `migratePetXpV2`/`PET_LEVELS_OLD` viennent avec, `migrateGameState` étant leur seul appelant.
 import { PET_LEVELS } from "./pets.js";
 import { TASK_CATALOG } from "./catalog.js";
-import { COLOR_DESATURATE_MAP, activeDaysFromCompleted } from "./shared.js";
+import { COLOR_DESATURATE_MAP, activeDaysFromCompleted, sanitizeXpLog } from "./shared.js";
 import { computeLeagueTier, leagueRank } from "./leagues.js";
 import { custodyWeekKey, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 import { CHANGELOG } from "./changelog.js";
@@ -92,7 +92,10 @@ export const migrateGameState = (gs) => {
     petNickname: gs.petNickname || {}, // v2.4.2 — surnom personnalisé par familier {petId:string}
     dismissedAnnouncements: gs.dismissedAnnouncements || [], // v2.6.0 — annonces parent archivées par l'enfant
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
-    xpLog: gs.xpLog || [], // v2.16.32 — Backlog #13 : journal d'XP horodaté toutes sources (voir appendXpLog)
+    // v2.16.32 — Backlog #13 : journal d'XP horodaté toutes sources (voir appendXpLog).
+    // v2.16.65 — réparé au chargement (sans drapeau, idempotent, même patron que `activeDaysFromCompleted`) :
+    // l'ancienne fusion concaténait le journal et le doublait à chaque synchro jusqu'au plafond de 500.
+    xpLog: sanitizeXpLog(gs.xpLog, gs.completedAt),
     refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
     refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)

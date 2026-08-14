@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.65", date:"2026-08-14", features:[
+    "📈 La courbe d'XP de ta fiche profil montrait n'importe quoi : une montagne géante sur une seule journée (jusqu'à 6000 XP le 9 août, plus que tout ce que tu as gagné depuis le début) et tout le reste écrasé à plat.",
+    "🧮 En cause : chaque synchro entre tes appareils recopiait ton journal d'XP au complet par-dessus lui-même. 2 quêtes devenaient 4, puis 8, puis 500. C'est réparé, et ton journal se remet tout seul d'aplomb au prochain chargement.",
+  ]},
   { version:"2.16.64", date:"2026-08-14", features:[
     "🔥 Ta série compte enfin le jour où TU as fait la quête, pas le jour où le parent l'a validée. Avant, une quête faite samedi et validée dimanche donnait le crédit à dimanche — et samedi ne comptait pas du tout.",
     "📅 Les journées perdues comme ça t'ont été rendues : 12 jours de travail remis aux 4 enfants, et les « jours actifs cette semaine » de ton profil sont enfin les bons.",

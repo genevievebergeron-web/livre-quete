@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.64";
+export const APP_VERSION = "2.16.65";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2640,7 +2640,7 @@ export default function App() {
       // Count tasks done today for streak badge (clés du jour: ..._player#YYYY-MM-DD)
       const today="#"+todayStamp();
       const todayCount=(p.completed||[]).filter(k=>k.endsWith(today)).length+1;
-      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()},xpLog:appendXpLog(p.xpLog,grantXp,"quete")};
+      const updatedPs={...p,xp:newXp,coins:newCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,completed:[...new Set([...(p.completed||[]),doneKey])],pending:(p.pending||[]).filter(k=>k!==doneKey),completedAt:{...(p.completedAt||{}), [doneKey]:new Date().toISOString()},xpLog:appendXpLog(p.xpLog,grantXp,"quete",dayOfDoneKey(doneKey,todayStamp()))};
       const newBadgeIds=checkBadges(updatedPs,player,todayCount, completionCatCounts(updatedPs, cfgRef.current||config));
       if(newBadgeIds.length) updatedPs.badges=[...(p.badges||[]),...newBadgeIds];
       // Le familier ÉQUIPÉ gagne de l'XP — SEULEMENT s'il est « en forme » (nourri aujourd'hui).

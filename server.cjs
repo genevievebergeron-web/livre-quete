@@ -72,6 +72,55 @@ async function putFamille(id, data) {
 // Port de mergeFamily/mergeGS du client : garantit qu'un PUT d'un appareil
 // (même une vieille version) n'écrase JAMAIS les changements d'un autre.
 const _uniq = (a) => [...new Set(a || [])];
+
+// v2.16.65 — MIROIR EXACT de sanitizeXpLog/mergeXpLog (src/shared.js). Les deux moitiés doivent
+// bouger ensemble, sinon la réparation faite par un client est annulée par la fusion du serveur :
+// c'est le serveur qui détient les journaux gonflés (500 entrées par enfant, mesuré le 14 août).
+const _dayOfDoneKey = (k) => { const m = /#(\d{4}-\d{2}-\d{2})$/.exec(String(k || "")); return m ? m[1] : null; };
+const _xpLogKey = (e) => `${e && e.date}|${e && e.amount}|${e && e.source}`;
+const sanitizeXpLog = (xpLog, completedAt) => {
+  const log = xpLog || [];
+  if (!log.some((e) => e && !e.id)) return log;
+  const doneByDate = {};
+  for (const k of Object.keys(completedAt || {})) { const d = _dayOfDoneKey(k); if (d) doneByDate[d] = (doneByDate[d] || 0) + 1; }
+  const legacyQuestByDate = {};
+  for (const e of log) { if (e && !e.id && e.source === "quete" && e.date) (legacyQuestByDate[e.date] = legacyQuestByDate[e.date] || []).push(e); }
+  const drop = new Set(); const keepCount = {};
+  for (const [date, entries] of Object.entries(legacyQuestByDate)) {
+    const limit = Math.max(doneByDate[date] || 0, 1);
+    if (entries.length <= limit) continue;
+    const counts = {}; for (const e of entries) counts[_xpLogKey(e)] = (counts[_xpLogKey(e)] || 0) + 1;
+    const g = Object.values(counts).reduce((a, b) => { while (b) { [a, b] = [b, a % b]; } return a; }, 0);
+    const target = g >= 2 ? Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, n / g])) : null;
+    const total = target ? Object.values(target).reduce((a, b) => a + b, 0) : 0;
+    if (target && total <= limit) { for (const [k, n] of Object.entries(target)) keepCount[date + " " + k] = n; }
+    drop.add(date);
+  }
+  if (!drop.size) return log;
+  const seen = {};
+  return log.filter((e) => {
+    if (!e || e.id || e.source !== "quete" || !drop.has(e.date)) return true;
+    const k = e.date + " " + _xpLogKey(e);
+    const quota = keepCount[k] || 0;
+    seen[k] = (seen[k] || 0) + 1;
+    return seen[k] <= quota;
+  });
+};
+const mergeXpLog = (a, b, completedAt) => {
+  const A = sanitizeXpLog(a, completedAt), B = sanitizeXpLog(b, completedAt);
+  const out = []; const ids = new Set(); const legacy = {};
+  for (const e of [...A, ...B]) {
+    if (!e) continue;
+    if (e.id) { if (!ids.has(e.id)) { ids.add(e.id); out.push(e); } }
+    else { const k = _xpLogKey(e); (legacy[k] = legacy[k] || []).push(e); }
+  }
+  for (const [k, entries] of Object.entries(legacy)) {
+    const inA = A.filter((e) => e && !e.id && _xpLogKey(e) === k).length;
+    const inB = B.filter((e) => e && !e.id && _xpLogKey(e) === k).length;
+    for (let i = 0; i < Math.max(inA, inB); i++) out.push(entries[i]);
+  }
+  return out.sort((x, y) => (x.date || "").localeCompare(y.date || "")).slice(-500);
+};
 const isNewer = (a, b) => { if (!a) return false; if (!b) return true; try { return new Date(a) > new Date(b); } catch { return false; } };
 // v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — port du même garde-fou côté client
 // (src/recurring.js, isValidCustodyWeekKey) : une valeur corrompue trouvée en prod ("2026-07-25z2",
@@ -98,6 +147,7 @@ const mergeGS = (a, b, preferIncoming) => {
   const refusedKeys = _uniq([...(a.refusedKeys||[]), ...(b.refusedKeys||[])]).slice(-400); // v1.64.0 — tombstone des refus
   const _refusedSet = new Set(refusedKeys);
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
+  const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : borne de plausibilité de mergeXpLog
   return {
     ...a, ...b,
     xp: Math.max(a.xp||0, b.xp||0),
@@ -107,8 +157,8 @@ const mergeGS = (a, b, preferIncoming) => {
     // (même un vieux, pas à jour) écraser coinsWeek côté serveur. On garde la semaine la plus récente.
     coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
     completed,
-    completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) },
-    xpLog: [...(a.xpLog||[]), ...(b.xpLog||[])].sort((x,y)=>(x.date||"").localeCompare(y.date||"")).slice(-500), // v2.16.32 — miroir du merge client, non-autoritatif (juste un graphique)
+    completedAt: _completedAt,
+    xpLog: mergeXpLog(a.xpLog, b.xpLog, _completedAt), // v2.16.65 — miroir du merge client : union par `id`, multiplicité MAX (jamais la somme) pour l'hérité, + réparation des journaux déjà gonflés
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),

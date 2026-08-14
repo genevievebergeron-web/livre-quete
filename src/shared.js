@@ -82,8 +82,79 @@ export const streakOf = (activeDays) => {
 // `completedAt` qui ne couvre que les quêtes normales. Plafonné à 500 entrées (même esprit que
 // `refusedKeys`/`removedCalendarIds` : borné, pas un historique infini). Ignore les montants ≤0
 // (garde-fou, ne devrait jamais arriver mais évite de polluer le journal si un appelant passe 0).
-export const appendXpLog = (xpLog, amount, source) =>
-  amount > 0 ? [...(xpLog || []), { date: todayStamp(), amount, source }].slice(-500) : (xpLog || []);
+// v2.16.65 — chaque entrée porte désormais un `id` UNIQUE. Sans lui, `mergeGS` ne pouvait pas
+// distinguer « la même entrée vue deux fois » de « deux quêtes identiques le même jour », et sa
+// concaténation DOUBLAIT le journal à chaque synchro (voir mergeXpLog / sanitizeXpLog).
+// `day` (v2.16.65, même patron que v2.16.64) : jour RÉEL de l'action quand l'appelant le connaît
+// — la validation parent peut tomber des jours après le geste de l'enfant.
+export const appendXpLog = (xpLog, amount, source, day) =>
+  amount > 0 ? [...(xpLog || []), { id: "xl_" + uid(), date: day || todayStamp(), amount, source }].slice(-500) : (xpLog || []);
+
+// v2.16.65 — clé de multiplicité des entrées SANS `id` (journaux d'avant ce correctif) : deux
+// entrées héritées identiques sur ces trois axes sont indistinguables, c'est précisément ce qui a
+// permis la duplication silencieuse.
+const _xpLogKey = (e) => `${e && e.date}|${e && e.amount}|${e && e.source}`;
+
+// v2.16.65 — RÉPARATION des journaux déjà gonflés par l'ancienne fusion (concaténation sans dédup :
+// 2 entrées → 4 → 8 → … → plafond de 500). Ne touche QUE les entrées héritées (sans `id`) et ne
+// s'active que sur une journée PROUVÉE impossible : plus d'entrées `quete` que la journée ne compte
+// de complétions dans `completedAt`. En prod le 14 août : Antoine Emery avait 500 entrées (250×15XP
+// + 250×8XP) pour 2 complétions réelles ce jour-là ; Olivier 500 et Antoine DR 500 pour ZÉRO.
+// Sur une telle journée, le PGCD des multiplicités donne le facteur de doublement exact (250 → 1×15
+// + 1×8, soit très exactement ses 2 quêtes) ; quand le plafond de 500 a tronqué le journal et brouillé
+// le rapport (PGCD = 1), on retire les entrées de la journée et le graphique retombe sur `completedAt`
+// — le repli documenté d'origine pour les jours antérieurs au journal (voir playerprofile.jsx).
+// Idempotent : après passage, la journée respecte la borne, donc un 2e appel ne fait plus rien.
+// Ne peut JAMAIS s'activer sur les entrées écrites depuis ce correctif (elles ont un `id`).
+export const sanitizeXpLog = (xpLog, completedAt) => {
+  const log = xpLog || [];
+  if (!log.some((e) => e && !e.id)) return log; // que du neuf : rien à réparer
+  const doneByDate = {};
+  for (const k of Object.keys(completedAt || {})) { const d = dayOfDoneKey(k); if (d) doneByDate[d] = (doneByDate[d] || 0) + 1; }
+  const legacyQuestByDate = {};
+  for (const e of log) { if (e && !e.id && e.source === "quete" && e.date) (legacyQuestByDate[e.date] = legacyQuestByDate[e.date] || []).push(e); }
+  const drop = new Set(); const keepCount = {};
+  for (const [date, entries] of Object.entries(legacyQuestByDate)) {
+    const limit = Math.max(doneByDate[date] || 0, 1); // 1 minimum : une quête de calendrier n'a pas de date dans sa clé
+    if (entries.length <= limit) continue; // journée plausible → intouchée
+    const counts = {}; for (const e of entries) counts[_xpLogKey(e)] = (counts[_xpLogKey(e)] || 0) + 1;
+    const g = Object.values(counts).reduce((a, b) => { while (b) { [a, b] = [b, a % b]; } return a; }, 0);
+    const target = g >= 2 ? Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, n / g])) : null;
+    const total = target ? Object.values(target).reduce((a, b) => a + b, 0) : 0;
+    if (target && total <= limit) { for (const [k, n] of Object.entries(target)) keepCount[date + " " + k] = n; }
+    drop.add(date); // marque la journée comme sous quota (keepCount décide quoi survit)
+  }
+  if (!drop.size) return log;
+  const seen = {};
+  return log.filter((e) => {
+    if (!e || e.id || e.source !== "quete" || !drop.has(e.date)) return true;
+    const k = e.date + " " + _xpLogKey(e);
+    const quota = keepCount[k] || 0;
+    seen[k] = (seen[k] || 0) + 1;
+    return seen[k] <= quota;
+  });
+};
+
+// v2.16.65 — fusion CORRECTE de deux journaux d'XP. L'ancienne version concaténait (`[...a, ...b]`),
+// donc chaque synchro doublait le journal du même appareil avec lui-même jusqu'au plafond de 500.
+// Ici : union par `id` pour les entrées modernes (exact), et multiplicité MAXIMALE — jamais la somme —
+// par (date, montant, source) pour les entrées héritées, ce qui est la bonne sémantique quand deux
+// copies du même journal append-only divergent (l'une est en avance sur l'autre).
+export const mergeXpLog = (a, b, completedAt) => {
+  const A = sanitizeXpLog(a, completedAt), B = sanitizeXpLog(b, completedAt);
+  const out = []; const ids = new Set(); const legacy = {};
+  for (const e of [...A, ...B]) {
+    if (!e) continue;
+    if (e.id) { if (!ids.has(e.id)) { ids.add(e.id); out.push(e); } }
+    else { const k = _xpLogKey(e); (legacy[k] = legacy[k] || []).push(e); }
+  }
+  for (const [k, entries] of Object.entries(legacy)) {
+    const inA = A.filter((e) => e && !e.id && _xpLogKey(e) === k).length;
+    const inB = B.filter((e) => e && !e.id && _xpLogKey(e) === k).length;
+    for (let i = 0; i < Math.max(inA, inB); i++) out.push(entries[i]);
+  }
+  return out.sort((x, y) => (x.date || "").localeCompare(y.date || "")).slice(-500);
+};
 
 export const COLORS = ["#5F87B3","#A874B0","#5CAD68","#C77B54","#D9BC5C","#D97070","#4FA8B3","#8A5A96","#C4789E","#0a0a0a","#F0F0FF"];
 

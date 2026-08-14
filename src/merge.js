@@ -9,7 +9,7 @@ import { PLAYER_THEMES } from "./themes.js";
 import { mergePetXp } from "./pets.js";
 import { leagueRank } from "./leagues.js";
 import { isValidCustodyWeekKey } from "./recurring.js";
-import { weekKey, _uniq } from "./shared.js";
+import { weekKey, _uniq, mergeXpLog } from "./shared.js";
 import { currentEnergy } from "./energy.js";
 
 export const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant aux absents)
@@ -52,6 +52,7 @@ export const mergeGS = (a, b, preferIncoming) => {
   const _refusedSet = new Set(refusedKeys);
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.7.0 — tombstone des événements calendrier supprimés
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
+  const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : `mergeXpLog` s'en sert comme borne de plausibilité
   return {
     ...a, ...b,
     xp: Math.max(a.xp || 0, b.xp || 0),
@@ -64,8 +65,13 @@ export const mergeGS = (a, b, preferIncoming) => {
     // reset spurieux à la prochaine migration. Fix : on garde la semaine la plus récente (lexicographique).
     coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     completed,
-    completedAt: { ...(b.completedAt || {}), ...(a.completedAt || {}) }, // v1.60.0 — horodatage de complétion (union)
-    xpLog: [...(a.xpLog || []), ...(b.xpLog || [])].sort((x, y) => (x.date || "").localeCompare(y.date || "")).slice(-500), // v2.16.32 — non-autoritatif (juste pour un graphique), union bornée suffit
+    completedAt: _completedAt, // v1.60.0 — horodatage de complétion (union)
+    // v2.16.65 — l'ancienne CONCATÉNATION doublait le journal à chaque synchro (2 → 4 → 8 → … → 500).
+    // Mesuré en prod le 14 août : 3 enfants sur 4 avec un journal saturé de 500 entrées toutes datées
+    // du même jour, dont un enfant qui n'avait pas joué depuis 9 jours. `mergeXpLog` unionne par `id`
+    // et prend la multiplicité MAXIMALE (jamais la somme) pour les entrées héritées, et répare au
+    // passage les journaux déjà gonflés — des deux côtés, donc la réparation survit à la synchro.
+    xpLog: mergeXpLog(a.xpLog, b.xpLog, _completedAt),
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées (sinon l'union les ré-ajoutait au portail parent)
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
