@@ -4,6 +4,27 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-13 (routine autonome, nuit, 5e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 240 ko, `savedAt` `2026-08-13T08:36:01Z` (**identique au 4e passage** : l'app n'a pas resservi depuis ce matin). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**, `config.bugs` **inchangé** (14 entrées, la plus récente du 31 juillet), `feed` (60 entrées) sans message neuf depuis le 24 juillet, `childTaskProposals`/`coinOffers`/`momentRequests`/`teamInvites`/`repairEvents`/`removedProposals`/`removalRequests` tous vides. **Aucun signalement neuf — 5e nuit propre d'affilée.** Pas de Phase 2.
+- Soldes `coins` **12 / 0 / 33 / 30** et `coinsLifetime` **947 / 317 / 376 / 1277** inchangés depuis le 9 août. Le bloc 🔴 GEN de `PROJET-ETAT.md` reste valable mot pour mot.
+
+### 🔍 `config.boss` audité — SAIN, à ne pas re-auditer
+Champ jamais regardé jusqu'ici (9 clés). Boss actif : `yeti_white`, `difficulty:"costaud"`, `startedAt` 2026-07-24, `lastHitTs` 2026-07-31, `defeatedAt:null`.
+- `hpMax` **308** = `round(BOSS_DIFF.costaud.hp 140 × (0,6 + 0,4 × 4 joueurs))` — la formule de `handleLaunchBoss` redonne exactement la valeur stockée.
+- `bossBattle.bossId` vaut `boss.startedAt` chez les **quatre** enfants, donc `_bb()` reconnaît bien leur combat (pas de dégâts orphelins). Dégâts cumulés **191 / 308** (66+53+40+32), `earned − spent` = 2/0/6/5 jetons restants, tous cohérents avec le barème (`petite` 1 jeton → 1 PV, `grosse` 3 → 4, familier 3 → dégâts variables).
+- Aucun blocage possible : le filet `v2.5.25` (`useEffect` qui réévalue la victoire à chaque changement d'état) couvre le cas « dégâts ≥ PV sans victoire » qui avait bloqué l'Hydre du 1er juillet.
+- ⚠️ Point d'affichage, **pas un bug** : `familyHp` tombe à 0 % après ~36 h sans attaque, donc les « PV famille » sont à `🖤🖤🖤🖤🖤` depuis le 1er août. C'est le comportement voulu (message « ⚠️ Le boss reprend des forces! ») et ça n'a **aucune** conséquence mécanique — rien ne se déclenche à 0 %. À signaler à Gen seulement si elle veut que ça fasse quelque chose.
+
+### 🎯 Ce qui a mené au bug de la v2.16.61
+`childTaskProposals` est **vide** alors que **trois** des 14 signalements parlent d'une quête ajoutée qui n'apparaît nulle part. Un champ vide n'innocente pas la fonctionnalité : il dit seulement que **ce chemin-là** (« proposer à la famille ») n'a jamais servi. Les enfants passent par les **deux autres** chemins d'ajout (`handleChildAddTask` portées « once »/« reusable », `handleChildPickTask`), qui écrivent dans `config.assignments` — et c'est là qu'était le défaut. Détail complet dans `PROJET-ETAT.md`, entrée v2.16.61.
+
+---
+
 ## Passage du 2026-08-13 (routine autonome, nuit, 4e passage)
 
 ### 🌐 Lecture de l'API de production
