@@ -6,7 +6,7 @@
 // `migratePetXpV2`/`PET_LEVELS_OLD` viennent avec, `migrateGameState` étant leur seul appelant.
 import { PET_LEVELS } from "./pets.js";
 import { TASK_CATALOG } from "./catalog.js";
-import { COLOR_DESATURATE_MAP } from "./shared.js";
+import { COLOR_DESATURATE_MAP, activeDaysFromCompleted } from "./shared.js";
 import { computeLeagueTier, leagueRank } from "./leagues.js";
 import { custodyWeekKey, CHALLENGE_PERFECTION_FRAME_ID } from "./recurring.js";
 import { CHANGELOG } from "./changelog.js";
@@ -53,6 +53,9 @@ export const migrateGameState = (gs) => {
   // `YYYY-MM-DD`) : un stamp « futur » écrit par un vieux client UTC ne doit pas être rétrogradé,
   // sinon la guerre de stamps avec ce client repart (même raison qu'au merge, `merge.js` ~65).
   const storedWeek = gs.coinsWeek?.week || "";
+  // v2.16.64 — voir `activeDaysFromCompleted` : le jour actif se relit dans la clé de complétion,
+  // pas dans la date de validation. Calculé ici parce que la ligue en dépend juste en dessous.
+  const _activeDays = activeDaysFromCompleted(gs.activeDays, gs.completed);
   return {
     xp: 0, completed: [], equipped: {},
     ...gs,
@@ -95,12 +98,16 @@ export const migrateGameState = (gs) => {
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)
     energyTs: gs.energyTs || null,
     lastFedDay: gs.lastFedDay || null,           // v1.41.0 — Tamagotchi : nourri le jour…
-    activeDays: gs.activeDays || [],             // v1.41.0 — jours avec ≥1 quête (pour la série 🔥)
+    // v1.41.0 — jours avec ≥1 quête (pour la série 🔥) ; v2.16.64 — reconstruits à CHAQUE chargement
+    // à partir des clés de `completed`, qui portent le jour où l'ENFANT a tapé (voir
+    // `activeDaysFromCompleted`). Répare les journées créditées au mauvais jour par l'ancien
+    // `todayStamp()` de la validation parent : 12 jours de travail manquaient chez les 4 enfants.
+    activeDays: _activeDays,
     // v2.16.34 — Backlog #13 (ligues) : recalculé à CHAQUE chargement à partir de activeDays (comme
     // le nettoyage des orphelines plus bas), mais RATCHET — ne remplace le palier déjà stocké que si
     // le palier mérité cette semaine est PLUS HAUT. Jamais de rétrogradation : une semaine calme
     // après une bonne série ne fait jamais reculer l'enfant.
-    leagueTier: (() => { const computed = computeLeagueTier(gs.activeDays || []); const stored = gs.leagueTier || "bronze"; return leagueRank(computed) > leagueRank(stored) ? computed : stored; })(),
+    leagueTier: (() => { const computed = computeLeagueTier(_activeDays); const stored = gs.leagueTier || "bronze"; return leagueRank(computed) > leagueRank(stored) ? computed : stored; })(),
     sessionMinutes: gs.sessionMinutes || { day: null, minutes: 0 }, // Backlog #13 — budget-temps quotidien (contrôle parental)
     bossBattle: gs.bossBattle || {bossId:null,earned:0,spent:0,dmg:0}, // v1.42.0 — combat de boss (jetons/dégâts)
     // v2.15.0 — calendrier purement événementiel (demande de Gen) : "devoir"/"examen" agissaient

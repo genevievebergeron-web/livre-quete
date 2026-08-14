@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.64", date:"2026-08-14", features:[
+    "🔥 Ta série compte enfin le jour où TU as fait la quête, pas le jour où le parent l'a validée. Avant, une quête faite samedi et validée dimanche donnait le crédit à dimanche — et samedi ne comptait pas du tout.",
+    "📅 Les journées perdues comme ça t'ont été rendues : 12 jours de travail remis aux 4 enfants, et les « jours actifs cette semaine » de ton profil sont enfin les bons.",
+  ]},
   { version:"2.16.63", date:"2026-08-14", features:[
     "⏰ Le rituel que tu choisis reste choisi. Avant, si tu prenais « 🌙 Soir » et que tu allais voir « 📋 Mes tâches » deux secondes, revenir sur « ⏰ Rituels » te ramenait au rituel du matin — sans rien dire.",
     "🗂️ Ça marche aussi pour la puce « Tout », et ton choix tient jusqu'à ta prochaine connexion.",

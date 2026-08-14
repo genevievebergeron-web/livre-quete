@@ -4,6 +4,37 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-14 (routine autonome, nuit, 8e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 242 ko, `savedAt` `2026-08-14T06:37:44Z` (**l'app a resservi depuis le 7e passage**, qui lisait `02:33:37Z`). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**, `config.bugs` **inchangé** (14 entrées, la plus récente du 31 juillet), `feed` (60 entrées) sans message neuf depuis le 9 août, `pending` vide chez les 4 enfants, `childTaskProposals`/`coinOffers`/`momentRequests`/`teamInvites`/`repairEvents`/`removedProposals`/`removalRequests` tous vides. **Aucun signalement neuf — 7e nuit propre d'affilée.** Pas de Phase 2.
+- Les 4 enfants portent toujours `activeRoutineId` = leur « Routine du matin » : la signature de la `v2.16.63`, poussée cette nuit et **pas encore rechargée** par les appareils. Attendu, rien à faire.
+
+### 🔍 Quatre champs de `gameStates` audités — tous SAINS, à ne pas re-auditer
+- **`refusedKeys`** (28 / 11 / 22 / 22). Toutes les clés sont datées (`#YYYY-MM-DD`), **zéro** recoupement avec `completed`, et `refusals` (la file du message drôle) est à **0 partout** — donc consommée normalement. Le tombstone de la `v1.64.0` fait ce qu'il annonce : `mergeGS` retire du `pending` toute clé refusée (`merge.js:68`), et comme la clé porte la date, un refus d'un jour ne barre pas le lendemain. Rien à corriger.
+- **`removedRoutineIds`** (11 / 14 / 12 / 11). **Aucune** collision avec les 4 rituels vivants de chaque enfant, et `activeRoutineId` pointe partout sur un rituel qui existe. Les ids tombstonés montrent trois générations de réensemencement (`rt_matin_*` → `rt_matin2_*` → `rt_matin3_*`) : comportement voulu.
+- **`calendar`** (14 / 24 / 13 / 10). Dernier événement le **31 juillet**, **aucun événement futur** chez personne, `removedCalendarIds` vide partout. Le calendrier est simplement inutilisé depuis un mois — ce n'est pas un défaut.
+- **`petEvo` / `petXp` / `petNickname`**. Cohérents (paliers d'évolution alignés sur l'XP du familier), surnoms d'enfants bien présents (« Bubbles », « BOB », « CACA!!! »). Rien à signaler.
+
+### 🔥 Le vrai défaut du passage — trouvé par une incohérence de CLASSEMENT, pas par un champ suspect
+Ce qui a mis sur la piste : **Antoine Emery est `leagueTier:"bronze"` avec 4176 XP** pendant qu'**Elli est `"argent"` avec 2659**. La ligue ne dépend pas de l'XP mais des **jours actifs** (`leagues.js`) — d'où `activeDays`, et de là au seul endroit qui l'écrit.
+
+`approvePending` écrivait `activeDays = [...p.activeDays, todayStamp()]`, soit **le jour où le parent clique**, jamais celui où l'enfant a fait la quête — alors que la clé de complétion porte déjà le bon jour. Preuve dans la donnée : `0lqxkq4_4khr1al#2026-08-08` a un `completedAt` au `2026-08-09T14:25:11Z`, et `activeDays` d'Olivier contient `2026-08-09` sans contenir `2026-08-08`. Second trou, même champ : `handleForceComplete` (bouton « Override ») ne touchait **pas du tout** `activeDays`.
+
+Mesuré en rejouant `streakOf`/`computeLeagueTier` sur les **63 jours** d'historique : **12 journées de travail non comptées** (3/2/4/3), **7 journées fantômes** créditées à tort (1/0/2/4), **40 jours** où le nombre affiché diffère — **Antoine Emery à « 🔥 1 jour » le 30 juillet au lieu de 7**, Elli à « 🔥 2 » le 31 au lieu de 8 — et **25 jours** où le palier de ligue mérité était plus haut. Corrigé en `v2.16.64` ; la donnée se répare seule au prochain chargement (union idempotente dans `migrateGameState`, **la routine n'a rien écrit en prod**). Détail, mesures et raison de ne PAS purger les fantômes : entrée `PROJET-ETAT.md` v2.16.64.
+
+⚠️ **Pas de vérification navigateur ce passage** : `preview_start` a été **refusé par le classificateur** en session planifiée. Remplacée par le rejeu des vrais modules du dépôt sur la vraie donnée de prod — **27 assertions, 0 échec**, dont `migrateGameState` exécuté sur les 4 états réels (idempotent, rien de perdu, ligue jamais rétrogradée). Le diff ne touche aucun JSX.
+
+### 💡 À signaler à Gen (pas un bug)
+- [ ] **🔴 Toujours ouvert — la restauration des soldes du 28 juillet.** Inchangé : `coinsLifetime` **947 / 317 / 376 / 1277**, `Le GOAT!!!` toujours à 0 pièce. Le code est réparé depuis `v2.16.45` ; le montant à restaurer reste ta décision.
+- [ ] **🏅 Nouveau — faut-il rendre les paliers de ligue perdus ?** Trois enfants sur quatre sont **Bronze** aujourd'hui alors que la donnée corrigée montre qu'ils avaient de quoi être **Argent** début août. Le ratchet ne regarde que la fenêtre du jour du chargement, et l'app n'a pas resservi entre le 31 juillet et le 9 août : ces fenêtres n'ont jamais été observées. Rattraper ça demanderait de rejouer le ratchet sur tout l'historique — ce qui change la règle et propulserait tout le monde à Or/Diamant. **Non tranché par la routine.**
+- 💡 **Méthode qui a payé ce passage** : chercher une **incohérence entre deux valeurs affichées** (le plus gros XP avec le plus petit rang) plutôt qu'un champ « suspect ». Les quatre champs choisis pour leur air louche sont tous ressortis propres ; c'est la contradiction visible qui a mené au bug.
+
+---
+
 ## Passage du 2026-08-14 (routine autonome, nuit, 6e passage)
 
 ### 🌐 Lecture de l'API de production

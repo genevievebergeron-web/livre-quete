@@ -44,6 +44,27 @@ export const mixSeed = (x) => {
   return (h ^ (h >>> 16)) >>> 0;
 };
 
+// v2.16.64 — jour RÉEL d'accomplissement, lu dans la clé de complétion (`instanceId_playerId#YYYY-MM-DD`,
+// posée par `requestComplete` au moment où l'ENFANT tape). Jusqu'ici `activeDays` recevait `todayStamp()`
+// au moment de la VALIDATION PARENT : une validation faite le lendemain (ou 9 jours plus tard) créditait
+// le mauvais jour, et le jour du travail ne comptait pas du tout. Les clés du calendrier n'ont pas de
+// date (elles persistent jusqu'à l'événement) → `fallback`.
+export const dayOfDoneKey = (doneKey, fallback = null) => {
+  const m = /#(\d{4}-\d{2}-\d{2})$/.exec(String(doneKey || ""));
+  return m ? m[1] : fallback;
+};
+
+// v2.16.64 — reconstruit les jours actifs à partir des clés de complétion (source de vérité : la
+// clé porte le jour où l'enfant a tapé). UNION avec l'existant, jamais de retrait : `mergeGS` unionne
+// `activeDays`, donc purger serait annulé à la première synchro — et un jour crédité à tort ne peut
+// pas être distingué à coup sûr d'un jour gagné par une quête de calendrier (clé sans date).
+// Idempotent : rejoué à chaque chargement, il répare aussi les données déjà en prod sans drapeau.
+export const activeDaysFromCompleted = (activeDays, completed) => {
+  const set = new Set(activeDays || []);
+  for (const k of completed || []) { const d = dayOfDoneKey(k); if (d) set.add(d); }
+  return [...set].sort();
+};
+
 // Série : jours consécutifs (en finissant aujourd'hui ou hier) présents dans activeDays
 export const streakOf = (activeDays) => {
   const set = new Set(activeDays || []);

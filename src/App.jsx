@@ -12,7 +12,7 @@ import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./u
 // (le dénominateur « 0/2 » de la boutique verrouillée) passe maintenant par `rotatingNeed`, qui
 // plafonne le seuil au nombre de rotatives réellement proposées. `parentpanel.jsx` (le sélecteur du
 // réglage) et `gating.js` continuent de l'importer depuis `shared.js`.
-import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog } from "./shared.js";
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog, dayOfDoneKey } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.63";
+export const APP_VERSION = "2.16.64";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2648,8 +2648,11 @@ export default function App() {
       const eqPet=p.equipped?.pet;
       const petFedToday=p.lastFedDay===todayStamp();
       if(eqPet && petFedToday){ const _g=gainPet(p,eqPet,grantXp); updatedPs.petXp=_g.petXp; updatedPs.petDay=_g.petDay; }
-      // Série 🔥 : marquer aujourd'hui comme jour actif (quête accomplie)
-      updatedPs.activeDays=_uniq([...(p.activeDays||[]), todayStamp()]);
+      // Série 🔥 : marquer le jour où l'ENFANT a accompli la quête — pas celui où le parent valide.
+      // v2.16.64 : `todayStamp()` ici créditait la date de la VALIDATION. Une validation faite le
+      // lendemain (ou en lot après plusieurs jours) déplaçait la journée de l'enfant, et le jour du
+      // travail ne comptait ni pour la série 🔥 ni pour la ligue. La clé porte le bon jour.
+      updatedPs.activeDays=_uniq([...(p.activeDays||[]), dayOfDoneKey(doneKey, todayStamp())]);
       const n=[...gs]; n[playerIdx]=updatedPs;
       // Fil de famille : on enregistre l'accomplissement (+ niveau / badges) dans le MÊME save
       const now=Date.now(); const fents=[{ id:"f_"+uid(), ts:now, likes:[], type:"task", playerId:player.id, text:`${displayName(player)} a accompli « ${task.label} »`, emoji:task.emoji||"✅" }];
@@ -2932,6 +2935,9 @@ export default function App() {
       if(p.completed?.includes(doneKey))return gs;
       n[playerIdx]={...p,xp:p.xp+grantXp,coins:p.coins+grantCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,
         completed:[...new Set([...(p.completed||[]),doneKey])],
+        // v2.16.64 — ce raccourci parent marquait la quête accomplie sans jamais toucher `activeDays` :
+        // une journée validée uniquement par override ne comptait ni pour la série 🔥 ni pour la ligue.
+        activeDays:_uniq([...(p.activeDays||[]), dayOfDoneKey(doneKey, todayStamp())]),
         pending:(p.pending||[]).filter(k=>k!==doneKey)};
       persist(config,n); return n; });
     logAction(`✅ Override: ${player?.name} — ${task.label}`,"#5CAD68");
