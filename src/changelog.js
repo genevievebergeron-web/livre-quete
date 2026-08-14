@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.62", date:"2026-08-14", features:[
+    "🪙 Une récompense déjà remboursée pouvait être remboursée encore, et redonner toutes ses pièces une fois par semaine, sans jamais avoir été rachetée. Un remboursement compte maintenant pour l'achat qu'il annule : une seule fois par achat.",
+    "🛒 Si tu rachètes vraiment la même récompense plus tard, tu peux évidemment changer d'idée à nouveau — ça, ça n'a pas changé.",
+  ]},
   { version:"2.16.61", date:"2026-08-13", features:[
     "➕ « Ajouter une quête à ma journée » disait « Quête ajoutée! » et la quête n'apparaissait nulle part. Ça arrivait dès qu'un rituel ⏰ était sélectionné : ta nouvelle quête n'appartenait à aucun rituel, donc l'écran la cachait tout de suite. Elle s'affiche maintenant tout de suite, rituel ou pas.",
     "🔎 Pareil pour la grille « ➕ Choisis une quête » : ce que tu prends dedans reste visible, même en mode Rituel.",

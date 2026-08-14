@@ -4,6 +4,27 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-14 (routine autonome, nuit, 6e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 241 ko, `savedAt` `2026-08-14T02:33:37Z` (**l'app a resservi ce soir**, contrairement au 5e passage). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**, `config.bugs` **inchangé** (14 entrées, la plus récente du 31 juillet), `feed` (60 entrées) sans message neuf depuis le 24 juillet. **Aucun signalement neuf — 6e nuit propre d'affilée.** Pas de Phase 2.
+- Les 14 bugs ouverts ont été **retriés** pour chercher un candidat hors réserve avatar : **six** portent sur l'avatar ou « Ma maison » (`bug_cas8lcb`, `bug_33as986`, `bug_56gb01a`, `bug_6k7827p`, `bug_xcqtyr7`, déplacement d'objets) → **sous réserve, non touchés** ; **deux ont déjà leur correctif dans le code** — `bug_h8r93zu` « le coffre se recharge trop vite » traité en `v2.15.7` (fusion de l'énergie, `merge.js:107`) et `bug_lyr5812` « le familier peut jouer à l'infini » traité en `v2.11.3` (toast honnête au plafond, `App.jsx:3562`) ; trois sont du bruit d'enfant ; `bug_hlu9mkd` reste le point (0) du bloc 🔴 GEN.
+
+### 🔍 Champs de `config` jamais audités — tous vides ou sains
+`coinOffers`, `teamInvites`, `momentRequests`, `repairEvents`, `removedProposals`, `childTaskProposals`, `removalRequests` : **tous à `[]`**. `mode` `"routine"`, `theme` `"minecraft"`, `routineEnd` `"08:30"` — cohérents et lus par `App.jsx`.
+- `momentRequests` vide est **normal** : 5 des 9 récompenses réellement vendables portent `moment:true`, mais aucun enfant n'en a acheté une depuis la `v2.6.2` (26 juillet, date d'introduction du champ). Le seul achat « moment » de la donnée (`rw_depanneur` chez Elli) est **antérieur** — son tombstone est daté du 20 juillet.
+- ⚠️ **`weekPersist` est un champ MORT** : écrit par l'assistant (`setupwizard.jsx:17` et `:146`), **lu par personne** — `grep` exhaustif sur tout le dépôt hors `node_modules`/`dist` ne donne que ces deux lignes. Il est forcé à `true` en édition (« always persist — badges depend on it ») et **aucun interrupteur ne l'expose** dans l'UI. Inoffensif en l'état, donc **laissé tel quel** ; le retirer touche l'assistant → candidat pour une session interactive.
+
+### 🪙 Le vrai défaut du passage — trouvé en croisant deux champs, pas en lisant du code
+En vérifiant *pourquoi* `momentRequests` était vide alors qu'un achat « moment » existait, une contradiction est sortie de la donnée : **Elli porte `rw_depanneur` et `rw_bonbon` dans `boughtRewards` ET dans `refundedRewards`** — or un remboursement est censé retirer la récompense de `boughtRewards`. Le tombestone anti-double-remboursement de la `v1.69.0` est keyé `id#semaine` alors que `boughtRewards` est en dernière-écriture-gagne (donc ressuscitable sans limite de temps) : passé le lundi suivant, « ↩️ J'ai changé d'idée » **repayait le prix plein**, et de nouveau chaque semaine. **270 pièces encaissables à deux tapes** (210 + 60) pour un `coinsLifetime` de **317**. Corrigé en `v2.16.62` (tombstone keyé sur l'achat) — détail complet, mesures et vérifications dans `PROJET-ETAT.md`.
+- Cas sain qui confirme le mécanisme : Antoine DR a le tombstone `rw_depanneur#2026-06-15` mais **plus** la récompense dans `boughtRewards` — aucun instantané périmé ne l'a ressuscitée chez lui.
+- ⚠️ **La donnée n'est pas réparée** (la routine n'écrit rien en prod) : les 4 ids restent dans le `boughtRewards` d'Elli et s'afficheront « RÉCLAMÉ! » jusqu'à ce qu'elle tape « J'ai changé d'idée » (qui les retire proprement, **sans pièce** pour les deux zombies) ou « ✓ Cacher ». **Rien à faire côté Gen.**
+
+---
+
 ## Passage du 2026-08-13 (routine autonome, nuit, 5e passage)
 
 ### 🌐 Lecture de l'API de production

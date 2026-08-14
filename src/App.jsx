@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.61";
+export const APP_VERSION = "2.16.62";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2811,6 +2811,12 @@ export default function App() {
     // double-invoque en dev : un uid()+setConfig générés à CHAQUE invocation créait 2 entrées
     // dupliquées par achat (trouvé en test navigateur). Précédent apparenté : v2.5.23.
     let newCfg = config;
+    // v2.16.62 — estampille d'ACHAT, calculée ici (corps de handleBuy, une fois par vrai clic) et
+    // jamais dans l'updater, que StrictMode double-invoque : c'est elle qui identifie désormais le
+    // remboursement dans `refundedRewards` (voir handleUnclaimReward). Le tombstone était keyé sur la
+    // SEMAINE, donc il expirait au changement de semaine alors que la récompense, elle, revenait
+    // indéfiniment par `boughtRewards` (dernière-écriture-gagne).
+    const buyTs = isReward ? Date.now() : 0;
     if(isReward && item.moment){
       const mr={ id:"mr_"+uid(), playerId, rewardId:item.id, emoji:item.emoji, label:item.label, coins:price, status:"attente", plannedDate:null, createdAt:new Date().toISOString() };
       newCfg = {...config, momentRequests:[...(config.momentRequests||[]), mr]};
@@ -2827,7 +2833,7 @@ export default function App() {
       const alreadyHave = isReward ? (p.boughtRewards||[]).includes(item.id) : (p.owned||[]).includes(item.id);
       if(alreadyHave) return gs;
       if((p.coins||0)<price)return gs;
-      const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
+      const n=[...gs]; n[idx]={...p,coins:(p.coins||0)-price,owned:[...new Set([...(p.owned||[]),item.id])],boughtRewards:isReward?[...new Set([...(p.boughtRewards||[]),item.id])]:p.boughtRewards,rewardBuyTs:isReward?{...(p.rewardBuyTs||{}),[item.id]:buyTs}:p.rewardBuyTs,equipped:item.slot?{...(p.equipped||{}),[item.slot]:item.id}:(p.equipped||{}),energy:Math.max(0,currentEnergy(p)-SHOP_ENERGY),energyTs:new Date().toISOString()};
       persist(newCfg,n); // newCfg identique à chaque (double-)invocation → persist reste idempotent
       return n;
     });
@@ -3449,11 +3455,26 @@ export default function App() {
     // FAMILLE → l'appareil d'un AUTRE enfant qui pousse un instantané périmé ressuscitait la
     // récompense remboursée (le bouton revenait) → re-remboursement sans fin. On pose un tombstone
     // `refundedRewards` (id#semaine, fusionné en UNION = increvable) : on ne rembourse qu'UNE fois.
-    const key=reward.id+"#"+weekKey();
+    // v2.16.62 — le tombstone de v1.69.0 ne tenait QUE la semaine où il était posé. Or la récompense,
+    // elle, ressuscite indéfiniment (boughtRewards = dernière-écriture-gagne, cf. ci-dessus) : passé
+    // le lundi suivant, `id#semaine` ne correspondait plus et le même « J'ai changé d'idée » repayait
+    // le prix PLEIN, sans que rien n'ait été dépensé — et de nouveau chaque semaine. Mesuré sur la
+    // donnée de prod du 14 août : Elli avait `rw_depanneur` et `rw_bonbon` à la fois dans
+    // `boughtRewards` ET dans `refundedRewards` (tombstones de la semaine du 20 juillet) = 270 pièces
+    // encaissables à deux tapes, pour un `coinsLifetime` de 317. La v2.16.59 (qui repêche toujours une
+    // récompense achetée dans la boutique) rendait justement ces deux cartes visibles tous les jours.
+    // Le tombstone est maintenant keyé sur l'ACHAT (`rewardBuyTs`, posé par handleBuy) : un vrai
+    // rachat produit une nouvelle estampille donc un nouveau remboursement légitime, tandis qu'une
+    // résurrection par synchro ramène l'ANCIENNE estampille → déjà tombstonée, aucune pièce.
+    // États d'avant la v2.16.62 (pas d'estampille) : tout tombstone portant cet id bloque le paiement.
+    const stamp=(gameStates[idx]?.rewardBuyTs||{})[reward.id];
+    const key=reward.id+"#"+(stamp?String(stamp):weekKey());
     let did=false;
     setGameStates(gs=>{ const n=[...gs]; const p=n[idx];
       if(!(p.boughtRewards||[]).includes(reward.id)) return gs; // pas réclamée → rien
-      if((p.refundedRewards||[]).includes(key)){
+      const already=(p.refundedRewards||[]).includes(key)
+        || (!stamp && (p.refundedRewards||[]).some(k=>k.startsWith(reward.id+"#"))); // legacy : jamais 2 fois
+      if(already){
         // déjà remboursée cette semaine (revenue via une synchro) → on retire juste le bouton, AUCUNE pièce
         n[idx]={...p, boughtRewards:(p.boughtRewards||[]).filter(r=>r!==reward.id), owned:(p.owned||[]).filter(id=>id!==reward.id)}; persist(config,n); return n;
       }

@@ -114,7 +114,8 @@ const mergeGS = (a, b, preferIncoming) => {
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins)
-    refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies
+    rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}), // v2.16.62 — voyage avec boughtRewards (même règle) : une résurrection ramène l'ancienne estampille, déjà tombstonée
+    refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
     calendar: _mergeCalendar(a.calendar, b.calendar),

@@ -71,7 +71,11 @@ export const mergeGS = (a, b, preferIncoming) => {
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
     owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins)
-    refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé cette semaine » (union increvable → fin des pièces infinies)
+    // v2.16.62 — l'estampille d'achat VOYAGE AVEC `boughtRewards` (exactement la même règle) : une
+    // résurrection par instantané périmé ramène donc l'ANCIENNE estampille, déjà tombstonée, au lieu
+    // de rouvrir un remboursement. Union interdite ici — il faut la valeur du même côté que l'achat.
+    rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}),
+    refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union increvable → fin des pièces infinies) ; keyé sur l'achat depuis v2.16.62
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
     equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
