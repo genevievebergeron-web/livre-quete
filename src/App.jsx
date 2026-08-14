@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.60";
+export const APP_VERSION = "2.16.61";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -303,13 +303,21 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   const ritualInstIds = useMemo(()=>{
     const s=new Set(); for(const r of (pState.routines||[])) for(const id of (r.taskIds||[])) s.add(id); return s;
   },[pState.routines]);
+  // v2.16.61 — les quêtes que l'enfant vient d'ajouter lui-même portent `childAdded` : elles
+  // rejoignent les `instanceId` prioritaires de la dédup, sinon une quête ajoutée dont le libellé
+  // existe déjà ailleurs (autre rituel, autre heure) se faisait replier sur la copie déjà là —
+  // donc « ajoutée! » puis rien à l'écran, le même symptôme que le filtre de rituel corrigé plus bas.
+  const childAddedIds = useMemo(
+    ()=>new Set((assignments||[]).filter(a=>a && a.childAdded).map(a=>a.instanceId)),
+    [assignments]
+  );
   const keptInstIds = useMemo(()=>{
-    const s=new Set(ritualInstIds);
+    const s=new Set([...ritualInstIds, ...childAddedIds]);
     const suffix="_"+player.id+"#"+todayStamp();
     for(const k of [...(pState.completed||[]), ...(pState.pending||[])])
       if(typeof k==="string" && k.endsWith(suffix)) s.add(k.slice(0, k.length-suffix.length));
     return s;
-  },[ritualInstIds, pState.completed, pState.pending, player.id]);
+  },[ritualInstIds, childAddedIds, pState.completed, pState.pending, player.id]);
   const labelOfTask = useMemo(()=>{
     const m=new Map((allTasks||[]).map(t=>[t.id,t.label]));
     return (id)=>m.get(id)||"";
@@ -365,11 +373,25 @@ const PlayerDashboard = memo(function PlayerDashboard({ player, playerIdx, pStat
   // - mode routine sans routine ciblée → toutes les tâches de routine
   // v2.6.0 — les quêtes de réparation 🕊️ sont TOUJOURS visibles, peu importe le mode (semaine/rituel)
   // ou le rituel actif : elles concernent la journée et tous les enfants sélectionnés doivent les voir.
+  // v2.16.61 — MÊME RAISON pour les quêtes que l'enfant ajoute lui-même avec « ➕ Ajouter une quête
+  // à ma journée ». En mode Rituel ⏰ avec un rituel sélectionné, la liste affichée est filtrée sur
+  // `activeRoutine.taskIds` — or une quête tout juste ajoutée n'appartient à AUCUN rituel (son
+  // `instanceId` vient d'être créé). L'enfant lisait « ➕ Quête ajoutée à ta journée! » et la carte
+  // n'apparaissait nulle part : c'est le motif exact de trois signalements ouverts depuis le 31
+  // juillet (« ajout de quête, ça dit c'Est ajouté, mais ça apparait pas », « jai cree une tache est
+  // elle est nule par », « Je peut pas ajouter dotre tache »). Mesuré sur la donnée de prod du 13
+  // août : les QUATRE enfants ont un rituel actif (« Routine du matin »), et deux d'entre eux sont
+  // en mode Rituel — Elli voit 6 de ses 87 assignations de rituel, Olivier 6 sur 60.
   const repairMine = allMine.filter(a=>a.repair);
-  const myAssignments = [...repairMine, ...(pMode==="week"
+  const modeMine = (pMode==="week"
     ? todayWeek
     : (activeRoutine ? routineMine.filter(a=>activeRoutine.taskIds?.includes(a.instanceId)) : routineMine)
-  ).filter(a=>!a.repair)];
+  ).filter(a=>!a.repair);
+  const childAddedMine = allMine.filter(a=>a.childAdded && !a.repair);
+  const _mySeen = new Set();
+  const myAssignments = [...repairMine, ...[...modeMine, ...childAddedMine].filter(a=>{
+    if(_mySeen.has(a.instanceId)) return false; _mySeen.add(a.instanceId); return true;
+  })];
   // Refonte visuelle Phase 5 — humeur affichée sur l'avatar du header : un événement (happy au
   // tap, voir requestComplete plus bas) est prioritaire ; sinon "tired" si ≥19h ET plus aucune
   // quête restante aujourd'hui (fin de journée paisible, pas un reproche — jamais si 0 quête).
@@ -3217,8 +3239,10 @@ export default function App() {
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:data.timeOfDay||"",createdAt:Date.now(),
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:data.timeOfDay||"",createdAt:Date.now(),childAdded:true,
       ...(scope==="reusable"?{}:{oneDay:todayStamp()})}; // v2.5.10 — portée A seulement : à usage unique (nettoyée après aujourd'hui)
+    // v2.16.61 — `childAdded` : marque une quête ajoutée par l'ENFANT lui-même, pour qu'elle reste
+    // visible même quand un rituel ⏰ est sélectionné (voir `childAddedMine` dans PlayerDashboard).
     const customTasks=existing?(config.customTasks||[]):[...(config.customTasks||[]),newTask];
     const newCfg={...config, customTasks, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
@@ -3276,7 +3300,9 @@ export default function App() {
     const pmode=gameStates[playerIdx]?.mode||config.mode||"routine";
     const todayIdx=(new Date().getDay()+6)%7;
     const days=pmode==="week" ? [todayIdx] : [];
-    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now()};
+    // v2.16.61 — `childAdded:true` (même raison que handleChildAddTask) : sans ça, une quête choisie
+    // dans la grille « ➕ Choisis une quête » disparaissait à l'écran d'un enfant en mode Rituel ⏰.
+    const ass={instanceId:uid(),taskId,playerIds:[pid],days,time:"",oneDay:todayStamp(),createdAt:Date.now(),childAdded:true};
     const newCfg={...config, assignments:[...(config.assignments||[]),ass]};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("➕ Quête ajoutée à ta journée!","#5CAD68");

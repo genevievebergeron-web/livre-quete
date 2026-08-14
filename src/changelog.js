@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.61", date:"2026-08-13", features:[
+    "➕ « Ajouter une quête à ma journée » disait « Quête ajoutée! » et la quête n'apparaissait nulle part. Ça arrivait dès qu'un rituel ⏰ était sélectionné : ta nouvelle quête n'appartenait à aucun rituel, donc l'écran la cachait tout de suite. Elle s'affiche maintenant tout de suite, rituel ou pas.",
+    "🔎 Pareil pour la grille « ➕ Choisis une quête » : ce que tu prends dedans reste visible, même en mode Rituel.",
+    "🧷 Et si la quête que tu ajoutes porte le même nom qu'une autre déjà prévue ailleurs dans ta semaine, c'est la tienne, celle que tu viens d'ajouter, qui reste à l'écran.",
+  ]},
   { version:"2.16.60", date:"2026-08-13", features:[
     "🔓 « BOUTIQUE VERROUILLÉE — fais encore 2 tâches rotatives » pouvait s'afficher les jours où AUCUNE tâche rotative n'existait : une semaine sur deux (hors semaine de garde), et dès qu'on passait en mode Rituel ⏰. Le compteur restait à 0/2 pour toujours, impossible à faire monter.",
     "🎨 Même chose pour le bouton « personnaliser mon perso » : il refusait de s'ouvrir avec la même consigne impossible. Les deux s'ouvrent maintenant normalement quand il n'y a pas de tâche rotative dans ta journée.",
