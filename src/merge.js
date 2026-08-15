@@ -94,7 +94,21 @@ export const mergeGS = (a, b, preferIncoming) => {
     // routine retirée localement (« Supprimer le rituel ») revenait dès qu'un autre appareil (ou le
     // serveur, qui garde l'ancien état) réapparaissait dans la fusion union-by-id ci-dessous.
     removedRoutineIds: _uniq([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]).slice(-200),
-    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); for (const r of [...(a.routines || []), ...(b.routines || [])]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    // v2.16.70 — l'union par id gardait la PREMIÈRE copie rencontrée, sans jamais regarder laquelle
+    // des deux est la plus fraîche : toute MODIFICATION d'un rituel existant (renommer, changer
+    // l'émoji, ajouter/retirer une quête — `onPatchState({routines:...})`, App.jsx ~1019) était donc
+    // jetée en silence dès qu'une copie du même id était déjà en place. Côté SERVEUR c'est
+    // systématique et non pas occasionnel : `mergeFamily(existing, data)` met toujours l'état déjà
+    // stocké en `a`, donc le nuage n'a JAMAIS pu accepter une seule modification de rituel — le
+    // contenu d'un rituel y est figé à sa toute première écriture. Conséquences mesurées sur la prod
+    // du 2026-08-15 : les 3 rituels d'Antoine Emery gardent 5 références d'assignations supprimées
+    // (`e3i368n`, `kmq0izq`, `ey05hal`, tous dans `removedAssignments`), alors que le ménage de
+    // rituels tourne à CHAQUE chargement depuis la v2.11.1 — il nettoie bien en local, puis la
+    // fusion serveur lui repasse l'ancienne copie par-dessus, en boucle depuis 3 semaines.
+    // Fix : la PRÉSENCE reste une union (avec le tombstone `removedRoutineIds` ci-dessus), mais le
+    // CONTENU d'un id présent des deux côtés vient de l'écriture la plus récente — même règle
+    // `preferIncoming` que `coins`/`pin`/`boughtRewards` plus haut dans cette même fonction.
+    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); const fresh = preferIncoming ? (b.routines || []) : (a.routines || []), stale = preferIncoming ? (a.routines || []) : (b.routines || []); for (const r of [...fresh, ...stale]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
     hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,

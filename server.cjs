@@ -197,7 +197,12 @@ const mergeGS = (a, b, preferIncoming) => {
     // aucun tombstone, contrairement à assignments/customTasks/childTaskProposals — une routine
     // supprimée localement revenait dès que ce merge serveur la retrouvait dans l'état existant.
     removedRoutineIds: _uniq([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]).slice(-200),
-    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); for (const r of [...(a.routines||[]), ...(b.routines||[])]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
+    // v2.16.70 — port du même correctif que le client (src/merge.js) : l'union par id gardait la
+    // PREMIÈRE copie rencontrée, donc `a` = l'état DÉJÀ stocké ici (`mergeFamily(existing, data)`)
+    // gagnait toujours. Le serveur ne pouvait donc jamais accepter la modification d'un rituel
+    // existant, ni le ménage des références mortes fait par le client à chaque chargement.
+    // Présence = union (avec tombstone) ; contenu d'un id commun = l'écriture la plus récente.
+    routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); const fresh = preferIncoming ? (b.routines||[]) : (a.routines||[]), stale = preferIncoming ? (a.routines||[]) : (b.routines||[]); for (const r of [...fresh, ...stale]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
     activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
     hiddenRewards: _uniq([...(a.hiddenRewards||[]), ...(b.hiddenRewards||[])]),
     hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,

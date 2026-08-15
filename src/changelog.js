@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.70", date:"2026-08-15", features:[
+    "⏰ Modifier un rituel ne tenait pas. Renommer « Routine du matin », changer son émoji, ajouter ou retirer une quête dedans : ça marchait sur ta tablette, puis la version d'avant revenait dès la synchro suivante, sans un mot. Le nuage gardait toujours sa première version du rituel et refusait tout le reste.",
+    "🧹 Du coup, les quêtes effacées restaient collées dans les rituels : les 3 rituels d'Antoine Emery traînaient 5 quêtes supprimées que le ménage automatique n'arrivait jamais à enlever. C'est réparé — la version la plus récente gagne, et supprimer un rituel le supprime toujours pour de bon.",
+  ]},
   { version:"2.16.69", date:"2026-08-15", features:[
     "⏱ Terminer ton rituel chronométré ne comptait pas comme une journée active. Tu avais beau finir ta routine au complet, l'app te disait « +XP 🎉 » et ta série 🔥 restait à zéro pour la journée, comme si tu n'avais rien fait.",
     "🔥 C'est réparé : un rituel terminé allume ta journée tout de suite, pour ta série comme pour ta ligue de la semaine.",

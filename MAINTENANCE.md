@@ -4,6 +4,63 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-15 (routine autonome, nuit, 14e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 168 ko, `savedAt` `2026-08-15T08:27:19Z` (**l'app a resservi depuis le 13e passage**,
+  2 h plus tôt la même nuit). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide** ; `coinOffers`, `teamInvites`, `repairEvents`, `momentRequests`,
+  `removalRequests`, `removedProposals`, `childTaskProposals` **tous vides** ; `feed` (60 entrées)
+  **sans aucun signalement**, rien de neuf depuis le 9 août.
+- `config.bugs` **inchangé** — les **mêmes 14** entrées, la plus récente du **31 juillet**, toutes
+  déjà examinées. **Phase 1 propre pour la 13e nuit d'affilée.** Aucune Phase 2.
+- **Backlog vérifié et confirmé épuisé** : les items #6, #7, #8, #12, #13 de `PROJET-ETAT.md` sont
+  tous ✅, et dans `le-design-de-mon-mighty-mountain.md` les 16 items du « backlog UX consolidé »,
+  les 6 « corrections rapides 🤖 » et les 4 items approuvés du 26 juillet sont tous cochés. Tout ce
+  qui reste y est marqué **👤 avec Gen** (décisions de conception, pas des correctifs à deviner).
+  D'où le basculement en audit de données, comme les passages précédents.
+
+### 🔍 Le bug trouvé cette nuit : les rituels, figés dans le nuage depuis toujours
+- Piste de départ : les 4 champs de `config` les moins couverts par la documentation
+  (`weekPersist`, `customRewards`, `weeklyQuests`, `announcements`). Tous **sains**
+  (`weeklyQuests` : 155 assignations, 0 doublon task|jour|joueur, 0 `playerId` inconnu ;
+  `customRewards` : les 4 `rw_hydre_*` `cost:0` sont des données de test **déjà** filtrées par
+  `baseCost(r) > 0`, `catalog.js:131`).
+- Le vrai signal est venu d'un croisement : **les `taskIds` des rituels contre les assignations
+  réellement existantes**. Antoine Emery porte **5 références mortes** dans ses 3 rituels
+  (`e3i368n`, `kmq0izq` ×3, `ey05hal`) — toutes présentes dans `config.removedAssignments`, donc
+  supprimées volontairement. « Routine du matin » lui affiche **3 quêtes sur 6**.
+- **Ce qui rend ça anormal** : ce ménage-là tourne à **chaque chargement** depuis la v2.11.1
+  (`migrations.js:298-310`), précisément parce qu'un drapeau à usage unique avait déjà échoué une
+  fois. Une saleté qui survit à un nettoyage permanent, c'est que **quelque chose la réécrit**.
+- **Cause** : `mergeGS` fusionne `routines` en union-par-id **premier-arrivé-gagne**. Le serveur
+  appelle `mergeFamily(existing, data)` — l'état déjà stocké arrive **toujours** en premier, donc
+  le nuage n'a **jamais** pu accepter la modification d'un rituel existant : ni le ménage, ni un
+  renommage, ni une quête ajoutée ou retirée. **Correctif → v2.16.70.**
+- **Vérifié** par rejeu des vrais modules sur le JSON de prod (`vite-node`), **avec contrôle
+  négatif** sur le code d'avant : AVANT, le ménage poussé au serveur laisse les 5 références mortes
+  et un renommage revient à l'ancien nom ; APRÈS, 8 assertions vertes (dont : rituel supprimé qui
+  ne ressuscite pas, 3 autres rituels intacts, idempotence).
+- **Leçon** : une donnée sale qui survit à un nettoyage *permanent* ne s'explique pas par le
+  nettoyage — il faut regarder qui la **réécrit** derrière. Ici, la couche de fusion.
+
+### 📌 Candidats nommés pour une prochaine nuit
+- **`seenVersions` en DEUX exemplaires** (racine de `data` **et** `config`, 2332 octets chacun) —
+  hérité des 12e et 13e passages, **toujours pas audité**. Ne pas le laisser tomber une 3e fois.
+- **L'humeur de l'Espace Famille** (`App.jsx:1919`) sourit sur `completedAt`, donc pas sur un
+  rituel — cosmétique, à trancher avec Gen (hérité du 13e passage).
+- **`weeklyChallenge.weekKey` figé à `2026-07-24`** alors que la semaine de garde du 7 août est
+  passée : les 4 défis affichés aux enfants sont ceux du 24 juillet, et le portail parent les
+  montre sans jamais proposer d'en écrire de nouveaux au changement de semaine. Rien n'est faux
+  dans les chiffres (`challengeDaysCount` ne compte que les 7 jours de la clé courante, et
+  `challengeTiers` d'Antoine Emery = `{week:"2026-07-24", tiers:[3]}` est **exact** : 3 coches les
+  25-26-27 juillet, palier 3 jours payé une fois). C'est une question de **conception** — faut-il
+  redemander un défi à chaque semaine de garde ? — donc 👤 avec Gen, pas un correctif à deviner.
+
+---
+
 ## Passage du 2026-08-15 (routine autonome, nuit, 13e passage)
 
 ### 🌐 Lecture de l'API de production
