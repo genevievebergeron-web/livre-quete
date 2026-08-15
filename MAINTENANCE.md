@@ -4,6 +4,51 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-15 (routine autonome, nuit, 13e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 168 ko, `savedAt` `2026-08-15T06:30:32Z` (**l'app a resservi depuis le 12e passage**,
+  4 h plus tôt la même nuit). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide** ; `coinOffers`, `teamInvites`, `repairEvents`, `momentRequests`,
+  `removalRequests`, `removedProposals`, `childTaskProposals` **tous vides** ; `feed` (60 entrées)
+  **sans aucun signalement**, rien de neuf depuis le 9 août.
+- `config.bugs` **inchangé** — les **mêmes 14** entrées, la plus récente du **31 juillet**, toutes
+  déjà examinées. **Phase 1 propre pour la 12e nuit d'affilée.** Aucune Phase 2.
+
+### 🔍 Le candidat nommé au 12e passage : moitié confirmé, moitié écarté
+- Le 12e passage annonçait deux chemins qui accordent de l'XP sans écrire `activeDays` : le bonus
+  de rituel et l'objectif du jour. **Un seul des deux est un vrai trou.**
+- **Confirmé — `handleRitualTimerDone`** : XP, `xpLog`, fil de famille, fête… et rien dans
+  `activeDays`, le seul champ que lisent la série 🔥 et la ligue. Un rituel complet et rien d'autre
+  = « 🔥 0 » juste après le « +30 XP 🎉 ». **Correctif → v2.16.69.**
+- **Écarté — `handleClaimDaily`** : les 3 objectifs (`o3`, `o6`, `oxp`) se calculent **tous** sur
+  `doneToday`, les clés de `completed` du jour. Une journée réclamable a donc forcément déjà ses
+  complétions, et `approvePending` a déjà inscrit le jour. **Aucun trou possible.**
+- **Écarté aussi — la victoire de boss** : elle donne 50 XP à **TOUS** les enfants, y compris ceux
+  qui n'ont rien fait. Lui donner un jour actif serait un faux positif.
+- **Latence mesurée** : `xpLog` ne peut plus servir de preuve rétroactive (`sanitizeXpLog` de la
+  v2.16.65 l'a ramené à 2 entrées), mais le `feed` garde **1** rituel — le 29 juillet chez Antoine
+  Emery, un jour qui portait **aussi** 2 quêtes, donc déjà actif. **Aucune journée réelle perdue** :
+  le correctif ferme un piège, il ne répare pas de la donnée. Vérifié : série 0 → 1 sur les 4
+  enfants, idempotent, sans effet sur un jour déjà actif, et le jour survit au rechargement
+  (`activeDaysFromCompleted` est une **union**) comme à la synchro (`mergeGS` unionne).
+- Vérifié en chemin : les 2 jours de `feed` hors `activeDays` chez Olivier (27-28 juillet) sont un
+  message de clavardage et une entrée de rattrapage. **Ni l'un ni l'autre n'est une activité** —
+  corrects tels quels.
+
+### 📌 Candidats nommés pour une prochaine nuit
+- **`seenVersions` en DEUX exemplaires** (racine de `data` **et** `config`, 2322 octets chacun,
+  identiques) — hérité du 12e passage, toujours pas audité. Vérifier qui écrit lequel et si les
+  deux sont lus. Attention, `seenVersions` a déjà mordu une fois (v2.16.52).
+- **L'humeur de l'Espace Famille** (`App.jsx:1919`) sourit sur `completedAt`, donc **pas** sur un
+  rituel : un enfant qui vient de finir sa routine garde un visage neutre. Cosmétique, volontairement
+  hors du correctif de cette nuit (`completedAt` est keyé par clé de quête, un rituel n'en a pas) —
+  à trancher avec Gen plutôt qu'à deviner.
+
+---
+
 ## Passage du 2026-08-15 (routine autonome, nuit, 12e passage)
 
 ### 🌐 Lecture de l'API de production

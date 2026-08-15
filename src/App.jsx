@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.68";
+export const APP_VERSION = "2.16.69";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3554,7 +3554,19 @@ export default function App() {
       return;
     }
     const bonus=Math.min(40, 5*Math.max(1,(ritual?.taskIds?.length||1)));
-    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{}; n[playerIdx]={...p, xp:(p.xp||0)+bonus, xpLog:appendXpLog(p.xpLog,bonus,"rituel")};
+    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx]||{};
+      // v2.16.69 — JOUR ACTIF. Un rituel chronométré terminé accordait l'XP, le fil de famille et
+      // la fête… mais n'écrivait pas `activeDays`, le seul champ que lisent la série 🔥 et la ligue.
+      // Un enfant dont la journée est un rituel complet (et rien d'autre de validé) voyait donc sa
+      // série affichée à 0 dans la seconde qui suit le « +XP 🎉 ». `todayStamp()` est le bon jour
+      // ici, contrairement à `approvePending` (v2.16.64) : le geste est LIVE sur l'écran de
+      // l'enfant, pas une validation parent qui peut tomber des jours plus tard.
+      // Volontairement PAS étendu à `handleClaimDaily` : les 3 objectifs du jour se calculent tous
+      // sur `doneToday` (clés de `completed` du jour), donc une journée réclamable a forcément déjà
+      // ses complétions — et `approvePending` a déjà inscrit le jour. Ni au boss : sa victoire
+      // donne 50 XP à TOUS les enfants, y compris ceux qui n'ont rien fait.
+      n[playerIdx]={...p, xp:(p.xp||0)+bonus, xpLog:appendXpLog(p.xpLog,bonus,"rituel"),
+        activeDays:_uniq([...(p.activeDays||[]), todayStamp()])};
       const txt=`${displayName(player)} a complété son rituel « ${ritual.name} » en ${minutes} min! (+${bonus} XP)`;
       const fe={id:"f_"+uid(),ts:Date.now(),likes:[],type:"ritual",playerId:player.id,emoji:ritual?.emoji||"⏱",text:txt};
       const newCfg={...config, feed:[fe,...(config.feed||[])].slice(0,60)};

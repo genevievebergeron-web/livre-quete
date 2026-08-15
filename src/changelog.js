@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.69", date:"2026-08-15", features:[
+    "⏱ Terminer ton rituel chronométré ne comptait pas comme une journée active. Tu avais beau finir ta routine au complet, l'app te disait « +XP 🎉 » et ta série 🔥 restait à zéro pour la journée, comme si tu n'avais rien fait.",
+    "🔥 C'est réparé : un rituel terminé allume ta journée tout de suite, pour ta série comme pour ta ligue de la semaine.",
+  ]},
   { version:"2.16.68", date:"2026-08-15", features:[
     "⚡ Le bouton « VALIDER SANS CODE » que ton parent utilise quand il est à côté de toi donnait bien l'XP et les pièces, mais rien d'autre : pas d'heure au journal de ta journée, rien dans la courbe d'XP de ta fiche, aucun badge même si tu venais de franchir un palier, aucun jeton pour taper sur le boss, rien au fil de la famille, et aucune fête.",
     "🎉 Maintenant c'est une vraie validation, exactement comme celle du portail : badge, montée de niveau, jeton de boss, message au fil de famille, et ta surprise qui part dès que ton parent te redonne l'appareil.",
