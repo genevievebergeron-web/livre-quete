@@ -38,6 +38,25 @@ export const isTimeLocked = (player, pState) => {
   return (sm.minutes || 0) >= limit;
 };
 
+// v2.16.66 — cœur du compteur de budget-temps, sorti du composant pour être vérifiable hors React
+// (le timer lui-même reste dans App()). Le compteur mesurait la PRÉSENCE et non l'USAGE : arrière-plan
+// et veille de l'appareil étaient crédités au budget du jour (465 minutes mesurées en prod le 8 août
+// pour une journée sans une seule quête complétée).
+export const SESSION_TICK_MS = 60000;                       // cadence du flush
+export const SESSION_MAX_CREDIT_MS = 2 * SESSION_TICK_MS;   // un flush ne crédite jamais plus que ~2 ticks
+// Décide ce qu'un flush accorde. `rawMs` = temps écoulé depuis le dernier versement, `counting` = faux
+// dès que l'onglet est en arrière-plan. Retourne les minutes à créditer et s'il faut repartir de
+// maintenant (`resetClock`) plutôt que d'avancer d'un compte rond en gardant le reste sous la minute.
+// Un écart > SESSION_MAX_CREDIT_MS ne peut pas être du jeu : le tick de 60 s n'a pas pu se produire,
+// donc la machine dormait. On crédite la part plausible et on repart de maintenant — sans quoi l'écart
+// sauté serait recrédité tick après tick jusqu'à rattrapage.
+export const sessionFlushPlan = (rawMs, counting) => {
+  if (!counting) return { minutes: 0, resetClock: true };
+  const gap = rawMs > SESSION_MAX_CREDIT_MS;
+  const minutes = Math.floor(Math.min(Math.max(0, rawMs), SESSION_MAX_CREDIT_MS) / 60000);
+  return { minutes, resetClock: gap };
+};
+
 // v2.16.26 — Backlog #15 : accès boutique/avatar débloqué après X tâches ROTATIVES (isRecurring:true,
 // système récurrent du Lot 7 — recurring.js) complétées aujourd'hui, pas juste n'importe quelle tâche.
 // Compte les assignations distinctes (pas les XP) : 1 tâche rotative faite = 1, peu importe sa difficulté.

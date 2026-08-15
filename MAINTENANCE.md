@@ -4,6 +4,45 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-14 (routine autonome, nuit, 10e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 163 ko, `savedAt` `2026-08-14T10:31:57Z` (**l'app a resservi depuis le 9e passage**).
+- **`gameStates` est retombé de 146 ko à 57 ko** : confirmation que la réparation `sanitizeXpLog` de la
+  `v2.16.65` a bien pris toute seule au chargement, sans intervention.
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide** ; `momentRequests`, `removalRequests`, `childTaskProposals` **vides** ;
+  `feed` (60 entrées) **sans aucun signalement** ; `config.bugs` **inchangé** — les **mêmes 14** entrées,
+  la plus récente du 31 juillet, toutes déjà examinées lors des passages précédents.
+- **Phase 1 propre pour la 9e nuit d'affilée.** Aucune Phase 2.
+
+### 🔍 Deux champs de `gameStates` audités — SAINS, à ne pas re-auditer
+- **`completed` / `completedAt`.** 112 clés de `completed` sans horodatage (44 / 20 / 25 / 23, ~25 %) —
+  c'est le « désynchronisé de ~30 % » noté au 9e passage. En les **datant**, la piste tombe : elles sont
+  **toutes** du **13, 14 ou 15 juin**, et `completedAt` ne commence qu'au **15 juin**. Héritage d'avant
+  l'arrivée du champ, pas un défaut vivant. `completedAt ⊆ completed` sans exception chez les quatre
+  (zéro clé horodatée absente de `completed`).
+- **`owned` / `equipped`.** Rejoués contre `ALL_SHOP_ITEMS` (257 items) + le catalogue déco de
+  `house.jsx` : **aucun id mort, aucun item équipé non possédé, aucun mauvais slot**. Les `rw_*` dans
+  `owned` sont voulus (`handleBuy` y met aussi les récompenses, et le remboursement les retire).
+
+### 🛠️ Phase 3 → v2.16.66 (budget-temps)
+- `sessionMinutes` mesurait la **présence** et non l'**usage** : arrière-plan et veille de l'appareil
+  étaient crédités au budget du jour. **Olivier : 465 minutes le 8 août** (7 h 45) pour **zéro quête
+  complétée** ce jour-là et une dernière action réelle à 13:49 UTC ; les trois autres sont à 2 minutes.
+- Latent aujourd'hui (aucun `dailyMinutesLimit` réglé), mais le réglage existe dans le portail : dès
+  qu'un budget est mis, l'écran « C'EST L'HEURE DE LA PAUSE! » se déclencherait pour du temps non joué.
+- Détail complet du correctif et des 25 assertions dans `PROJET-ETAT.md`.
+
+### 📌 Candidat nommé pour une prochaine nuit
+- **`handleForceComplete`** (bouton « Override » du portail) écrit `completed` mais **ni `completedAt`
+  ni `xpLog`** — même famille que v2.16.64 / v2.16.65. La quête accorde bien XP et pièces mais reste
+  invisible dans la courbe d'XP du profil, sans heure au journal du jour, et ne compte pas pour le
+  « a joué aujourd'hui ». **Latent** : aucun override dans la donnée depuis juin.
+
+---
+
 ## Passage du 2026-08-14 (routine autonome, nuit, 8e passage)
 
 ### 🌐 Lecture de l'API de production

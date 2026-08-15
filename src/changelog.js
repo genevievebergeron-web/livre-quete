@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.66", date:"2026-08-14", features:[
+    "\u23f3 Le compteur \u00ab temps de jeu aujourd'hui \u00bb comptait les heures o\u00f9 l'app dormait dans le fond de l'\u00e9cran, ou celles o\u00f9 la tablette \u00e9tait en veille. Une journ\u00e9e sans une seule qu\u00eate y a \u00e9t\u00e9 enregistr\u00e9e comme 7 h 45 de jeu.",
+    "\ud83d\udee1\ufe0f Maintenant le temps ne court que pendant que tu es vraiment dans l'app. L'\u00e9cran de pause ne peut donc plus se d\u00e9clencher pour du temps que tu n'as pas jou\u00e9.",
+  ]},
   { version:"2.16.65", date:"2026-08-14", features:[
     "📈 La courbe d'XP de ta fiche profil montrait n'importe quoi : une montagne géante sur une seule journée (jusqu'à 6000 XP le 9 août, plus que tout ce que tu as gagné depuis le début) et tout le reste écrasé à plat.",
     "🧮 En cause : chaque synchro entre tes appareils recopiait ton journal d'XP au complet par-dessus lui-même. 2 quêtes devenaient 4, puis 8, puis 500. C'est réparé, et ton journal se remet tout seul d'aplomb au prochain chargement.",

@@ -27,7 +27,7 @@ import { LoginScreen } from "./loginscreen.jsx";
 import { BOSSES, BossSprite, BOSS_DIFF, ATTACKS, FAMILY_HP_MAX, familyHp, repairDamageFor, bossDamageTotal, bossJetons, heartsRow, bossQuestsAllDone, bossModifierOfDay, bossAtkDamage, PET_ATTACK_COST, petAttackDamage } from "./bosses.jsx";
 import { TimerView } from "./timerview.jsx";
 import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
-import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining, rotatingNeed } from "./gating.js";
+import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining, rotatingNeed, sessionFlushPlan, SESSION_TICK_MS } from "./gating.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
 import { CHANGELOG } from "./changelog.js";
@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.65";
+export const APP_VERSION = "2.16.66";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2263,23 +2263,38 @@ export default function App() {
   // Backlog #13 — budget-temps quotidien par enfant (contrôle parental). Comptabilise le temps de
   // session en minutes RÉELLES écoulées (horodatage, pas des ticks comptés — un intervalle peut être
   // retardé quand l'onglet est en arrière-plan) pendant qu'un enfant est connecté (hors mode parent).
-  // Flush aussi quand l'onglet passe en arrière-plan (visibilitychange), pour ne pas perdre de temps
-  // déjà écoulé si l'enfant quitte l'app avant le prochain tick de 60s.
+  // v2.16.66 — le compteur mesurait la PRÉSENCE (« l'enfant est connecté »), pas l'USAGE : tout le
+  // temps passé en arrière-plan ou appareil en veille était crédité au budget du jour. Preuve dans la
+  // donnée de prod du 14 août : Olivier portait `sessionMinutes {day:"2026-08-08", minutes:465}` —
+  // 7 h 45 de « jeu » un jour où il n'a complété AUCUNE quête et dont la dernière action réelle
+  // (`energyTs`) date de 13:49 UTC ; les trois autres enfants sont à 2 minutes. Le jour où un budget
+  // est réglé dans le portail, ces minutes-là déclenchent l'écran « C'EST L'HEURE DE LA PAUSE! »
+  // (`isTimeLocked`, gating.js) sans que l'enfant ait joué. Deux gardes, aucune n'invente de seuil :
+  //   (a) le temps ne court QUE pendant que l'onglet est visible — passer en arrière-plan verse ce
+  //       qui est dû puis arrête le chrono, revenir le redémarre à maintenant ;
+  //   (b) un flush ne crédite jamais plus que ~2 ticks : le tick est de 60 s et ne peut se produire
+  //       que si la machine tourne, donc un écart supérieur signifie veille/gel, pas du jeu. Le
+  //       compteur repart alors de maintenant (sinon l'écart sauté serait recrédité tick après tick).
   useEffect(()=>{
     if(sessionPlayer==null || parentMode) return;
     let lastFlush = Date.now();
+    let counting = (typeof document==="undefined") || document.visibilityState!=="hidden";
     const flush = () => {
-      const elapsedMin = Math.floor((Date.now()-lastFlush)/60000);
-      if(elapsedMin<=0) return;
-      lastFlush += elapsedMin*60000;
+      const now = Date.now();
+      const { minutes:elapsedMin, resetClock } = sessionFlushPlan(now-lastFlush, counting);
+      if(elapsedMin<=0){ if(resetClock) lastFlush = now; return; }
+      lastFlush = resetClock ? now : lastFlush + elapsedMin*60000;
       const day = todayStamp();
       const gs = gsRef.current; const s = gs[sessionPlayer]; if(!s) return;
       const sm = s.sessionMinutes && s.sessionMinutes.day===day ? s.sessionMinutes : {day, minutes:0};
       const n=[...gs]; n[sessionPlayer]={...s, sessionMinutes:{day, minutes:(sm.minutes||0)+elapsedMin}};
       setGameStates(n); persist(cfgRef.current, n);
     };
-    const iv=setInterval(flush,60000);
-    const onVis=()=>{ if(document.visibilityState==="hidden") flush(); };
+    const iv=setInterval(flush,SESSION_TICK_MS);
+    const onVis=()=>{
+      if(document.visibilityState==="hidden"){ flush(); counting=false; }   // verser AVANT d'arrêter
+      else { lastFlush = Date.now(); counting=true; }
+    };
     document.addEventListener("visibilitychange",onVis);
     return ()=>{ clearInterval(iv); document.removeEventListener("visibilitychange",onVis); flush(); };
   },[sessionPlayer, parentMode, persist]);
