@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.68", date:"2026-08-15", features:[
+    "⚡ Le bouton « VALIDER SANS CODE » que ton parent utilise quand il est à côté de toi donnait bien l'XP et les pièces, mais rien d'autre : pas d'heure au journal de ta journée, rien dans la courbe d'XP de ta fiche, aucun badge même si tu venais de franchir un palier, aucun jeton pour taper sur le boss, rien au fil de la famille, et aucune fête.",
+    "🎉 Maintenant c'est une vraie validation, exactement comme celle du portail : badge, montée de niveau, jeton de boss, message au fil de famille, et ta surprise qui part dès que ton parent te redonne l'appareil.",
+  ]},
   { version:"2.16.67", date:"2026-08-15", features:[
     "📅 Un événement ajouté à plusieurs enfants d'un coup se modifie enfin pour tout le monde. Avant, le crayon ✏️ ne changeait que la copie de l'enfant dont on avait touché la ligne, sans le dire : « Soirée cinéma » est devenue un rendez-vous hebdomadaire pour un seul des quatre, et est restée une soirée unique du 30 juillet pour les trois autres.",
     "👀 Le formulaire de modification montre maintenant à quels enfants le changement s'applique, et laisse décocher ceux qu'on veut laisser tranquilles.",

@@ -4,6 +4,47 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-15 (routine autonome, nuit, 12e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 167 ko, `savedAt` `2026-08-15T02:32:12Z` (**l'app a resservi depuis le 11e passage**).
+  **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide** ; `coinOffers`, `teamInvites`, `repairEvents`, `momentRequests`,
+  `removalRequests`, `removedProposals`, `childTaskProposals` **tous vides** ; `pending` vide chez
+  les 4 enfants ; `feed` (60 entrées) **sans aucun signalement**, plus rien de neuf depuis le 9 août.
+- `config.bugs` **inchangé** — les **mêmes 14** entrées, la plus récente du **31 juillet**, toutes
+  déjà examinées et documentées. **Phase 1 propre pour la 11e nuit d'affilée.** Aucune Phase 2.
+
+### 🔍 Le candidat nommé au 10e passage : confirmé, et plus large que prévu
+- Le 10e passage annonçait « `handleForceComplete` écrit `completed` mais ni `completedAt` ni
+  `xpLog` ». **Vrai, mais incomplet** : la fonction est une **copie partielle** d'`approvePending`
+  et laissait aussi tomber les **badges** (`checkBadges` jamais appelé), l'**XP du familier**, le
+  **jeton de boss**, l'**entrée au fil de famille**, la **célébration** et l'**undo**.
+- **Latence confirmée dans la donnée** : la signature d'un override, c'est une clé de `completed`
+  **sans** `completedAt`. Il y en a 44 / 20 / 25 / 23 — **toutes du 13, 14 ou 15 juin**, donc
+  antérieures à l'arrivée du champ. **Zéro après le 15 juin** : le bouton n'a jamais servi depuis.
+  Le correctif ne répare aucune donnée abîmée, il ferme un piège.
+- **Correctif → v2.16.68** : le bouton **délègue** à `approvePending` au lieu d'en recopier une
+  moitié (2e fois qu'elle prenait du retard — `v2.16.64` avait déjà dû y greffer `activeDays`).
+  Détail complet, garde-fou `refusedKeys` et les 526 scénarios rejoués dans `PROJET-ETAT.md`.
+
+### 📌 Candidats nommés pour une prochaine nuit
+- **Autres copies partielles du même genre ?** La méthode qui a payé ici : chercher les chemins qui
+  accordent `xp`/`coins` **sans** passer par `approvePending`. Après ce correctif, `activeDays`
+  n'est plus écrit qu'à **un seul endroit** (`App.jsx:2676`, dans `approvePending`) — or le bonus de
+  rituel (`App.jsx:3557`) et l'objectif du jour (`App.jsx:3621`) accordent bien de l'XP et appellent
+  `appendXpLog`, mais **ne touchent ni `activeDays` ni `completedAt`** : un enfant dont la seule
+  activité du jour est un rituel chronométré ou un objectif quotidien ne compte donc **ni pour la
+  série 🔥 ni pour la ligue**. Même famille que v2.16.64 — à mesurer contre la donnée avant de coder.
+- **`seenVersions` existe en DEUX exemplaires** en prod : un au niveau **racine** de `data` et un dans
+  `config`, **2302 octets chacun et strictement identiques** (comparés). Jamais audité — vérifier qui
+  écrit lequel et si les deux sont lus, ou si l'un est mort (patron déjà vu : « champs de config
+  écrits mais jamais lus »). Attention, `seenVersions` a déjà mordu une fois (v2.16.52).
+
+---
+
 ## Passage du 2026-08-14 (routine autonome, nuit, 10e passage)
 
 ### 🌐 Lecture de l'API de production

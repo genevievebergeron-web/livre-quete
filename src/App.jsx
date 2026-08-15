@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.67";
+export const APP_VERSION = "2.16.68";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2627,7 +2627,13 @@ export default function App() {
   },[config,gameStates]);
 
   // Validation parent (portail) : donne XP/pièces/badges + popup/mini-jeu
-  const approvePending = useCallback((playerIdx, doneKey)=>{
+  // v2.16.68 — `opts.viaOverride` : même chemin, même comptabilité, seuls les mots changent.
+  // Le raccourci « ⚡ VALIDER SANS CODE » du tableau de bord enfant passe par ici (voir
+  // `handleForceComplete`), et le parent est alors DEVANT l'enfant — « à sa prochaine connexion »
+  // serait faux, la fête part dès qu'il rend l'appareil (l'effet ~2827 la retient tant que
+  // `parentMode` est actif). Le journal du portail garde la distinction des deux gestes.
+  const approvePending = useCallback((playerIdx, doneKey, opts)=>{
+    const viaOverride=!!opts?.viaOverride;
     const task=resolvePendingTask(playerIdx,doneKey);
     const player=config.players[playerIdx];
     if(!task){ // assignation disparue → on nettoie sans récompense
@@ -2691,10 +2697,12 @@ export default function App() {
       setConfig(newCfg);
       persist(newCfg,n);
       setUndoStack(u=>[...u.slice(-9),{doneKey,playerIdx,xp:grantXp,coins:grantCoins}]);
-      showToast(`✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#5CAD68",4000);
+      showToast(viaOverride
+        ? `⚡ Validé sans code! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} en revenant à son écran 🎉`
+        : `✅ Validé! ${displayName(player)} aura sa surprise${prevLv<newLv?" et son jeu de niveau":""} à sa prochaine connexion 🎉`,"#5CAD68",4000);
       return n;
     });
-    logAction(`✅ Validé: ${displayName(player)} — ${task.label}`,"#5CAD68");
+    logAction(`${viaOverride?"⚡ Validé sans code":"✅ Validé"}: ${displayName(player)} — ${task.label}`,"#5CAD68");
   },[config,persist,resolvePendingTask,logAction,showToast]);
 
   // v1.64.0 — l'enfant « archive » (efface) un message de refus
@@ -2935,30 +2943,32 @@ export default function App() {
     setConfig(newCfg); persist(newCfg, gameStates);
   },[config,gameStates,persist]);
 
+  // v2.16.68 — « ⚡ VALIDER SANS CODE (parent) » n'était pas une validation, mais une validation
+  // AU RABAIS : il écrivait `xp`, `coins`, `coinsLifetime`, `completed`, `activeDays`… et rien
+  // d'autre. Manquaient, en silence : `completedAt` (aucune heure au journal du jour, et la quête
+  // ne comptait pas pour le « a joué aujourd'hui » qui se lit sur `completedAt`), `xpLog` (invisible
+  // dans la courbe d'XP du profil et dans les ligues), les badges (`checkBadges` jamais appelé — un
+  // palier franchi par ce bouton n'était JAMAIS décerné), l'XP du familier, le jeton d'attaque du
+  // boss, l'entrée au fil de famille (la fratrie ne voyait pas la quête passer) et la célébration
+  // différée (l'enfant n'avait ni popup, ni jeu de niveau, ni annonce de badge). Or le bouton dit
+  // « VALIDER » : il ne se distingue de la validation normale que par l'absence de code à taper —
+  // pas par ce qu'il accorde. Il délègue donc maintenant à `approvePending`, le MÊME chemin, au
+  // lieu d'en recopier une moitié qui prenait du retard à chaque correctif (c'est la 2e fois :
+  // v2.16.64 avait déjà dû venir y greffer `activeDays` à la main). Même famille que v2.16.64/65.
   const handleForceComplete = useCallback((ass, playerId) => {
     const playerIdx=config.players.findIndex(p=>p.id===playerId); if(playerIdx<0)return;
-    const player=config.players[playerIdx];
     const isCal=String(ass.instanceId).startsWith("cal_");
     const doneKey=isCal ? ass.instanceId+"_"+playerId : ass.instanceId+"_"+playerId+"#"+todayStamp();
-    const task=[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId);
-    if(!task)return;
-    // Backlog #17 — même règle de partage que approvePending : une tâche teamSplit reste partagée
-    // même validée par ce raccourci parent (sinon l'override contournerait silencieusement le partage).
-    const grantXp=ass.teamSplit?Math.round((task.xp||0)/2):(task.xp||0);
-    const grantCoins=ass.teamSplit?Math.round((task.coins||0)/2):(task.coins||0);
-    setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
-      if(p.completed?.includes(doneKey))return gs;
-      n[playerIdx]={...p,xp:p.xp+grantXp,coins:p.coins+grantCoins,coinsLifetime:(p.coinsLifetime||0)+grantCoins,
-        completed:[...new Set([...(p.completed||[]),doneKey])],
-        // v2.16.64 — ce raccourci parent marquait la quête accomplie sans jamais toucher `activeDays` :
-        // une journée validée uniquement par override ne comptait ni pour la série 🔥 ni pour la ligue.
-        activeDays:_uniq([...(p.activeDays||[]), dayOfDoneKey(doneKey, todayStamp())]),
-        pending:(p.pending||[]).filter(k=>k!==doneKey)};
-      persist(config,n); return n; });
-    logAction(`✅ Override: ${player?.name} — ${task.label}`,"#5CAD68");
-    showToast(`✅ Tâche forcée pour ${player?.name}`,"#5CAD68");
-    spawnParticles(task.emoji);
-  },[config,persist,logAction,showToast]);
+    // Garde-fou : `approvePending` tombstone dans `refusedKeys` une clé dont la tâche est
+    // introuvable — c'est voulu pour une demande fantôme envoyée par l'enfant (v2.6.6), PAS pour un
+    // clic parent sur une carte affichée à l'écran. On résout d'abord, et on ne délègue qu'ensuite.
+    const task=resolvePendingTask(playerIdx,doneKey);
+    if(!task){ showToast("⚠️ Cette quête n'existe plus — rien n'a été validé.","#D97070",3500); return; }
+    // Le tap parent est célébré tout de suite (l'enfant est là, il regarde) ; la vraie fête, elle,
+    // reste différée jusqu'à la sortie du mode parent, comme pour toute validation.
+    spawnParticles(task.emoji||"✅");
+    approvePending(playerIdx, doneKey, {viaOverride:true});
+  },[config,resolvePendingTask,approvePending,showToast]);
 
   // ── Gestion des tâches depuis le portail parent ──────────
   // Ajoute une tâche pour chaque joueur coché (copies indépendantes, comme le wizard)
