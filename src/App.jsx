@@ -12,7 +12,7 @@ import { Toast, PinDots, PinKeypad, TaskCheck, AnnouncementCountdown } from "./u
 // (le dénominateur « 0/2 » de la boutique verrouillée) passe maintenant par `rotatingNeed`, qui
 // plafonne le seuil au nombre de rotatives réellement proposées. `parentpanel.jsx` (le sélecteur du
 // réglage) et `gating.js` continuent de l'importer depuis `shared.js`.
-import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog, dayOfDoneKey } from "./shared.js";
+import { DAYS_SHORT, fmtDateShort, displayName, THEMES, uid, _uniq, todayStamp, weekKey, getWeeklyFreeTheme, isThemeUnlocked, resolveRandomTheme, resolveWeekRandomTheme, GLOBAL_CSS, streakOf, appendXpLog, dayOfDoneKey, findCalendarSiblings, calendarUpdatePlan } from "./shared.js";
 import { WeekView } from "./weekview.jsx";
 import { TaskChooser, CustomTaskModal } from "./taskpickers.jsx";
 import { EvolutionModal, PinPad, RewardPopup } from "./popups.jsx";
@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.66";
+export const APP_VERSION = "2.16.67";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3555,21 +3555,43 @@ export default function App() {
   // Parent : ajoute un événement au calendrier d'un ou plusieurs enfants (récurrent ou daté)
   const handleAddCalendarEvent = useCallback((playerIds, entry)=>{
     if(!playerIds?.length || !entry?.label?.trim())return;
+    // v2.16.67 — un seul geste = un seul événement : toutes les copies partagent un `groupId`,
+    // pour que ✏️ sache plus tard qu'elles sont la même chose (voir findCalendarSiblings).
+    const groupId="cg_"+uid();
     setGameStates(gs=>{ const n=[...gs];
       playerIds.forEach(pid=>{ const i=config.players.findIndex(p=>p.id===pid); if(i<0)return;
-        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, time:entry.time||null, recur:entry.recur||null, updatedAt:Date.now() };
+        const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), groupId, type:entry.type||"evenement", label:entry.label.trim(), date:entry.date||null, time:entry.time||null, recur:entry.recur||null, updatedAt:Date.now() };
         n[i]={...n[i], calendar:[...(n[i].calendar||[]), e]};
       });
       persist(config,n); return n; });
     showToast("📅 Événement ajouté au calendrier!","#85CDD1");
   },[config,persist,showToast]);
-  // v2.6.6 — modifier/supprimer un événement depuis l'onglet Calendrier parent (retrouvé par
-  // playerName car allEntries est agrégé cross-enfants ; le nom est stable, fixé à la création du profil).
-  const handleUpdateCalendarEvent = useCallback((playerName, entry)=>{
-    const i=config.players.findIndex(p=>(p.name||"")===playerName); if(i<0)return;
-    const updated={...entry, updatedAt:Date.now()}; // v2.7.0 — pour que le merge multi-appareils garde la version la plus récente
+  // v2.6.6 — modifier un événement depuis la section Calendrier.
+  // v2.16.67 — l'édition porte sur TOUTES les copies de l'événement, pas seulement celle de
+  // l'enfant dont on a tapé la ligne. `siblingIds` ({indice joueur → id de sa copie}) est résolu
+  // par l'appelant AVANT d'entrer ici, et `targetIds` est la sélection d'enfants affichée à
+  // l'écran : cocher un enfant sans copie lui en crée une, décocher un enfant qui en a une la
+  // lui retire (avec pierre tombale, comme la suppression). Côté enfant, l'appelant ne passe que
+  // sa propre copie — un enfant ne touche jamais au calendrier d'un autre.
+  const handleUpdateCalendarEvent = useCallback((siblingIds, payload, targetIds, groupId)=>{
+    const targets=new Set(targetIds||[]);
+    if(!targets.size) return;                       // garde-fou : un formulaire sans cible n'efface rien
+    const gid=groupId||("cg_"+uid());
     setGameStates(gs=>{ const n=[...gs];
-      n[i]={...n[i], calendar:(n[i].calendar||[]).map(e=>e.id===entry.id?updated:e)};
+      calendarUpdatePlan(config.players||[], siblingIds, targetIds).forEach(({idx:i, op, id})=>{
+        if(op==="none") return;
+        const cal=n[i]?.calendar||[];
+        if(op==="update"){
+          // v2.7.0 — updatedAt : pour que le merge multi-appareils garde la version la plus récente
+          n[i]={...n[i], calendar:cal.map(e=>(e && e.id===id)?{...e, ...payload, groupId:gid, updatedAt:Date.now()}:e)};
+        } else if(op==="remove"){
+          n[i]={...n[i], calendar:cal.filter(e=>!e || e.id!==id),
+            removedCalendarIds:[...(n[i].removedCalendarIds||[]), id].slice(-400)};
+        } else { // "add" — un enfant coché qui n'avait pas encore cet événement
+          const e={ id:Date.now()+"_"+Math.random().toString(36).slice(2,6), groupId:gid, ...payload, updatedAt:Date.now() };
+          n[i]={...n[i], calendar:[...cal, e]};
+        }
+      });
       persist(config,n); return n; });
     showToast("📅 Événement modifié!","#85CDD1");
   },[config,persist,showToast]);
@@ -3997,10 +4019,18 @@ export default function App() {
           const TYPE_OPTIONS = parentMode
             ? [["evenement","📅 Événement"],["sante",CAL_TYPES.sante.label],["sport",CAL_TYPES.sport.label],["intervenant",CAL_TYPES.intervenant.label],["camp",CAL_TYPES.camp.label]]
             : [["evenement","📅 Événement"]];
-          const blankForm = { editId:null, ownerIdx:null, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 };
+          const blankForm = { editId:null, ownerIdx:null, groupId:null, siblingIds:{}, type:"evenement", label:"", date:"", time:"", recur:"none", day:0 };
           const resetForm=()=>{ setMyCalForm(blankForm); setMyCalTargets(sessionPlayer!=null?[config.players[sessionPlayer]?.id].filter(Boolean):[]); setMyCalOpen(false); };
           const startEdit=(e,ownerIdx)=>{
-            setMyCalForm({editId:e.id,ownerIdx,type:e.type||"evenement",label:e.label,date:e.date||"",time:e.time||"",recur:e.recur?e.recur.freq:"none",day:e.recur?.day??0});
+            // v2.16.67 — retrouver les autres copies du MÊME événement (ajout multi-enfants) pour
+            // que la portée de la modification soit visible et modifiable, au lieu d'être devinée.
+            // Côté enfant : jamais de fratrie, on ne touche que sa propre copie.
+            const sibs = parentMode
+              ? findCalendarSiblings((config.players||[]).map((_,pi)=>gameStates[pi]?.calendar||[]), ownerIdx, e)
+              : [{idx:ownerIdx, entry:e}];
+            const siblingIds={}; sibs.forEach(s=>{ siblingIds[s.idx]=s.entry.id; });
+            setMyCalForm({editId:e.id,ownerIdx,groupId:e.groupId||null,siblingIds,type:e.type||"evenement",label:e.label,date:e.date||"",time:e.time||"",recur:e.recur?e.recur.freq:"none",day:e.recur?.day??0});
+            setMyCalTargets(sibs.map(s=>config.players[s.idx]?.id).filter(Boolean));
             setMyCalOpen(true);
           };
           const saveForm=()=>{
@@ -4013,8 +4043,11 @@ export default function App() {
               recur: myCalForm.recur==="none" ? null : (myCalForm.recur==="weekly" ? {freq:"weekly",day:myCalForm.day} : {freq:"daily"}),
             };
             if(myCalForm.editId!=null){
-              const owner=config.players[myCalForm.ownerIdx];
-              if(owner) handleUpdateCalendarEvent(owner.name, {...payload, id:myCalForm.editId});
+              // v2.16.67 — côté enfant la portée reste sa seule copie ; côté parent c'est la
+              // sélection affichée (pré-cochée sur les enfants qui ont déjà cet événement).
+              const targets = parentMode ? myCalTargets : [config.players[myCalForm.ownerIdx]?.id].filter(Boolean);
+              if(!targets.length) return;
+              handleUpdateCalendarEvent(myCalForm.siblingIds||{}, payload, targets, myCalForm.groupId);
             } else if(myCalTargets.length){
               handleAddCalendarEvent(myCalTargets, payload);
             } else return;
@@ -4065,9 +4098,17 @@ export default function App() {
                         <input type="time" value={myCalForm.time} onChange={e=>setMyCalForm(f=>({...f,time:e.target.value}))}
                           style={{fontFamily:"'VT323',monospace",fontSize:15,padding:"6px 8px",background:"#111",color:"#fff",border:"2px solid #333",borderRadius:3,outline:"none"}}/>
                       </div>
-                      {parentMode && myCalForm.editId==null && (
+                      {/* v2.16.67 — la sélection d'enfants est désormais affichée AUSSI en modification :
+                          un événement ajouté à plusieurs enfants existe en autant de copies, et sans ce
+                          bloc le parent n'avait aucun moyen de voir laquelle (ou lesquelles) il changeait. */}
+                      {parentMode && (
                         <div>
-                          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:4}}>Pour quel enfant?</div>
+                          <div style={{fontFamily:"'VT323',monospace",fontSize:13,color:"var(--txt-muted,#888)",marginBottom:4}}>{myCalForm.editId!=null?"Appliquer à quels enfants?":"Pour quel enfant?"}</div>
+                          {myCalForm.editId!=null && Object.keys(myCalForm.siblingIds||{}).length>1 && (
+                            <div style={{fontFamily:"'VT323',monospace",fontSize:14,color:"#85CDD1",marginBottom:4,lineHeight:1.3}}>
+                              🔗 Même événement chez {Object.keys(myCalForm.siblingIds).length} enfants. Décoche un enfant pour le lui retirer.
+                            </div>
+                          )}
                           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                             {config.players.map(pl=>{ const sel=myCalTargets.includes(pl.id); return (
                               <div key={pl.id} onClick={()=>setMyCalTargets(ids=>sel?ids.filter(x=>x!==pl.id):[...ids,pl.id])} style={{fontFamily:"'Press Start 2P',monospace",fontSize:6,padding:"6px 9px",background:sel?pl.color:"#1a1a1a",color:sel?"#0d0d0d":"var(--txt-faint,#555)",border:`2px solid ${sel?pl.color:"#333"}`,borderRadius:3,cursor:"pointer"}}>{displayName(pl)}</div>

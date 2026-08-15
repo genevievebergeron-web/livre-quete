@@ -925,3 +925,53 @@ Corrigé en `v2.16.54` : copie prolongée jusqu'à aujourd'hui si elle naîtrait
 - [ ] **👤 Ménage à faire toi-même — les 6 annonces « Départ: 8:00! » en double.** Le correctif `v2.16.54` empêche d'en refabriquer, mais **ne supprime rien** : les 6 copies restent dans les données. Elles sont toutes expirées (donc invisibles pour les enfants), mais elles encombrent la liste du portail parent et la fusion plafonne `announcements` à 20. Un clic « 🗑 Supprimer » sur chacune dans Portail → Communication → Annonces suffit. La routine ne supprime pas de données en autonome.
 - [ ] **👤 Décision de conception à trancher — le défi perso ne se réinitialise jamais.** Le texte du **24 juillet** est encore présenté aux enfants comme « DÉFI DE LA SEMAINE », trois semaines plus tard. Deux options : (a) le laisser persister jusqu'à ce qu'un parent le change (comportement actuel), ou (b) le remettre à zéro à chaque semaine de garde comme les quêtes récurrentes, quitte à afficher « Défi à venir… » tant que rien n'est écrit. La routine n'a pas tranché toute seule.
 - 💡 **La méthode a maintenant payé quatre passages de suite** : lire **tous** les champs de `config` en prod trouve des bugs que personne ne signale — `updateFeedEntries` (v2.16.52), `weeklyChallenge` (v2.16.53), `announcements` (v2.16.54). Restent jamais audités de cette façon : `selectedRewards` (20), `customRewards` (4), `boss`, `removedAssignments`/`removedCustomTasks` (335/145 entrées).
+
+## Passage du 2026-08-15 (nuit, routine autonome) — Phase 1 propre pour la 10e nuit d'affilée, et un bug trouvé dans le CALENDRIER
+
+`git pull`/`npm run build` propres en Phase 0 (déjà à jour sur `73042a5`, v2.16.66). Vérifié aussi
+qu'aucun commit poussé n'était orphelin d'entrée `PROJET-ETAT` : toutes les versions jusqu'à
+v2.16.66 y figurent, aucun trou.
+
+**Phase 1 — rien de neuf.** Lecture `GET /api/famille` (HTTP 200, 167 ko). **14 `config.bugs`,
+identiques id pour id depuis le 31 juillet** — le plus récent reste `bug_hlu9mkd` (« J'ai perdu
+150 pièces »). `errorLogs` **vide** (et depuis la v2.16.42 ça veut enfin dire quelque chose),
+`coinOffers`/`teamInvites` vides, `feed` (60 entrées) sans aucun signalement neuf — les dernières
+entrées datent du 24 juillet. Aucun correctif de Phase 2 nécessaire.
+
+**Phase 3 — deux champs audités et déclarés sains, un troisième qui sort un bug.**
+
+1. **`completed` / `completedAt` — SAIN, candidat écarté.** C'était le candidat nommé par la
+   v2.16.65 (« divergent d'environ 30 % »). Mesuré : 44/20/25/23 clés sans horodatage, soit 112 au
+   total — et elles sont **toutes** datées du 13, 14 ou 15 juin (105) ou sans date du tout (7,
+   d'avant l'ajout de la date dans la clé). La première clé **avec** horodatage est du 15 juin.
+   Autrement dit : `completedAt` a commencé à être écrit le 15 juin, et tout ce qui précède n'en a
+   pas. **Zéro horodatage orphelin, zéro trou après le 15 juin.** Héritage, pas un défaut vivant.
+2. **`weeklyChallenge` + `challengeTiers` — SAINS.** Un seul enfant porte `challengeTiers`
+   (`{week:"2026-07-24", tiers:[3]}`) et c'est **exactement** le seul à avoir atteint 3 coches cette
+   semaine-là (3 pour Antoine Emery, 2 pour Elli, 1 pour LE FRERO, 0 pour URSUL — les paliers
+   commencent à 3). Le moteur de paliers a fait précisément ce qu'il devait. Le `weekKey` figé au
+   24 juillet n'est pas un bug non plus : il ne bouge qu'à l'écriture, et le parent n'a pas changé
+   de défi depuis. **Voir l'item de conception déjà ouvert plus bas** (« le défi perso ne se
+   réinitialise jamais ») — inchangé, toujours à trancher par Gen.
+3. **`pendingCelebrations` — SAIN.** 2/0/6/5 fêtes en attente, ce qui a l'air d'une file bloquée.
+   Ça n'en est pas une : les trois enfants concernés ont une `lastSeenDay` **antérieure** aux
+   validations parent qui ont créé ces fêtes (8 août, 31 juillet…). C'est le comportement voulu
+   depuis la v1.31.0 — la fête attend l'appareil de l'enfant. Les deux chemins de vidange
+   (connexion + `useEffect` en cours de session, v1.67.0) sont bien en place.
+4. **`calendar` — BUG.** Détaillé dans l'entrée `PROJET-ETAT.md` v2.16.67. En deux lignes : un
+   événement ajouté à plusieurs enfants d'un seul geste existe en **une copie par enfant, avec un
+   id différent**, et le ✏️ ne pouvait toucher qu'une copie. « Soirée cinéma » (quatre ids frappés
+   dans la même milliseconde, donc un seul geste) est hebdomadaire à 17:30 chez un enfant et restée
+   une soirée unique du 30 juillet chez les trois autres. **1 groupe divergent sur 14.** Trouvé en
+   imprimant les 4 calendriers côte à côte. Corrigé en v2.16.67 (identité de groupe + portée montrée
+   dans le formulaire + miroir serveur du merge enfin fidèle) — 113 assertions sur la vraie donnée.
+
+**Pas de vérification navigateur** : le serveur de prévisualisation est refusé en session planifiée
+(5e passage d'affilée). Vérification par rejeu des vrais modules du dépôt sur le vrai JSON de prod.
+
+### 💡 À signaler à Gen (ajout de ce passage)
+- [ ] **👤 Un clic à faire — « Soirée cinéma » chez trois enfants.** Le correctif v2.16.67 empêche
+  que ça se reproduise, mais **ne répare pas la donnée existante, délibérément** : impossible de
+  savoir laquelle des deux versions tu voulais (l'hebdo du vendredi 17:30, ou la soirée unique du
+  30 juillet). Choisir à ta place serait inventer de la donnée. Le geste : 📅 Calendrier → ✏️ sur
+  « Soirée cinéma » → les quatre enfants sont maintenant **pré-cochés** → Modifier.

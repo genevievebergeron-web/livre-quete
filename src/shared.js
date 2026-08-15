@@ -386,6 +386,67 @@ export const resolveWeekRandomTheme = (weekSeed) => {
   return all[(weekSeed||0) % all.length];
 };
 
+// ─── CALENDRIER — la fratrie d'un événement partagé (v2.16.67) ──────────────
+// Un événement ajouté à plusieurs enfants d'un seul geste n'existe pas une fois : il est recopié
+// dans le `calendar` de CHAQUE enfant, avec un id différent (`handleAddCalendarEvent` boucle sur
+// les cibles). Le bouton ✏️, lui, ne retrouvait sa cible que par `e.id` — il ne modifiait donc
+// qu'UNE des copies, sans rien dire. Constaté dans la donnée de prod du 15 août : « Soirée cinéma »
+// (un seul geste, 4 enfants, ids frappés dans la même milliseconde) était devenue hebdomadaire à
+// 17:30 pour un enfant et restée ponctuelle du 30 juillet pour les 3 autres.
+//
+// Les copies créées à partir de la v2.16.67 partagent un `groupId`. Pour celles d'AVANT, on
+// retrouve la fratrie à la trace laissée par la création : même libellé, même type, et ids frappés
+// dans la même milliseconde. Rien n'est réécrit en base à l'aveugle — la fratrie retrouvée est
+// affichée au parent dans le formulaire (cases à cocher), c'est lui qui confirme la portée.
+export const calendarIdTs = (id) => { const m = /^(\d{10,})_/.exec(String(id || "")); return m ? +m[1] : null; };
+
+// Fenêtre volontairement étroite : la boucle sur 4 enfants prend moins d'une milliseconde, alors
+// que deux ajouts distincts du même libellé sont séparés de plusieurs secondes (mesuré sur la
+// prod : les 3 « Capy et Nachos au camp », dates différentes, sont à 15 s et 5 s d'écart).
+export const CAL_SIBLING_WINDOW_MS = 1000;
+
+// `calendars` : un tableau de calendriers, indexé comme `config.players`.
+// Renvoie [{idx, entry}] — l'entrée d'origine incluse, AU PLUS UNE par enfant.
+export const findCalendarSiblings = (calendars, ownerIdx, entry) => {
+  const out = [];
+  if (!entry) return out;
+  const gid = entry.groupId || null;
+  const ts0 = calendarIdTs(entry.id);
+  const type0 = entry.type || "evenement";
+  (calendars || []).forEach((cal, idx) => {
+    let best = null, bestGap = Infinity;
+    for (const e of cal || []) {
+      if (!e) continue;
+      if (idx === ownerIdx && e.id === entry.id) { best = e; break; }   // l'entrée éditée elle-même
+      if (gid) { if (e.groupId === gid) { best = e; break; } continue; }
+      if (e.groupId) continue;                      // déjà rattachée à un autre groupe
+      if (e.label !== entry.label) continue;
+      if ((e.type || "evenement") !== type0) continue;
+      const ts = calendarIdTs(e.id);
+      if (ts == null || ts0 == null) continue;
+      const gap = Math.abs(ts - ts0);
+      if (gap <= CAL_SIBLING_WINDOW_MS && gap < bestGap) { best = e; bestGap = gap; }
+    }
+    if (best) out.push({ idx, entry: best });
+  });
+  return out;
+};
+
+// Décision de portée d'une modification d'événement, sortie du composant pour être vérifiable
+// hors React (même patron que `sessionFlushPlan` en v2.16.66). `siblingIds` = {indice joueur → id
+// de sa copie}, `targetIds` = les enfants cochés dans le formulaire.
+export const calendarUpdatePlan = (players, siblingIds, targetIds) => {
+  const sib = siblingIds || {}; const want = new Set(targetIds || []);
+  return (players || []).map((p, i) => {
+    const id = sib[i] ?? null;
+    const keep = want.has(p?.id);
+    if (id && keep) return { idx: i, op: "update", id };
+    if (id && !keep) return { idx: i, op: "remove", id };
+    if (!id && keep) return { idx: i, op: "add", id: null };
+    return { idx: i, op: "none", id: null };
+  });
+};
+
 // v2.16.37 — Backlog #15 (v2.16.26) : nombre de tâches ROTATIVES à compléter aujourd'hui pour
 // débloquer boutique/avatar, valeur par défaut quand `config.shopUnlockCount` n'est pas défini.
 // Migrée d'`App.jsx` vers ce module lors de l'extraction de `ParentPanel` (Lot 5/#24) — utilisée

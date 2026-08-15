@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.67", date:"2026-08-15", features:[
+    "📅 Un événement ajouté à plusieurs enfants d'un coup se modifie enfin pour tout le monde. Avant, le crayon ✏️ ne changeait que la copie de l'enfant dont on avait touché la ligne, sans le dire : « Soirée cinéma » est devenue un rendez-vous hebdomadaire pour un seul des quatre, et est restée une soirée unique du 30 juillet pour les trois autres.",
+    "👀 Le formulaire de modification montre maintenant à quels enfants le changement s'applique, et laisse décocher ceux qu'on veut laisser tranquilles.",
+  ]},
   { version:"2.16.66", date:"2026-08-14", features:[
     "\u23f3 Le compteur \u00ab temps de jeu aujourd'hui \u00bb comptait les heures o\u00f9 l'app dormait dans le fond de l'\u00e9cran, ou celles o\u00f9 la tablette \u00e9tait en veille. Une journ\u00e9e sans une seule qu\u00eate y a \u00e9t\u00e9 enregistr\u00e9e comme 7 h 45 de jeu.",
     "\ud83d\udee1\ufe0f Maintenant le temps ne court que pendant que tu es vraiment dans l'app. L'\u00e9cran de pause ne peut donc plus se d\u00e9clencher pour du temps que tu n'as pas jou\u00e9.",

@@ -133,7 +133,26 @@ const isValidCustodyWeekKey = (v) => {
   if (isNaN(d.getTime())) return false;
   return d.getDay() === 5; // vendredi
 };
-const _mergeCalendar = (a, b) => { const m = new Map(); for (const e of [...(a||[]), ...(b||[])]) { if (e && e.id != null) m.set(e.id, e); } return [...m.values()]; };
+// v2.16.67 — miroir enfin fidèle du merge client (`src/merge.js` _mergeCalendar, v2.7.0). Cette
+// version-ci ignorait DEUX choses que le client applique depuis longtemps : les pierres tombales
+// (`removedCalendarIds`, que le serveur ne transportait même pas — voir mergeGS) et `updatedAt`.
+// Conséquence : un événement supprimé sur un appareil ressuscitait à la synchro suivante, et la
+// version gagnante était « celle qui arrive en dernier » plutôt que la plus récente. Personne ne
+// s'en était aperçu parce qu'aucun événement n'avait jamais été supprimé en prod
+// (`removedCalendarIds` vide chez les 4 enfants) — mais la v2.16.67 ajoute une deuxième façon
+// d'en retirer un (décocher un enfant dans le formulaire), donc le trou devait être bouché.
+const _mergeCalendar = (a, b, removedIds) => {
+  const rm = removedIds ? new Set(removedIds) : null;
+  const byId = new Map(); const noId = []; const seenRaw = new Set();
+  for (const e of [...(a || []), ...(b || [])]) {
+    if (!e) continue;
+    if (e.id == null) { const k = JSON.stringify(e); if (!seenRaw.has(k)) { seenRaw.add(k); noId.push(e); } continue; }
+    if (rm && rm.has(e.id)) continue;
+    const prev = byId.get(e.id);
+    if (!prev || (e.updatedAt || 0) >= (prev.updatedAt || 0)) byId.set(e.id, e);
+  }
+  return [...byId.values(), ...noId];
+};
 const mergePetXp = (a, b) => { const out = { ...(a||{}) }; for (const k in (b||{})) out[k] = Math.max(out[k]||0, b[k]||0); return out; };
 const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
   if (!a.bossId) return b.bossId ? b : { bossId:null, earned:0, spent:0, dmg:0 };
@@ -148,6 +167,7 @@ const mergeGS = (a, b, preferIncoming) => {
   const _refusedSet = new Set(refusedKeys);
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
   const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : borne de plausibilité de mergeXpLog
+  const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.16.67 — miroir du client (v2.7.0) : le serveur ne transportait pas du tout ce tombstone
   return {
     ...a, ...b,
     xp: Math.max(a.xp||0, b.xp||0),
@@ -168,7 +188,8 @@ const mergeGS = (a, b, preferIncoming) => {
     refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
-    calendar: _mergeCalendar(a.calendar, b.calendar),
+    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
+    removedCalendarIds,
     avatar: avatarConfigured,
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
