@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.73", date:"2026-08-16", features:[
+    "🎨 Le thème de la famille pouvait changer tout seul. Une tablette restée en retard de quelques jours remettait l'ancien thème pour tout le monde dès qu'elle se synchronisait — même si personne n'avait rien demandé, même si quelqu'un venait tout juste d'en choisir un autre. Maintenant c'est le dernier choix fait qui gagne, peu importe l'appareil.",
+    "🎁 Les récompenses maison de ton parent (celles qu'il écrit lui-même dans l'assistant) pouvaient disparaître de la même façon, et une récompense déjà achetée perdait son nom dans ta liste. Réglé aussi.",
+    "🛡️ Et une nouvelle vérification automatique refuse maintenant de laisser sortir une version où un réglage périmé peut écraser un réglage tout neuf. C'est la 7e fois que ce genre de bug se produisait — c'était la dernière.",
+  ]},
   { version:"2.16.72", date:"2026-08-16", features:[
     "🏠 Ta maison ne gardait pas ce que tu y mettais. Quand tu posais un tapis, une plante ou une affiche, le nuage pouvait te renvoyer la version d'avant quelques secondes plus tard, et ton meuble disparaissait tout seul. Sur deux tablettes, la déco de l'une pouvait carrément effacer celle de l'autre. Maintenant c'est le dernier changement qui gagne, et un meuble que tu enlèves reste enlevé.",
     "🌅 Le message « Nouvelle journée! » se réaffichait parfois pour une journée que tu avais déjà ouverte. Réglé.",

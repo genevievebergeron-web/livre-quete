@@ -281,6 +281,14 @@ const mergeFamily = (base, incoming) => {
     pin: newerC.pin || bC.pin || iC.pin || "1146",
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+    // v2.16.73 — miroir du merge client : `theme` (thème de la famille) et `customRewards`
+    // (récompenses maison du parent) n'avaient de règle NULLE PART. Sans règle, l'incoming gagne
+    // toujours, même plus vieux — un appareil en retard rebasculait le thème de toute la famille
+    // et effaçait les récompenses maison. `customRewards` = dernière écriture gagne (jamais une
+    // union : le parent doit pouvoir en supprimer une), et `[]` du côté frais tient, alors qu'un
+    // `undefined` n'efface rien.
+    theme: newerC.theme || bC.theme || iC.theme || "minecraft",
+    customRewards: (() => { const n=newerC.customRewards, o=(preferIncoming?bC:iC).customRewards; if (Array.isArray(n)) return n; if (Array.isArray(o)) return o; return []; })(),
     // Lot 7 — last-write-wins par weekKey (plus récent gagne)
     weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests; if (!a) return b||null; if (!b) return a;
       const aValid=isValidCustodyWeekKey(a.generatedForWeek), bValid=isValidCustodyWeekKey(b.generatedForWeek);

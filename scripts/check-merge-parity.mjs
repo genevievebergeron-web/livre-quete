@@ -127,13 +127,16 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A" }],
   childTaskProposals: [{ id: "pr1", label: "Proposition A" }], removedProposals: ["pr0"],
   removalRequests: [{ id: "rq1", instanceId: "as1" }],
-  customRewards: [{ id: "cr1", label: "Maison A", coins: 20 }],
+  customRewards: [{ id: "cr1", label: "Maison A", coins: 20 }], theme: "minecraft",
   updateFeedEntries: [{ type: "update", version: "2.16.70", features: ["a"], ts: "2026-08-15" }],
   selectedRewards: ["rw_ecran"], seenVersions: ["2.16.70"],
   feed: [{ id: "f1", ts: 2, likes: ["p1"] }],
   bugs: [{ id: "bg1", ts: 2 }], errorLogs: [{ id: "er1", ts: 2 }],
   coinOffers: [], teamInvites: [], repairEvents: [{ id: "rp1", ts: 2 }], momentRequests: [],
-  boss: { startedAt: "2026-08-01", hp: 100, lastHitTs: "2026-08-14T10:00:00.000Z" },
+  // `defeatedAt` seulement d'un côté : sans ça, la règle « même boss » ({...a,...b} + garde sur
+  // defeatedAt/lastHitTs) rend un objet identique à famB, et le contrôle « le périmé a gagné »
+  // ci-dessous ne peut pas distinguer une vraie règle d'un spread naïf (faux positif).
+  boss: { startedAt: "2026-08-01", hp: 100, lastHitTs: "2026-08-14T10:00:00.000Z", defeatedAt: "2026-08-14T20:00:00.000Z" },
   weeklyQuests: { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] },
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
 });
@@ -141,7 +144,7 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B" }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
   removalRequests: [{ id: "rq2", instanceId: "as1" }],
-  customRewards: [{ id: "cr2", label: "Maison B", coins: 30 }],
+  customRewards: [{ id: "cr2", label: "Maison B", coins: 30 }], theme: "foret",
   updateFeedEntries: [{ type: "update", version: "2.16.41", features: ["b"], ts: "2026-08-06" }],
   selectedRewards: ["rw_bonbon"], seenVersions: ["2.16.41"],
   feed: [{ id: "f1", ts: 2, likes: ["p2"] }],
@@ -164,8 +167,51 @@ for (const [la, a, lb, b] of [["A", famA, "B", famB], ["B", famB, "A", famA]]) {
   if (!same(rc.gameStates, rs.gameStates)) fail(`mergeFamily(${la},${lb}) — gameStates`);
 }
 
+// ── Champs de config sans règle de fusion ──────────────────────────────────
+// v2.16.73 — la parité ci-dessus ne voit PAS une règle manquante : quand un champ
+// retombe sur le spread naïf `{...bC,...iC}`, les deux copies sont naïves de la
+// même façon, donc d'accord, donc vertes. C'est ce trou qui a laissé passer
+// `weeklyChallenge` (v2.5.16), `weeklyQuests` (v2.14.2), `routines` (v2.16.70),
+// `petNickname` (v2.16.71), `house` (v2.16.72), puis `theme` et `customRewards`
+// (v2.16.73) — sept fois la même forme, trouvée sept fois à la main.
+//
+// Le test : fusionner la copie FRAÎCHE (famA) avec une copie PLUS VIEILLE
+// (famB) — c'est le sens réel du bug, un appareil en retard qui pousse. Un champ
+// avec une vraie règle donne soit la valeur fraîche, soit une fusion des deux.
+// Le spread naïf, lui, rend EXACTEMENT la valeur périmée : c'est la signature.
+//
+// L'exemption est nominative et doit se justifier — pas une liste fourre-tout.
+const NAIF_ASSUME = {
+  // Reconstruit à chaque chargement depuis CHANGELOG (`migrations.js`, dedupeUpdateFeed)
+  // et purement informatif. Une union ici RÉ-GONFLERAIT la liste : c'est exactement
+  // l'incident des ~5127 entrées qui a cassé la synchro (v2.5.29).
+  updateFeedEntries: "reconstruit au chargement depuis CHANGELOG — une union le regonflerait",
+  // Date de création de la famille : écrite une fois, jamais modifiée, donc identique
+  // des deux côtés dans la vraie vie.
+  createdAt: "immuable après la création",
+  // Drapeaux de migration (`colorToneDownV1`, `rotativeCleanupV1`, `orphanAssignCleanupV1/V2`,
+  // `routineOrphanCleanupV1`, `updateFeedRebuildV1`…) : ne valent JAMAIS que `true`, et une
+  // clé absente d'`iC` n'efface pas celle de `bC` avec un spread. Vérifié en v2.16.72.
+  __drapeaux: "true-seulement, le spread ne peut pas les perdre",
+};
+const estDrapeau = (k, v) => v === true && /V\d+$/.test(k);
+
+console.log("· mergeFamily — un champ périmé ne doit jamais gagner sur un champ frais");
+for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+  const out = fn(famA, famB).config; // famA = la plus fraîche, famB = l'incoming périmé
+  for (const k of Object.keys(famB.config)) {
+    const frais = famA.config[k], perime = famB.config[k];
+    if (same(frais, perime)) continue;            // rien à départager
+    if (NAIF_ASSUME[k] || estDrapeau(k, perime)) continue;
+    if (same(out[k], perime))
+      fail(`${nom} mergeFamily(frais, périmé) — config.${k} : la copie PÉRIMÉE a gagné `
+         + `(${JSON.stringify(perime)}). Ce champ n'a pas de règle de fusion : ajoute-la dans `
+         + `src/merge.js ET server-merge.cjs, ou inscris-le dans NAIF_ASSUME avec sa raison.`);
+  }
+}
+
 if (failures) {
-  console.error(`\n✗ Parité de fusion : ${failures} divergence(s) entre src/merge.js et server-merge.cjs.`);
+  console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
   process.exit(1);
 }

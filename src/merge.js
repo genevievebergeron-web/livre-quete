@@ -331,6 +331,32 @@ export const mergeFamily = (base, incoming) => {
     pin: newerC.pin || bC.pin || iC.pin || "1146",
     mode: newerC.mode || bC.mode || iC.mode || "routine",
     routineEnd: newerC.routineEnd || bC.routineEnd || iC.routineEnd,
+    // v2.16.73 — `theme` (thème visuel de la FAMILLE, celui que `App.jsx` résout en
+    // `resolvedWeekTheme`) était le seul réglage de l'assistant à ne pas avoir sa règle, à côté de
+    // `pin`/`mode`/`routineEnd` juste au-dessus qui l'ont depuis toujours. Sans règle, il retombait
+    // sur le spread naïf `{...bC,...iC}` : l'incoming gagnait TOUJOURS, même vieux de trois jours.
+    // Un appareil resté sur l'ancien thème pouvait donc rebasculer toute la famille en poussant
+    // n'importe quelle autre modification (un enfant qui coche une quête suffit). Même patron que
+    // `mode`, et même défaut que le repli d'`App.jsx` (`THEMES[config?.theme||"minecraft"]`).
+    theme: newerC.theme || bC.theme || iC.theme || "minecraft",
+    // v2.16.73 — `customRewards` (les récompenses maison créées par le parent dans l'assistant)
+    // n'avait aucune règle non plus. Le champ était décoratif jusqu'à la v2.16.56 — c'est elle qui
+    // l'a rendu porteur : la boutique lit maintenant `shopRewardPool` (`catalog.js`) = catalogue +
+    // `customRewards`, et `PlayerDashboard` repêche dans `allRewards` le libellé d'une récompense
+    // DÉJÀ ACHETÉE qui n'est plus au bassin du jour (`App.jsx:427-431`). Devenu porteur, il est
+    // resté sur le spread naïf : une copie plus vieille effaçait les récompenses maison, et
+    // `selectedRewards` — protégé, lui, depuis la v2.16.56 — continuait de pointer vers des ids
+    // qui n'existaient plus.
+    // DERNIÈRE ÉCRITURE GAGNE, pas une union : le parent doit pouvoir SUPPRIMER une récompense
+    // maison (une union la ressusciterait à la synchro suivante, exactement le piège corrigé pour
+    // `selectedRewards`). On distingue `[]` (le côté frais dit « il n'y en a plus » — ça tient) de
+    // `undefined` (le côté frais ne connaît pas le champ — il ne doit rien effacer).
+    customRewards: (() => {
+      const n = newerC.customRewards, o = (newer === base ? iC : bC).customRewards;
+      if (Array.isArray(n)) return n;
+      if (Array.isArray(o)) return o;
+      return [];
+    })(),
     // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
     announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
     // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — Lot 7 (semaine de garde) :
