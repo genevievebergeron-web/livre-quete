@@ -87,6 +87,22 @@ export const mergeGS = (a, b, preferIncoming) => {
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
     removedCalendarIds,
     avatar: avatarConfigured,
+    // v2.16.72 — « Ma maison » (v2.8.0) n'avait de règle dans AUCUNE des deux fusions : `house` tombait
+    // dans le `{...a, ...b}` ci-dessus, où l'incoming écrase l'objet ENTIER sans jamais regarder
+    // laquelle des deux écritures est la plus fraîche. `migrateGameState` (migrations.js:120) pose
+    // toujours le champ, donc la clé est présente des deux côtés : l'incoming gagne TOUJOURS, même
+    // quand il est en retard. Deux conséquences, toutes deux mesurées en rejouant la fusion sur la
+    // prod du 16 août : (1) boucle de sync du client, `mergeFamily(local, remote)` toutes les 25 s
+    // (App.jsx ~2393) — le nuage pas encore à jour dans la fenêtre du push debounced (~1,5 s) rend
+    // sa copie d'avant et le meuble que l'enfant vient de poser DISPARAÎT de son écran ; (2) côté
+    // serveur, `mergeFamily(existing, data)` (server.cjs) met toujours l'état stocké en `a`, donc
+    // n'importe quelle tablette en retard efface du nuage la déco d'une autre. Même famille exacte
+    // que `routines` en v2.16.70 et `petNickname` en v2.16.71.
+    // Règle : dernière-écriture-gagne sur l'objet ENTIER — comme `coins`/`pin`/`boughtRewards` plus
+    // haut. Surtout PAS d'union par slot : retirer un meuble se fait en enlevant sa clé de `placed`,
+    // donc une union le ressusciterait (vérifié : l'assertion « un meuble retiré ne revient pas »
+    // échoue avec une union comme elle échouait avec le spread naïf).
+    house: preferIncoming ? (b.house ?? a.house ?? null) : (a.house ?? b.house ?? null),
     // PIN : dernière écriture gagne (permet de changer le code d'un enfant depuis un autre appareil)
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
@@ -144,6 +160,13 @@ export const mergeGS = (a, b, preferIncoming) => {
       if (Math.abs(aT-bT) <= 5*60*1000) return (a.energy??100) <= (b.energy??100) ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null, // jour le plus récent
+    // v2.16.72 — même trou que `house` juste au-dessus, conséquence plus petite mais du même
+    // mécanisme : `lastSeenDay` retient le dernier jour où l'enfant a ouvert l'app, et c'est LUI
+    // qui décide du toast « 🌅 Nouvelle journée! Tes routines sont prêtes. » (App.jsx:361). En
+    // spread naïf, une copie en retard le fait RECULER — l'enfant se refait expliquer le reset
+    // quotidien sur une journée qu'il a déjà ouverte. Le champ ne fait qu'avancer : jour le plus
+    // récent, exactement comme `lastFedDay` ci-dessus.
+    lastSeenDay: [a.lastSeenDay, b.lastSeenDay].filter(Boolean).sort().pop() || null,
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]), // union (série merge-safe)
     // v2.16.34 — Backlog #13 (ligues) : ratchet par rang, même esprit que xp/coinsLifetime — le
     // palier ne doit jamais reculer parce qu'un appareil moins à jour a fusionné en dernier.

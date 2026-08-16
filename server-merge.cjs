@@ -134,6 +134,10 @@ const mergeGS = (a, b, preferIncoming) => {
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
     removedCalendarIds,
     avatar: avatarConfigured,
+    // v2.16.72 — MIROIR de src/merge.js : « Ma maison » n'avait de règle dans aucune des deux copies.
+    // Dernière-écriture-gagne sur l'objet entier (jamais d'union par slot : retirer un meuble, c'est
+    // enlever sa clé de `placed`, une union le ferait revenir).
+    house: preferIncoming ? (b.house ?? a.house ?? null) : (a.house ?? b.house ?? null),
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
     mode: b.mode ?? a.mode ?? null,
     // v2.15.8 — port du même tombstone que le client (App.jsx, mergeGS) : les routines n'avaient
@@ -171,6 +175,9 @@ const mergeGS = (a, b, preferIncoming) => {
       if (Math.abs(aT-bT) <= 5*60*1000) return (a.energy??100) <= (b.energy??100) ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null,
+    // v2.16.72 — MIROIR de src/merge.js : le jour ne recule jamais (sinon le toast « Nouvelle
+    // journée! » se rejoue sur une journée déjà ouverte).
+    lastSeenDay: [a.lastSeenDay, b.lastSeenDay].filter(Boolean).sort().pop() || null,
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]),
     // v2.16.34 — miroir du merge client (App.jsx, mergeGS) : ratchet par rang, jamais de recul.
     leagueTier: (() => { const RANK={bronze:0,argent:1,or:2,diamant:3}; const ra=RANK[a.leagueTier]||0, rb=RANK[b.leagueTier]||0; return rb>=ra ? (b.leagueTier||"bronze") : (a.leagueTier||"bronze"); })(),

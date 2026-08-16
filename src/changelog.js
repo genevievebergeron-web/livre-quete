@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.72", date:"2026-08-16", features:[
+    "🏠 Ta maison ne gardait pas ce que tu y mettais. Quand tu posais un tapis, une plante ou une affiche, le nuage pouvait te renvoyer la version d'avant quelques secondes plus tard, et ton meuble disparaissait tout seul. Sur deux tablettes, la déco de l'une pouvait carrément effacer celle de l'autre. Maintenant c'est le dernier changement qui gagne, et un meuble que tu enlèves reste enlevé.",
+    "🌅 Le message « Nouvelle journée! » se réaffichait parfois pour une journée que tu avais déjà ouverte. Réglé.",
+  ]},
   { version:"2.16.71", date:"2026-08-15", features:[
     "☁️ Le nuage ne suivait pas les mêmes règles que l'app pour huit choses, et il les jetait en silence : ton temps d'écran du jour repartait plus bas que la vraie durée, la fête d'un rituel déjà célébré revenait, le surnom de ton familier disparaissait, une annonce balayée réapparaissait, et les annonces de ton parent, tes propositions de quête et tes demandes de retrait pouvaient s'effacer avant même qu'il les voie.",
     "🪙 Pire : le bonus du défi de la semaine (3 jours → +10 🪙, 5 → +15, 7 → +25) pouvait être repayé, parce que la trace « déjà payé » n'était protégée nulle part. C'est réparé des deux côtés.",
