@@ -55,7 +55,8 @@ const gsA = {
   pending: ["t2#2026-08-14"], refusedKeys: ["t9#2026-08-01"], refusals: ["r-a"],
   owned: ["item_a"], boughtRewards: ["rw_ecran"], rewardBuyTs: { rw_ecran: 111 },
   refundedRewards: ["rw_old"], badges: ["b_a"], equipped: { hat: "h_a" },
-  calendar: [{ id: "e1", updatedAt: 5, title: "A" }], removedCalendarIds: ["e0"],
+  // v2.16.75 — `updatedAt` du côté FRAIS : voir la note « cohérence de fraîcheur » plus bas.
+  calendar: [{ id: "e1", updatedAt: 9, title: "A" }], removedCalendarIds: ["e0"],
   avatar: { configured: true, skin: "a" }, pin: "1111", mode: "routine",
   removedRoutineIds: ["r_old"],
   routines: [{ id: "rt1", name: "Matin A", tasks: ["a"] }],
@@ -63,7 +64,7 @@ const gsA = {
   dailyClaimed: { day: "2026-08-14", ids: ["o3"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt1"] },
   consumedCelebrationIds: ["c_a"], pendingCelebrations: [{ id: "c_p_a" }],
-  petXp: { dragon: 40 }, petDay: { day: "2026-08-14", xp: 10 },
+  petXp: { dragon: 40 }, petDay: { day: "2026-08-14", xp: 25 },
   petEvo: { dragon: { path: "feu" } }, petNickname: { dragon: "Flamme" },
   energy: 60, energyTs: "2026-08-14T12:00:00.000Z", lastFedDay: "2026-08-14",
   activeDays: ["2026-08-14"], leagueTier: "or",
@@ -71,7 +72,7 @@ const gsA = {
   bossBattle: { bossId: "2026-08-01", earned: 5, spent: 2, dmg: 30 },
   settings: { calm: true }, dismissedAnnouncements: ["an_a"],
   challengeTiers: { week: "2026-08-14", tiers: [3] },
-  house: { deco: ["tapis_a"] }, lastSeenDay: "2026-08-14",
+  house: { deco: ["tapis_a"] }, lastSeenDay: "2026-08-15",
   // v2.16.74 — valeurs croisées EXPRÈS (A gagne sur menage, B sur cuisine, defi seulement chez B) :
   // un MAX clé par clé doit rendre un objet différent des DEUX entrées, sinon un spread naïf
   // passerait inaperçu.
@@ -85,7 +86,7 @@ const gsB = {
   pending: ["t4#2026-08-15"], refusedKeys: ["t8#2026-08-02"], refusals: ["r-b"],
   owned: ["item_b"], boughtRewards: ["rw_bonbon"], rewardBuyTs: { rw_bonbon: 222 },
   refundedRewards: ["rw_new"], badges: ["b_b"], equipped: { cape: "c_b" },
-  calendar: [{ id: "e1", updatedAt: 9, title: "B" }], removedCalendarIds: ["e2"],
+  calendar: [{ id: "e1", updatedAt: 5, title: "B" }], removedCalendarIds: ["e2"],
   avatar: { configured: false, skin: "b" }, pin: "2222", mode: "semaine",
   removedRoutineIds: ["r_other"],
   routines: [{ id: "rt1", name: "Matin B", tasks: ["a", "b"] }],
@@ -93,7 +94,7 @@ const gsB = {
   dailyClaimed: { day: "2026-08-14", ids: ["o6"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt2"] },
   consumedCelebrationIds: ["c_b"], pendingCelebrations: [{ id: "c_p_b" }],
-  petXp: { dragon: 10, chat: 5 }, petDay: { day: "2026-08-14", xp: 25 },
+  petXp: { dragon: 10, chat: 5 }, petDay: { day: "2026-08-14", xp: 10 },
   petEvo: { dragon: { path: "glace" } }, petNickname: { chat: "Minou" },
   energy: 95, energyTs: "2026-08-14T12:01:00.000Z", lastFedDay: "2026-08-13",
   activeDays: ["2026-08-13"], leagueTier: "bronze",
@@ -101,9 +102,29 @@ const gsB = {
   bossBattle: { bossId: "2026-08-01", earned: 9, spent: 1, dmg: 10 },
   settings: { sound: false }, dismissedAnnouncements: ["an_b"],
   challengeTiers: { week: "2026-08-07", tiers: [3, 5, 7] },
-  house: { deco: ["tapis_b"] }, lastSeenDay: "2026-08-15",
+  house: { deco: ["tapis_b"] }, lastSeenDay: "2026-08-14",
   catCounts: { menage: 4, cuisine: 9, defi: 2 },
 };
+
+// ── Les fixtures doivent VRAIMENT se contredire ────────────────────────────
+// v2.16.75 — `gsB` part d'un `...gsA` puis ré-écrit les champs un à un. Si une
+// ré-écriture manque (champ ajouté à `gsA` seulement) ou pose la MÊME valeur, le
+// champ devient identique des deux côtés — et tous les contrôles ci-dessous
+// l'écartent en silence par « rien à départager ». Le champ semble surveillé, il
+// ne l'est pas. C'est arrivé en écrivant ce fichier : `lastSeenDay` s'est retrouvé
+// à "2026-08-15" des deux côtés, et la preuve de sensibilité (retirer sa règle des
+// deux copies) ne déclenchait rien. Un champ non surveillé doit crier, pas se taire.
+const memeValeur = (a, b, quoi, exempt = {}) => {
+  for (const k of Object.keys(b)) {
+    if (exempt[k]) continue;
+    if (same(a[k], b[k]))
+      fail(`fixture ${quoi} — « ${k} » porte la MÊME valeur des deux côtés : aucun contrôle `
+         + `ne peut le voir (tous écartent « rien à départager »). Donne-lui deux valeurs `
+         + `contradictoires, la plus fraîche du côté A.`);
+  }
+};
+console.log("· fixtures — chaque champ connu doit se contredire entre A et B");
+memeValeur(gsA, gsB, "gameStates");
 
 console.log("· mergeGS — champ par champ, dans les deux sens et les deux préférences");
 for (const [la, a, lb, b] of [["A", gsA, "B", gsB], ["B", gsB, "A", gsA]]) {
@@ -160,6 +181,17 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   weeklyChallenge: { weekKey: "2026-08-07", challenges: [{ playerId: "p1", text: "B", checkins: { "2026-08-07": true } }] },
 });
 
+memeValeur(famA.config, famB.config, "config", {
+  // Structurels, volontairement identiques : ce sont les supports sur lesquels les
+  // autres champs s'accrochent (un joueur `p1`, une assignation `as1`, sa tâche
+  // `tk1`), pas des champs dont la fusion est en jeu ici.
+  players: 1, assignments: 1, customTasks: 1, removedAssignments: 1, removedCustomTasks: 1,
+  pin: 1, mode: 1, routineEnd: 1,
+  // Volontairement vides des deux côtés : rien à départager par construction, la
+  // parité champ par champ ci-dessus reste leur contrôle.
+  coinOffers: 1, teamInvites: 1, momentRequests: 1,
+});
+
 console.log("· mergeFamily — instantanés complets, dans les deux sens");
 for (const [la, a, lb, b] of [["A", famA, "B", famB], ["B", famB, "A", famA]]) {
   const rc = client.mergeFamily(a, b), rs = server.mergeFamily(a, b);
@@ -212,6 +244,62 @@ for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.merg
       fail(`${nom} mergeFamily(frais, périmé) — config.${k} : la copie PÉRIMÉE a gagné `
          + `(${JSON.stringify(perime)}). Ce champ n'a pas de règle de fusion : ajoute-la dans `
          + `src/merge.js ET server-merge.cjs, ou inscris-le dans NAIF_ASSUME avec sa raison.`);
+  }
+}
+
+// ── Champs de gameStates sans règle de fusion ──────────────────────────────
+// v2.16.75 — exactement le même contrôle que celui ci-dessus, un cran plus bas.
+// Le test « le périmé ne gagne jamais » ne regardait que `config`, alors que les
+// DEUX derniers champs pris en flagrant délit de spread naïf (`house` et
+// `lastSeenDay`, v2.16.72) vivent dans `gameStates`, pas dans `config` : le
+// garde-fou écrit la veille pour cette famille de bugs ne pouvait pas les voir.
+// `routines` (v2.16.70), `petNickname` (v2.16.71) et `challengeTiers` (v2.16.71)
+// sont dans le même cas. Étendu ici, il les aurait tous attrapés seul.
+//
+// Même sens que pour `config` : `mergeFamily(famA, famB)` met la copie FRAÎCHE en
+// base et la PÉRIMÉE en incoming, donc `preferIncoming` vaut `false`. Un champ
+// avec une vraie règle rend la valeur fraîche ou une fusion des deux ; le spread
+// naïf `{...a, ...b}` de `mergeGS` rend EXACTEMENT la valeur périmée.
+//
+// ⚠️ COHÉRENCE DE FRAÎCHEUR DES FIXTURES (à respecter en modifiant gsA/gsB).
+// Beaucoup de règles de `mergeGS` n'arbitrent PAS sur la fraîcheur de la famille
+// mais sur un jeton porté par le champ lui-même : `updatedAt` par événement
+// (`calendar`), le jour (`petDay`, `dailyClaimed`, `lastFedDay`, `lastSeenDay`,
+// `sessionMinutes`), la semaine (`coinsWeek`, `challengeTiers`), `energyTs`, ou un
+// MAX (`petDay.xp`, `catCounts`, `xp`). Si la fixture PÉRIMÉE porte le jeton le plus
+// récent — ou le plus grand pour un MAX — la règle rend légitimement la valeur
+// périmée et ce contrôle crie au loup. Ce n'est pas un cas réel : un appareil dont
+// le `savedAt` est en retard ne peut pas avoir vu un jour postérieur.
+// Donc : dans `gsA` (famille fraîche), TOUT jeton de fraîcheur doit être le plus
+// récent, et tout champ arbitré par MAX doit porter la plus grande valeur. Trois
+// l'avaient à l'envers au moment d'écrire ce contrôle (`calendar.updatedAt` 5 vs 9,
+// `petDay.xp` 10 vs 25, `lastSeenDay` 08-14 vs 08-15) — corrigés ici, pas exemptés :
+// une exemption aurait éteint pour de bon la surveillance de trois vrais champs.
+//
+// L'exemption est nominative et doit se justifier — pas une liste fourre-tout.
+const NAIF_ASSUME_GS = {
+  // Bascule Rituel/Semaine, rituel sélectionné, semaine de masquage de la boutique :
+  // ces trois-là ONT une règle explicite (`b.X ?? a.X`, écrite pareil dans les deux
+  // copies), mais cette règle dit « l'incoming gagne toujours », ce qui est le
+  // comportement du spread naïf. Ce n'est donc pas une règle MANQUANTE — c'est un
+  // choix à trancher, hors du périmètre de ce garde-fou (qui traque la dérive et
+  // l'absence de règle, pas la justesse d'une règle présente). Noté comme piste.
+  mode: "règle explicite `b.mode ?? a.mode` — incoming gagne par choix, pas par oubli",
+  activeRoutineId: "règle explicite `b ?? a` — voyage avec `mode`",
+  hiddenWeek: "règle explicite `b ?? a` — voyage avec `hiddenRewards`",
+};
+
+console.log("· mergeGS — un champ périmé ne doit jamais gagner sur un champ frais");
+for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+  const out = fn(famA, famB).gameStates[0]; // famA = la plus fraîche, famB = l'incoming périmé
+  const frais = famA.gameStates[0], perime = famB.gameStates[0];
+  for (const k of Object.keys(perime)) {
+    if (same(frais[k], perime[k])) continue;    // rien à départager
+    if (NAIF_ASSUME_GS[k]) continue;
+    if (same(out[k], perime[k]))
+      fail(`${nom} mergeFamily(frais, périmé) — gameStates[0].${k} : la copie PÉRIMÉE a gagné `
+         + `(${JSON.stringify(perime[k])}). Ce champ n'a pas de règle de fusion : ajoute-la dans `
+         + `src/merge.js ET server-merge.cjs, ou inscris-le dans NAIF_ASSUME_GS avec sa raison.`);
   }
 }
 

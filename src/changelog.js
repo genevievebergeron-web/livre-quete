@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.75", date:"2026-08-16", features:[
+    "🛡️ La vérification automatique ajoutée la semaine dernière (celle qui refuse de laisser sortir une version où un réglage périmé peut écraser un réglage tout neuf) ne surveillait que les réglages de la famille. Tout ce qui t'appartient personnellement — ta maison, tes rituels, le surnom de ton familier, tes paliers de défi, le dernier jour où tu as ouvert l'app — n'était pas couvert. C'est justement là que les 4 derniers bugs de ce genre se cachaient.",
+    "🔍 Maintenant elle regarde aussi tes affaires à toi, et elle refuse en plus de se laisser endormir : si un réglage se retrouve avec la même valeur des deux côtés du test, elle le signale au lieu de faire semblant de le surveiller.",
+  ]},
   { version:"2.16.74", date:"2026-08-16", features:[
     "🏅 Les badges « As du Ménage », « Marmiton », « Roi des Routines », « Casse-Cou » et « Aventurier du Dehors » comptaient tes quêtes en repassant par la liste des tâches d'aujourd'hui. Résultat : dès que ton parent effaçait une tâche, ou dès qu'une quête rotative changeait de semaine, les fois où tu l'avais faite ne comptaient plus. 259 des 442 quêtes déjà accomplies dans la famille (59 %) avaient disparu de ces compteurs.",
     "🔢 Maintenant, chaque quête validée est comptée dans son étiquette au moment même de la validation, pour toujours. Ton avancement vers ces badges ne peut plus redescendre — et plus rien n'efface le travail que tu as déjà fait.",
