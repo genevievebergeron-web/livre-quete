@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.71", date:"2026-08-15", features:[
+    "☁️ Le nuage ne suivait pas les mêmes règles que l'app pour huit choses, et il les jetait en silence : ton temps d'écran du jour repartait plus bas que la vraie durée, la fête d'un rituel déjà célébré revenait, le surnom de ton familier disparaissait, une annonce balayée réapparaissait, et les annonces de ton parent, tes propositions de quête et tes demandes de retrait pouvaient s'effacer avant même qu'il les voie.",
+    "🪙 Pire : le bonus du défi de la semaine (3 jours → +10 🪙, 5 → +15, 7 → +25) pouvait être repayé, parce que la trace « déjà payé » n'était protégée nulle part. C'est réparé des deux côtés.",
+    "🛡️ Et pour que ça ne recommence pas : une vérification automatique compare maintenant les deux moitiés de la synchro à chaque nouvelle version. Si elles ne disent pas exactement la même chose, la version ne peut plus sortir.",
+  ]},
   { version:"2.16.70", date:"2026-08-15", features:[
     "⏰ Modifier un rituel ne tenait pas. Renommer « Routine du matin », changer son émoji, ajouter ou retirer une quête dedans : ça marchait sur ta tablette, puis la version d'avant revenait dès la synchro suivante, sans un mot. Le nuage gardait toujours sa première version du rituel et refusait tout le reste.",
     "🧹 Du coup, les quêtes effacées restaient collées dans les rituels : les 3 rituels d'Antoine Emery traînaient 5 quêtes supprimées que le ménage automatique n'arrivait jamais à enlever. C'est réparé — la version la plus récente gagne, et supprimer un rituel le supprime toujours pour de bon.",

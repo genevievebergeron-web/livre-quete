@@ -4,6 +4,57 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-15 (routine autonome, nuit, 15e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 168 798 octets, `savedAt` `2026-08-15T10:34:34Z` (l'app a resservi ~2 h après le 14e
+  passage, le temps que le correctif v2.16.70 se propage). **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide** ; `coinOffers`, `teamInvites`, `repairEvents`, `momentRequests`,
+  `removalRequests`, `removedProposals`, `childTaskProposals` **tous vides** ; `feed` (60 entrées)
+  sans aucun signalement — rien de neuf depuis le **9 août**.
+- `config.bugs` **inchangé** : les **mêmes 14** entrées, la plus récente du **31 juillet**.
+  **Phase 1 propre pour la 14e nuit d'affilée.** Aucune Phase 2.
+- Vérifié au passage, sains : `weeklyQuests` (155 assignations, **0 doublon** jour|tâche|joueur sur
+  157 paires, `generatedForWeek` `2026-08-07` — normal, l'app n'a pas resservi depuis le 9) ;
+  `updateFeedEntries` (30 entrées, **2.16.70 → 2.16.41**, le correctif v2.16.52 tient) ;
+  `selectedRewards` / `customRewards` (les 4 `rw_hydre_*` à `cost:0` restent filtrés par
+  `baseCost(r) > 0`, `catalog.js:131`).
+
+### 🔍 Le bug trouvé cette nuit : le serveur ne fusionnait pas comme l'app
+- Changement de méthode : au lieu d'auditer **un champ de données** de plus, auditer **la fonction
+  qui les écrit**. La fusion du serveur est une copie manuelle de celle du client, patchée à la main
+  depuis juillet (v2.15.7, v2.15.8, v2.16.34, v2.16.42, v2.16.62, v2.16.65, v2.16.67, v2.16.70) et
+  **jamais comparée à l'originale**. Les deux implémentations ont été rejouées sur les mêmes entrées,
+  champ par champ, dans les deux sens.
+- **9 règles divergeaient.** Les plus visibles pour la famille : le **budget-temps quotidien** du
+  parent pouvait être repoussé (42 minutes comptées ramenées à 3 par une poussée d'un appareil en
+  retard), une **annonce du parent**, une **proposition de quête d'un enfant** ou une **demande de
+  retrait** pouvaient disparaître du nuage avant même d'être vues, la **fête d'un rituel** déjà
+  célébré pouvait se rejouer, et le **bonus du défi hebdo** (+10/+15/+25 🪙) pouvait être **repayé**,
+  faute de règle protégeant son marqueur `challengeTiers` — nulle part, ni client ni serveur.
+- **Impact réel mesuré en prod : nul pour l'instant.** Un seul enfant a jamais atteint un palier de
+  défi (Antoine Emery, 3 jours, semaine `2026-07-24`) et son marqueur est intact. Le correctif ferme
+  un piège, il ne répare pas de la donnée abîmée.
+- **Le vrai livrable est le garde-fou** : `npm run build` compare maintenant les deux moitiés de la
+  synchro (`scripts/check-merge-parity.mjs`) et **refuse de construire** si elles divergent. Détail
+  complet dans `PROJET-ETAT.md`, entrée v2.16.71.
+
+### 💡 Suggestions à approuver
+- Aucune nouvelle.
+
+### 📋 Points laissés à Gen
+- 4 champs (`config.customRewards`, `config.updateFeedEntries`, `gameState.house`,
+  `gameState.lastSeenDay`) n'ont de règle de fusion explicite dans **aucune** des deux copies : ils
+  sont donc cohérents entre eux, mais en « dernière écriture gagne » aveugle. `house` touche la
+  réserve avatar/maison — à trancher en session interactive.
+- Supprimer pour de bon la copie manuelle du serveur (lui faire charger `src/merge.js`) demande de
+  confirmer que le dossier `src/` est bien présent à l'exécution sur canner.ca. Invérifiable depuis
+  une session nocturne.
+
+---
+
 ## Passage du 2026-08-15 (routine autonome, nuit, 14e passage)
 
 ### 🌐 Lecture de l'API de production

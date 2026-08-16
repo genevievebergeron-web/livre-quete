@@ -155,6 +155,19 @@ export const mergeGS = (a, b, preferIncoming) => {
 
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
     dismissedAnnouncements: _uniq([...(a.dismissedAnnouncements||[]), ...(b.dismissedAnnouncements||[])]), // v2.6.0 — union des annonces archivées
+    // v2.16.71 — `challengeTiers` n'avait de règle dans AUCUNE des deux fusions, alors que c'est le
+    // SEUL garde-fou d'idempotence d'un versement de pièces réel : les paliers gradués du défi hebdo
+    // (3 jours → +10 🪙, 5 → +15, 7 → +25 + badge « Maître de soi », App.jsx ~2535) ne sont payés
+    // qu'une fois parce que le palier atteint est inscrit ici. En spread naïf `{...a, ...b}`, une
+    // copie portant le marqueur d'une semaine PASSÉE (le cas normal : le marqueur ne bouge que
+    // quand un palier tombe) écrase celui de la semaine en cours dès que l'autre côté est en
+    // retard — typiquement la boucle de sync (App.jsx ~2393, `mergeFamily(local, remote)` toutes
+    // les 25 s) qui relit un nuage pas encore à jour dans la fenêtre de ~1,5 s du push debounced.
+    // L'effet, dont la dépendance `config?.weeklyChallenge` change à chaque tick fusionné, repasse
+    // alors avec `claimed=[]` et REPAIE le palier. Même famille que v2.16.62 (récompense remboursée
+    // deux fois). Règle : même semaine → union des paliers (monotone, un palier payé ne se dépaie
+    // jamais) ; semaine différente → la plus récente gagne — patron de `dailyClaimed`/`ritualCelebrated`.
+    challengeTiers: (()=>{ const A=a.challengeTiers||{}, B=b.challengeTiers||{}; if(A.week&&A.week===B.week) return {week:A.week, tiers:_uniq([...(A.tiers||[]),...(B.tiers||[])])}; return ((B.week||"")>=(A.week||""))?(B.week?B:A):(A.week?A:B); })(),
   };
 };
 // Fusion d'un joueur (config) — garde UN seul thème par enfant.
@@ -283,7 +296,12 @@ export const mergeFamily = (base, incoming) => {
     boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
       const a = bC.boss, b = iC.boss;
       if (!a) return b || null; if (!b) return a;
-      if (a.startedAt === b.startedAt) return { ...a, ...b, defeatedAt: a.defeatedAt || b.defeatedAt };
+      // v2.16.71 — `lastHitTs` était arbitré côté SERVEUR seulement (le seul cas de dérive dans ce
+      // sens-là) : sur le même boss, `{...a, ...b}` laissait l'incoming imposer sa date de dernier
+      // coup, même plus vieille. Or c'est elle qui pilote la régénération des PV de la famille
+      // (`bosses.jsx:131-133`) : une date reculée redonne des PV au boss après un coup encaissé.
+      // On garde la plus récente des deux, comme le serveur le fait déjà.
+      if (a.startedAt === b.startedAt) { const lastHitTs = [a.lastHitTs, b.lastHitTs].filter(Boolean).sort().pop() || a.lastHitTs; return { ...a, ...b, defeatedAt: a.defeatedAt || b.defeatedAt, lastHitTs }; }
       return (new Date(b.startedAt||0) >= new Date(a.startedAt||0)) ? b : a;
     })(),
     // PIN parent : dernière écriture gagne (permet de le changer / réinitialiser depuis n'importe quel appareil)
