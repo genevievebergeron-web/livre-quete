@@ -96,6 +96,11 @@ export const migrateGameState = (gs) => {
     // v2.16.65 — réparé au chargement (sans drapeau, idempotent, même patron que `activeDaysFromCompleted`) :
     // l'ancienne fusion concaténait le journal et le doublait à chaque synchro jusqu'au plafond de 500.
     xpLog: sanitizeXpLog(gs.xpLog, gs.completedAt),
+    // v2.16.74 — compteur À VIE par étiquette de tâche (ménage/cuisine/routine/défi/dehors…),
+    // tamponné à la validation. Pas de seed ici (`migrateGameState` ne reçoit pas `config`, donc
+    // pas les assignations) et aucun n'est nécessaire : `mergeCatCounts` prend le MAX du compteur
+    // et du calcul historique, qui reste la meilleure source tant que les assignations vivent.
+    catCounts: gs.catCounts || {},
     refusedKeys: gs.refusedKeys || [], // v1.64.0 — tombstone des demandes refusées
     refusals: gs.refusals || [], // v1.64.0 — file du message drôle de refus à montrer à l'enfant
     energy: gs.energy == null ? 100 : gs.energy, // v1.41.0 — énergie (sieste/frein sain)

@@ -392,6 +392,27 @@ export const completionCatCounts = (ps, config) => {
   (ps.completed||[]).forEach(k=>{ const base=k.split("#")[0]; const inst=base.slice(0,base.lastIndexOf("_")); const cat=catByInst[inst]; if(cat) counts[cat]=(counts[cat]||0)+1; });
   return counts;
 };
+// v2.16.74 — pourquoi le compte ci-dessus ne suffit PAS, et pourquoi un compteur persistant
+// s'y ajoute. `completionCatCounts` retrouve la catégorie d'une quête accomplie en repassant
+// par l'ASSIGNATION (`instanceId` → `taskId` → `cat`). Or une assignation ne vit pas aussi
+// longtemps qu'une complétion : le parent la supprime (tombstone `removedAssignments`), ou
+// c'est une quête rotative `wq_*` que la semaine suivante REMPLACE. Dans les deux cas la
+// complétion reste dans `completed` mais sa catégorie devient introuvable — elle cesse de
+// compter pour les badges par étiquette (As du Ménage, Marmiton, Roi des Routines…).
+// Mesuré sur la prod du 2026-08-16 : 259 des 442 quêtes accomplies (59 %) — 205 assignations
+// supprimées + 54 quêtes rotatives de semaines passées. Preuve que le compteur RECULE pour de
+// vrai : trois enfants portent `b_cat_routine20` (20 routines) alors que leur compte relu
+// aujourd'hui affiche 10, 14 et 8, et un porte `b_cat_outdoor10` avec un compte de 4.
+// D'où `pState.catCounts` : un compteur À VIE par catégorie, tamponné à la validation (là où
+// la tâche — donc sa catégorie — est encore résolue), qui ne peut plus rien perdre ensuite.
+// Il ne remplace pas le calcul : on garde le MAX des deux, pour que rien ne recule le jour où
+// le calcul, lui, voit plus que le compteur (typiquement l'historique d'avant ce correctif,
+// tant que les assignations vivent encore). Famille `coinsLifetime`/`leagueTier` : monotone.
+export const mergeCatCounts = (stored, computed) => {
+  const out = { ...(computed || {}) };
+  Object.entries(stored || {}).forEach(([k, v]) => { out[k] = Math.max(out[k] || 0, v || 0); });
+  return out;
+};
 // ─── REGISTRE DES ICÔNES UI (Refonte Phase 7) ─────────────────
 // Source unique nom → { emoji (repli), desc (prompt PixelLab) } pour les icônes UI
 // FIXES de l'app (nav, monnaies, onglets, catégories, portail, calendrier, boss).

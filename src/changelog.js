@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.74", date:"2026-08-16", features:[
+    "🏅 Les badges « As du Ménage », « Marmiton », « Roi des Routines », « Casse-Cou » et « Aventurier du Dehors » comptaient tes quêtes en repassant par la liste des tâches d'aujourd'hui. Résultat : dès que ton parent effaçait une tâche, ou dès qu'une quête rotative changeait de semaine, les fois où tu l'avais faite ne comptaient plus. 259 des 442 quêtes déjà accomplies dans la famille (59 %) avaient disparu de ces compteurs.",
+    "🔢 Maintenant, chaque quête validée est comptée dans son étiquette au moment même de la validation, pour toujours. Ton avancement vers ces badges ne peut plus redescendre — et plus rien n'efface le travail que tu as déjà fait.",
+  ]},
   { version:"2.16.73", date:"2026-08-16", features:[
     "🎨 Le thème de la famille pouvait changer tout seul. Une tablette restée en retard de quelques jours remettait l'ancien thème pour tout le monde dès qu'elle se synchronisait — même si personne n'avait rien demandé, même si quelqu'un venait tout juste d'en choisir un autre. Maintenant c'est le dernier choix fait qui gagne, peu importe l'appareil.",
     "🎁 Les récompenses maison de ton parent (celles qu'il écrit lui-même dans l'assistant) pouvaient disparaître de la même façon, et une récompense déjà achetée perdait son nom dans ta liste. Réglé aussi.",

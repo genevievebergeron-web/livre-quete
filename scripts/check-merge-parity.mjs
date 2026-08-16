@@ -72,6 +72,10 @@ const gsA = {
   settings: { calm: true }, dismissedAnnouncements: ["an_a"],
   challengeTiers: { week: "2026-08-14", tiers: [3] },
   house: { deco: ["tapis_a"] }, lastSeenDay: "2026-08-14",
+  // v2.16.74 — valeurs croisées EXPRÈS (A gagne sur menage, B sur cuisine, defi seulement chez B) :
+  // un MAX clé par clé doit rendre un objet différent des DEUX entrées, sinon un spread naïf
+  // passerait inaperçu.
+  catCounts: { menage: 12, cuisine: 3 },
 };
 const gsB = {
   ...gsA,
@@ -98,6 +102,7 @@ const gsB = {
   settings: { sound: false }, dismissedAnnouncements: ["an_b"],
   challengeTiers: { week: "2026-08-07", tiers: [3, 5, 7] },
   house: { deco: ["tapis_b"] }, lastSeenDay: "2026-08-15",
+  catCounts: { menage: 4, cuisine: 9, defi: 2 },
 };
 
 console.log("· mergeGS — champ par champ, dans les deux sens et les deux préférences");

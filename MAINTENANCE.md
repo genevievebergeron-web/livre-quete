@@ -1169,3 +1169,45 @@ entrées datent du 24 juillet. Aucun correctif de Phase 2 nécessaire.
   savoir laquelle des deux versions tu voulais (l'hebdo du vendredi 17:30, ou la soirée unique du
   30 juillet). Choisir à ta place serait inventer de la donnée. Le geste : 📅 Calendrier → ✏️ sur
   « Soirée cinéma » → les quatre enfants sont maintenant **pré-cochés** → Modifier.
+
+---
+
+## Passage du 2026-08-16 (nuit, routine autonome, 15e passage) — Phase 1 propre, 2 candidats hérités audités et sains
+
+**Phase 0** : `git pull` déjà à jour (`14f5ce0`, v2.16.73), `npm run build` propre (garde-fou de
+parité de fusion inclus). `PROJET-ETAT.md` vérifié contre `git log` : aucun commit poussé sans son
+entrée dédiée — la ligne d'en-tête était bien à `v2.16.73`, qui est `HEAD`.
+
+**Phase 1** — lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-16T06:30:03Z) :
+- **14 `config.bugs`, identiques id pour id depuis le 31 juillet** (`bug_hlu9mkd` reste le plus
+  récent). Tous déjà classés dans les passages ci-dessus. Rien de neuf.
+- `errorLogs` **vide**. `coinOffers` / `teamInvites` / `repairEvents` / `momentRequests` /
+  `removalRequests` / `removedProposals` / `childTaskProposals` tous **vides**.
+- `feed` : 60 entrées, dernier événement réel au **9 août**, aucun message de signalement neuf.
+- **Aucun bug à corriger → pas de Phase 2.**
+
+**Deux candidats hérités de la v2.16.73, audités ce passage et déclarés SAINS** (vérifiés plutôt
+que supposés, parce que « jamais audité » n'est pas « défectueux ») :
+- **`seenVersions` en deux exemplaires** (racine de `data` et `config`) : **260 entrées de chaque
+  côté, 0 doublon, strictement identiques dans le même ordre**. Les deux fusions unionnent les
+  **quatre** sources (`bC`/`iC`/`base`/`incoming`, `merge.js:434`, `server-merge.cjs:328`) et
+  `migrations.js:149-150` relit les deux avant d'écrire. Le doublon est un **miroir voulu**
+  (v2.16.52 : le champ vivait à la racine et chaque `persist()` l'effaçait ; il a été déplacé dans
+  `config` **sans casser** les vieux clients qui lisent encore la racine). Rien à faire.
+- **L'anomalie `placed.lamp = "dl1"` d'Antoine Emery** (déco placée mais absente d'`owned`, notée
+  en v2.16.72) : **`dl1` EST dans son `owned` au 16 août**, et le croisement complet
+  `house.placed` × `owned` sur les 4 enfants ne rend **aucune** déco placée non possédée. Point clos.
+
+**Ce qui a occupé la Phase 3** : l'audit a changé de cible — la **fonction** `checkBadges` plutôt
+qu'un champ de plus. Sa sortie était propre (0 badge dû, 0 id mort) mais son **entrée** ne l'était
+pas : 259 des 442 quêtes accomplies ne comptent plus pour aucune catégorie. Voir `PROJET-ETAT.md`,
+entrée **v2.16.74**.
+
+**Pas de vérification navigateur** : `preview_start` refusé en session planifiée (7e passage
+d'affilée, message « Dev servers can't be started from unattended sessions »). Vérification par
+rejeu des vrais modules du dépôt sur le vrai JSON de prod — 155 assertions, 0 échec.
+
+### 💡 À signaler à Gen (ajout de ce passage)
+- Rien de neuf. Les points hérités restent : la restauration des soldes du 28 juillet, le ménage
+  des 26 doublons de `customTasks`, les 67 assignations en double, `config.weekPersist` mort, et
+  le clic « Soirée cinéma » ci-dessus.

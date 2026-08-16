@@ -177,6 +177,11 @@ export const mergeGS = (a, b, preferIncoming) => {
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
 
     settings: { ...(a.settings || {}), ...(b.settings || {}) },
+    // v2.16.74 — compteur à vie par étiquette de tâche : MAX clé par clé, exactement comme
+    // `coinsLifetime`/`leagueTier`. Un spread naïf laisserait une tablette en retard ramener le
+    // compte de « ménage » à sa valeur d'avant, ce qui est précisément le recul que ce compteur
+    // existe pour empêcher.
+    catCounts: (()=>{ const A=a.catCounts||{}, B=b.catCounts||{}, out={...A}; Object.entries(B).forEach(([k,v])=>{ out[k]=Math.max(out[k]||0, v||0); }); return out; })(),
     dismissedAnnouncements: _uniq([...(a.dismissedAnnouncements||[]), ...(b.dismissedAnnouncements||[])]), // v2.6.0 — union des annonces archivées
     // v2.16.71 — `challengeTiers` n'avait de règle dans AUCUNE des deux fusions, alors que c'est le
     // SEUL garde-fou d'idempotence d'un versement de pièces réel : les paliers gradués du défi hebdo

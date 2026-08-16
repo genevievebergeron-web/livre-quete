@@ -183,6 +183,9 @@ const mergeGS = (a, b, preferIncoming) => {
     leagueTier: (() => { const RANK={bronze:0,argent:1,or:2,diamant:3}; const ra=RANK[a.leagueTier]||0, rb=RANK[b.leagueTier]||0; return rb>=ra ? (b.leagueTier||"bronze") : (a.leagueTier||"bronze"); })(),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
     settings: { ...(a.settings||{}), ...(b.settings||{}) },
+    // v2.16.74 — miroir du merge client (src/merge.js) : compteur à vie par étiquette de tâche,
+    // MAX clé par clé, famille `coinsLifetime`/`leagueTier`.
+    catCounts: (()=>{ const A=a.catCounts||{}, B=b.catCounts||{}, out={...A}; Object.entries(B).forEach(([k,v])=>{ out[k]=Math.max(out[k]||0, v||0); }); return out; })(),
     // v2.16.71 — les 4 règles suivantes existaient côté client depuis longtemps et n'ont JAMAIS
     // été portées ici : elles tombaient donc dans le `{...a, ...b}` du haut, où l'incoming écrase
     // l'existant en entier. Mesuré par `scripts/check-merge-parity.mjs` (nouveau, lancé au build).
