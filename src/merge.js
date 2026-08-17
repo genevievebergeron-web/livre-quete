@@ -53,6 +53,29 @@ export const mergeGS = (a, b, preferIncoming) => {
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.7.0 — tombstone des événements calendrier supprimés
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
   const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : `mergeXpLog` s'en sert comme borne de plausibilité
+  // v2.16.76 — `hiddenRewards` (récompenses « rangées » par l'enfant) n'a de sens QUE pour le jour
+  // inscrit dans `hiddenWeek` : la lecture (App.jsx ~415) fait `hiddenWeek===todayStamp() ? ids : []`
+  // et l'écriture (handleHideReward, App.jsx ~3707) repart d'une liste VIDE dès que le jour change.
+  // Or les deux champs étaient fusionnés séparément et incompatiblement : la liste en union sans fin,
+  // le jour en « l'incoming gagne toujours ». Les deux sens de la synchro cassaient, en miroir :
+  //   • boucle client, `mergeFamily(local, remote)` toutes les 25 s → `hiddenWeek` revenait à celui du
+  //     nuage (périmé), donc la récompense que l'enfant venait de ranger REVENAIT sur son écran ;
+  //   • serveur, `mergeFamily(existing, data)` → `hiddenWeek` prenait le jour FRAIS mais la liste
+  //     gardait toute l'histoire, donc de vieilles récompenses disparaissaient de la boutique du jour
+  //     sans que personne n'y touche.
+  // Mesuré sur la prod du 2026-08-16 : 3 enfants sur 4 traînent une réserve périmée que le verrou
+  // daté neutralise correctement au repos (Antoine Emery `rw_hydre_5dollars` du 1er juillet, Elli
+  // `rw_servi`+`rw_hydre_5dollars` du 25 juillet, Antoine DR `rw_depanneur` du 8 juin) — il suffisait
+  // du premier « ranger » d'aujourd'hui pour la ressusciter en bloc.
+  // Règle : les deux champs forment UN seau daté, fusionné comme `dailyClaimed`/`ritualCelebrated`
+  // juste plus bas — même jour → union des ids ; jours différents → le jour le plus récent emporte SA
+  // liste, en entier. Le verrou daté redevient increvable.
+  const _hidden = (() => {
+    const A = { day: a.hiddenWeek || "", ids: a.hiddenRewards || [] };
+    const B = { day: b.hiddenWeek || "", ids: b.hiddenRewards || [] };
+    if (A.day && A.day === B.day) return { day: A.day, ids: _uniq([...A.ids, ...B.ids]) };
+    return ((B.day || "") >= (A.day || "")) ? (B.day ? B : A) : (A.day ? A : B);
+  })();
   return {
     ...a, ...b,
     xp: Math.max(a.xp || 0, b.xp || 0),
@@ -105,7 +128,14 @@ export const mergeGS = (a, b, preferIncoming) => {
     house: preferIncoming ? (b.house ?? a.house ?? null) : (a.house ?? b.house ?? null),
     // PIN : dernière écriture gagne (permet de changer le code d'un enfant depuis un autre appareil)
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
-    mode: b.mode ?? a.mode ?? null,
+    // v2.16.76 — `mode` (📋 Mes tâches / ⏰ Rituels) et `activeRoutineId` (plus bas) disaient
+    // « l'incoming gagne TOUJOURS », sans jamais regarder lequel des deux côtés est le plus frais :
+    // exactement le comportement du spread naïf que `house` avait avant la v2.16.72. Dans la boucle
+    // de sync du client, `mergeFamily(local, remote)` met le NUAGE en `b` : la copie d'avant le push
+    // debounced (~1,5 s) écrasait donc le choix que l'enfant venait de faire, dans les 25 s. C'est le
+    // retour par la synchro du symptôme que la v2.16.63 a corrigé côté écran (« le rituel choisi par
+    // l'enfant était jeté, retour forcé au matin, en silence »). Même règle que `pin`/`house`/`coins`.
+    mode: preferIncoming ? (b.mode ?? a.mode ?? null) : (a.mode ?? b.mode ?? null),
     // v2.15.8 — tombstone des rituels supprimés (union, comme removedProposals) : sans ça, une
     // routine retirée localement (« Supprimer le rituel ») revenait dès qu'un autre appareil (ou le
     // serveur, qui garde l'ancien état) réapparaissait dans la fusion union-by-id ci-dessous.
@@ -125,9 +155,9 @@ export const mergeGS = (a, b, preferIncoming) => {
     // CONTENU d'un id présent des deux côtés vient de l'écriture la plus récente — même règle
     // `preferIncoming` que `coins`/`pin`/`boughtRewards` plus haut dans cette même fonction.
     routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); const fresh = preferIncoming ? (b.routines || []) : (a.routines || []), stale = preferIncoming ? (a.routines || []) : (b.routines || []); for (const r of [...fresh, ...stale]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
-    activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
-    hiddenRewards: _uniq([...(a.hiddenRewards||[]),...(b.hiddenRewards||[])]),
-    hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
+    activeRoutineId: preferIncoming ? (b.activeRoutineId ?? a.activeRoutineId ?? null) : (a.activeRoutineId ?? b.activeRoutineId ?? null), // v2.16.76 — voir `mode` ci-dessus
+    hiddenRewards: _hidden.ids,       // v2.16.76 — seau daté, voir `_hidden` plus haut
+    hiddenWeek: _hidden.day || null,  // v2.16.76 — indissociable de `hiddenRewards` ci-dessus
     dailyClaimed: (()=>{ const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     ritualCelebrated: (()=>{ const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if(A.day&&A.day===B.day) return {day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])])}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.68.0 (B5) — garde « rituel déjà fêté aujourd'hui »
     // v2.12.2 — bug signalé par Gen (« notification félicitation qui revient sans cesse ») : la file

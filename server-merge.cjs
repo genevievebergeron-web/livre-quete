@@ -111,6 +111,18 @@ const mergeGS = (a, b, preferIncoming) => {
   const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
   const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : borne de plausibilité de mergeXpLog
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.16.67 — miroir du client (v2.7.0) : le serveur ne transportait pas du tout ce tombstone
+  // v2.16.76 — miroir du correctif client (src/merge.js) : `hiddenRewards` n'a de sens que pour le
+  // jour inscrit dans `hiddenWeek`, or la liste était en union sans fin et le jour en « l'incoming
+  // gagne toujours ». Ici (`mergeFamily(existing, data)`, l'état stocké toujours en `a`) le jour
+  // frais gagnait pendant que la liste gardait toute l'histoire : de vieilles récompenses rangées
+  // des semaines plus tôt disparaissaient de la boutique du jour au premier « ranger » de l'enfant.
+  // Seau daté, même règle que `dailyClaimed` plus bas.
+  const _hidden = (() => {
+    const A = { day: a.hiddenWeek || "", ids: a.hiddenRewards || [] };
+    const B = { day: b.hiddenWeek || "", ids: b.hiddenRewards || [] };
+    if (A.day && A.day === B.day) return { day: A.day, ids: _uniq([...A.ids, ...B.ids]) };
+    return ((B.day || "") >= (A.day || "")) ? (B.day ? B : A) : (A.day ? A : B);
+  })();
   return {
     ...a, ...b,
     xp: Math.max(a.xp||0, b.xp||0),
@@ -139,7 +151,10 @@ const mergeGS = (a, b, preferIncoming) => {
     // enlever sa clé de `placed`, une union le ferait revenir).
     house: preferIncoming ? (b.house ?? a.house ?? null) : (a.house ?? b.house ?? null),
     pin: preferIncoming ? (b.pin ?? a.pin ?? null) : (a.pin ?? b.pin ?? null),
-    mode: b.mode ?? a.mode ?? null,
+    // v2.16.76 — miroir du client : `mode` et `activeRoutineId` disaient « l'incoming gagne
+    // TOUJOURS » sans regarder la fraîcheur, donc n'importe quelle tablette en retard imposait au
+    // nuage son vieux mode et son vieux rituel. Même règle que `pin`/`house`/`coins`.
+    mode: preferIncoming ? (b.mode ?? a.mode ?? null) : (a.mode ?? b.mode ?? null),
     // v2.15.8 — port du même tombstone que le client (App.jsx, mergeGS) : les routines n'avaient
     // aucun tombstone, contrairement à assignments/customTasks/childTaskProposals — une routine
     // supprimée localement revenait dès que ce merge serveur la retrouvait dans l'état existant.
@@ -150,9 +165,9 @@ const mergeGS = (a, b, preferIncoming) => {
     // existant, ni le ménage des références mortes fait par le client à chaque chargement.
     // Présence = union (avec tombstone) ; contenu d'un id commun = l'écriture la plus récente.
     routines: (() => { const removed=new Set([...(a.removedRoutineIds||[]), ...(b.removedRoutineIds||[])]); const m = new Map(); const fresh = preferIncoming ? (b.routines||[]) : (a.routines||[]), stale = preferIncoming ? (a.routines||[]) : (b.routines||[]); for (const r of [...fresh, ...stale]) { if (r && r.id != null && !removed.has(r.id) && !m.has(r.id)) m.set(r.id, r); } return [...m.values()]; })(),
-    activeRoutineId: b.activeRoutineId ?? a.activeRoutineId ?? null,
-    hiddenRewards: _uniq([...(a.hiddenRewards||[]), ...(b.hiddenRewards||[])]),
-    hiddenWeek: b.hiddenWeek ?? a.hiddenWeek ?? null,
+    activeRoutineId: preferIncoming ? (b.activeRoutineId ?? a.activeRoutineId ?? null) : (a.activeRoutineId ?? b.activeRoutineId ?? null), // v2.16.76 — voir `mode` ci-dessus
+    hiddenRewards: _hidden.ids,       // v2.16.76 — seau daté, voir `_hidden` plus haut
+    hiddenWeek: _hidden.day || null,  // v2.16.76 — indissociable de `hiddenRewards` ci-dessus
     dailyClaimed: (() => { const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // v2.12.2 — miroir du fix client (bug "notification félicitation qui revient sans cesse") :
     // dernière-écriture-gagne laissait une soeur/frère au savedAt plus récent ressusciter en bloc

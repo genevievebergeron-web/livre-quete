@@ -60,7 +60,10 @@ const gsA = {
   avatar: { configured: true, skin: "a" }, pin: "1111", mode: "routine",
   removedRoutineIds: ["r_old"],
   routines: [{ id: "rt1", name: "Matin A", tasks: ["a"] }],
-  activeRoutineId: "rt1", hiddenRewards: ["rw_h_a"], hiddenWeek: "2026-08-07",
+  // v2.16.76 — `hiddenWeek` porte le JOUR du seau `hiddenRewards`, et la règle arbitre sur ce jour,
+  // pas sur la fraîcheur de la famille. Le jour le plus récent va donc du côté FRAIS (famA), même
+  // raison que `calendar.updatedAt` juste au-dessus : sans ça le contrôle crierait au loup.
+  activeRoutineId: "rt1", hiddenRewards: ["rw_h_a"], hiddenWeek: "2026-08-14",
   dailyClaimed: { day: "2026-08-14", ids: ["o3"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt1"] },
   consumedCelebrationIds: ["c_a"], pendingCelebrations: [{ id: "c_p_a" }],
@@ -90,7 +93,7 @@ const gsB = {
   avatar: { configured: false, skin: "b" }, pin: "2222", mode: "semaine",
   removedRoutineIds: ["r_other"],
   routines: [{ id: "rt1", name: "Matin B", tasks: ["a", "b"] }],
-  activeRoutineId: "rt2", hiddenRewards: ["rw_h_b"], hiddenWeek: "2026-08-14",
+  activeRoutineId: "rt2", hiddenRewards: ["rw_h_b"], hiddenWeek: "2026-08-07", // v2.16.76 — jour PÉRIMÉ ici, voir famA
   dailyClaimed: { day: "2026-08-14", ids: ["o6"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt2"] },
   consumedCelebrationIds: ["c_b"], pendingCelebrations: [{ id: "c_p_b" }],
@@ -277,17 +280,13 @@ for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.merg
 // une exemption aurait éteint pour de bon la surveillance de trois vrais champs.
 //
 // L'exemption est nominative et doit se justifier — pas une liste fourre-tout.
-const NAIF_ASSUME_GS = {
-  // Bascule Rituel/Semaine, rituel sélectionné, semaine de masquage de la boutique :
-  // ces trois-là ONT une règle explicite (`b.X ?? a.X`, écrite pareil dans les deux
-  // copies), mais cette règle dit « l'incoming gagne toujours », ce qui est le
-  // comportement du spread naïf. Ce n'est donc pas une règle MANQUANTE — c'est un
-  // choix à trancher, hors du périmètre de ce garde-fou (qui traque la dérive et
-  // l'absence de règle, pas la justesse d'une règle présente). Noté comme piste.
-  mode: "règle explicite `b.mode ?? a.mode` — incoming gagne par choix, pas par oubli",
-  activeRoutineId: "règle explicite `b ?? a` — voyage avec `mode`",
-  hiddenWeek: "règle explicite `b ?? a` — voyage avec `hiddenRewards`",
-};
+// v2.16.76 — les 3 exemptions posées la veille (`mode`, `activeRoutineId`, `hiddenWeek`) sont
+// LEVÉES : c'était la piste laissée par la v2.16.75, et elle était bien un bug. Leur règle
+// `b.X ?? a.X` disait « l'incoming gagne toujours » — le comportement exact du spread naïf que ce
+// contrôle traque — donc la tablette en retard imposait son mode, son rituel et son jour de
+// masquage. Les trois arbitrent désormais sur la fraîcheur (`preferIncoming`, ou le jour du seau
+// pour `hiddenWeek`) et sont surveillés comme les autres. Liste vide : plus rien à exempter ici.
+const NAIF_ASSUME_GS = {};
 
 console.log("· mergeGS — un champ périmé ne doit jamais gagner sur un champ frais");
 for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {

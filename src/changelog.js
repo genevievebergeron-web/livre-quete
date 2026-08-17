@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.76", date:"2026-08-16", features:[
+    "🎁 Quand tu rangeais une récompense de la boutique pour en faire apparaître une autre, elle revenait toute seule quelques secondes plus tard. Et à l'inverse, de vieilles récompenses rangées il y a des semaines pouvaient disparaître d'un coup de ta boutique du jour, sans que tu y touches. Les deux sont réglés : ce que tu ranges reste rangé pour la journée, et rien d'autre ne bouge.",
+    "⏰ Le rituel que tu choisis (☀️ Matin, 🌙 Soir…) et ta bascule « 📋 Mes tâches / ⏰ Rituels » pouvaient être remis à l'ancien choix par un autre appareil de la maison resté en retard. Maintenant c'est toujours le choix le plus récent qui gagne, c'est-à-dire le tien.",
+  ]},
   { version:"2.16.75", date:"2026-08-16", features:[
     "🛡️ La vérification automatique ajoutée la semaine dernière (celle qui refuse de laisser sortir une version où un réglage périmé peut écraser un réglage tout neuf) ne surveillait que les réglages de la famille. Tout ce qui t'appartient personnellement — ta maison, tes rituels, le surnom de ton familier, tes paliers de défi, le dernier jour où tu as ouvert l'app — n'était pas couvert. C'est justement là que les 4 derniers bugs de ce genre se cachaient.",
     "🔍 Maintenant elle regarde aussi tes affaires à toi, et elle refuse en plus de se laisser endormir : si un réglage se retrouve avec la même valeur des deux côtés du test, elle le signale au lieu de faire semblant de le surveiller.",
