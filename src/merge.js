@@ -51,7 +51,27 @@ export const mergeGS = (a, b, preferIncoming) => {
   const refusedKeys = _uniq([...(a.refusedKeys || []), ...(b.refusedKeys || [])]).slice(-400); // v1.64.0 — tombstone des demandes refusées
   const _refusedSet = new Set(refusedKeys);
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.7.0 — tombstone des événements calendrier supprimés
-  const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar || {}), ...(b.avatar || {}) });
+  // v2.16.79 — objets fusionnés CLÉ PAR CLÉ (`{...a.X, ...b.X}`) : chaque sous-clé présente chez
+  // l'incoming gagnait, même périmée, sans jamais regarder `preferIncoming`. C'est le spread naïf
+  // de `house` (v2.16.72) et de `mode` (v2.16.76), mais à l'échelle de la sous-clé — donc invisible
+  // aux garde-fous, qui ne font jamais entrer les deux côtés en collision sur la MÊME sous-clé.
+  // L'union par clé a une vraie raison d'être (un appareil peut connaître une clé que l'autre ignore,
+  // ex. un réglage ajouté par une version plus récente) : on la GARDE, on ne fait qu'inverser l'ordre
+  // du spread quand c'est la BASE qui est la plus fraîche. Le côté frais écrase, le côté périmé
+  // complète. Utilisé pour `equipped`, `settings`, `petNickname` et l'avatar ci-dessous.
+  const _byKey = (A, B) => (preferIncoming ? { ...(A || {}), ...(B || {}) } : { ...(B || {}), ...(A || {}) });
+  // v2.16.79 — `avatar` : le verrou `configured` (une apparence configurée bat une apparence qui ne
+  // l'est pas) est conservé, mais quand les DEUX côtés sont configurés — le cas des 4 enfants de la
+  // prod — `b.avatar` gagnait EN BLOC, quelle que soit sa fraîcheur. Dans la boucle de sync du client
+  // (`mergeFamily(local, remote)`, App.jsx:2393) le nuage est en `b` : la copie d'avant le push
+  // debounced (~1,5 s) rendait donc son ancienne apparence et le changement que l'enfant venait de
+  // faire disparaissait dans les 25 s, sans message. C'est le signalement `bug_xcqtyr7` du 27 juillet
+  // (« Je clique sur changer les yeux, et ça ne marche pas, ça reste pareil, c'est aussi comme ça
+  // pour quand je pèse sur l'option bouches du personnage »), longtemps classé « à voir dans
+  // `avatarpopup.jsx` » alors que le composant n'y est pour rien.
+  const _aCfg = !!a.avatar?.configured, _bCfg = !!b.avatar?.configured;
+  const avatarConfigured = (_aCfg && _bCfg) ? _byKey(a.avatar, b.avatar)
+    : _bCfg ? b.avatar : (_aCfg ? a.avatar : _byKey(a.avatar, b.avatar));
   const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : `mergeXpLog` s'en sert comme borne de plausibilité
   // v2.16.76 — `hiddenRewards` (récompenses « rangées » par l'enfant) n'a de sens QUE pour le jour
   // inscrit dans `hiddenWeek` : la lecture (App.jsx ~415) fait `hiddenWeek===todayStamp() ? ids : []`
@@ -106,7 +126,13 @@ export const mergeGS = (a, b, preferIncoming) => {
     rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}),
     refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union increvable → fin des pièces infinies) ; keyé sur l'achat depuis v2.16.62
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
-    equipped: { ...(a.equipped || {}), ...(b.equipped || {}) },
+    // v2.16.79 — voir `_byKey` en tête de `mergeGS`. `equipped` porte ce que l'enfant a sur le dos
+    // (chapeau, armure, familier, skin, thème) ; `onEquip` (App.jsx:2907) écrit la sous-clé du slot,
+    // et RETIRE en y posant `null` — donc une sous-clé qui existe des deux côtés, tout le temps.
+    // Le nuage périmé gagnait sur chaque slot : l'enfant équipe un masque, la synchro lui remet son
+    // ancien casque. C'est le signalement `bug_56gb01a` du 28 juillet, mot pour mot (« je veut maitre
+    // un nouvaut masque mais il me mais tougour un casque de chevalier »).
+    equipped: _byKey(a.equipped, b.equipped),
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
     removedCalendarIds,
     avatar: avatarConfigured,
@@ -170,7 +196,7 @@ export const mergeGS = (a, b, preferIncoming) => {
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
     petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
-    petNickname: {...(a.petNickname||{}), ...(b.petNickname||{})}, // v2.4.2 — surnom par familier (union ; dernier nom donné gagne par petId)
+    petNickname: _byKey(a.petNickname, b.petNickname), // v2.4.2 — surnom par familier (union par petId) ; v2.16.79 — RENOMMER un familier déjà nommé est une collision sur la même sous-clé : le côté frais gagne, voir `_byKey`
     // Énergie : consommable → l'horodatage energyTs arbitre directement (pas le flag coarse preferIncoming).
     // Bug v2.5.3 : preferIncoming basé sur savedAt global pouvait annuler une consommation d'énergie
     // si l'appareil qui avait ouvert un coffre avait un savedAt plus vieux que l'autre.
@@ -206,7 +232,11 @@ export const mergeGS = (a, b, preferIncoming) => {
     sessionMinutes: (()=>{ const A=a.sessionMinutes||{}, B=b.sessionMinutes||{}; if(A.day&&A.day===B.day) return {day:A.day, minutes:Math.max(A.minutes||0,B.minutes||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle), // jetons/dégâts monotones par boss → max
 
-    settings: { ...(a.settings || {}), ...(b.settings || {}) },
+    // v2.16.79 — voir `_byKey` en tête de `mergeGS`. `settings` porte le mode calme, le décompte
+    // calme, la police lisible, une tâche à la fois, l'échelle de police, le son et le réglage
+    // d'humour (v2.16.x) : précisément les réglages d'accessibilité qu'un enfant coupe pour son
+    // confort. Une tablette en retard les rallumait un par un, en silence.
+    settings: _byKey(a.settings, b.settings),
     // v2.16.74 — compteur à vie par étiquette de tâche : MAX clé par clé, exactement comme
     // `coinsLifetime`/`leagueTier`. Un spread naïf laisserait une tablette en retard ramener le
     // compte de « ménage » à sa valeur d'avant, ce qui est précisément le recul que ce compteur

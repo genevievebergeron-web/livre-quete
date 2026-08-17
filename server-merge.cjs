@@ -108,7 +108,17 @@ const mergeGS = (a, b, preferIncoming) => {
   const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]);
   const refusedKeys = _uniq([...(a.refusedKeys||[]), ...(b.refusedKeys||[])]).slice(-400); // v1.64.0 — tombstone des refus
   const _refusedSet = new Set(refusedKeys);
-  const avatarConfigured = b.avatar?.configured ? b.avatar : (a.avatar?.configured ? a.avatar : { ...(a.avatar||{}), ...(b.avatar||{}) });
+  // v2.16.79 — MIROIR de src/merge.js. Objets fusionnés CLÉ PAR CLÉ : chaque sous-clé de l'incoming
+  // gagnait, même périmée, sans jamais regarder `preferIncoming`. L'union par clé est conservée (un
+  // appareil peut connaître une clé que l'autre ignore) ; seul l'ordre du spread s'inverse quand
+  // c'est la BASE la plus fraîche. Le côté frais écrase, le côté périmé complète.
+  const _byKey = (A, B) => (preferIncoming ? { ...(A||{}), ...(B||{}) } : { ...(B||{}), ...(A||{}) });
+  // v2.16.79 — le verrou `configured` est gardé, mais quand les DEUX côtés sont configurés (le cas
+  // des 4 enfants de la prod) `b.avatar` gagnait en bloc quelle que soit sa fraîcheur : signalement
+  // `bug_xcqtyr7` (« Je clique sur changer les yeux, et ça ne marche pas, ça reste pareil »).
+  const _aCfg = !!a.avatar?.configured, _bCfg = !!b.avatar?.configured;
+  const avatarConfigured = (_aCfg && _bCfg) ? _byKey(a.avatar, b.avatar)
+    : _bCfg ? b.avatar : (_aCfg ? a.avatar : _byKey(a.avatar, b.avatar));
   const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : borne de plausibilité de mergeXpLog
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.16.67 — miroir du client (v2.7.0) : le serveur ne transportait pas du tout ce tombstone
   // v2.16.76 — miroir du correctif client (src/merge.js) : `hiddenRewards` n'a de sens que pour le
@@ -142,7 +152,7 @@ const mergeGS = (a, b, preferIncoming) => {
     rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}), // v2.16.62 — voyage avec boughtRewards (même règle) : une résurrection ramène l'ancienne estampille, déjà tombstonée
     refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
-    equipped: { ...(a.equipped||{}), ...(b.equipped||{}) },
+    equipped: _byKey(a.equipped, b.equipped), // v2.16.79 — voir `_byKey` ci-dessus ; signalement `bug_56gb01a` (« il me mais tougour un casque de chevalier »)
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
     removedCalendarIds,
     avatar: avatarConfigured,
@@ -197,7 +207,7 @@ const mergeGS = (a, b, preferIncoming) => {
     // v2.16.34 — miroir du merge client (App.jsx, mergeGS) : ratchet par rang, jamais de recul.
     leagueTier: (() => { const RANK={bronze:0,argent:1,or:2,diamant:3}; const ra=RANK[a.leagueTier]||0, rb=RANK[b.leagueTier]||0; return rb>=ra ? (b.leagueTier||"bronze") : (a.leagueTier||"bronze"); })(),
     bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
-    settings: { ...(a.settings||{}), ...(b.settings||{}) },
+    settings: _byKey(a.settings, b.settings), // v2.16.79 — réglages d'accessibilité : une tablette en retard les rallumait un par un
     // v2.16.74 — miroir du merge client (src/merge.js) : compteur à vie par étiquette de tâche,
     // MAX clé par clé, famille `coinsLifetime`/`leagueTier`.
     catCounts: (()=>{ const A=a.catCounts||{}, B=b.catCounts||{}, out={...A}; Object.entries(B).forEach(([k,v])=>{ out[k]=Math.max(out[k]||0, v||0); }); return out; })(),
@@ -209,7 +219,7 @@ const mergeGS = (a, b, preferIncoming) => {
     ritualCelebrated: (() => { const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // Surnoms de familiers (v2.4.2) : union par petId, sinon le surnom donné sur une tablette
     // disparaît dès qu'un autre appareil pousse un objet qui ne le contient pas.
-    petNickname: { ...(a.petNickname||{}), ...(b.petNickname||{}) },
+    petNickname: _byKey(a.petNickname, b.petNickname), // v2.16.79 — renommer un familier DÉJÀ nommé est une collision sur la même sous-clé
     // Budget-temps quotidien (Backlog #13) : même jour → MAX. Sans ça, un appareil qui a compté
     // moins de minutes REMET le compteur du jour à sa valeur à lui — le plafond posé par le parent
     // (« 30 min ») se retrouve silencieusement repoussé d'autant.

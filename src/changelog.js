@@ -6,6 +6,12 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.79", date:"2026-08-17", features:[
+    "🎭 « Je clique sur changer les yeux, et ça ne marche pas, ça reste pareil » — vous étiez deux à l'avoir signalé, pour les yeux, les bouches, et le casque de chevalier qui revenait toujours à la place du masque. Ce n'était pas l'écran du personnage : c'est la synchro qui remettait par-dessus l'apparence enregistrée dans le nuage, quelques secondes après ton changement. Ton personnage garde maintenant ce que tu lui mets.",
+    "🎒 Pareil pour ce que tu portes (chapeau, armure, familier, thème) : équiper ou retirer un objet tient pour de bon, même si une autre tablette de la famille est en retard.",
+    "⚙️ Tes réglages à toi — mode calme, décompte calme, police lisible, une tâche à la fois, taille du texte, son, blagues — ne se rallument plus tout seuls après une synchro.",
+    "🐾 Renommer un familier que tu avais déjà nommé : le nouveau nom reste.",
+  ]},
   { version:"2.16.78", date:"2026-08-17", features:[
     "🔄 Pendant une semaine de garde, tes quêtes de la semaine étaient figées dans le nuage dès leur toute première écriture : plus rien de ce qui les changeait ensuite n'arrivait à s'enregistrer. Une tâche récurrente manquée que l'app reporte au lendemain, par exemple, n'était jamais retenue ailleurs que sur la tablette où tu étais. C'est réglé.",
     "🗑️ « Je ne veux plus de cette tâche » sur une quête de la semaine de garde : ton parent avait beau approuver, la tâche revenait le lendemain comme si de rien n'était. Le retrait tient maintenant pour la semaine en cours.",

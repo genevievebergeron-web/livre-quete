@@ -456,6 +456,78 @@ console.log("· tombstone removedAssignments — doit retirer aussi une assignat
   }
 }
 
+// ── Objets fusionnés CLÉ PAR CLÉ : collision sur la MÊME sous-clé ──────────
+// v2.16.79 — le contrôle précédent regarde dans un objet arbitré EN BLOC. Il ne
+// voit rien d'un objet fusionné `{...a.X, ...b.X}`, où chaque sous-clé est
+// arbitrée séparément : là, l'incoming gagne sur chaque clé qu'il porte, même
+// périmé, et aucune fixture du fichier ne met jamais les deux côtés en collision
+// sur la MÊME sous-clé (`gsA.equipped={hat}` contre `gsB.equipped={cape}` :
+// l'union rend un objet différent des DEUX entrées, donc tous les contrôles se
+// taisent, parité comprise). C'est ce trou qui a caché `equipped` et `avatar`
+// pendant toute la vie de l'app — les deux signalements d'enfants les plus vieux
+// encore ouverts (`bug_56gb01a` le casque de chevalier, `bug_xcqtyr7` les yeux et
+// les bouches) étaient ça, et étaient classés « à voir dans le composant ».
+//
+// Le test : même sous-clé, valeurs contradictoires, valeur fraîche du côté frais,
+// PLUS une sous-clé que seul le côté périmé connaît. La fraîche doit gagner dans
+// les DEUX SENS, et la sous-clé orpheline doit survivre (sinon on aurait « remplacer
+// l'objet entier », qui perd ce que l'autre côté était seul à savoir).
+const OBJETS_PAR_CLE = [
+  { champ: "equipped",    sousCle: "hat",  frais: "h_FRAIS", perime: "h_PERIME", orpheline: ["armor", "a_PERIME"], extra: {} },
+  { champ: "settings",    sousCle: "calm", frais: true,      perime: false,      orpheline: ["fontScale", 1.3],    extra: {} },
+  { champ: "petNickname", sousCle: "p1",   frais: "Nom frais", perime: "Nom périmé", orpheline: ["p9", "Vieux"],  extra: {} },
+  // L'avatar n'entre dans la fusion par clé que si les DEUX côtés sont `configured`
+  // (le cas des 4 enfants de la prod) — sinon le verrou `configured` tranche avant.
+  { champ: "avatar",      sousCle: "eyes", frais: "ey_FRAIS", perime: "ey_PERIME", orpheline: ["mouth", "mo_PERIME"], extra: { configured: true } },
+];
+console.log("· objets fusionnés clé par clé — sur une sous-clé en collision, la fraîche doit gagner");
+for (const o of OBJETS_PAR_CLE) {
+  const objFrais  = { ...o.extra, [o.sousCle]: o.frais };
+  const objPerime = { ...o.extra, [o.sousCle]: o.perime, [o.orpheline[0]]: o.orpheline[1] };
+  if (same(objFrais[o.sousCle], objPerime[o.sousCle]))
+    fail(`fixture clé-par-clé « ${o.champ} » — la sous-clé « ${o.sousCle} » porte la MÊME valeur des `
+       + `deux côtés : il n'y a pas de collision, le contrôle ne surveille rien.`);
+  if (o.orpheline[0] in objFrais)
+    fail(`fixture clé-par-clé « ${o.champ} » — la sous-clé « ${o.orpheline[0] }» doit être connue du `
+       + `SEUL côté périmé, sinon le contrôle d'union ne prouve rien.`);
+  const fA = mkFam("2026-08-15T12:00:00.000Z", { ...gsA, [o.champ]: objFrais },  famA.config, plA);
+  const fB = mkFam("2026-08-14T12:00:00.000Z", { ...gsB, [o.champ]: objPerime }, famB.config, plB);
+  for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+    const rc = client.mergeFamily(base, inc).gameStates[0][o.champ];
+    const rs = server.mergeFamily(base, inc).gameStates[0][o.champ];
+    if (!same(rc, rs))
+      fail(`mergeFamily (${sens}) — gameStates[0].${o.champ} : client ≠ serveur (dérive entre les deux copies).`);
+    if (same(rc?.[o.sousCle], o.perime))
+      fail(`mergeFamily (${sens}) — gameStates[0].${o.champ}.${o.sousCle} : la sous-clé PÉRIMÉE a gagné. `
+         + `L'objet est fusionné clé par clé sans regarder \`preferIncoming\` : inverse l'ordre du spread `
+         + `quand la BASE est la plus fraîche (\`_byKey\`), dans src/merge.js ET server-merge.cjs.`);
+    if (!same(rc?.[o.orpheline[0]], o.orpheline[1]))
+      fail(`mergeFamily (${sens}) — gameStates[0].${o.champ}.${o.orpheline[0]} : la sous-clé que SEUL le `
+         + `côté périmé connaissait a disparu. La règle remplace l'objet entier au lieu de le fusionner `
+         + `clé par clé : le côté frais doit écraser, le côté périmé compléter.`);
+  }
+}
+
+// ── Verrou `configured` de l'avatar : une apparence non configurée ne gagne jamais ──
+// v2.16.79 — non-régression de la règle d'origine, que le correctif ci-dessus ne doit pas dissoudre :
+// un appareil FRAIS qui n'a pas encore fait l'onboarding avatar ne doit pas écraser l'apparence
+// configurée d'un appareil en retard (sinon une réinstallation efface le personnage de l'enfant).
+console.log("· avatar — une apparence NON configurée ne gagne jamais, même fraîche");
+{
+  const cfgOui = { configured: true, skin: "sk_CHOISI", eyes: "ey_CHOISI" };
+  const cfgNon = { configured: false, skin: "sk_DEFAUT" };
+  const fA = mkFam("2026-08-15T12:00:00.000Z", { ...gsA, avatar: cfgNon }, famA.config, plA); // FRAIS, pas configuré
+  const fB = mkFam("2026-08-14T12:00:00.000Z", { ...gsB, avatar: cfgOui }, famB.config, plB); // périmé, configuré
+  for (const [sens, base, inc] of [["non-configuré en base", fA, fB], ["non-configuré en incoming", fB, fA]]) {
+    for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const out = fn(base, inc).gameStates[0].avatar;
+      if (!same(out, cfgOui))
+        fail(`${nom} mergeFamily (${sens}) — gameStates[0].avatar : l'apparence NON configurée a gagné `
+           + `(${JSON.stringify(out)}). Le verrou \`configured\` doit passer avant la fraîcheur.`);
+    }
+  }
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

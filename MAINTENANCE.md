@@ -4,6 +4,52 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-17 (routine autonome, nuit, 20e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 173 725 octets, `savedAt` `2026-08-17T06:34:04Z`. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle** — la plus récente date toujours du **31 juillet**
+  (`bug_hlu9mkd`). Les 14 sont tracées, ici ou dans `PROJET-ETAT.md`, vérifié id par id.
+- `config.feed` : 60 entrées, dernier événement le **9 août**, aucun message signalant un problème.
+- **Aucune Phase 2.** 20e nuit propre d'affilée côté signalements.
+
+### ✅ Deux signalements d'enfants RÉSOLUS (v2.16.79), trouvés en Phase 3
+
+Les deux plus vieux signalements encore ouverts étaient **le même bug**, dans la couche de fusion —
+pas dans les composants d'avatar où ils étaient parqués depuis trois semaines.
+
+- **`bug_56gb01a`** (28 juillet, « je suis le gote ») — « je veut maitre un nouvaut masque mais il me
+  mais tougour un casque de chevalier ». → `gameStates[i].equipped` était fusionné `{...a, ...b}` :
+  chaque slot de l'incoming gagnait, **même périmé**. Dans la boucle de sync du client
+  (`mergeFamily(local, remote)`, App.jsx:2393) le nuage est en `b`, donc sa copie d'avant le push
+  debounced (~1,5 s) réécrasait le slot que l'enfant venait de changer. Le retrait est pire :
+  `onEquip` (App.jsx:2907) retire en posant `null`, donc la sous-clé existe des deux côtés.
+- **`bug_xcqtyr7`** (27 juillet, « D1TEXXY!!! ») — « Je clique sur changer les yeux, et ça ne marche
+  pas, ça reste pareil, c'est aussi comme ça pour quand je pèse sur l'option bouches du personnage ».
+  → `avatar` : le verrou `configured` court-circuitait la fraîcheur
+  (`b.avatar?.configured ? b.avatar : …`), donc quand les DEUX côtés sont configurés — **le cas des
+  4 enfants de la prod** — la copie du nuage gagnait EN BLOC.
+
+Deux autres champs de la même famille, non signalés mais bien réels : **`settings`** (mode calme,
+décompte calme, police lisible, une tâche à la fois, échelle de police, son, humour — les réglages
+d'accessibilité se rallumaient un par un après une synchro) et **`petNickname`** (renommer un
+familier déjà nommé ne tenait jamais).
+
+**Preuve** : rejeu des vrais modules du dépôt sur le vrai JSON de prod, lecture seule — **30 rouges**
+sur les 4 enfants réels, avec `house` et `coins` en témoins sains dans la même fixture ; 40/40 vertes
+après correctif, puis **99 vérifications de non-régression** sans une rouge. Détail complet dans
+l'entrée `v2.16.79` de `PROJET-ETAT.md`.
+
+**Leçon pour les prochains passages** : un signalement d'enfant qui décrit un écran (« l'avatar ne
+change pas ») n'est pas forcément un bug d'écran. Ces deux-là ont été classés « composant avatar,
+réserve de Gen » pendant trois semaines et bloquaient une réserve qui n'avait rien à voir. Avant de
+parquer un signalement sur un composant, vérifier si la donnée qu'il affiche survit à la synchro.
+
+---
+
 ## Passage du 2026-08-17 (routine autonome, nuit, 18e passage)
 
 ### 🌐 Lecture de l'API de production
