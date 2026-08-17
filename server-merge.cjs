@@ -280,20 +280,36 @@ const mergeFamily = (base, incoming) => {
   // propositions de tâche enfant→parent (v2.5.10) n'avaient AUCUNE règle ici — elles tombaient dans
   // le `{...bC, ...iC}` plus bas, où l'incoming écrase l'existant en entier. Un appareil poussant
   // une config sans la demande d'un enfant l'effaçait donc du nuage : le parent ne la voyait jamais.
+  // v2.16.80 — miroir du merge client : le « tombstone naturel » (`_rmSet`) ne couvre que
+  // l'APPROBATION d'une demande de retrait ; un REFUS ne touche pas à l'assignation, donc la demande
+  // refusée revenait par l'union à chaque synchro. Tombstone explicite, écrit par les deux branches.
+  const removedRemovalRequests = _uniq([...(bC.removedRemovalRequests||[]), ...(iC.removedRemovalRequests||[])]).slice(-400);
+  const _rmReq = new Set(removedRemovalRequests);
   const reqMap = new Map();
-  [...(bC.removalRequests||[]), ...(iC.removalRequests||[])].forEach(r => { if (r && r.id && !_rmSet.has(r.instanceId)) reqMap.set(r.id, r); });
+  [...(bC.removalRequests||[]), ...(iC.removalRequests||[])].forEach(r => { if (r && r.id && !_rmSet.has(r.instanceId) && !_rmReq.has(r.id)) reqMap.set(r.id, r); });
   const removedProposals = _uniq([...(bC.removedProposals||[]), ...(iC.removedProposals||[])]).slice(-800);
   const _rmProp = new Set(removedProposals);
+  // v2.16.80 — miroir du merge client : tombstones des deux listes du portail parent qui n'en avaient
+  // aucun (`announcements` : supprimer une annonce ne partait jamais ; `momentRequests` : une demande
+  // annulée par remboursement revenait, le « fantôme » que le commentaire v2.6.4 dit vouloir éviter).
+  const removedAnnouncements = _uniq([...(bC.removedAnnouncements||[]), ...(iC.removedAnnouncements||[])]).slice(-200);
+  const _rmAnn = new Set(removedAnnouncements);
+  const removedMomentRequests = _uniq([...(bC.removedMomentRequests||[]), ...(iC.removedMomentRequests||[])]).slice(-200);
+  const _rmMom = new Set(removedMomentRequests);
   const propMap = new Map();
   [...(bC.childTaskProposals||[]), ...(iC.childTaskProposals||[])].forEach(p => { if (p && p.id && !_rmProp.has(p.id)) propMap.set(p.id, p); });
   // v2.16.35 — miroir du merge client : invitations "en équipe" enfant→enfant, union-by-id + statut COLLANT
   const teamInvites = (() => { const m=new Map(); for (const inv of [...(bC.teamInvites||[]), ...(iC.teamInvites||[])]) { if (!inv||inv.id==null) continue; const prev=m.get(inv.id); if (!prev) m.set(inv.id,{ ...inv }); else if (prev.status==="pending"&&inv.status&&inv.status!=="pending") m.set(inv.id,{ ...inv }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(inv=>inv.status==="pending"||(inv.createdAt||0)>cut).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,40); })();
   const config = {
     ...bC, ...iC, players, assignments:[...assignMap.values()], removedAssignments, customTasks:[...taskMap.values()], removedCustomTasks, teamInvites,
-    removalRequests:[...reqMap.values()], childTaskProposals:[...propMap.values()], removedProposals,
+    removalRequests:[...reqMap.values()], removedRemovalRequests, childTaskProposals:[...propMap.values()], removedProposals,
     // v2.16.71 — miroir du merge client (v2.6.0) : les annonces du parent n'avaient pas de règle ici.
     // Union par id, 20 plus récentes, comme le client.
-    announcements: (() => { const m=new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    // v2.16.80 — plus le tombstone `removedAnnouncements` : sans lui, l'union RESSUSCITAIT toute
+    // annonce supprimée par le parent (et le serveur, qui met toujours sa copie en base, le faisait
+    // systématiquement — la suppression ne pouvait pas marcher).
+    removedAnnouncements,
+    announcements: (() => { const m=new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
     // v2.16.56 — miroir du merge client : récompenses cochées par le parent = DERNIÈRE ÉCRITURE GAGNE.
     // En union, aucun décochage ne survivait à une synchro. Une liste vide ne peut pas écraser une
     // liste réelle.
@@ -302,7 +318,12 @@ const mergeFamily = (base, incoming) => {
     // v2.6.0 — miroir du merge client : quêtes de réparation 🕊️, union-by-id exactly-once
     repairEvents: (() => { const m=new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
     // v2.6.2 — miroir du merge client : récompenses "moment" à planifier, union-by-id + statut MONOTONE
-    momentRequests: (() => { const rank={attente:0,planifie:1,fait:2}; const m=new Map(); for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) { if (!r||r.id==null) continue; const prev=m.get(r.id); if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id,r); else if ((rank[r.status]||0)===(rank[prev.status]||0) && r.plannedDate && !prev.plannedDate) m.set(r.id,r); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60); })(),
+    // v2.16.80 — miroir du merge client : (A) à statut ÉGAL la règle gardait la PREMIÈRE copie vue,
+    // donc la BASE, donc la copie du serveur : re-planifier la date d'un moment déjà « planifie » ne
+    // pouvait jamais être acceptée par le nuage (même défaut que `routines` avant la v2.16.70).
+    // (B) tombstone `removedMomentRequests` pour la demande annulée par remboursement.
+    removedMomentRequests,
+    momentRequests: (() => { const rank={attente:0,planifie:1,fait:2}; const m=new Map(); for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) { if (!r||r.id==null||_rmMom.has(r.id)) continue; const prev=m.get(r.id); if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id,r); else if ((rank[r.status]||0)===(rank[prev.status]||0)) { if (r.plannedDate && !prev.plannedDate) m.set(r.id,r); else if (!(prev.plannedDate && !r.plannedDate) && preferIncoming) m.set(r.id,r); } } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60); })(),
     coinOffers: (() => { const m=new Map(); for (const o of [...(bC.coinOffers||[]), ...(iC.coinOffers||[])]) { if (!o||o.id==null) continue; const prev=m.get(o.id); if (!prev) m.set(o.id,{ ...o }); else if (prev.status==="pending"&&o.status&&o.status!=="pending") m.set(o.id,{ ...o }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(o=>o.status==="pending"||(o.ts||0)>cut).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,40); })(),
     bugs: (() => { const m=new Map(); for (const x of [...(bC.bugs||[]), ...(iC.bugs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
     // v2.16.42 — miroir du merge client (merge.js, v1.90.0) qui MANQUAIT ici : les logs

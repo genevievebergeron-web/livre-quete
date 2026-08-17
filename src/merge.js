@@ -324,12 +324,28 @@ export const mergeFamily = (base, incoming) => {
   (iC.customTasks || []).forEach((t) => { if (_keepTask(t) && !taskMap.has(t.id)) taskMap.set(t.id, t); });
   // v1.83.0 (Lot 1 #B6) — demandes de retrait de tâche (enfant→parent) : union par id,
   // en retirant celles dont l'assignation visée a déjà été supprimée entretemps (tombstone naturel).
+  // v2.16.80 — ce « tombstone naturel » ne couvre QUE l'approbation : approuver retire l'assignation,
+  // donc son instanceId entre dans `removedAssignments` et la demande s'efface. REFUSER, lui, ne
+  // touche pas à l'assignation (c'est tout l'intérêt du refus) : `handleRefuseRemoval` (App.jsx ~3259)
+  // retirait la demande de la liste locale et RIEN ne l'empêchait de revenir par l'union. Côté serveur
+  // c'est systématique — `mergeFamily(existing, PUT)` remet toujours sa propre copie en base — donc la
+  // demande refusée réapparaissait dans le portail parent à la synchro suivante, indéfiniment, avec un
+  // toast « Demande de retrait refusée » qui n'avait jamais d'effet durable. Tombstone explicite, écrit
+  // par les DEUX branches (approbation et refus), même patron que `removedProposals` juste dessous.
+  const removedRemovalRequests = _uniq([...(bC.removedRemovalRequests || []), ...(iC.removedRemovalRequests || [])]).slice(-400);
+  const _rmReq = new Set(removedRemovalRequests);
   const reqMap = new Map();
-  [...(bC.removalRequests || []), ...(iC.removalRequests || [])].forEach((r) => { if (r && r.id && !_rmSet.has(r.instanceId)) reqMap.set(r.id, r); });
+  [...(bC.removalRequests || []), ...(iC.removalRequests || [])].forEach((r) => { if (r && r.id && !_rmSet.has(r.instanceId) && !_rmReq.has(r.id)) reqMap.set(r.id, r); });
   // v2.5.10 (Correctif 2C) — propositions de tâche enfant→parent : union par id, moins les tombstones
   // (approuvées ou refusées sur un appareil, ne doivent pas revenir via une copie pas encore synchronisée).
   const removedProposals = _uniq([...(bC.removedProposals || []), ...(iC.removedProposals || [])]).slice(-800);
   const _rmProp = new Set(removedProposals);
+  // v2.16.80 — tombstones des deux listes du portail parent qui n'en avaient aucun (voir `announcements`
+  // et `momentRequests` plus bas). Bornés comme les autres : ces listes sont déjà tronquées à 20 / 60.
+  const removedAnnouncements = _uniq([...(bC.removedAnnouncements || []), ...(iC.removedAnnouncements || [])]).slice(-200);
+  const _rmAnn = new Set(removedAnnouncements);
+  const removedMomentRequests = _uniq([...(bC.removedMomentRequests || []), ...(iC.removedMomentRequests || [])]).slice(-200);
+  const _rmMom = new Set(removedMomentRequests);
   const propMap = new Map();
   [...(bC.childTaskProposals || []), ...(iC.childTaskProposals || [])].forEach((p) => { if (p && p.id && !_rmProp.has(p.id)) propMap.set(p.id, p); });
   // v2.16.35 — Backlog #17 incrément 1 : invitations "en équipe" enfant→enfant — union par id, résolution
@@ -354,6 +370,7 @@ export const mergeFamily = (base, incoming) => {
     customTasks: [...taskMap.values()],
     removedCustomTasks,
     removalRequests: [...reqMap.values()],
+    removedRemovalRequests, // v2.16.80 — tombstone du REFUS, voir plus haut
     childTaskProposals: [...propMap.values()],
     removedProposals,
     teamInvites,
@@ -434,8 +451,18 @@ export const mergeFamily = (base, incoming) => {
       if (Array.isArray(o)) return o;
       return [];
     })(),
-    // v2.6.0 — annonces parent : union par id, 20 les plus récentes (suppression = tombstone via absence sur les deux côtés)
-    announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    // v2.6.0 — annonces parent : union par id, 20 les plus récentes.
+    // v2.16.80 — le commentaire d'origine disait « suppression = tombstone via absence sur les deux
+    // côtés » : c'est précisément ce qu'une union par id ne peut pas faire. `handleDeleteAnnouncement`
+    // (App.jsx ~2736) retire l'annonce de la liste locale, puis la fusion la RESSUSCITE depuis l'autre
+    // copie — et côté serveur `mergeFamily(existing, PUT)` a toujours l'ancienne liste en base, donc
+    // supprimer une annonce ne pouvait tout simplement PAS marcher, dans aucun sens. Même famille que
+    // `selectedRewards` (v2.16.56) et `customRewards` (v2.16.73), où l'union rendait le retrait
+    // impossible ; ici la sortie choisie est un tombstone plutôt qu'un dernière-écriture-gagne, parce
+    // qu'une annonce est CRÉÉE par un appareil et lue par les autres (une liste fraîche mais partielle
+    // ne doit pas effacer l'annonce qu'un autre appareil vient d'écrire).
+    removedAnnouncements,
+    announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
     // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — Lot 7 (semaine de garde) :
     // weeklyQuests n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}` ci-dessus
     // — iC (incoming) écrasait TOUJOURS bC, sans égard à la fraîcheur (même bug déjà corrigé pour
@@ -497,14 +524,35 @@ export const mergeFamily = (base, incoming) => {
     // v2.6.2 — récompenses "moment" à planifier avec le parent : union-by-id + progression MONOTONE
     // du statut (attente < planifie < fait) — après fusion multi-appareils, un statut ne recule jamais
     // (le parent a pu le marquer "Fait" sur un appareil pendant qu'un autre pousse encore "attente").
+    // v2.16.80 — DEUX défauts, tous deux invisibles aux garde-fous parce que rien ne met jamais deux
+    // copies du même ÉLÉMENT DE LISTE en collision sur des champs internes contradictoires.
+    // (A) RE-PLANIFIER une date ne tenait jamais. Le bouton « 📅 Prévu » (parentpanel.jsx ~565) reste
+    //     affiché tant que le parent n'a pas cliqué « ✔ Fait », et le champ date est pré-rempli avec
+    //     `m.plannedDate` : changer la date d'un moment déjà planifié est un geste normal et prévu.
+    //     Or à statut ÉGAL (« planifie » des deux côtés) la règle gardait `prev`, c'est-à-dire la
+    //     PREMIÈRE copie rencontrée, donc la BASE — et le serveur met toujours sa propre copie en base
+    //     (`mergeFamily(existing, PUT)`). Le nuage ne pouvait donc accepter aucune re-planification :
+    //     la date y restait figée à la première, exactement comme le contenu des rituels avant la
+    //     v2.16.70. Règle : le rang du statut reste MONOTONE (il ne recule jamais) ; à rang égal,
+    //     dernière-écriture-gagne (`preferIncoming`), comme `coins`/`pin`/`house`.
+    // (B) Une demande ANNULÉE revenait. Quand l'enfant se fait rembourser une récompense « moment »
+    //     encore en attente, `handleRefundReward` (App.jsx ~3569) la retire — le commentaire v2.6.4 dit
+    //     mot pour mot « sinon un fantôme reste pour toujours dans à planifier ». Sans tombstone,
+    //     l'union la ressuscitait et le fantôme restait quand même. Tombstone explicite.
+    removedMomentRequests,
     momentRequests: (() => {
       const rank = { attente:0, planifie:1, fait:2 };
       const m = new Map();
       for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) {
-        if (!r || r.id == null) continue;
+        if (!r || r.id == null || _rmMom.has(r.id)) continue;
         const prev = m.get(r.id);
         if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id, r);
-        else if ((rank[r.status]||0) === (rank[prev.status]||0) && r.plannedDate && !prev.plannedDate) m.set(r.id, r);
+        else if ((rank[r.status]||0) === (rank[prev.status]||0)) {
+          // Un côté a une date, l'autre pas : la date gagne (elle ne s'efface jamais toute seule).
+          // Sinon — le cas de la re-planification — c'est l'écriture la plus récente qui tranche.
+          if (r.plannedDate && !prev.plannedDate) m.set(r.id, r);
+          else if (!(prev.plannedDate && !r.plannedDate) && preferIncoming) m.set(r.id, r);
+        }
       }
       return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60);
     })(),

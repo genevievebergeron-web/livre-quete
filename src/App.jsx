@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.79";
+export const APP_VERSION = "2.16.80";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2732,8 +2732,13 @@ export default function App() {
     setConfig(newCfg); persist(newCfg, gameStates);
   },[config,gameStates,persist]);
   // v2.6.0 — suppression d'une annonce parent
+  // v2.16.80 — le retrait local ne suffisait pas : `announcements` se fusionne en union par id, donc
+  // l'annonce revenait de l'autre copie à la synchro suivante (et systématiquement côté serveur, qui
+  // met toujours son état stocké en base). Tombstone, comme pour les rituels et les propositions.
   const handleDeleteAnnouncement = useCallback((announcementId)=>{
-    const newCfg={...config, announcements:(config.announcements||[]).filter(a=>a.id!==announcementId)};
+    const newCfg={...config,
+      announcements:(config.announcements||[]).filter(a=>a.id!==announcementId),
+      removedAnnouncements:_uniq([...(config.removedAnnouncements||[]), announcementId]).slice(-200)};
     setConfig(newCfg); persist(newCfg, gameStates);
   },[config,gameStates,persist]);
   // v2.15.1 — renvoyer une annonce aux enfants qui l'ont fermée (copie ciblée, nouvel id —
@@ -3030,9 +3035,17 @@ export default function App() {
     const mr=(cfg.momentRequests||[]).find(m=>m.id===momentId); if(!mr) return;
     const idx=config.players.findIndex(p=>p.id===mr.playerId); if(idx<0) return;
     const calId=Date.now()+"_"+Math.random().toString(36).slice(2,6);
+    // v2.16.80 — RE-planifier (le bouton « 📅 Prévu » reste affiché tant que « ✔ Fait » n'est pas
+    // cliqué, et le champ date est pré-rempli avec la date déjà prévue) ajoutait un DEUXIÈME
+    // événement 🎁 sans retirer le premier : l'enfant voyait le même moment à deux dates. On déplace
+    // l'événement au lieu de l'empiler, et on tombstone l'ancien pour que le retrait survive à la
+    // synchro (`removedCalendarIds`, même mécanisme que la suppression d'un événement ordinaire).
+    const ancienCal=mr.calId ? String(mr.calId).replace(/^cal_/,"") : null;
     setGameStates(gs=>{ const n=[...gs];
       const e={ id:calId, type:"recompense", label:`${mr.emoji} ${mr.label}`, date, recur:null };
-      n[idx]={...n[idx], calendar:[...(n[idx].calendar||[]), e]};
+      const reste=(n[idx].calendar||[]).filter(c=>!ancienCal || c.id!==ancienCal);
+      n[idx]={...n[idx], calendar:[...reste, e],
+        removedCalendarIds:ancienCal ? _uniq([...(n[idx].removedCalendarIds||[]), ancienCal]).slice(-400) : (n[idx].removedCalendarIds||[])};
       const newCfg={...cfg, momentRequests:(cfg.momentRequests||[]).map(m=>m.id===momentId?{...m,status:"planifie",plannedDate:date,calId:"cal_"+calId}:m)};
       setConfig(newCfg);
       persist(newCfg,n);
@@ -3249,14 +3262,22 @@ export default function App() {
       assignments:(config.assignments||[]).filter(a=>a.instanceId!==req.instanceId),
       weeklyQuests:config.weeklyQuests?{...config.weeklyQuests,assignments:(config.weeklyQuests.assignments||[]).filter(a=>a.instanceId!==req.instanceId)}:config.weeklyQuests,
       removedAssignments:_uniq([...(config.removedAssignments||[]), req.instanceId]).slice(-800),
-      removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
+      removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId),
+      // v2.16.80 — la demande elle-même a son propre tombstone (l'assignation supprimée suffisait ici,
+      // mais pas dans la branche « refus » juste dessous : on écrit la même chose des deux côtés).
+      removedRemovalRequests:_uniq([...(config.removedRemovalRequests||[]), reqId]).slice(-400)};
     setConfig(newCfg); persist(newCfg,gameStates);
     logAction(`🗑️ Retrait approuvé: ${task?.label||req.instanceId}`,"#D99248");
     showToast("🗑️ Tâche retirée","#D99248");
   },[config,gameStates,persist,logAction,showToast]);
 
+  // v2.16.80 — le refus ne touche PAS à l'assignation (c'est tout son intérêt), donc il ne posait
+  // aucun tombstone : la demande refusée revenait dans le portail parent à chaque synchro, pour
+  // toujours. Le toast était le seul effet durable du bouton.
   const handleRefuseRemoval = useCallback((reqId)=>{
-    const newCfg={...config, removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
+    const newCfg={...config,
+      removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId),
+      removedRemovalRequests:_uniq([...(config.removedRemovalRequests||[]), reqId]).slice(-400)};
     setConfig(newCfg); persist(newCfg,gameStates);
     showToast("Demande de retrait refusée","#FF6464");
   },[config,gameStates,persist,showToast]);
@@ -3566,7 +3587,12 @@ export default function App() {
     // "planifie"/"fait" (le parent s'est déjà engagé) n'est JAMAIS effacée automatiquement.
     if(did && reward.moment){
       const cfg=cfgRef.current||config;
-      const newCfg={...cfg, momentRequests:(cfg.momentRequests||[]).filter(m=>!(m.playerId===playerId && m.rewardId===reward.id && m.status==="attente"))};
+      // v2.16.80 — sans tombstone, l'union par id ressuscitait la demande retirée ici : le « fantôme
+      // pour toujours dans à planifier » que ce bloc existe pour éviter revenait quand même.
+      const partis=(cfg.momentRequests||[]).filter(m=>m.playerId===playerId && m.rewardId===reward.id && m.status==="attente").map(m=>m.id);
+      const newCfg={...cfg,
+        momentRequests:(cfg.momentRequests||[]).filter(m=>!(m.playerId===playerId && m.rewardId===reward.id && m.status==="attente")),
+        removedMomentRequests:_uniq([...(cfg.removedMomentRequests||[]), ...partis]).slice(-200)};
       setConfig(newCfg); persist(newCfg,gameStates);
     }
     if(did) showToast("↩️ J'ai changé d'idée — pièces remises!","#D99248");

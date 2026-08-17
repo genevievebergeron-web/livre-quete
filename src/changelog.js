@@ -6,6 +6,12 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.80", date:"2026-08-17", features:[
+    "🗑️ Une annonce supprimée par ton parent revenait toute seule à la synchro suivante — en fait elle n'a jamais pu être supprimée pour de bon. C'est réglé : quand elle part, elle part.",
+    "🙅 Quand ton parent refusait ta demande « Je ne veux plus de cette tâche », la demande réapparaissait dans son portail à chaque synchro, encore et encore. Le refus tient maintenant.",
+    "🗓️ Un moment à planifier ensemble (sortie, activité) dont ton parent changeait la date : le nuage gardait la première date pour toujours, et ton calendrier finissait avec le même moment à deux dates différentes. La nouvelle date remplace maintenant l'ancienne, partout.",
+    "👻 Un moment déjà remboursé ne revient plus hanter la liste « à planifier » de ton parent.",
+  ]},
   { version:"2.16.79", date:"2026-08-17", features:[
     "🎭 « Je clique sur changer les yeux, et ça ne marche pas, ça reste pareil » — vous étiez deux à l'avoir signalé, pour les yeux, les bouches, et le casque de chevalier qui revenait toujours à la place du masque. Ce n'était pas l'écran du personnage : c'est la synchro qui remettait par-dessus l'apparence enregistrée dans le nuage, quelques secondes après ton changement. Ton personnage garde maintenant ce que tu lui mets.",
     "🎒 Pareil pour ce que tu portes (chapeau, armure, familier, thème) : équiper ou retirer un objet tient pour de bon, même si une autre tablette de la famille est en retard.",

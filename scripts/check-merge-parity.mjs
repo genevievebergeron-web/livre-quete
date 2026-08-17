@@ -528,6 +528,186 @@ console.log("· avatar — une apparence NON configurée ne gagne jamais, même 
   }
 }
 
+// ── LISTES fusionnées par `id` : le 4e étage, celui de l'ÉLÉMENT ───────────
+// v2.16.80 — les trois formes d'OBJET sont couvertes (plate v2.16.73/75/77, arbitrée en bloc
+// v2.16.78, fusionnée clé par clé v2.16.79). Rien ne regardait la 4e : le TABLEAU unionné par `id`.
+// Toutes les fixtures du fichier donnent deux ids DIFFÉRENTS de chaque côté (`an1`/`an2`,
+// `rq1`/`rq2`, `pr1`/`pr2`…) : l'union les concatène, le résultat diffère des deux entrées, et
+// TOUS les contrôles se taisent — parité comprise, les deux copies étant unionnaires de la même
+// façon. Deux familles de bugs vivaient exactement là, et le patron `routines` de la v2.16.70
+// était déjà l'une des deux (trouvée à la main, pas par un garde-fou).
+//
+// (1) COLLISION sur le même id — un élément MODIFIÉ EN PLACE. La règle « le premier vu gagne »
+//     rend la BASE, et le serveur met toujours sa propre copie en base : le nuage ne peut alors
+//     accepter aucune modification, jamais. C'est `routines` (v2.16.70) et `momentRequests`
+//     (re-planifier une date, v2.16.80).
+// (2) SUPPRESSION — un élément retiré d'un côté que l'union RESSUSCITE depuis l'autre. Une union
+//     par id ne peut pas exprimer un retrait : il faut un tombstone. Trois listes n'en avaient
+//     aucun (`announcements`, `removalRequests` refusée, `momentRequests` annulée, v2.16.80).
+//
+// Chaque liste doit se classer sur les DEUX axes, nominativement. Une liste non classée fait
+// échouer le contrôle de complétude plus bas : c'est lui la vraie valeur du garde-fou (un champ
+// ajouté demain ne peut plus passer sans que quelqu'un ait tranché ces deux questions).
+const LISTES = [
+  // ── config ──
+  { champ: "momentRequests", cle: "id", dans: "config",
+    frais:  { id: "mm1", status: "planifie", plannedDate: "2026-08-20", calId: "cal_2", createdAt: "2026-08-10" },
+    perime: { id: "mm1", status: "planifie", plannedDate: "2026-08-16", calId: "cal_1", createdAt: "2026-08-10" },
+    modifieEnPlace: true, // statut ET date réécrits par le portail parent (« 📅 Prévu », « ✔ Fait »)
+    tombstone: "removedMomentRequests", supprime: { id: "mmX", status: "attente", rewardId: "rw", playerId: "p1", createdAt: "2026-08-09" } },
+  { champ: "announcements", cle: "id", dans: "config",
+    frais:  { id: "aa1", text: "FRAIS", createdAt: "2026-08-15" },
+    perime: { id: "aa1", text: "périmé", createdAt: "2026-08-15" },
+    modifieEnPlace: "créée puis supprimée, jamais réécrite — « renvoyer » crée une COPIE à nouvel id (v2.15.1)",
+    tombstone: "removedAnnouncements", supprime: { id: "aaX", text: "supprimée par le parent", createdAt: "2026-08-11" } },
+  { champ: "removalRequests", cle: "id", dans: "config",
+    frais:  { id: "rr1", instanceId: "asZ", note: "FRAIS" },
+    perime: { id: "rr1", instanceId: "asZ", note: "périmé" },
+    modifieEnPlace: "écrite par l'enfant, consommée par le parent (approuver/refuser) — jamais modifiée",
+    tombstone: "removedRemovalRequests", supprime: { id: "rrX", instanceId: "asZ", note: "refusée par le parent" } },
+  { champ: "assignments", cle: "instanceId", dans: "config",
+    frais:  { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2] },
+    perime: { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0] },
+    modifieEnPlace: "ajoutée ou retirée en entier ; le report des récurrentes (carryOverUnfinishedTasks) ne réécrit QUE `weeklyQuests.assignments`, couvert par OBJETS_ARBITRES",
+    tombstone: "removedAssignments", supprime: { instanceId: "azX", taskId: "tkZ", playerIds: ["p1"], days: [3] } },
+  { champ: "customTasks", cle: "id", dans: "config",
+    frais:  { id: "cz1", label: "FRAIS" }, perime: { id: "cz1", label: "périmé" },
+    modifieEnPlace: "créée puis supprimée ; aucun écran ne réécrit une tâche perso existante",
+    tombstone: "removedCustomTasks", supprime: { id: "czX", label: "supprimée" } },
+  { champ: "childTaskProposals", cle: "id", dans: "config",
+    frais:  { id: "pz1", label: "FRAIS" }, perime: { id: "pz1", label: "périmé" },
+    modifieEnPlace: "écrite par l'enfant, consommée par le parent — jamais modifiée",
+    tombstone: "removedProposals", supprime: { id: "pzX", label: "consommée" } },
+  { champ: "feed", cle: "id", dans: "config",
+    frais:  { id: "fz1", ts: 5, text: "FRAIS", likes: ["p1"] },
+    perime: { id: "fz1", ts: 5, text: "périmé", likes: ["p2"] },
+    modifieEnPlace: "seuls les `likes` bougent, et ils s'unionnent (règle explicite) — le texte est figé à l'écriture",
+    sansSuppression: "journal d'événements : aucun écran n'efface une entrée (troncature à 60)" },
+  { champ: "bugs", cle: "id", dans: "config",
+    frais: { id: "bz1", ts: 5, text: "FRAIS" }, perime: { id: "bz1", ts: 5, text: "périmé" },
+    modifieEnPlace: "signalement figé à l'envoi par l'enfant",
+    sansSuppression: "aucun bouton ne supprime un signalement (troncature à 60)" },
+  { champ: "errorLogs", cle: "id", dans: "config",
+    frais: { id: "ez1", ts: 5, msg: "FRAIS" }, perime: { id: "ez1", ts: 5, msg: "périmé" },
+    modifieEnPlace: "trace technique figée à la capture",
+    sansSuppression: "aucun bouton ne vide le journal (troncature à 80)" },
+  { champ: "repairEvents", cle: "id", dans: "config",
+    frais: { id: "rz1", ts: 5, v: "FRAIS" }, perime: { id: "rz1", ts: 5, v: "périmé" },
+    modifieEnPlace: "événement exactly-once, figé à l'écriture",
+    sansSuppression: "journal collectif, aucune suppression (troncature à 100)" },
+  { champ: "teamInvites", cle: "id", dans: "config",
+    frais: { id: "tz1", status: "pending", createdAt: 2, note: "FRAIS" },
+    perime: { id: "tz1", status: "pending", createdAt: 2, note: "périmé" },
+    modifieEnPlace: "seul le `status` bouge, et sa résolution est COLLANTE par choix (v2.16.35) — une règle de fraîcheur la casserait",
+    sansSuppression: "péremption automatique à 2 jours une fois résolue" },
+  { champ: "coinOffers", cle: "id", dans: "config",
+    frais: { id: "oz1", status: "pending", ts: 2, note: "FRAIS" },
+    perime: { id: "oz1", status: "pending", ts: 2, note: "périmé" },
+    modifieEnPlace: "même règle collante que teamInvites",
+    sansSuppression: "péremption automatique à 2 jours une fois résolue" },
+  { champ: "customRewards", cle: "id", dans: "config",
+    modifieEnPlace: "liste ENTIÈRE en dernière-écriture-gagne depuis la v2.16.73 — pas une union par id",
+    sansSuppression: "le retrait passe par le remplacement de la liste entière (v2.16.73)" },
+  { champ: "updateFeedEntries", cle: "version", dans: "config",
+    modifieEnPlace: "reconstruit à chaque chargement depuis CHANGELOG (dedupeUpdateFeed)",
+    sansSuppression: "reconstruit au chargement — une union le regonflerait (incident des ~5127 entrées, v2.5.29)" },
+  { champ: "players", cle: "id", dans: "config",
+    modifieEnPlace: "fusionné champ par champ par `_mergePlayer` — trois contrôles dédiés plus haut",
+    sansSuppression: "un joueur ne se supprime pas depuis l'app" },
+  // ── gameStates ──
+  { champ: "routines", cle: "id", dans: "gameStates",
+    frais:  { id: "rtz", name: "FRAIS", tasks: ["a", "b"] },
+    perime: { id: "rtz", name: "périmé", tasks: ["a"] },
+    modifieEnPlace: true, // renommer / changer l'émoji / ajouter une quête (v2.16.70)
+    tombstone: "removedRoutineIds", cleTombstone: "id", supprime: { id: "rtX", name: "rituel supprimé", tasks: [] } },
+  { champ: "calendar", cle: "id", dans: "gameStates",
+    // Arbitré par `updatedAt` (v2.7.0), pas par la fraîcheur de la famille : le plus grand va donc
+    // du côté frais, même règle de cohérence que pour `gsA`/`gsB` plus haut.
+    frais:  { id: "cvz", updatedAt: 9, title: "FRAIS" },
+    perime: { id: "cvz", updatedAt: 5, title: "périmé" },
+    modifieEnPlace: true, // modifier un événement du calendrier
+    tombstone: "removedCalendarIds", cleTombstone: "id", supprime: { id: "cvX", updatedAt: 3, title: "événement supprimé" } },
+  { champ: "pendingCelebrations", cle: "id", dans: "gameStates",
+    frais: { id: "pcz", label: "FRAIS" }, perime: { id: "pcz", label: "périmé" },
+    modifieEnPlace: "file consommable : une célébration est écrite puis consommée, jamais réécrite",
+    tombstone: "consumedCelebrationIds", cleTombstone: "id", supprime: { id: "pcX", label: "déjà fêtée" } },
+  { champ: "xpLog", cle: "id", dans: "gameStates",
+    modifieEnPlace: "fusionné par `mergeXpLog` (union par id + multiplicité MAX, v2.16.65) — entrée figée à l'écriture",
+    sansSuppression: "journal d'XP, aucune suppression (réparation des journaux gonflés seulement)" },
+];
+
+// Injecte une liste dans une copie famille, en gardant tout le reste intact.
+const avecListe = (savedAt, gsBase, cfgBase, pl, l, elems, cfgPlus = {}, gsPlus = {}) =>
+  l.dans === "config"
+    ? mkFam(savedAt, gsBase, { ...cfgBase, [l.champ]: elems, ...cfgPlus }, pl)
+    : mkFam(savedAt, { ...gsBase, [l.champ]: elems, ...gsPlus }, { ...cfgBase, ...cfgPlus }, pl);
+const litListe = (fam, l) => (l.dans === "config" ? fam.config[l.champ] : fam.gameStates[0][l.champ]) || [];
+
+console.log("· listes par id — complétude : toute liste d'objets doit être classée");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const declarees = new Set(LISTES.map((l) => `${l.dans}.${l.champ}`));
+  const scan = (obj, dans) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!Array.isArray(v) || !v.length) continue;
+      if (typeof v[0] !== "object" || v[0] === null || Array.isArray(v[0])) continue;
+      if (!declarees.has(`${dans}.${k}`))
+        fail(`liste « ${dans}.${k} » non classée : c'est un tableau d'objets fusionné par id, mais rien `
+           + `ne dit (a) si ses éléments sont MODIFIÉS EN PLACE — auquel cas la copie fraîche doit gagner `
+           + `sur le même id — ni (b) comment une SUPPRESSION s'exprime (tombstone, ou « pas de `
+           + `suppression »). Ajoute-la à LISTES dans scripts/check-merge-parity.mjs.`);
+    }
+  };
+  scan(fusion.config, "config");
+  scan(fusion.gameStates[0], "gameStates");
+}
+
+console.log("· listes par id — sur le même id, le contenu FRAIS doit gagner");
+for (const l of LISTES) {
+  if (l.modifieEnPlace !== true) continue;
+  if (same(l.frais, l.perime))
+    fail(`fixture liste « ${l.champ} » — les deux copies de l'élément sont identiques : pas de collision, le contrôle ne surveille rien.`);
+  if (l.frais[l.cle] !== l.perime[l.cle])
+    fail(`fixture liste « ${l.champ} » — les deux copies portent des « ${l.cle} » DIFFÉRENTS : l'union `
+       + `les concatène et le contrôle ne teste rien. Mets le même id des deux côtés.`);
+  const fA = avecListe("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, [l.frais]);
+  const fB = avecListe("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [l.perime]);
+  for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+    const rc = litListe(client.mergeFamily(base, inc), l), rs = litListe(server.mergeFamily(base, inc), l);
+    if (!same(rc, rs)) fail(`mergeFamily (${sens}) — ${l.dans}.${l.champ} : client ≠ serveur (dérive entre les deux copies).`);
+    const el = rc.find((e) => e && e[l.cle] === l.frais[l.cle]);
+    if (same(el, l.perime))
+      fail(`mergeFamily (${sens}) — ${l.dans}.${l.champ}[${l.cle}=${l.frais[l.cle]}] : la copie PÉRIMÉE de `
+         + `l'élément a gagné. L'union garde « le premier vu », donc la BASE — et le serveur met toujours `
+         + `sa propre copie en base : le nuage ne peut accepter AUCUNE modification de cet élément. `
+         + `Arbitre le contenu par \`preferIncoming\`, dans src/merge.js ET server-merge.cjs.`);
+  }
+}
+
+console.log("· listes par id — un tombstone doit vraiment retirer l'élément, dans les deux sens");
+for (const l of LISTES) {
+  if (!l.tombstone) {
+    if (!l.sansSuppression) fail(`liste « ${l.champ} » — ni \`tombstone\` ni \`sansSuppression\` : classe-la.`);
+    continue;
+  }
+  const marque = l.supprime[l.cleTombstone || l.cle];
+  // L'élément est présent des DEUX côtés ; seul le côté frais porte le tombstone. Sans lui, l'union
+  // le ramène : c'est exactement ce qui se passait pour les trois listes du portail parent.
+  const posé = l.dans === "config" ? { [l.tombstone]: [marque] } : {};
+  const gsPlus = l.dans === "gameStates" ? { [l.tombstone]: [marque] } : {};
+  const fA = avecListe("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, [l.supprime], posé, gsPlus);
+  const fB = avecListe("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [l.supprime]);
+  for (const [sens, base, inc] of [["tombstone en base", fA, fB], ["tombstone en incoming", fB, fA]]) {
+    for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const out = litListe(fn(base, inc), l);
+      if (out.some((e) => e && e[l.cle] === l.supprime[l.cle]))
+        fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.champ} : l'élément « ${l.supprime[l.cle]} » est `
+           + `tombstoné dans \`${l.tombstone}\` mais l'union le RESSUSCITE depuis l'autre copie. `
+           + `Applique le tombstone dans src/merge.js ET server-merge.cjs.`);
+    }
+  }
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
