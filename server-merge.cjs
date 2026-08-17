@@ -227,9 +227,16 @@ const mergeGS = (a, b, preferIncoming) => {
   };
 };
 // v1.66.0 (fix B2) : pseudo / themeId / themeChosenAt en DERNIÈRE-ÉCRITURE-GAGNE (preferIncoming)
+// v2.16.77 : `name`/`color` en dernière-écriture-gagne (ils étaient restés en base-gagne-toujours,
+// donc un renommage ne survivait jamais au merge serveur) ; `morningLock`/`dailyMinutesLimit`
+// (contrôles parentaux) avaient AUCUNE règle et retombaient sur le spread `{...a,...b}`, donc
+// « l'incoming gagne toujours », même périmé. Arbitrage par PRÉSENCE de la clé : `null` (= aucune
+// limite) est une valeur choisie par le parent. Miroir exact de `src/merge.js`.
 const _mergePlayer = (a, b, preferIncoming = false) => {
   const w = preferIncoming ? b : a, o = preferIncoming ? a : b;
-  return { ...a, ...b, name:a.name||b.name, color:a.color||b.color,
+  const frais = (k) => (k in w ? w[k] : o[k]);
+  return { ...a, ...b, name:w.name||o.name, color:w.color||o.color,
+    morningLock: frais("morningLock"), dailyMinutesLimit: frais("dailyMinutesLimit"),
     pseudo: w.pseudo || o.pseudo,
     themeId:(w.themeId && w.themeId!=="none") ? w.themeId : (o.themeId && o.themeId!=="none") ? o.themeId : (w.themeId||o.themeId||"none"),
     themeChosenAt: w.themeChosenAt || o.themeChosenAt,

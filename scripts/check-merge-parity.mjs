@@ -141,11 +141,33 @@ for (const [la, a, lb, b] of [["A", gsA, "B", gsB], ["B", gsB, "A", gsA]]) {
 }
 
 // ── Instantanés famille complets ───────────────────────────────────────────
-const mkFam = (savedAt, gs, cfgExtra) => ({
+// v2.16.77 — les champs de `config.players[i]` (fusionnés par `_mergePlayer`) n'avaient AUCUN
+// contrôle : le joueur était une fixture STRUCTURELLE, identique des deux côtés, donc tout ce qui
+// suit l'écartait par « rien à départager ». C'est la même forme de code et la même famille de bug
+// qu'un cran au-dessus, et elle cachait quatre champs fautifs (`name`, `color`, `morningLock`,
+// `dailyMinutesLimit`). Le joueur se contredit donc maintenant sur CHAQUE champ, `id` excepté —
+// c'est la clé de rapprochement de `mergeFamily`, elle doit rester identique.
+// Cohérence de fraîcheur, même règle que pour `gsA`/`gsB` : `plA` va dans `famA` (la copie fraîche),
+// donc il porte les valeurs les plus récentes.
+const plA = {
+  id: "p1", name: "Test A", color: "#fff", pseudo: "T-A",
+  themeId: "foret", themeChosenAt: "2026-08-15T10:00:00.000Z", starterThemes: ["lego"],
+  morningLock: { enabled: true, start: "06:00", end: "09:00" },
+  dailyMinutesLimit: 45,
+};
+const plB = {
+  id: "p1", name: "Test B", color: "#000", pseudo: "T-B",
+  themeId: "kpop", themeChosenAt: "2026-08-14T10:00:00.000Z", starterThemes: ["marvel"],
+  morningLock: { enabled: false, start: "07:00", end: "10:00" },
+  dailyMinutesLimit: null, // `null` est une VALEUR (« aucune limite »), pas une absence
+};
+memeValeur(plA, plB, "players[0]", { id: "clé de rapprochement de mergeFamily" });
+
+const mkFam = (savedAt, gs, cfgExtra, pl) => ({
   savedAt,
   gameStates: [gs],
   config: {
-    players: [{ id: "p1", name: "Test", color: "#fff", themeId: "foret", pseudo: "T" }],
+    players: [pl],
     assignments: [{ instanceId: "as1", taskId: "tk1", playerIds: ["p1"], days: [1] }],
     removedAssignments: [], customTasks: [{ id: "tk1", label: "Tâche" }], removedCustomTasks: [],
     pin: "1146", mode: "routine", routineEnd: "08:30",
@@ -168,7 +190,7 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   boss: { startedAt: "2026-08-01", hp: 100, lastHitTs: "2026-08-14T10:00:00.000Z", defeatedAt: "2026-08-14T20:00:00.000Z" },
   weeklyQuests: { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] },
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
-});
+}, plA);
 const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B" }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
@@ -182,13 +204,14 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   boss: { startedAt: "2026-08-01", hp: 60, lastHitTs: "2026-08-15T10:00:00.000Z" },
   weeklyQuests: { generatedForWeek: "2026-08-07", assignments: [{ instanceId: "wq2", taskId: "tk1", playerIds: ["p1"], days: [1] }] },
   weeklyChallenge: { weekKey: "2026-08-07", challenges: [{ playerId: "p1", text: "B", checkins: { "2026-08-07": true } }] },
-});
+}, plB);
 
 memeValeur(famA.config, famB.config, "config", {
   // Structurels, volontairement identiques : ce sont les supports sur lesquels les
-  // autres champs s'accrochent (un joueur `p1`, une assignation `as1`, sa tâche
-  // `tk1`), pas des champs dont la fusion est en jeu ici.
-  players: 1, assignments: 1, customTasks: 1, removedAssignments: 1, removedCustomTasks: 1,
+  // autres champs s'accrochent (une assignation `as1`, sa tâche `tk1`), pas des champs
+  // dont la fusion est en jeu ici. (`players` n'en fait plus partie depuis la v2.16.77 :
+  // il se contredit champ par champ et son contrôle dédié est plus bas.)
+  assignments: 1, customTasks: 1, removedAssignments: 1, removedCustomTasks: 1,
   pin: 1, mode: 1, routineEnd: 1,
   // Volontairement vides des deux côtés : rien à départager par construction, la
   // parité champ par champ ci-dessus reste leur contrôle.
@@ -299,6 +322,64 @@ for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.merg
       fail(`${nom} mergeFamily(frais, périmé) — gameStates[0].${k} : la copie PÉRIMÉE a gagné `
          + `(${JSON.stringify(perime[k])}). Ce champ n'a pas de règle de fusion : ajoute-la dans `
          + `src/merge.js ET server-merge.cjs, ou inscris-le dans NAIF_ASSUME_GS avec sa raison.`);
+  }
+}
+
+// ── Champs de players[] sans règle de fusion ───────────────────────────────
+// v2.16.77 — troisième étage du même contrôle, après `config` (v2.16.73) et
+// `gameStates` (v2.16.75). `_mergePlayer` finit par `{ ...a, ...b }` comme les deux
+// autres : tout champ joueur sans règle explicite rend la valeur de l'incoming, y
+// compris quand l'incoming est PÉRIMÉ. Quatre champs y étaient : `morningLock` et
+// `dailyMinutesLimit` (aucune règle du tout) et `name`/`color` (règle `a.X || b.X`,
+// donc « la base gagne toujours » — le côté serveur met TOUJOURS sa propre copie en
+// base, donc un renommage ne survivait jamais).
+console.log("· _mergePlayer — parité client/serveur, dans les deux sens et les deux préférences");
+for (const [la, a, lb, b] of [["A", plA, "B", plB], ["B", plB, "A", plA]]) {
+  for (const pref of [true, false]) {
+    const rc = client._mergePlayer(a, b, pref), rs = server._mergePlayer(a, b, pref);
+    for (const k of new Set([...Object.keys(rc), ...Object.keys(rs)])) {
+      if (!same(rc[k], rs[k]))
+        fail(`_mergePlayer(${la},${lb},preferIncoming=${pref}) — champ « ${k} » : client ${JSON.stringify(rc[k])} ≠ serveur ${JSON.stringify(rs[k])}`);
+    }
+  }
+}
+
+// L'exemption est nominative et doit se justifier — pas une liste fourre-tout.
+const NAIF_ASSUME_PL = {
+  // Union bornée des deux côtés (tirage aléatoire fait UNE fois à la création du joueur,
+  // sur un `id` unique : deux appareils ne peuvent pas en produire deux listes rivales).
+  // Le résultat contient les deux valeurs, donc il n'est jamais « exactement le périmé » —
+  // l'exemption ne masque rien, elle documente pourquoi ce champ ne peut pas crier.
+  starterThemes: "union bornée, le résultat contient déjà la valeur fraîche",
+};
+
+console.log("· _mergePlayer — un champ périmé ne doit jamais gagner sur un champ frais");
+for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+  const out = fn(famA, famB).config.players[0]; // famA = la plus fraîche, famB = l'incoming périmé
+  for (const k of Object.keys(plB)) {
+    if (same(plA[k], plB[k])) continue;          // rien à départager
+    if (NAIF_ASSUME_PL[k]) continue;
+    if (same(out[k], plB[k]))
+      fail(`${nom} mergeFamily(frais, périmé) — players[0].${k} : la copie PÉRIMÉE a gagné `
+         + `(${JSON.stringify(plB[k])}). Ce champ n'a pas de règle de fusion : ajoute-la dans `
+         + `src/merge.js ET server-merge.cjs, ou inscris-le dans NAIF_ASSUME_PL avec sa raison.`);
+  }
+}
+
+// Le sens inverse compte autant : le serveur appelle `mergeFamily(sa copie, le PUT)`, donc la
+// copie fraîche arrive en INCOMING dès qu'un appareil pousse quelque chose de neuf. Un champ
+// bloqué en « la base gagne toujours » (le défaut de `name`/`color` avant la v2.16.77) passe le
+// contrôle ci-dessus sans broncher et échoue ici.
+console.log("· _mergePlayer — le frais doit gagner AUSSI quand il arrive en incoming");
+for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+  const out = fn(famB, famA).config.players[0]; // famB = base périmée, famA = incoming frais
+  for (const k of Object.keys(plA)) {
+    if (same(plA[k], plB[k])) continue;
+    if (NAIF_ASSUME_PL[k]) continue;
+    if (same(out[k], plB[k]))
+      fail(`${nom} mergeFamily(périmé, frais) — players[0].${k} : la copie PÉRIMÉE a gagné `
+         + `(${JSON.stringify(plB[k])}) alors que la fraîche arrivait en incoming. Règle bloquée `
+         + `en « la base gagne toujours » — passe-la en dernière-écriture-gagne (\`w\`/\`o\`).`);
   }
 }
 

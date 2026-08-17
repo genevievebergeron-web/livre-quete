@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.77", date:"2026-08-17", features:[
+    "✏️ Changer le nom ou la couleur d'un enfant dans le livre ne tenait pas : la modification repartait, puis l'ancien nom revenait tout seul à la synchro suivante. Corrigé — c'est maintenant la dernière modification qui gagne, comme pour le pseudo.",
+    "🚪 Le verrou du matin et le budget-temps quotidien (réglages parent) pouvaient se remettre tout seuls à leur ancienne valeur : un appareil resté en retard imposait son vieux réglage à tout le monde. Ce que le parent règle en dernier tient maintenant partout.",
+  ] },
   { version:"2.16.76", date:"2026-08-16", features:[
     "🎁 Quand tu rangeais une récompense de la boutique pour en faire apparaître une autre, elle revenait toute seule quelques secondes plus tard. Et à l'inverse, de vieilles récompenses rangées il y a des semaines pouvaient disparaître d'un coup de ta boutique du jour, sans que tu y touches. Les deux sont réglés : ce que tu ranges reste rangé pour la journée, et rien d'autre ne bouge.",
     "⏰ Le rituel que tu choisis (☀️ Matin, 🌙 Soir…) et ta bascule « 📋 Mes tâches / ⏰ Rituels » pouvaient être remis à l'ancien choix par un autre appareil de la maison resté en retard. Maintenant c'est toujours le choix le plus récent qui gagne, c'est-à-dire le tien.",

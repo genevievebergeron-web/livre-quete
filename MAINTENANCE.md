@@ -4,6 +4,27 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-17 (routine autonome, nuit, 18e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK — 172 775 octets, `savedAt` `2026-08-17T02:30:08Z` (l'app a resservi la nuit même).
+  **Aucune écriture.**
+
+### 🐛 Bugs traités
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle** — la plus récente date toujours du **31 juillet**
+  (`bug_hlu9mkd`). Les 14 sont déjà tracées, ici et dans `PROJET-ETAT.md`.
+- `config.feed` : aucun message d'enfant signalant un problème depuis le dernier passage.
+- **Aucune Phase 2.** 18e nuit propre d'affilée côté signalements.
+
+### 🔎 Ce que le passage a trouvé quand même (Phase 3)
+Le bug de la nuit n'a pas été signalé par personne : il a été trouvé en suivant la piste que la
+v2.16.76 avait laissée écrite — *le garde-fou de fusion ne regarde ni `config.players` ni
+`_mergePlayer`*. Quatre champs joueur y étaient fautifs (`morningLock`, `dailyMinutesLimit`,
+`name`, `color`) : détail complet dans l'entrée v2.16.77 de `PROJET-ETAT.md`.
+
+---
+
 ## Passage du 2026-08-15 (routine autonome, nuit, 15e passage)
 
 ### 🌐 Lecture de l'API de production

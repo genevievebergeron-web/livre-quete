@@ -232,12 +232,24 @@ export const mergeGS = (a, b, preferIncoming) => {
 // v1.66.0 (fix B2) : pseudo / themeId / themeChosenAt en DERNIÈRE-ÉCRITURE-GAGNE
 // (preferIncoming = la copie entrante est plus récente). Avant, la base gagnait
 // toujours → le pseudo changé par l'enfant « revenait » à sa prochaine sync.
+// v2.16.77 : `name` et `color` étaient restés en BASE-GAGNE-TOUJOURS (`a.X || b.X`) alors que le
+// reste passait en dernière-écriture-gagne — exactement le bug que la v1.66.0 décrit pour `pseudo`,
+// laissé sur deux champs. Côté serveur, `mergeFamily(existant, PUT)` met TOUJOURS la copie du
+// serveur en `a` : renommer un enfant ou changer sa couleur ne survivait donc jamais au premier
+// aller-retour. `morningLock` et `dailyMinutesLimit` (contrôles parentaux, `gating.js`) n'avaient
+// eux AUCUNE règle : ils retombaient sur le spread `{...a, ...b}`, donc « l'incoming gagne
+// toujours », donc une tablette en retard rouvrait la boutique et rendait le budget-temps périmé.
+// `dailyMinutesLimit` s'arbitre par PRÉSENCE de la clé, pas par véracité : `null` (= aucune limite)
+// est une valeur choisie par le parent, qu'un `||` ou un `??` écraserait par l'ancienne limite.
 export const _mergePlayer = (a, b, preferIncoming = false) => {
   const w = preferIncoming ? b : a, o = preferIncoming ? a : b; // w = écriture la plus récente
+  const frais = (k) => (k in w ? w[k] : o[k]);
   return {
     ...a, ...b,
-    name: a.name || b.name,
-    color: a.color || b.color,
+    name: w.name || o.name,
+    color: w.color || o.color,
+    morningLock: frais("morningLock"),
+    dailyMinutesLimit: frais("dailyMinutesLimit"),
     pseudo: w.pseudo || o.pseudo,
     themeId: (w.themeId && w.themeId !== "none") ? w.themeId
            : (o.themeId && o.themeId !== "none") ? o.themeId
