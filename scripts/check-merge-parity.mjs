@@ -383,6 +383,79 @@ for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.merg
   }
 }
 
+// ── Champs-OBJETS : le contrôle qui regarde À L'INTÉRIEUR ──────────────────
+// v2.16.78 — les trois étages ci-dessus ne testent que des champs PLATS, et ils
+// comparent des fixtures dont la CLÉ D'ARBITRAGE diffère (famA/famB ont deux
+// semaines de garde différentes, deux `weekKey` différents). Or plusieurs champs
+// sont des objets arbitrés EN BLOC sur une seule de leurs clés — et la vraie vie,
+// c'est justement l'égalité : pendant les 7 jours d'une semaine de garde,
+// `generatedForWeek` ne bouge pas d'un pouce pendant que `assignments`, lui, est
+// réécrit (report des tâches manquées, ménage des orphelines). À clé ÉGALE, une
+// règle « la base gagne » ou « l'incoming gagne » rend l'objet entier d'un côté :
+// la sous-clé que l'autre côté était seul à connaître est perdue, en silence, et
+// aucun contrôle existant ne pouvait le voir — les deux copies étant d'accord
+// (parité verte) et la clé d'arbitrage n'étant jamais mise à égalité.
+// C'est ce trou qui a caché `weeklyQuests` pendant toute la vie du Lot 7.
+//
+// Le test : clé d'arbitrage IDENTIQUE des deux côtés, sous-clé contradictoire,
+// valeur fraîche du côté frais. La sous-clé fraîche doit survivre DANS LES DEUX
+// SENS (le serveur reçoit le frais en incoming, le client l'a en base).
+const OBJETS_ARBITRES = [
+  {
+    champ: "weeklyQuests", cle: "generatedForWeek", sousCle: "assignments",
+    // Écriture réelle : `carryOverUnfinishedTasks` (App.jsx ~2569) reporte à aujourd'hui une
+    // récurrente manquée en réécrivant `days`, sans jamais toucher `generatedForWeek`.
+    frais: { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0, 2] }] },
+    perime: { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] },
+  },
+  {
+    champ: "weeklyChallenge", cle: "weekKey", sousCle: "challenges",
+    // Le parent peut réécrire le texte du défi en cours de semaine ; les `checkins` s'unionnent.
+    frais: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "Défi RÉÉCRIT", checkins: { "2026-08-14": true } }] },
+    perime: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "Défi d'origine", checkins: { "2026-08-14": true } }] },
+  },
+];
+console.log("· champs-objets — à clé d'arbitrage ÉGALE, une sous-clé fraîche ne doit pas être perdue");
+for (const o of OBJETS_ARBITRES) {
+  if (same(o.frais, o.perime))
+    fail(`fixture champ-objet « ${o.champ} » — les deux copies sont identiques : le contrôle ne surveille rien.`);
+  if (!same(o.frais[o.cle], o.perime[o.cle]))
+    fail(`fixture champ-objet « ${o.champ} » — la clé d'arbitrage « ${o.cle} » DIFFÈRE entre les deux `
+       + `copies : c'est le cas déjà couvert plus haut. Mets-la à ÉGALITÉ, sinon ce contrôle ne teste rien.`);
+  const fA = mkFam("2026-08-15T12:00:00.000Z", gsA, { ...famA.config, [o.champ]: o.frais }, plA);
+  const fB = mkFam("2026-08-14T12:00:00.000Z", gsB, { ...famB.config, [o.champ]: o.perime }, plB);
+  for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+    const rc = client.mergeFamily(base, inc).config[o.champ];
+    const rs = server.mergeFamily(base, inc).config[o.champ];
+    if (!same(rc, rs))
+      fail(`mergeFamily (${sens}) — config.${o.champ} : client ≠ serveur (dérive entre les deux copies).`);
+    if (same(rc[o.sousCle], o.perime[o.sousCle]))
+      fail(`mergeFamily (${sens}) — config.${o.champ}.${o.sousCle} : la sous-clé PÉRIMÉE a gagné alors `
+         + `que « ${o.cle} » est identique des deux côtés. L'objet est arbitré EN BLOC sans regarder `
+         + `dedans : passe l'égalité en dernière-écriture-gagne (\`preferIncoming\`) dans src/merge.js `
+         + `ET server-merge.cjs, ou fusionne la sous-clé explicitement.`);
+  }
+}
+
+// ── Tombstone d'assignation : il doit mordre DANS `weeklyQuests` aussi ──────
+// v2.16.78 — `removedAssignments` protégeait `config.assignments` depuis toujours, mais pas les
+// assignations vivant dans `weeklyQuests.assignments`. Pendant une semaine de garde, l'enfant voit
+// pourtant les deux listes confondues et peut demander le retrait de n'importe laquelle.
+console.log("· tombstone removedAssignments — doit retirer aussi une assignation de weeklyQuests");
+{
+  const wq = { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] };
+  const fA = mkFam("2026-08-15T12:00:00.000Z", gsA, { ...famA.config, weeklyQuests: wq, removedAssignments: ["wq1"] }, plA);
+  const fB = mkFam("2026-08-14T12:00:00.000Z", gsB, { ...famB.config, weeklyQuests: wq, removedAssignments: [] }, plB);
+  for (const [sens, base, inc] of [["retrait en base", fA, fB], ["retrait en incoming", fB, fA]]) {
+    for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const out = fn(base, inc).config.weeklyQuests;
+      if ((out?.assignments || []).some((a) => a.instanceId === "wq1"))
+        fail(`${nom} mergeFamily (${sens}) — l'assignation « wq1 » est tombstonée dans removedAssignments `
+           + `mais survit dans weeklyQuests.assignments : le retrait approuvé par le parent ne part jamais.`);
+    }
+  }
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

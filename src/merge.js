@@ -413,18 +413,53 @@ export const mergeFamily = (base, incoming) => {
     // `weeklyQuests:null`) pouvait donc effacer les assignations de la semaine en cours partout, orphelinant
     // les demandes de validation en attente. Fix : dernière-semaine-gagne par generatedForWeek, comme le
     // fait déjà server.cjs (mergeFamily côté serveur) — les deux moitiés de la fusion restent cohérentes.
+    // v2.16.78 — DEUX défauts d'une même racine : `weeklyQuests` était traité comme un BLOC OPAQUE,
+    // arbitré en entier sur sa seule clé de semaine, sans que rien ne regarde jamais à l'intérieur.
+    // (A) Sur une MÊME `generatedForWeek` — le cas normal pendant les 7 jours de la semaine de garde —
+    //     `>=` rendait `a`, la BASE, TOUJOURS. Or le serveur met toujours l'état stocké en `a`
+    //     (`mergeFamily(existing, data)`) : le nuage n'a donc JAMAIS pu accepter la moindre
+    //     modification de `weeklyQuests.assignments` à l'intérieur d'une semaine — figé à sa toute
+    //     première écriture, exactement le défaut de `routines` en v2.16.70. Deux écrivains réels
+    //     tombaient dedans : le report des tâches récurrentes manquées (`carryOverUnfinishedTasks`,
+    //     App.jsx ~2569, qui réécrit `a.days` sans toucher `generatedForWeek`) et le ménage des
+    //     assignations orphelines (`migrations.js` ~254, qui tourne à CHAQUE chargement — il nettoie
+    //     en local, le nuage repasse la copie sale par-dessus, en boucle). Prouvé en rejouant les vrais
+    //     modules sur la prod du 2026-08-17 (`savedAt` 02:30Z, jamais d'écriture) : le report réel
+    //     modifie 2 assignations (`rc_lavabo_cuisine`) et les 2 sens serveur perdaient l'écriture fraîche.
+    //     Règle : à clé de semaine ÉGALE, dernière-écriture-gagne (`preferIncoming`), comme `coins`/
+    //     `pin`/`house`. À clé différente, comportement inchangé (la semaine la plus récente gagne).
+    // (B) Le tombstone `removedAssignments` — le seul mécanisme qui empêche une assignation supprimée
+    //     de ressusciter à la synchro — n'était appliqué qu'à `config.assignments`, jamais aux
+    //     assignations DANS `weeklyQuests`. Pendant une semaine de garde, `PlayerDashboard` reçoit
+    //     pourtant les deux listes confondues (App.jsx ~4253) et le bouton « 🗑️ Je ne veux plus de
+    //     cette tâche » (App.jsx ~1156) s'affiche sur TOUTES les cartes : l'enfant pouvait demander le
+    //     retrait d'une rotative, le parent approuver (toast « 🗑️ Tâche retirée », tombstone écrit,
+    //     demande consommée) — et la tâche restait là, pour toujours, sans aucune trace de l'échec.
+    //     Le filtre est appliqué APRÈS l'arbitrage, donc il tient quel que soit le côté qui l'emporte
+    //     (le tombstone, lui, s'unionne — increvable, patron de `removedCalendarIds`/`removedProposals`).
+    //     ⚠️ Portée : les instanceId sont RÉGÉNÉRÉS à chaque semaine de garde, donc le retrait vaut
+    //     pour la semaine en cours. Le rendre permanent d'une semaine à l'autre demande un autre
+    //     mécanisme (une exclusion par enfant) — décision de conception, à trancher avec Gen (👤).
     weeklyQuests: (() => {
       const a = bC.weeklyQuests, b = iC.weeklyQuests;
-      if (!a) return b || null;
-      if (!b) return a;
-      // v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) : une donnée corrompue trouvée
-      // en prod ("2026-07-25z2", jamais produite par ce code — voir isValidCustodyWeekKey) battait
-      // pour toujours la vraie clé du jour dans une comparaison `>=` brute, empêchant tout correctif
-      // via une simple synchro. Une clé invalide perd maintenant automatiquement face à une clé
-      // valide, peu importe l'ordre alphabétique.
-      const aValid = isValidCustodyWeekKey(a.generatedForWeek), bValid = isValidCustodyWeekKey(b.generatedForWeek);
-      if (aValid !== bValid) return aValid ? a : b;
-      return (a.generatedForWeek || "") >= (b.generatedForWeek || "") ? a : b;
+      let wq;
+      if (!a) wq = b || null;
+      else if (!b) wq = a;
+      else {
+        // v2.14.3 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) : une donnée corrompue trouvée
+        // en prod ("2026-07-25z2", jamais produite par ce code — voir isValidCustodyWeekKey) battait
+        // pour toujours la vraie clé du jour dans une comparaison `>=` brute, empêchant tout correctif
+        // via une simple synchro. Une clé invalide perd maintenant automatiquement face à une clé
+        // valide, peu importe l'ordre alphabétique.
+        const aValid = isValidCustodyWeekKey(a.generatedForWeek), bValid = isValidCustodyWeekKey(b.generatedForWeek);
+        if (aValid !== bValid) wq = aValid ? a : b;
+        else {
+          const aw = a.generatedForWeek || "", bw = b.generatedForWeek || "";
+          wq = (aw === bw) ? (preferIncoming ? b : a) : (aw > bw ? a : b); // v2.16.78 (A)
+        }
+      }
+      if (!wq) return null;
+      return { ...wq, assignments: (wq.assignments || []).filter((x) => x && !_rmSet.has(x.instanceId)) }; // v2.16.78 (B)
     })(),
     // v2.6.0 — quêtes de réparation 🕊️ : union-by-id (id = instanceId de l'assignation) = effet
     // collectif exactly-once même après fusion multi-appareils. ⚠️ JAMAIS sur config.boss (merge shallow).

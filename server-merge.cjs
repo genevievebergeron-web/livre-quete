@@ -315,10 +315,22 @@ const mergeFamily = (base, incoming) => {
     theme: newerC.theme || bC.theme || iC.theme || "minecraft",
     customRewards: (() => { const n=newerC.customRewards, o=(preferIncoming?bC:iC).customRewards; if (Array.isArray(n)) return n; if (Array.isArray(o)) return o; return []; })(),
     // Lot 7 — last-write-wins par weekKey (plus récent gagne)
-    weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests; if (!a) return b||null; if (!b) return a;
-      const aValid=isValidCustodyWeekKey(a.generatedForWeek), bValid=isValidCustodyWeekKey(b.generatedForWeek);
-      if (aValid !== bValid) return aValid ? a : b;
-      return (a.generatedForWeek||"") >= (b.generatedForWeek||"") ? a : b; })(),
+    // v2.16.78 — remis à l'identique du client (src/merge.js) : (A) à clé de semaine ÉGALE,
+    // dernière-écriture-gagne au lieu de « la base gagne toujours » — c'est ICI que le défaut
+    // mordait le plus fort, `mergeFamily(existing, data)` mettant toujours l'état stocké en `a` ;
+    // (B) tombstone `removedAssignments` appliqué DANS `weeklyQuests.assignments`. Voir le commentaire
+    // long côté client pour la preuve et la portée (le retrait vaut pour la semaine en cours).
+    weeklyQuests: (() => { const a=bC.weeklyQuests, b=iC.weeklyQuests;
+      let wq;
+      if (!a) wq = b||null;
+      else if (!b) wq = a;
+      else {
+        const aValid=isValidCustodyWeekKey(a.generatedForWeek), bValid=isValidCustodyWeekKey(b.generatedForWeek);
+        if (aValid !== bValid) wq = aValid ? a : b;
+        else { const aw=a.generatedForWeek||"", bw=b.generatedForWeek||""; wq = (aw===bw) ? (preferIncoming?b:a) : (aw>bw ? a : b); }
+      }
+      if (!wq) return null;
+      return { ...wq, assignments: (wq.assignments||[]).filter(x => x && !_rmSet.has(x.instanceId)) }; })(),
     // v2.16.71 — remis à l'identique du client (src/merge.js, fix v2.5.16 « défi cochable à
     // l'infini »). Cette copie n'unionnait les coches QUE si les deux côtés portaient la même
     // `weekKey` : à la bascule du vendredi, un appareil resté sur l'ancienne clé voyait sa coche

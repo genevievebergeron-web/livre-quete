@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.77";
+export const APP_VERSION = "2.16.78";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3173,11 +3173,18 @@ export default function App() {
   },[config,persist,logAction,showToast]);
 
   const handleRemoveAssignment = useCallback((instanceId)=>{
-    const ass=(config.assignments||[]).find(a=>a.instanceId===instanceId);
+    // v2.16.78 — cherchée dans les DEUX listes, comme `handleApproveRemoval` : sans ça le journal
+    // du parent retomberait sur l'instanceId brut pour une rotative.
+    const ass=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])].find(a=>a.instanceId===instanceId);
     const task=ass?[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId):null;
     // Tombstone : la fusion ré-ajouterait l'assignation sinon → on mémorise les supprimées
+    // v2.16.78 — pendant une semaine de garde, une assignation peut vivre dans `weeklyQuests.assignments`
+    // et PAS dans `config.assignments` : ne filtrer que la seconde laissait la tâche à l'écran malgré le
+    // toast « Tâche retirée ». La fusion applique désormais le tombstone dans les deux listes (merge.js) ;
+    // on retire ici aussi pour que l'écran suive tout de suite, sans attendre un aller-retour de synchro.
     const newCfg={...config,
       assignments:(config.assignments||[]).filter(a=>a.instanceId!==instanceId),
+      weeklyQuests:config.weeklyQuests?{...config.weeklyQuests,assignments:(config.weeklyQuests.assignments||[]).filter(a=>a.instanceId!==instanceId)}:config.weeklyQuests,
       removedAssignments:_uniq([...(config.removedAssignments||[]), instanceId]).slice(-800)};
     setConfig(newCfg); persist(newCfg,gameStates);
     logAction(`🗑️ Tâche retirée: ${task?.label||instanceId}`,"#D99248");
@@ -3228,10 +3235,19 @@ export default function App() {
 
   const handleApproveRemoval = useCallback((reqId)=>{
     const req=(config.removalRequests||[]).find(r=>r.id===reqId); if(!req) return;
-    const ass=(config.assignments||[]).find(a=>a.instanceId===req.instanceId);
+    // v2.16.78 — c'est LE chemin par lequel une rotative pouvait être « retirée » sans jamais partir :
+    // l'enfant voit ses quêtes de la semaine de garde mêlées aux siennes (App.jsx ~4253) et le bouton
+    // « 🗑️ Je ne veux plus de cette tâche » s'affiche sur toutes les cartes, mais l'approbation ne
+    // filtrait que `config.assignments`. La demande était consommée, le tombstone écrit, le toast
+    // affiché — et la tâche revenait le lendemain, sans trace de l'échec. On cherche donc la tâche
+    // dans les DEUX listes (sinon le libellé du journal retombait sur l'instanceId brut) et on retire
+    // dans les deux. Le tombstone reste le vrai garde-fou : voir `weeklyQuests` dans merge.js.
+    const _allAss=[...(config.assignments||[]),...(config.weeklyQuests?.assignments||[])];
+    const ass=_allAss.find(a=>a.instanceId===req.instanceId);
     const task=ass?[...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId):null;
     const newCfg={...config,
       assignments:(config.assignments||[]).filter(a=>a.instanceId!==req.instanceId),
+      weeklyQuests:config.weeklyQuests?{...config.weeklyQuests,assignments:(config.weeklyQuests.assignments||[]).filter(a=>a.instanceId!==req.instanceId)}:config.weeklyQuests,
       removedAssignments:_uniq([...(config.removedAssignments||[]), req.instanceId]).slice(-800),
       removalRequests:(config.removalRequests||[]).filter(r=>r.id!==reqId)};
     setConfig(newCfg); persist(newCfg,gameStates);

@@ -6,6 +6,10 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.78", date:"2026-08-17", features:[
+    "🔄 Pendant une semaine de garde, tes quêtes de la semaine étaient figées dans le nuage dès leur toute première écriture : plus rien de ce qui les changeait ensuite n'arrivait à s'enregistrer. Une tâche récurrente manquée que l'app reporte au lendemain, par exemple, n'était jamais retenue ailleurs que sur la tablette où tu étais. C'est réglé.",
+    "🗑️ « Je ne veux plus de cette tâche » sur une quête de la semaine de garde : ton parent avait beau approuver, la tâche revenait le lendemain comme si de rien n'était. Le retrait tient maintenant pour la semaine en cours.",
+  ]},
   { version:"2.16.77", date:"2026-08-17", features:[
     "✏️ Changer le nom ou la couleur d'un enfant dans le livre ne tenait pas : la modification repartait, puis l'ancien nom revenait tout seul à la synchro suivante. Corrigé — c'est maintenant la dernière modification qui gagne, comme pour le pseudo.",
     "🚪 Le verrou du matin et le budget-temps quotidien (réglages parent) pouvaient se remettre tout seuls à leur ancienne valeur : un appareil resté en retard imposait son vieux réglage à tout le monde. Ce que le parent règle en dernier tient maintenant partout.",
