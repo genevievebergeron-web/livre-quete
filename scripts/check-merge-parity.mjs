@@ -57,7 +57,9 @@ const gsA = {
   owned: ["item_a"], boughtRewards: ["rw_ecran"], rewardBuyTs: { rw_ecran: 111 },
   refundedRewards: ["rw_old"], badges: ["b_a"], equipped: { hat: "h_a" },
   // v2.16.75 — `updatedAt` du côté FRAIS : voir la note « cohérence de fraîcheur » plus bas.
-  calendar: [{ id: "e1", updatedAt: 9, title: "A" }], removedCalendarIds: ["e0"],
+  // v2.16.85 — `recur` porté des DEUX côtés : c'est un sous-OBJET dans un élément de liste, et le
+  // 9e étage ne peut recenser que ce que la fusion des fixtures fait apparaître (leçon de la v2.16.84).
+  calendar: [{ id: "e1", updatedAt: 9, title: "A", recur: { freq: "weekly", day: 2 } }], removedCalendarIds: ["e0"],
   avatar: { configured: true, skin: "a" }, pin: "1111", mode: "routine",
   removedRoutineIds: ["r_old"],
   routines: [{ id: "rt1", name: "Matin A", taskIds: ["as1"] }],
@@ -90,7 +92,7 @@ const gsB = {
   pending: ["t4#2026-08-15"], refusedKeys: ["t8#2026-08-02"], refusals: ["r-b"],
   owned: ["item_b"], boughtRewards: ["rw_bonbon"], rewardBuyTs: { rw_bonbon: 222 },
   refundedRewards: ["rw_new"], badges: ["b_b"], equipped: { cape: "c_b" },
-  calendar: [{ id: "e1", updatedAt: 5, title: "B" }], removedCalendarIds: ["e2"],
+  calendar: [{ id: "e1", updatedAt: 5, title: "B", recur: { freq: "daily" } }], removedCalendarIds: ["e2"],
   avatar: { configured: false, skin: "b" }, pin: "2222", mode: "semaine",
   removedRoutineIds: ["r_other"],
   routines: [{ id: "rt1", name: "Matin B", taskIds: ["as1", "as2"] }],
@@ -182,13 +184,14 @@ const mkFam = (savedAt, gs, cfgExtra, pl) => ({
   },
 });
 const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
-  announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A", targetPlayerIds: ["p1"], sharedTasks: ["ranger"] }],
+  announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
+                   playerTasks: { p1: ["vider le lave-vaisselle"] } }],
   childTaskProposals: [{ id: "pr1", label: "Proposition A" }], removedProposals: ["pr0"],
   removalRequests: [{ id: "rq1", instanceId: "as1" }],
   customRewards: [{ id: "cr1", label: "Maison A", coins: 20 }], theme: "minecraft",
   updateFeedEntries: [{ type: "update", version: "2.16.70", features: ["a"], ts: "2026-08-15" }],
   selectedRewards: ["rw_ecran"], seenVersions: ["2.16.70"],
-  feed: [{ id: "f1", ts: 2, likes: ["p1"] }],
+  feed: [{ id: "f1", ts: 2, likes: ["p1"], likeTs: { p1: 10 }, unlikes: { p9: 5 } }],
   bugs: [{ id: "bg1", ts: 2 }], errorLogs: [{ id: "er1", ts: 2 }],
   coinOffers: [], teamInvites: [], repairEvents: [{ id: "rp1", ts: 2 }], momentRequests: [],
   // `defeatedAt` seulement d'un côté : sans ça, la règle « même boss » ({...a,...b} + garde sur
@@ -199,13 +202,14 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
 }, plA);
 const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
-  announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"] }],
+  announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
+                   playerTasks: { p1: ["sortir le recyclage"] } }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
   removalRequests: [{ id: "rq2", instanceId: "as1" }],
   customRewards: [{ id: "cr2", label: "Maison B", coins: 30 }], theme: "foret",
   updateFeedEntries: [{ type: "update", version: "2.16.41", features: ["b"], ts: "2026-08-06" }],
   selectedRewards: ["rw_bonbon"], seenVersions: ["2.16.41"],
-  feed: [{ id: "f1", ts: 2, likes: ["p2"] }],
+  feed: [{ id: "f1", ts: 2, likes: ["p2"], likeTs: { p2: 20 }, unlikes: { p8: 7 } }],
   bugs: [{ id: "bg2", ts: 1 }], errorLogs: [{ id: "er2", ts: 1 }],
   coinOffers: [], teamInvites: [], repairEvents: [{ id: "rp2", ts: 1 }], momentRequests: [],
   boss: { startedAt: "2026-08-01", hp: 60, lastHitTs: "2026-08-15T10:00:00.000Z" },
@@ -535,6 +539,44 @@ console.log("· avatar — une apparence NON configurée ne gagne jamais, même 
   }
 }
 
+// ── RECENSEMENT DES LISTES D'OBJETS : où qu'elles soient ───────────────────
+// v2.16.85 — les étages 8 et 9 ne valent que par leur recensement, et celui de la v2.16.84
+// n'énumérait que les listes de PREMIER NIVEAU (`config.X`, `gameStates.X`). Or deux des listes
+// d'objets de la prod vivent DANS un objet : `config.weeklyQuests.assignments` (155 éléments au
+// 18 août) et `config.weeklyChallenge.challenges`. Elles étaient donc invisibles au contrôle de
+// complétude — `weeklyQuests.assignments[].playerIds` n'a jamais été classé nulle part, et rien ne
+// pouvait le signaler. C'est exactement l'angle mort que la v2.16.84 s'était noté : « le
+// recensement dépend des fixtures ». Profondeur 2, ce qui couvre tout ce que porte la prod
+// (recensement complet de `config` et des 4 `gameStates` fait le 18 août : aucune liste d'objets
+// plus profonde n'existe).
+const listesDObjets = (racine, dans) => {
+  const out = [];
+  const ajoute = (chemin, arr) => {
+    if (arr.some((e) => e && typeof e === "object" && !Array.isArray(e))) out.push({ chemin, elems: arr });
+  };
+  for (const [k, v] of Object.entries(racine || {})) {
+    if (Array.isArray(v)) { ajoute(`${dans}.${k}`, v); continue; }
+    if (!v || typeof v !== "object") continue;
+    for (const [k2, v2] of Object.entries(v)) if (Array.isArray(v2)) ajoute(`${dans}.${k}.${k2}`, v2);
+  }
+  return out;
+};
+// Une liste nichée se déclare avec `conteneur: {cle, fixe}` — `fixe` porte ce dont la règle de
+// fusion du conteneur a besoin pour arbitrer (ex. `generatedForWeek` égal des deux côtés, qui est
+// justement le cas normal des 7 jours d'une semaine de garde).
+const cheminDe = (l) => `${l.dans}.${l.conteneur ? l.conteneur.cle + "." : ""}${l.liste}`;
+const poseListe = (savedAt, gsBase, cfgBase, pl, l, elems) => {
+  const bloc = l.conteneur ? { [l.conteneur.cle]: { ...l.conteneur.fixe, [l.liste]: elems } } : { [l.liste]: elems };
+  return l.dans === "config"
+    ? mkFam(savedAt, gsBase, { ...cfgBase, ...bloc }, pl)
+    : mkFam(savedAt, { ...gsBase, ...bloc }, cfgBase, pl);
+};
+const litElemDe = (fam, l, id) => {
+  const racine = l.dans === "config" ? fam.config : fam.gameStates[0];
+  const c = l.conteneur ? racine[l.conteneur.cle] : racine;
+  return ((c && c[l.liste]) || []).find((e) => e && e[l.cle] === id);
+};
+
 // ── LISTES fusionnées par `id` : le 4e étage, celui de l'ÉLÉMENT ───────────
 // v2.16.80 — les trois formes d'OBJET sont couvertes (plate v2.16.73/75/77, arbitrée en bloc
 // v2.16.78, fusionnée clé par clé v2.16.79). Rien ne regardait la 4e : le TABLEAU unionné par `id`.
@@ -577,6 +619,23 @@ const LISTES = [
     perime: { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0] },
     modifieEnPlace: "ajoutée ou retirée en entier ; le report des récurrentes (carryOverUnfinishedTasks) ne réécrit QUE `weeklyQuests.assignments`, couvert par OBJETS_ARBITRES",
     tombstone: "removedAssignments", supprime: { instanceId: "azX", taskId: "tkZ", playerIds: ["p1"], days: [3] } },
+  // v2.16.85 — les deux listes d'objets NICHÉES de la prod. Le recensement de premier niveau ne
+  // pouvait pas les voir ; `weeklyQuests.assignments` (155 éléments) était réputée « couverte par
+  // OBJETS_ARBITRES », ce qui est vrai du CONTENEUR et n'a jamais rien testé de l'ÉLÉMENT.
+  { champ: "assignments", cle: "instanceId", dans: "config",
+    conteneur: { cle: "weeklyQuests", fixe: { generatedForWeek: "2026-08-14" } },
+    frais:  { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2], isRecurring: true },
+    perime: { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0], isRecurring: true },
+    modifieEnPlace: true, // le report des récurrentes (carryOverUnfinishedTasks, App.jsx ~2569) et le ménage des orphelines (migrations.js ~254) réécrivent `days` en place
+    tombstone: "removedAssignments", supprime: { instanceId: "wzX", taskId: "tkZ", playerIds: ["p1"], days: [3], isRecurring: true } },
+  { champ: "challenges", cle: "playerId", dans: "config",
+    conteneur: { cle: "weeklyChallenge", fixe: { weekKey: "2026-08-14" } },
+    // Un SEUL champ diffère : sinon l'élément fusionné diffère du périmé par l'autre champ et le
+    // contrôle passe au vert sans rien voir (leçon « fixture identique = contrôle inerte »).
+    frais:  { playerId: "p1", text: "FRAIS", emoji: "🦁", checkins: {} },
+    perime: { playerId: "p1", text: "périmé", emoji: "🦁", checkins: {} },
+    modifieEnPlace: true, // « 💾 Enregistrer le défi » (parentpanel.jsx ~463 → handleUpdateChallenge) réécrit texte et emoji en cours de semaine
+    sansSuppression: "aucun écran ne retire le défi d'un enfant : le portail parent ne propose que d'en réécrire le texte, et la bascule de semaine se règle par `weekKey` (le défi d'une autre semaine est ignoré à la lecture, App.jsx ~2540)" },
   { champ: "customTasks", cle: "id", dans: "config",
     frais:  { id: "cz1", label: "FRAIS" }, perime: { id: "cz1", label: "périmé" },
     modifieEnPlace: "créée puis supprimée ; aucun écran ne réécrit une tâche perso existante",
@@ -646,20 +705,31 @@ const LISTES = [
 ];
 
 // Injecte une liste dans une copie famille, en gardant tout le reste intact.
+// v2.16.85 — `conteneur` : la liste vit DANS un objet (`weeklyQuests.assignments`,
+// `weeklyChallenge.challenges`). `fixe` porte ce dont la règle du conteneur a besoin pour arbitrer,
+// posé IDENTIQUE des deux côtés — c'est le cas normal (7 jours d'une même semaine de garde), et
+// c'est justement celui qu'aucune fixture ne mettait à égalité (leçon de la v2.16.80).
+const bloc = (l, elems) => (l.conteneur
+  ? { [l.conteneur.cle]: { ...l.conteneur.fixe, [l.champ]: elems } }
+  : { [l.champ]: elems });
 const avecListe = (savedAt, gsBase, cfgBase, pl, l, elems, cfgPlus = {}, gsPlus = {}) =>
   l.dans === "config"
-    ? mkFam(savedAt, gsBase, { ...cfgBase, [l.champ]: elems, ...cfgPlus }, pl)
-    : mkFam(savedAt, { ...gsBase, [l.champ]: elems, ...gsPlus }, { ...cfgBase, ...cfgPlus }, pl);
-const litListe = (fam, l) => (l.dans === "config" ? fam.config[l.champ] : fam.gameStates[0][l.champ]) || [];
+    ? mkFam(savedAt, gsBase, { ...cfgBase, ...bloc(l, elems), ...cfgPlus }, pl)
+    : mkFam(savedAt, { ...gsBase, ...bloc(l, elems), ...gsPlus }, { ...cfgBase, ...cfgPlus }, pl);
+const litListe = (fam, l) => {
+  const racine = l.dans === "config" ? fam.config : fam.gameStates[0];
+  const c = l.conteneur ? racine[l.conteneur.cle] : racine;
+  return (c && c[l.champ]) || [];
+};
+const cheminListe = (l) => `${l.dans}.${l.conteneur ? l.conteneur.cle + "." : ""}${l.champ}`;
 
 console.log("· listes par id — complétude : toute liste d'objets doit être classée");
 {
   const fusion = client.mergeFamily(famA, famB);
-  const declarees = new Set(LISTES.map((l) => `${l.dans}.${l.champ}`));
-  const scan = (obj, dans) => {
-    for (const [k, v] of Object.entries(obj || {})) {
-      if (!Array.isArray(v) || !v.length) continue;
-      if (typeof v[0] !== "object" || v[0] === null || Array.isArray(v[0])) continue;
+  const declarees = new Set(LISTES.map((l) => `${l.dans}.${l.conteneur ? l.conteneur.cle + "." : ""}${l.champ}`));
+  const scan = (racine, dans) => {
+    for (const { chemin, elems } of listesDObjets(racine, dans)) {
+      const k = chemin.slice(dans.length + 1), v = elems;
       if (!declarees.has(`${dans}.${k}`))
         fail(`liste « ${dans}.${k} » non classée : c'est un tableau d'objets fusionné par id, mais rien `
            + `ne dit (a) si ses éléments sont MODIFIÉS EN PLACE — auquel cas la copie fraîche doit gagner `
@@ -683,10 +753,10 @@ for (const l of LISTES) {
   const fB = avecListe("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [l.perime]);
   for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
     const rc = litListe(client.mergeFamily(base, inc), l), rs = litListe(server.mergeFamily(base, inc), l);
-    if (!same(rc, rs)) fail(`mergeFamily (${sens}) — ${l.dans}.${l.champ} : client ≠ serveur (dérive entre les deux copies).`);
+    if (!same(rc, rs)) fail(`mergeFamily (${sens}) — ${cheminListe(l)} : client ≠ serveur (dérive entre les deux copies).`);
     const el = rc.find((e) => e && e[l.cle] === l.frais[l.cle]);
     if (same(el, l.perime))
-      fail(`mergeFamily (${sens}) — ${l.dans}.${l.champ}[${l.cle}=${l.frais[l.cle]}] : la copie PÉRIMÉE de `
+      fail(`mergeFamily (${sens}) — ${cheminListe(l)}[${l.cle}=${l.frais[l.cle]}] : la copie PÉRIMÉE de `
          + `l'élément a gagné. L'union garde « le premier vu », donc la BASE — et le serveur met toujours `
          + `sa propre copie en base : le nuage ne peut accepter AUCUNE modification de cet élément. `
          + `Arbitre le contenu par \`preferIncoming\`, dans src/merge.js ET server-merge.cjs.`);
@@ -710,7 +780,7 @@ for (const l of LISTES) {
     for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
       const out = litListe(fn(base, inc), l);
       if (out.some((e) => e && e[l.cle] === l.supprime[l.cle]))
-        fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.champ} : l'élément « ${l.supprime[l.cle]} » est `
+        fail(`${nom} mergeFamily (${sens}) — ${cheminListe(l)} : l'élément « ${l.supprime[l.cle]} » est `
            + `tombstoné dans \`${l.tombstone}\` mais l'union le RESSUSCITE depuis l'autre copie. `
            + `Applique le tombstone dans src/merge.js ET server-merge.cjs.`);
     }
@@ -1085,49 +1155,47 @@ const SOUS_LISTES = [
     sansRetrait: "reconstruit à chaque chargement depuis CHANGELOG (`dedupeUpdateFeed`)" },
   { liste: "routines", cle: "id", dans: "gameStates", champ: "taskIds",
     elementEnBloc: "l'élément entier vient du côté frais (v2.16.70/78) : retirer une quête d'un rituel tient par construction" },
+  // v2.16.85 — la seule sous-liste NICHÉE de la prod, et la seule que le recensement de la v2.16.84
+  // ne pouvait pas voir : elle vit dans l'objet `weeklyQuests`, pas dans une liste de premier niveau.
+  { liste: "assignments", cle: "instanceId", dans: "config", champ: "playerIds",
+    conteneur: { cle: "weeklyQuests", fixe: { generatedForWeek: "2026-08-14" } },
+    elementEnBloc: "`weeklyQuests` est arbitré EN BLOC (v2.16.78) : à `generatedForWeek` égale — le cas normal pendant les 7 jours d'une semaine de garde — c'est dernière-écriture-gagne, donc l'élément vient entier du côté frais" },
 ];
 
 console.log("· sous-listes — complétude : toute liste de chaînes DANS un élément doit être classée");
 {
   const fusion = client.mergeFamily(famA, famB);
-  const declarees = new Set(SOUS_LISTES.map((l) => `${l.dans}.${l.liste}[].${l.champ}`));
-  const scan = (obj, dans) => {
-    for (const [k, v] of Object.entries(obj || {})) {
-      if (!Array.isArray(v) || !v.length) continue;
-      for (const el of v) {
+  const declarees = new Set(SOUS_LISTES.map((l) => `${cheminDe(l)}[].${l.champ}`));
+  for (const dans of ["config", "gameStates"]) {
+    const racine = dans === "config" ? fusion.config : fusion.gameStates[0];
+    for (const { chemin, elems } of listesDObjets(racine, dans))
+      for (const el of elems) {
         if (!el || typeof el !== "object" || Array.isArray(el)) continue;
         for (const [sk, sv] of Object.entries(el)) {
           if (!Array.isArray(sv) || !sv.length || typeof sv[0] !== "string") continue;
-          if (!declarees.has(`${dans}.${k}[].${sk}`))
-            fail(`sous-liste de chaînes « ${dans}.${k}[].${sk} » non classée : rien ne dit si un geste `
+          if (!declarees.has(`${chemin}[].${sk}`))
+            fail(`sous-liste de chaînes « ${chemin}[].${sk} » non classée : rien ne dit si un geste `
                + `de l'app en RETIRE un élément. Le 5e étage ne regarde que le premier niveau — une `
                + `sous-liste unionnée dans un élément ressuscite ses retraits tout pareil `
                + `(c'était « feed[].likes », v2.16.84). Ajoute-la à SOUS_LISTES.`);
         }
       }
-    }
-  };
-  scan(fusion.config, "config");
-  scan(fusion.gameStates[0], "gameStates");
+  }
 }
 
 console.log("· sous-listes — un retrait exprimé par le côté frais doit survivre");
 {
-  const avecElem = (savedAt, gsBase, cfgBase, pl, l, elem) =>
-    l.dans === "config"
-      ? mkFam(savedAt, gsBase, { ...cfgBase, [l.liste]: [elem] }, pl)
-      : mkFam(savedAt, { ...gsBase, [l.liste]: [elem] }, cfgBase, pl);
-  const litElem = (fam, l, id) =>
-    ((l.dans === "config" ? fam.config[l.liste] : fam.gameStates[0][l.liste]) || []).find((e) => e && e[l.cle] === id);
+  const avecElem = (savedAt, gsBase, cfgBase, pl, l, elem) => poseListe(savedAt, gsBase, cfgBase, pl, l, [elem]);
+  const litElem = (fam, l, id) => litElemDe(fam, l, id);
   const T1 = 1_000_000, T2 = 2_000_000, T3 = 3_000_000;
   for (const l of SOUS_LISTES) {
     if (l.sansRetrait) {
       if (typeof l.sansRetrait !== "string" || !l.sansRetrait.length)
-        fail(`sous-liste « ${l.liste}[].${l.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+        fail(`sous-liste « ${cheminDe(l)}[].${l.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
       continue;
     }
     if (!l.elementEnBloc && !l.tombstoneDate)
-      fail(`sous-liste « ${l.liste}[].${l.champ} » — ni \`sansRetrait\`, ni \`elementEnBloc\`, ni \`tombstoneDate\` : classe-la.`);
+      fail(`sous-liste « ${cheminDe(l)}[].${l.champ} » — ni \`sansRetrait\`, ni \`elementEnBloc\`, ni \`tombstoneDate\` : classe-la.`);
     const ID = "sl1", RETIRE = "qui_retire", VOISIN = "qui_reste";
     // Les deux copies ont posé les deux coeurs au même instant T1 ; seul le côté FRAIS a ensuite
     // retiré `RETIRE` (tombstone en T2 > T1). `VOISIN` est le témoin : il doit survivre partout.
@@ -1142,13 +1210,13 @@ console.log("· sous-listes — un retrait exprimé par le côté frais doit sur
         const out = litElem(fn(base, inc), l, ID) || {};
         const vals = out[l.champ] || [];
         if (vals.includes(RETIRE))
-          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : « ${RETIRE} » a été `
+          fail(`${nom} mergeFamily (${sens}) — ${cheminDe(l)}[].${l.champ} : « ${RETIRE} » a été `
              + `RETIRÉ par le côté frais et l'autre copie le ressuscite. Une union DANS un élément ne `
              + `sait pas plus exprimer un retrait qu'une union de premier niveau : il faut un tombstone `
              + `daté (ici \`${l.tombstoneDate?.retrait || "?"}\`) ou remplacer l'élément en bloc, dans `
              + `src/merge.js ET server-merge.cjs.`);
         if (!vals.includes(VOISIN))
-          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : le retrait a emporté `
+          fail(`${nom} mergeFamily (${sens}) — ${cheminDe(l)}[].${l.champ} : le retrait a emporté `
              + `« ${VOISIN} », qui n'était pas visé. Le mécanisme de retrait est trop large.`);
       }
     }
@@ -1163,10 +1231,95 @@ console.log("· sous-listes — un retrait exprimé par le côté frais doit sur
       for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
         const out = litElem(fn(base, inc), l, ID) || {};
         if (!(out[l.champ] || []).includes(RETIRE))
-          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : « ${RETIRE} » a été `
+          fail(`${nom} mergeFamily (${sens}) — ${cheminDe(l)}[].${l.champ} : « ${RETIRE} » a été `
              + `REPOSÉ après son retrait (\`${l.tombstoneDate.pose}\` plus récent que `
              + `\`${l.tombstoneDate.retrait}\`) et le tombstone le refuse quand même. Un tombstone `
              + `définitif interdirait de ré-aimer une entrée pour toujours.`);
+      }
+    }
+  }
+}
+
+// ── 9e ÉTAGE : LES SOUS-OBJETS, DANS LES ÉLÉMENTS ──────────────────────────
+// v2.16.85 — le 6e étage classe les OBJETS de premier niveau (`equipped`, `house`, `completedAt`…)
+// et pose la bonne question : « une SOUS-CLÉ retirée survit-elle ? ». Le 8e a descendu d'un cran
+// la question du 5e (les listes de chaînes DANS un élément). Il manquait la descente symétrique du
+// 6e : les OBJETS dans un élément de liste — c'est mot pour mot la piste que la v2.16.84 s'était
+// laissée. Recensés sur la prod du 18 août : `announcements[].playerTasks`,
+// `weeklyChallenge.challenges[].checkins`, `calendar[].recur`, plus `players[].morningLock` et les
+// deux registres du ❤️ (`feed[].likeTs`, `feed[].unlikes`) apparus avec la v2.16.84.
+// Mesuré en rejouant les vrais modules : sur ces six, DEUX ressuscitent une sous-clé retirée —
+// `playerTasks` dans un sens de fusion sur deux, `checkins` dans les QUATRE. Aucun geste de l'app
+// ne les retire aujourd'hui (donc aucun bug vivant), mais rien ne l'écrivait et rien ne le
+// surveillait : c'est exactement l'état dans lequel `completed` était avant la v2.16.82.
+//   • `sansRetrait: "raison"`   — aucun geste ne retire une sous-clé (dis POURQUOI)
+//   • `elementEnBloc: "raison"` — l'élément ENTIER vient du côté frais (retrait acquis)
+const SOUS_OBJETS = [
+  { liste: "announcements", cle: "id", dans: "config", champ: "playerTasks",
+    sansRetrait: "le contenu d'une annonce est figé à l'envoi : elle est créée (App.jsx ~2743), supprimée (~2752) ou RECOPIÉE à nouvel id (« renvoyer », ~2789) — aucun chemin ne la réécrit en place. ⚠️ mesuré : l'union par id garde la PREMIÈRE copie vue, une sous-clé retirée reviendrait dans un sens sur deux" },
+  { liste: "challenges", cle: "playerId", dans: "config", champ: "checkins",
+    conteneur: { cle: "weeklyChallenge", fixe: { weekKey: "2026-08-14" } },
+    sansRetrait: "cocher le défi est à sens unique : l'unique appelant ne passe que `true` (`onChallengeCheckin(todayC,true)`, App.jsx ~1326) et le portail parent n'affiche les 7 jours qu'en LECTURE (parentpanel.jsx ~472). ⚠️ mesuré : `{...ex.checkins, ...c.checkins}` ressuscite une clé retirée dans les QUATRE sens — le jour où un bouton « décocher » apparaît, il faudra un tombstone daté, pas une retouche de l'union" },
+  { liste: "feed", cle: "id", dans: "config", champ: "likeTs",
+    sansRetrait: "registre daté du ❤️ posé (v2.16.84), fusionné par MAX clé par clé : une clé ne fait que grandir, jamais disparaître (les tables vides sont supprimées à la sortie pour ne pas peser sur les 60 entrées du fil)" },
+  { liste: "feed", cle: "id", dans: "config", champ: "unlikes",
+    sansRetrait: "tombstone daté du ❤️ retiré (v2.16.84), même MAX clé par clé : re-aimer n'efface pas la clé, il pose un `likeTs` plus récent qui la bat" },
+  { liste: "calendar", cle: "id", dans: "gameStates", champ: "recur",
+    elementEnBloc: "`_mergeCalendar` garde l'élément ENTIER dont l'`updatedAt` est le plus grand, et repasser un événement en « ponctuel » réécrit bien `recur: null` avec un `updatedAt` neuf (payload App.jsx ~4155 → `handleUpdateCalendarEvent`)" },
+  { liste: "players", cle: "id", dans: "config", champ: "morningLock",
+    elementEnBloc: "`_mergePlayer` prend `morningLock` EN BLOC du côté le plus frais (`frais(\"morningLock\")`, v2.16.77) : l'objet est remplacé, jamais fusionné clé par clé" },
+];
+
+console.log("· sous-objets — complétude : tout objet DANS un élément de liste doit être classé");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const declarees = new Set(SOUS_OBJETS.map((l) => `${cheminDe(l)}[].${l.champ}`));
+  for (const dans of ["config", "gameStates"]) {
+    const racine = dans === "config" ? fusion.config : fusion.gameStates[0];
+    for (const { chemin, elems } of listesDObjets(racine, dans))
+      for (const el of elems) {
+        if (!el || typeof el !== "object" || Array.isArray(el)) continue;
+        for (const [sk, sv] of Object.entries(el)) {
+          if (!sv || typeof sv !== "object" || Array.isArray(sv) || !Object.keys(sv).length) continue;
+          if (!declarees.has(`${chemin}[].${sk}`))
+            fail(`sous-objet « ${chemin}[].${sk} » non classé : rien ne dit si un geste de l'app en `
+               + `RETIRE une SOUS-CLÉ. Le 6e étage ne regarde que les objets de premier niveau — un `
+               + `objet fusionné clé par clé DANS un élément ressuscite ses retraits tout pareil. `
+               + `Ajoute-le à SOUS_OBJETS dans scripts/check-merge-parity.mjs.`);
+        }
+      }
+  }
+}
+
+console.log("· sous-objets — un retrait de sous-clé exprimé par le côté frais doit survivre");
+{
+  const ID = "so1", RETIRE = "cle_retiree", VOISIN = "cle_gardee";
+  for (const l of SOUS_OBJETS) {
+    if (l.sansRetrait) {
+      if (typeof l.sansRetrait !== "string" || !l.sansRetrait.length)
+        fail(`sous-objet « ${cheminDe(l)}[].${l.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+      continue;
+    }
+    if (!l.elementEnBloc)
+      fail(`sous-objet « ${cheminDe(l)}[].${l.champ} » — ni \`sansRetrait\`, ni \`elementEnBloc\` : classe-le.`);
+    // Le côté FRAIS a retiré la sous-clé ; le périmé l'a encore. `VOISIN` est le témoin : il doit
+    // survivre partout, sinon le mécanisme de retrait emporte plus que sa cible.
+    const elemFrais = { [l.cle]: ID, updatedAt: 9, ts: 9, [l.champ]: { [VOISIN]: 1 } };
+    const elemPerime = { [l.cle]: ID, updatedAt: 5, ts: 9, [l.champ]: { [VOISIN]: 1, [RETIRE]: 1 } };
+    const fFrais = poseListe("2026-08-15T12:00:00.000Z", gsA, famA.config, { ...plA, id: ID }, l, [elemFrais]);
+    const fPerime = poseListe("2026-08-14T12:00:00.000Z", gsB, famB.config, { ...plB, id: ID }, l, [elemPerime]);
+    for (const [sens, base, inc] of [["frais en base", fFrais, fPerime], ["frais en incoming", fPerime, fFrais]]) {
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const sous = (litElemDe(fn(base, inc), l, ID) || {})[l.champ] || {};
+        if (Object.prototype.hasOwnProperty.call(sous, RETIRE))
+          fail(`${nom} mergeFamily (${sens}) — ${cheminDe(l)}[].${l.champ} : la sous-clé « ${RETIRE} » a `
+             + `été RETIRÉE par le côté frais et l'autre copie la ressuscite. Un objet fusionné clé par `
+             + `clé DANS un élément ne sait pas plus exprimer un retrait qu'un objet de premier niveau : `
+             + `il faut remplacer l'élément en bloc ou passer par un tombstone daté, dans src/merge.js `
+             + `ET server-merge.cjs.`);
+        if (!Object.prototype.hasOwnProperty.call(sous, VOISIN))
+          fail(`${nom} mergeFamily (${sens}) — ${cheminDe(l)}[].${l.champ} : le retrait a emporté la `
+             + `sous-clé « ${VOISIN} », qui n'était pas visée. Le mécanisme de retrait est trop large.`);
       }
     }
   }
