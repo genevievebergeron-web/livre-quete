@@ -60,7 +60,7 @@ const gsA = {
   calendar: [{ id: "e1", updatedAt: 9, title: "A" }], removedCalendarIds: ["e0"],
   avatar: { configured: true, skin: "a" }, pin: "1111", mode: "routine",
   removedRoutineIds: ["r_old"],
-  routines: [{ id: "rt1", name: "Matin A", tasks: ["a"] }],
+  routines: [{ id: "rt1", name: "Matin A", taskIds: ["as1"] }],
   // v2.16.76 — `hiddenWeek` porte le JOUR du seau `hiddenRewards`, et la règle arbitre sur ce jour,
   // pas sur la fraîcheur de la famille. Le jour le plus récent va donc du côté FRAIS (famA), même
   // raison que `calendar.updatedAt` juste au-dessus : sans ça le contrôle crierait au loup.
@@ -93,7 +93,7 @@ const gsB = {
   calendar: [{ id: "e1", updatedAt: 5, title: "B" }], removedCalendarIds: ["e2"],
   avatar: { configured: false, skin: "b" }, pin: "2222", mode: "semaine",
   removedRoutineIds: ["r_other"],
-  routines: [{ id: "rt1", name: "Matin B", tasks: ["a", "b"] }],
+  routines: [{ id: "rt1", name: "Matin B", taskIds: ["as1", "as2"] }],
   activeRoutineId: "rt2", hiddenRewards: ["rw_h_b"], hiddenWeek: "2026-08-07", // v2.16.76 — jour PÉRIMÉ ici, voir famA
   dailyClaimed: { day: "2026-08-14", ids: ["o6"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt2"] },
@@ -182,7 +182,7 @@ const mkFam = (savedAt, gs, cfgExtra, pl) => ({
   },
 });
 const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
-  announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A" }],
+  announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A", targetPlayerIds: ["p1"], sharedTasks: ["ranger"] }],
   childTaskProposals: [{ id: "pr1", label: "Proposition A" }], removedProposals: ["pr0"],
   removalRequests: [{ id: "rq1", instanceId: "as1" }],
   customRewards: [{ id: "cr1", label: "Maison A", coins: 20 }], theme: "minecraft",
@@ -199,7 +199,7 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
 }, plA);
 const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
-  announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B" }],
+  announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"] }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
   removalRequests: [{ id: "rq2", instanceId: "as1" }],
   customRewards: [{ id: "cr2", label: "Maison B", coins: 30 }], theme: "foret",
@@ -588,7 +588,9 @@ const LISTES = [
   { champ: "feed", cle: "id", dans: "config",
     frais:  { id: "fz1", ts: 5, text: "FRAIS", likes: ["p1"] },
     perime: { id: "fz1", ts: 5, text: "périmé", likes: ["p2"] },
-    modifieEnPlace: "seuls les `likes` bougent, et ils s'unionnent (règle explicite) — le texte est figé à l'écriture",
+    // v2.16.84 — la raison écrite ici était FAUSSE : « ils s'unionnent » répond à l'AJOUT et ne dit
+    // rien du RETRAIT. Le ❤️ est un toggle. Le retrait des sous-listes est vérifié au 8e étage.
+    modifieEnPlace: "seuls les `likes` bougent (ajout par union, retrait par tombstone daté `unlikes`, v2.16.84) — le texte est figé à l'écriture",
     sansSuppression: "journal d'événements : aucun écran n'efface une entrée (troncature à 60)" },
   { champ: "bugs", cle: "id", dans: "config",
     frais: { id: "bz1", ts: 5, text: "FRAIS" }, perime: { id: "bz1", ts: 5, text: "périmé" },
@@ -623,10 +625,10 @@ const LISTES = [
     sansSuppression: "un joueur ne se supprime pas depuis l'app" },
   // ── gameStates ──
   { champ: "routines", cle: "id", dans: "gameStates",
-    frais:  { id: "rtz", name: "FRAIS", tasks: ["a", "b"] },
-    perime: { id: "rtz", name: "périmé", tasks: ["a"] },
+    frais:  { id: "rtz", name: "FRAIS", taskIds: ["as1", "as2"] },
+    perime: { id: "rtz", name: "périmé", taskIds: ["as1"] },
     modifieEnPlace: true, // renommer / changer l'émoji / ajouter une quête (v2.16.70)
-    tombstone: "removedRoutineIds", cleTombstone: "id", supprime: { id: "rtX", name: "rituel supprimé", tasks: [] } },
+    tombstone: "removedRoutineIds", cleTombstone: "id", supprime: { id: "rtX", name: "rituel supprimé", taskIds: [] } },
   { champ: "calendar", cle: "id", dans: "gameStates",
     // Arbitré par `updatedAt` (v2.7.0), pas par la fraîcheur de la famille : le plus grand va donc
     // du côté frais, même règle de cohérence que pour `gsA`/`gsB` plus haut.
@@ -1032,6 +1034,7 @@ console.log("· gestes — tout retrait d'une liste à tombstone doit écrire ce
     momentRequests: "removedMomentRequests", childTaskProposals: "removedProposals",
     routines: "removedRoutineIds", calendar: "removedCalendarIds",
     pendingCelebrations: "consumedCelebrationIds",
+    likes: "unlikes", // v2.16.84 — sous-liste (feed[].likes), même exigence : le geste écrit son tombstone
   };
   const lignes = require("node:fs").readFileSync(path.join(ROOT, "src/App.jsx"), "utf8").split("\n");
   // Bornes de bloc : les déclarations de premier niveau du composant (`  const handleX`, `  function X`).
@@ -1050,6 +1053,121 @@ console.log("· gestes — tout retrait d'une liste à tombstone doit écrire ce
            + `\`${tombstone}\`. Une liste unionnée ne sait pas exprimer un retrait : la copie d'en `
            + `face ramènera l'élément à la synchro suivante. Écris le tombstone ICI aussi — la règle `
            + `de fusion existe déjà, c'est l'appelant qui manque (c'était « handleUndo », v2.16.83).`);
+    }
+  }
+}
+
+// ── 8e ÉTAGE : LES SOUS-LISTES DE CHAÎNES, DANS LES ÉLÉMENTS ───────────────
+// v2.16.84 — le 5e étage classe les listes de chaînes de PREMIER NIVEAU (`config.X`,
+// `gameStates.X`). Il ne descend jamais dans les ÉLÉMENTS des listes d'objets. Or il y en a une
+// dizaine là-dedans, et l'une d'elles bouge à chaque tape sur un coeur : `feed[].likes`.
+// La fiche de `feed` dans LISTES disait « seuls les likes bougent, et ils s'unionnent » — une
+// raison qui répond à l'AJOUT et ne dit rien du RETRAIT. Le bouton ❤️ est un TOGGLE : retaper le
+// coeur enlève l'id. Mesuré sur la prod du 18 août : 204/204 retraits ressuscités par la fusion.
+// Même question qu'aux étages 5 et 6, une couche plus bas : chaque sous-liste de chaînes doit dire
+// si un geste en retire un élément, et comment ce retrait survit.
+//   • `sansRetrait: "raison"`   — aucun geste ne retire (dis POURQUOI)
+//   • `elementEnBloc: "raison"` — l'élément ENTIER est remplacé par le côté frais (retrait acquis)
+//   • `tombstoneDate: {retrait, pose}` — paire datée, comme `deCompleted`/`completedAt`
+const SOUS_LISTES = [
+  { liste: "feed", cle: "id", dans: "config", champ: "likes",
+    tombstoneDate: { retrait: "unlikes", pose: "likeTs" },
+    pourquoi: "le ❤️ est un TOGGLE (`toggleFeedLike`, App.jsx ~2366) : retaper le coeur retire l'id" },
+  { liste: "players", cle: "id", dans: "config", champ: "starterThemes",
+    sansRetrait: "posé à la création du joueur, jamais réduit (même raison qu'au 5e étage)" },
+  { liste: "assignments", cle: "instanceId", dans: "config", champ: "playerIds",
+    sansRetrait: "l'assistant réémet un `instanceId` NEUF pour chaque enfant à la sauvegarde (setupwizard.jsx ~140) : aucune assignation existante n'est réécrite en place, le toggle ne vit que dans le brouillon local" },
+  { liste: "announcements", cle: "id", dans: "config", champ: "targetPlayerIds",
+    sansRetrait: "une annonce est créée puis supprimée, jamais réécrite ; « renvoyer » crée une COPIE à nouvel id (v2.15.1)" },
+  { liste: "announcements", cle: "id", dans: "config", champ: "sharedTasks",
+    sansRetrait: "même raison : le contenu d'une annonce est figé à l'envoi" },
+  { liste: "updateFeedEntries", cle: "version", dans: "config", champ: "features",
+    sansRetrait: "reconstruit à chaque chargement depuis CHANGELOG (`dedupeUpdateFeed`)" },
+  { liste: "routines", cle: "id", dans: "gameStates", champ: "taskIds",
+    elementEnBloc: "l'élément entier vient du côté frais (v2.16.70/78) : retirer une quête d'un rituel tient par construction" },
+];
+
+console.log("· sous-listes — complétude : toute liste de chaînes DANS un élément doit être classée");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const declarees = new Set(SOUS_LISTES.map((l) => `${l.dans}.${l.liste}[].${l.champ}`));
+  const scan = (obj, dans) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!Array.isArray(v) || !v.length) continue;
+      for (const el of v) {
+        if (!el || typeof el !== "object" || Array.isArray(el)) continue;
+        for (const [sk, sv] of Object.entries(el)) {
+          if (!Array.isArray(sv) || !sv.length || typeof sv[0] !== "string") continue;
+          if (!declarees.has(`${dans}.${k}[].${sk}`))
+            fail(`sous-liste de chaînes « ${dans}.${k}[].${sk} » non classée : rien ne dit si un geste `
+               + `de l'app en RETIRE un élément. Le 5e étage ne regarde que le premier niveau — une `
+               + `sous-liste unionnée dans un élément ressuscite ses retraits tout pareil `
+               + `(c'était « feed[].likes », v2.16.84). Ajoute-la à SOUS_LISTES.`);
+        }
+      }
+    }
+  };
+  scan(fusion.config, "config");
+  scan(fusion.gameStates[0], "gameStates");
+}
+
+console.log("· sous-listes — un retrait exprimé par le côté frais doit survivre");
+{
+  const avecElem = (savedAt, gsBase, cfgBase, pl, l, elem) =>
+    l.dans === "config"
+      ? mkFam(savedAt, gsBase, { ...cfgBase, [l.liste]: [elem] }, pl)
+      : mkFam(savedAt, { ...gsBase, [l.liste]: [elem] }, cfgBase, pl);
+  const litElem = (fam, l, id) =>
+    ((l.dans === "config" ? fam.config[l.liste] : fam.gameStates[0][l.liste]) || []).find((e) => e && e[l.cle] === id);
+  const T1 = 1_000_000, T2 = 2_000_000, T3 = 3_000_000;
+  for (const l of SOUS_LISTES) {
+    if (l.sansRetrait) {
+      if (typeof l.sansRetrait !== "string" || !l.sansRetrait.length)
+        fail(`sous-liste « ${l.liste}[].${l.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+      continue;
+    }
+    if (!l.elementEnBloc && !l.tombstoneDate)
+      fail(`sous-liste « ${l.liste}[].${l.champ} » — ni \`sansRetrait\`, ni \`elementEnBloc\`, ni \`tombstoneDate\` : classe-la.`);
+    const ID = "sl1", RETIRE = "qui_retire", VOISIN = "qui_reste";
+    // Les deux copies ont posé les deux coeurs au même instant T1 ; seul le côté FRAIS a ensuite
+    // retiré `RETIRE` (tombstone en T2 > T1). `VOISIN` est le témoin : il doit survivre partout.
+    const poses = l.tombstoneDate ? { [l.tombstoneDate.pose]: { [VOISIN]: T1, [RETIRE]: T1 } } : {};
+    const elemFrais = { [l.cle]: ID, ts: 5, [l.champ]: [VOISIN], ...poses,
+      ...(l.tombstoneDate ? { [l.tombstoneDate.retrait]: { [RETIRE]: T2 } } : {}) };
+    const elemPerime = { [l.cle]: ID, ts: 5, [l.champ]: [VOISIN, RETIRE], ...poses };
+    const fFrais = avecElem("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, elemFrais);
+    const fPerime = avecElem("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, elemPerime);
+    for (const [sens, base, inc] of [["frais en base", fFrais, fPerime], ["frais en incoming", fPerime, fFrais]]) {
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = litElem(fn(base, inc), l, ID) || {};
+        const vals = out[l.champ] || [];
+        if (vals.includes(RETIRE))
+          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : « ${RETIRE} » a été `
+             + `RETIRÉ par le côté frais et l'autre copie le ressuscite. Une union DANS un élément ne `
+             + `sait pas plus exprimer un retrait qu'une union de premier niveau : il faut un tombstone `
+             + `daté (ici \`${l.tombstoneDate?.retrait || "?"}\`) ou remplacer l'élément en bloc, dans `
+             + `src/merge.js ET server-merge.cjs.`);
+        if (!vals.includes(VOISIN))
+          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : le retrait a emporté `
+             + `« ${VOISIN} », qui n'était pas visé. Le mécanisme de retrait est trop large.`);
+      }
+    }
+    if (!l.tombstoneDate) continue;
+    // Le tombstone daté ne doit PAS être définitif : reposer le coeur après l'avoir retiré refonctionne.
+    const elemRepose = { [l.cle]: ID, ts: 5, [l.champ]: [VOISIN, RETIRE],
+      [l.tombstoneDate.retrait]: { [RETIRE]: T2 },
+      [l.tombstoneDate.pose]: { [VOISIN]: T1, [RETIRE]: T3 } };
+    const fRepose = avecElem("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, elemRepose);
+    const fVieux = avecElem("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, elemFrais);
+    for (const [sens, base, inc] of [["reposé en base", fRepose, fVieux], ["reposé en incoming", fVieux, fRepose]]) {
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = litElem(fn(base, inc), l, ID) || {};
+        if (!(out[l.champ] || []).includes(RETIRE))
+          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.liste}[].${l.champ} : « ${RETIRE} » a été `
+             + `REPOSÉ après son retrait (\`${l.tombstoneDate.pose}\` plus récent que `
+             + `\`${l.tombstoneDate.retrait}\`) et le tombstone le refuse quand même. Un tombstone `
+             + `définitif interdirait de ré-aimer une entrée pour toujours.`);
+      }
     }
   }
 }

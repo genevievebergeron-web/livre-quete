@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.84", date:"2026-08-18", features:[
+    "\u2764\ufe0f Quand tu retirais ton coeur d'un message du fil de famille, il revenait tout seul quelques secondes plus tard — et il revenait pour toujours. Corrigé : un coeur retiré reste retiré, et tu peux le remettre quand tu veux.",
+  ]},
   { version:"2.16.83", date:"2026-08-18", features:[
     "↩️ Le portail parent a DEUX boutons pour annuler : le petit « ↩️ Annuler » sur une carte (réparé hier) et « ↩️ Annuler dernière » en bas du panneau. Le deuxième avait exactement le même défaut : la quête revenait cochée après la synchro, et un 2e clic ne réessayait pas la même quête : il reprenait l'XP de la validation d'AVANT. Les deux boutons annulent maintenant pour de bon.",
   ]},

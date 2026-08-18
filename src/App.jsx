@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.83";
+export const APP_VERSION = "2.16.84";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2363,9 +2363,21 @@ export default function App() {
     const n={...cfg, feed:[fe,...(cfg.feed||[])].slice(0,60)};
     setConfig(n); persist(n, gsRef.current);
   },[persist]);
+  // v2.16.84 — ce bouton est un TOGGLE : retaper le coeur RETIRE l'id de `likes`. `likes` est
+  // unionné à la fusion (deux appareils peuvent aimer la même entrée en même temps), et une union
+  // ne sait pas exprimer un retrait : le coeur retiré revenait à la synchro suivante, pour toujours
+  // (204/204 mesurés sur la prod du 18 août). Le retrait s'écrit donc ICI, comme un tombstone DATÉ
+  // `unlikes[qui]`, avec son horodatage de pose `likeTs[qui]` en face — même paire que
+  // `deCompleted`/`completedAt` (v2.16.82), pour que ré-aimer plus tard refonctionne.
   const toggleFeedLike = useCallback((feedId, byId)=>{
-    const cfg=cfgRef.current||{};
-    const feed=(cfg.feed||[]).map(f=> f.id!==feedId ? f : {...f, likes: (f.likes||[]).includes(byId) ? f.likes.filter(x=>x!==byId) : [...(f.likes||[]),byId]});
+    const cfg=cfgRef.current||{}; const now=Date.now();
+    const feed=(cfg.feed||[]).map(f=>{
+      if(f.id!==feedId) return f;
+      const aime=(f.likes||[]).includes(byId);
+      return aime
+        ? {...f, likes:(f.likes||[]).filter(x=>x!==byId), unlikes:{...(f.unlikes||{}), [byId]:now}}
+        : {...f, likes:[...(f.likes||[]),byId], likeTs:{...(f.likeTs||{}), [byId]:now}};
+    });
     const n={...cfg, feed}; setConfig(n); persist(n, gsRef.current);
   },[persist]);
 

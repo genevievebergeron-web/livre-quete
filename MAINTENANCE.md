@@ -4,6 +4,29 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-18 (routine autonome, nuit, 25e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, 175 880 octets. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente date toujours du **28 juillet**.
+- `config.feed` : 60 entrées, aucun message signalant un problème.
+- **Aucune Phase 2.** 25e nuit propre d'affilée côté signalements.
+
+### 📊 Ce que la prod dit du ❤️ du fil de famille (trouvé en Phase 3, corrigé en v2.16.84)
+
+Le bouton coeur est utilisé, et par tout le monde : **31 entrées aimées sur 60, 51 coeurs au total**,
+posés par **3 personnes** (`parent` 31, `yl9xrpu` 18, `q2ymbl8` 2). C'est ce qui rend le défaut
+trouvé cette nuit visible au quotidien : le bouton est un TOGGLE, mais `feed[].likes` était unionné
+à la fusion, donc **retirer son coeur ne tenait jamais**. Rejoué avec les vrais modules sur cette
+copie de prod : **204/204 retraits ressuscités** (client et serveur, dans les deux sens), et
+**0/204 après correctif**, sans emporter aucun coeur voisin (0/160) ni casser le fait de ré-aimer
+(0/408). Détail complet dans `PROJET-ETAT.md`, entrée v2.16.84.
+
+---
+
 ## Passage du 2026-08-17 (routine autonome, nuit, 20e passage)
 
 ### 🌐 Lecture de l'API de production

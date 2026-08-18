@@ -485,15 +485,37 @@ export const mergeFamily = (base, incoming) => {
       if (Array.isArray(o)) return _uniq(o);
       return [];
     })(),
-    feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
+    // v2.16.84 — le ❤️ du fil de famille est un TOGGLE (`toggleFeedLike`, App.jsx ~2366) : retaper
+    // le coeur RETIRE l'id de `likes`. Or `likes` était unionné, et une union ne sait pas exprimer
+    // un retrait — le « je retire mon coeur » revenait à la synchro suivante, pour toujours.
+    // Mesuré en rejouant les vrais modules sur la prod du 18 août : 204/204 retraits ressuscités
+    // (31 entrées aimées, 51 coeurs, client ET serveur, dans les deux sens).
+    // L'union reste le bon choix pour l'AJOUT : deux appareils peuvent aimer la même entrée en même
+    // temps, et un dernière-écriture-gagne perdrait le coeur de l'autre enfant. On garde donc
+    // l'union et on la soustrait d'un tombstone DATÉ, exactement comme `completed`/`deCompleted`
+    // (v2.16.82) : `unlikes[qui]` bat le coeur seulement s'il est plus récent que `likeTs[qui]`,
+    // donc ré-aimer après avoir retiré son coeur refonctionne (sinon le tombstone serait définitif).
+    // Coeurs d'avant la v2.16.84 : pas de `likeTs` → 0 → tout retrait les bat, ce qui est voulu.
+    feed: (() => { // fil de famille : union par id, likes unionnés moins les retraits datés, 60 plus récents
       const m = new Map();
+      const maxPar = (A, B) => { const o = { ...(A || {}) }; for (const [k, v] of Object.entries(B || {})) if ((Number(v) || 0) > (Number(o[k]) || 0)) o[k] = v; return o; };
       for (const f of [...(bC.feed || []), ...(iC.feed || [])]) {
         if (!f || f.id == null) continue;
         const prev = m.get(f.id);
-        if (prev) prev.likes = _uniq([...(prev.likes || []), ...(f.likes || [])]);
-        else m.set(f.id, { ...f, likes: [...(f.likes || [])] });
+        if (prev) {
+          prev.likes = _uniq([...(prev.likes || []), ...(f.likes || [])]);
+          prev.likeTs = maxPar(prev.likeTs, f.likeTs);
+          prev.unlikes = maxPar(prev.unlikes, f.unlikes);
+        } else m.set(f.id, { ...f, likes: [...(f.likes || [])], likeTs: { ...(f.likeTs || {}) }, unlikes: { ...(f.unlikes || {}) } });
       }
-      return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
+      // Les deux tables vides ne sont pas réécrites : le fil voyage à chaque synchro, et 60 entrées
+      // × 2 objets vides pèsent pour rien (leçon des ~5127 `updateFeedEntries`, v2.5.29).
+      return [...m.values()].map((f) => {
+        const e = { ...f, likes: f.likes.filter((q) => (Number(f.unlikes[q]) || 0) <= (Number(f.likeTs[q]) || 0)) };
+        if (!Object.keys(e.likeTs).length) delete e.likeTs;
+        if (!Object.keys(e.unlikes).length) delete e.unlikes;
+        return e;
+      }).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
     })(),
     coinOffers: (() => { // offres de pièces : union par id; une résolution (accepté/refusé) est COLLANTE
       const m = new Map();

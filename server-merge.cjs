@@ -369,7 +369,10 @@ const mergeFamily = (base, incoming) => {
     // v2.16.81 — MIROIR : `&& n.length` retiré (revert silencieux quand le parent décoche la
     // dernière récompense). Voir la note complète dans src/merge.js.
     selectedRewards:(() => { const n=newerC.selectedRewards, o=(preferIncoming?bC:iC).selectedRewards; if (Array.isArray(n)) return _uniq(n); if (Array.isArray(o)) return _uniq(o); return []; })(),
-    feed: (() => { const m=new Map(); for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); else m.set(f.id,{ ...f, likes:[...(f.likes||[])] }); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
+    // v2.16.84 — miroir du merge client : le ❤️ est un TOGGLE, l'union ne savait pas exprimer le
+    // retrait du coeur (204/204 ressuscités sur la prod du 18 août). Tombstone DATÉ `unlikes`, qui
+    // ne bat le coeur que s'il est plus récent que `likeTs` (ré-aimer doit refonctionner).
+    feed: (() => { const m=new Map(); const maxPar=(A,B)=>{ const o={...(A||{})}; for (const [k,v] of Object.entries(B||{})) if ((Number(v)||0)>(Number(o[k])||0)) o[k]=v; return o; }; for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) { prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); prev.likeTs=maxPar(prev.likeTs,f.likeTs); prev.unlikes=maxPar(prev.unlikes,f.unlikes); } else m.set(f.id,{ ...f, likes:[...(f.likes||[])], likeTs:{...(f.likeTs||{})}, unlikes:{...(f.unlikes||{})} }); } return [...m.values()].map(f=>{ const e={ ...f, likes:f.likes.filter(q=>(Number(f.unlikes[q])||0)<=(Number(f.likeTs[q])||0)) }; if(!Object.keys(e.likeTs).length) delete e.likeTs; if(!Object.keys(e.unlikes).length) delete e.unlikes; return e; }).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
     // v2.6.0 — miroir du merge client : quêtes de réparation 🕊️, union-by-id exactly-once
     repairEvents: (() => { const m=new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
     // v2.6.2 — miroir du merge client : récompenses "moment" à planifier, union-by-id + statut MONOTONE
