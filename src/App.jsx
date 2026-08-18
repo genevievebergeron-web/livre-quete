@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.82";
+export const APP_VERSION = "2.16.83";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3813,10 +3813,20 @@ export default function App() {
     logAction(`🔒 Seuil de déblocage boutique/avatar : ${n} tâche(s) rotative(s)`,"#888");
   },[config,gameStates,persist,logAction]);
 
+  // v2.16.83 — le portail parent a DEUX boutons d'annulation, et la v2.16.82 n'en a réparé qu'un.
+  // Celui-ci (« ↩️ Annuler dernière », parentpanel.jsx:575) dépile la dernière validation. Il
+  // retirait la clé de `completed` sans écrire le moindre tombstone : `completed` est une union de
+  // chaînes, un état d'où la clé a disparu n'exprime AUCUN retrait, et la copie d'en face la
+  // ramenait à la synchro suivante — mesuré 32/32 sur la prod du 18 août, les 4 enfants, les deux
+  // sens, client et serveur. Pire que sur l'autre bouton : un 2e clic ne réessaie pas la même
+  // quête, il dépile la PRÉCÉDENTE et reprend SON xp — un parent qui insiste parce que « ça ne
+  // marche pas » vide le compte quête par quête pendant que tout reste coché.
+  // Le mécanisme existe déjà (`deCompleted`, v2.16.82) : il suffit de s'en servir. `completedAt`
+  // n'est pas effacé — c'est la borne de comparaison qui laisse la quête refaite le même jour gagner.
   const handleUndo = useCallback(()=>{
     if(!undoStack.length)return;
     const last=undoStack[undoStack.length-1]; setUndoStack(u=>u.slice(0,-1));
-    setGameStates(gs=>{ const n=[...gs]; const p=n[last.playerIdx]; n[last.playerIdx]={...p,xp:Math.max(0,p.xp-last.xp),coins:Math.max(0,p.coins-last.coins),completed:(p.completed||[]).filter(k=>k!==last.doneKey)}; persist(config,n); return n; });
+    setGameStates(gs=>{ const n=[...gs]; const p=n[last.playerIdx]; n[last.playerIdx]={...p,xp:Math.max(0,p.xp-last.xp),coins:Math.max(0,p.coins-last.coins),completed:(p.completed||[]).filter(k=>k!==last.doneKey),deCompleted:{...(p.deCompleted||{}), [last.doneKey]:Date.now()}}; persist(config,n); return n; });
     showToast("↩️ Action annulée!","#D99248");
   },[undoStack,config,persist,showToast]);
 

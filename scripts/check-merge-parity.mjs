@@ -1006,6 +1006,54 @@ console.log("· époque de reset — le côté qui a vu le reset le plus récent
     fail("époque égale — la fusion normale ne s'applique plus (l'époque court-circuite alors qu'elle ne devrait pas).");
 }
 
+// ── 7e ÉTAGE : LE GESTE ÉCRIT-IL VRAIMENT LE TOMBSTONE ? ───────────────────
+// v2.16.83 — les six étages précédents vérifient que la RÈGLE de fusion sait exprimer un retrait.
+// Aucun ne vérifie que le GESTE qui retire s'en sert. La v2.16.82 a réparé « ↩️ Annuler » (une
+// carte) et laissé intact « ↩️ Annuler dernière » (`handleUndo`) — le MÊME retrait, le même
+// portail parent, le même champ `completed`, à 900 lignes de distance. Le garde-fou est resté
+// vert : la règle `deCompleted` qu'il teste était bel et bien correcte, elle n'était simplement
+// jamais appelée depuis ce bouton-là. Un correctif appliqué à un seul écran ne se voit pas d'ici.
+//
+// Ce contrôle lit la SOURCE, pas la fusion : dans `src/App.jsx`, tout bloc qui réduit une liste
+// à tombstone (`champ: (…).filter(`) doit mentionner le tombstone correspondant dans le même
+// bloc. C'est volontairement grossier — une seule question, posée sur du texte — mais c'est la
+// seule forme capable de voir un appelant manquant.
+//
+// Portée : `src/App.jsx` seul, le fichier des GESTES. `src/migrations.js` en est exclu à dessein —
+// ses nettoyages tournent à CHAQUE chargement sur chaque appareil, donc ils se réappliquent après
+// une fusion qui les défait ; ils n'ont pas besoin de tombstone (vérifié : `frame_maitre_de_soi`
+// est absent d'`owned` chez les 4 enfants en prod, le ménage permanent tient tout seul).
+console.log("· gestes — tout retrait d'une liste à tombstone doit écrire ce tombstone");
+{
+  const GESTES = {
+    completed: "deCompleted", owned: "refundedRewards",
+    announcements: "removedAnnouncements", assignments: "removedAssignments",
+    customTasks: "removedCustomTasks", removalRequests: "removedRemovalRequests",
+    momentRequests: "removedMomentRequests", childTaskProposals: "removedProposals",
+    routines: "removedRoutineIds", calendar: "removedCalendarIds",
+    pendingCelebrations: "consumedCelebrationIds",
+  };
+  const lignes = require("node:fs").readFileSync(path.join(ROOT, "src/App.jsx"), "utf8").split("\n");
+  // Bornes de bloc : les déclarations de premier niveau du composant (`  const handleX`, `  function X`).
+  const bornes = lignes.reduce((acc, l, i) => (/^  (?:const|function) \w+/.test(l) ? [...acc, i] : acc), []);
+  const blocDe = (i) => {
+    let debut = 0, fin = lignes.length;
+    for (const b of bornes) { if (b <= i && b > debut) debut = b; if (b > i && b < fin) fin = b; }
+    return { corps: lignes.slice(debut, fin).join("\n"), nom: (lignes[debut].match(/^  (?:const|function) (\w+)/) || [])[1] || "?" };
+  };
+  for (let i = 0; i < lignes.length; i++) {
+    for (const [champ, tombstone] of Object.entries(GESTES)) {
+      if (!new RegExp("\\b" + champ + "\\s*:\\s*[^,]*\\.filter\\(").test(lignes[i])) continue;
+      const { corps, nom } = blocDe(i);
+      if (!corps.includes(tombstone))
+        fail(`App.jsx:${i + 1} (${nom}) — retire un élément de « ${champ} » sans jamais écrire `
+           + `\`${tombstone}\`. Une liste unionnée ne sait pas exprimer un retrait : la copie d'en `
+           + `face ramènera l'élément à la synchro suivante. Écris le tombstone ICI aussi — la règle `
+           + `de fusion existe déjà, c'est l'appelant qui manque (c'était « handleUndo », v2.16.83).`);
+    }
+  }
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

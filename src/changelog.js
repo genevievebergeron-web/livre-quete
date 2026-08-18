@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.83", date:"2026-08-18", features:[
+    "↩️ Le portail parent a DEUX boutons pour annuler : le petit « ↩️ Annuler » sur une carte (réparé hier) et « ↩️ Annuler dernière » en bas du panneau. Le deuxième avait exactement le même défaut : la quête revenait cochée après la synchro, et un 2e clic ne réessayait pas la même quête : il reprenait l'XP de la validation d'AVANT. Les deux boutons annulent maintenant pour de bon.",
+  ]},
   { version:"2.16.82", date:"2026-08-18", features:[
     "\u21a9\ufe0f Quand un parent annulait une qu\u00eate d\u00e9j\u00e0 valid\u00e9e (le petit bouton \u00ab \u21a9\ufe0f Annuler \u00bb), l'XP et les pi\u00e8ces \u00e9taient bien repris\u2026 mais la qu\u00eate revenait coch\u00e9e quelques secondes plus tard, et chaque nouveau clic reprenait encore des points. L'annulation tient maintenant pour de bon \u2014 et si tu refais la qu\u00eate la m\u00eame journ\u00e9e, elle recompte normalement.",
   ]},
