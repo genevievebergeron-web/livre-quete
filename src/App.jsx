@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.81";
+export const APP_VERSION = "2.16.82";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2919,9 +2919,17 @@ export default function App() {
     const assId = doneKey.split("_")[0];
     const ass = config.assignments.find(a=>a.instanceId===assId);
     const task = ass ? [...TASK_CATALOG,...(config.customTasks||[])].find(t=>t.id===ass.taskId) : null;
+    // v2.16.82 — retirer la clé de `completed` ne suffisait pas : `completed` est une UNION de
+    // chaînes, et un état d'où la clé a disparu n'exprime AUCUN retrait — la copie d'en face la
+    // ramenait à la synchro suivante, dans les deux sens. Le bouton reprenait donc l'XP et les
+    // pièces sans jamais décocher la quête pour de bon, et chaque nouveau clic les reprenait encore.
+    // `deCompleted[doneKey]` = date de l'annulation ; `mergeGS` soustrait de l'union les clés dont
+    // l'annulation est plus récente que la complétion (`completedAt`), donc refaire la quête le même
+    // jour la remet bien au tableau. `completedAt` n'est PAS effacé : c'est la borne de comparaison.
     setGameStates(gs=>{ const n=[...gs]; const p=n[playerIdx];
       n[playerIdx]={...p, xp:Math.max(0,p.xp-(task?.xp||0)), coins:Math.max(0,p.coins-(task?.coins||0)),
-        completed:(p.completed||[]).filter(k=>k!==doneKey)};
+        completed:(p.completed||[]).filter(k=>k!==doneKey),
+        deCompleted:{...(p.deCompleted||{}), [doneKey]:Date.now()}};
       persist(config,n); return n; });
     logAction(`↩️ ${player?.name}: tâche annulée (${task?.label||doneKey})`,"#D99248");
     showToast(`↩️ Tâche annulée pour ${player?.name}`,"#D99248");

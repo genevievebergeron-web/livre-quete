@@ -65,7 +65,55 @@ export const mergeGS = (a, b, preferIncoming) => {
     if (aVieux && !bVieux) return { ...b, resetAt: _resetAt };
     if (bVieux && !aVieux) return { ...a, resetAt: _resetAt };
   }
-  const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
+  // v2.16.82 — `completedAt` : union par clé où la valeur la plus RÉCENTE gagne, au lieu de
+  // « le côté `a` gagne toujours ». L'ordre du spread ne regardait pas `preferIncoming` (c'est le
+  // spread naïf de la v2.16.79, resté sur ce champ). Pour une PREMIÈRE complétion la clé n'existe
+  // que d'un côté, donc l'ordre ne se voyait jamais ; il ne se voit qu'à la RÉÉCRITURE de la même
+  // clé — précisément le cas qu'ouvre le correctif ci-dessous (annuler puis refaire la quête), où
+  // le serveur (`mergeFamily(existing, data)`, l'état stocké en `a`) aurait gardé à vie l'ancien
+  // horodatage. Le max est monotone : il donne le même résultat dans les deux sens et dans les deux
+  // copies, sans avoir besoin de `preferIncoming`. Ensemble de clés inchangé (toujours l'union),
+  // donc la borne de plausibilité de `mergeXpLog` (v2.16.65), qui ne COMPTE que les clés par jour,
+  // est strictement identique.
+  const _completedAt = (() => {
+    const A = a.completedAt || {}, B = b.completedAt || {}, out = { ...A };
+    for (const k of Object.keys(B)) {
+      const prev = out[k];
+      if (prev === undefined) { out[k] = B[k]; continue; }
+      const tp = Date.parse(prev), tb = Date.parse(B[k]);
+      out[k] = (Number.isNaN(tp) || (!Number.isNaN(tb) && tb > tp)) ? B[k] : prev;
+    }
+    return out;
+  })();
+  // v2.16.82 — `deCompleted` : tombstone daté du bouton « ↩️ Annuler » du portail parent
+  // (`handleDeComplete`, App.jsx ~2917 ; visible sur toute carte déjà validée en mode parent).
+  // Le handler retire la clé de `completed` et reprend l'XP et les pièces — mais `completed` est une
+  // UNION de chaînes, et un état d'où la clé a disparu n'exprime AUCUN retrait : la copie d'en face
+  // la ramenait, toujours, dans les deux sens et dans les deux copies (vérifié en rejouant les vrais
+  // modules). Le bouton existe depuis le portail parent et n'a donc jamais rien annulé pour de bon :
+  // la quête revient cochée à la synchro suivante, l'XP et les pièces restent repris, et chaque
+  // nouveau clic les reprend une fois de plus.
+  // La quête peut être REFAITE le même jour (même `doneKey` : `instanceId_playerId#jour`), donc un
+  // tombstone permanent la condamnerait. Même patron que `refundedRewards`/`rewardBuyTs` (v2.16.81) :
+  // le tombstone porte la DATE de l'annulation et ne l'emporte que s'il est plus récent que la
+  // complétion inscrite dans `completedAt`. Une re-validation écrit un horodatage neuf → le
+  // tombstone ne mord plus. Union par clé en MAX : monotone, donc aucun retrait à exprimer ici.
+  const deCompleted = (() => {
+    const A = a.deCompleted || {}, B = b.deCompleted || {}, out = { ...A };
+    for (const k of Object.keys(B)) out[k] = Math.max(Number(out[k]) || 0, Number(B[k]) || 0);
+    const cles = Object.keys(out);
+    if (cles.length <= 400) return out;
+    const garde = cles.sort((x, y) => (out[x] || 0) - (out[y] || 0)).slice(-400); // borné, comme `refusedKeys`
+    const borne = {}; for (const k of garde) borne[k] = out[k];
+    return borne;
+  })();
+  const _annulee = (k) => {
+    const t = Number(deCompleted[k]) || 0;
+    if (!t) return false;
+    const fait = Date.parse(_completedAt[k]); // absent (complétions d'avant la v1.60.0) ou illisible → 0
+    return t > (Number.isNaN(fait) ? 0 : fait);
+  };
+  const completed = _uniq([...(a.completed || []), ...(b.completed || [])]).filter((k) => !_annulee(k));
   const refusedKeys = _uniq([...(a.refusedKeys || []), ...(b.refusedKeys || [])]).slice(-400); // v1.64.0 — tombstone des demandes refusées
   const _refusedSet = new Set(refusedKeys);
   // v2.16.81 — hoistés (le littéral les lisait en place) : `owned` s'appuie dessus, voir plus bas.
@@ -101,7 +149,6 @@ export const mergeGS = (a, b, preferIncoming) => {
   const _aCfg = !!a.avatar?.configured, _bCfg = !!b.avatar?.configured;
   const avatarConfigured = (_aCfg && _bCfg) ? _byKey(a.avatar, b.avatar)
     : _bCfg ? b.avatar : (_aCfg ? a.avatar : _byKey(a.avatar, b.avatar));
-  const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : `mergeXpLog` s'en sert comme borne de plausibilité
   // v2.16.76 — `hiddenRewards` (récompenses « rangées » par l'enfant) n'a de sens QUE pour le jour
   // inscrit dans `hiddenWeek` : la lecture (App.jsx ~415) fait `hiddenWeek===todayStamp() ? ids : []`
   // et l'écriture (handleHideReward, App.jsx ~3707) repart d'une liste VIDE dès que le jour change.
@@ -138,6 +185,7 @@ export const mergeGS = (a, b, preferIncoming) => {
     coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max), voir la tête de mergeGS
     completed,
+    deCompleted, // v2.16.82 — tombstone daté de « ↩️ Annuler » (voir plus haut)
     completedAt: _completedAt, // v1.60.0 — horodatage de complétion (union)
     // v2.16.65 — l'ancienne CONCATÉNATION doublait le journal à chaque synchro (2 → 4 → 8 → … → 500).
     // Mesuré en prod le 14 août : 3 enfants sur 4 avec un journal saturé de 500 entrées toutes datées

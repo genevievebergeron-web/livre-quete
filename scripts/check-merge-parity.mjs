@@ -731,7 +731,12 @@ for (const l of LISTES) {
 // liste non classée fait échouer le contrôle de complétude.
 const CHAINES = [
   // ── gameStates ── monotones : aucun chemin de l'app n'en retire un élément
-  { champ: "completed", dans: "gameStates", sansRetrait: "une quête accomplie ne se dé-accomplit pas (le reset passe par l'époque)" },
+  // v2.16.82 — la raison écrite ici (« une quête accomplie ne se dé-accomplit pas ») était FAUSSE :
+  // le portail parent a un bouton « ↩️ Annuler » sur toute carte validée. Le retrait passe
+  // désormais par le tombstone DATÉ `deCompleted`, qui doit perdre contre une complétion plus
+  // récente (la quête peut être refaite le même jour sous la même clé) — ce que la formule
+  // générique d'ici ne sait pas exprimer. Vérifié dans sa propre section, plus bas.
+  { champ: "completed", dans: "gameStates", sansRetrait: "retrait couvert par sa propre section (tombstone daté `deCompleted`, v2.16.82)" },
   { champ: "activeDays", dans: "gameStates", sansRetrait: "un jour actif ne se retire jamais (série 🔥)" },
   { champ: "badges", dans: "gameStates", sansRetrait: "un badge gagné ne se reprend pas" },
   { champ: "pending", dans: "gameStates", sansRetrait: "le retrait passe par `completed`/`refusedKeys`, filtrés dans la règle elle-même" },
@@ -819,6 +824,150 @@ console.log("· listes de chaînes — un retrait exprimé par le côté frais d
       }
     }
   }
+}
+
+// ── OBJETS : un retrait de SOUS-CLÉ survit-il ? ─────────────────────────────
+// v2.16.82 — 6e étage, la piste nommée par la v2.16.81. Les cinq précédents couvrent les LISTES
+// (objets à id, objets sans id, listes datées, chaînes) et l'époque de reset. Restent les champs
+// dont la valeur est un OBJET dont les SOUS-CLÉS bougent : `equipped` (déséquiper un slot),
+// `house.placed` (retirer un meuble), `completedAt`, `deCompleted`, `settings`, `petNickname`…
+// Une union par clé (`{...a.X, ...b.X}`) ne sait pas plus exprimer un retrait qu'une union de
+// chaînes — sauf si le retrait s'écrit comme une VALEUR (poser `null` sur la clé, qui reste
+// présente), ce qui est le cas d'`equipped` et des bascules de `settings`.
+// Trois classements possibles, comme pour CHAINES ; un champ non classé fait crier la complétude.
+//   • `sansRetrait: "raison"`      — aucun geste de l'app ne retire de sous-clé (dis POURQUOI)
+//   • `valeurNulle: "raison"`      — le retrait s'écrit `null`/`false` SUR la clé : la clé survit,
+//                                    il suffit que la règle respecte la fraîcheur (`_byKey`)
+//   • `derniereEcriture: true`     — objet remplacé en bloc : une clé supprimée reste supprimée
+const OBJETS = [
+  { champ: "equipped", dans: "gameStates", valeurNulle: "`handleEquip` (App.jsx ~2908) est un TOGGLE : retaper l'item équipé pose `null` sur le slot, la clé reste", slot: "hat", garde: "cape" },
+  { champ: "settings", dans: "gameStates", valeurNulle: "bascules d'accessibilité : décocher écrit `false` sur la clé, jamais `delete`", slot: "calm", garde: null },
+  { champ: "house", dans: "gameStates", derniereEcriture: true, slot: "placed",
+    pourquoi: "`toggle` (avatarpopup.jsx:168) fait `delete h.placed[d.anchor]` pour retirer un meuble — la SEULE suppression de clé de l'app" },
+  { champ: "avatar", dans: "gameStates", sansRetrait: "chaque partie du corps a toujours une valeur ; changer d'yeux réécrit la clé, ne la retire pas" },
+  { champ: "petNickname", dans: "gameStates", sansRetrait: "renommer réécrit la clé ; aucun geste ne rend un familier anonyme" },
+  { champ: "petXp", dans: "gameStates", sansRetrait: "monotone (max par familier)" },
+  { champ: "petEvo", dans: "gameStates", sansRetrait: "une évolution ne se dé-évolue pas" },
+  { champ: "catCounts", dans: "gameStates", sansRetrait: "compteurs à vie par étiquette (max par clé) ; le remise à zéro passe par l'époque de reset" },
+  { champ: "rewardBuyTs", dans: "gameStates", sansRetrait: "voyage en bloc avec `boughtRewards` (dernière-écriture-gagne), voir CHAINES" },
+  { champ: "completedAt", dans: "gameStates", sansRetrait: "`handleDeComplete` (v2.16.82) le GARDE exprès : c'est la borne de comparaison du tombstone `deCompleted`" },
+  { champ: "deCompleted", dans: "gameStates", sansRetrait: "tombstone daté (max par clé, ne fait que grandir)" },
+  // seaux datés : la clé `day`/`week` EST le mécanisme de retrait, déjà couvert par leur propre règle
+  { champ: "dailyClaimed", dans: "gameStates", sansRetrait: "seau daté {day, ids} : un jour neuf repart à vide (règle dédiée)" },
+  { champ: "ritualCelebrated", dans: "gameStates", sansRetrait: "seau daté {day, ids} (règle dédiée)" },
+  { champ: "challengeTiers", dans: "gameStates", sansRetrait: "seau daté {week, tiers} (règle dédiée)" },
+  { champ: "sessionMinutes", dans: "gameStates", sansRetrait: "seau daté {day, minutes} (règle dédiée)" },
+  { champ: "petDay", dans: "gameStates", sansRetrait: "seau daté {day, xp} (règle dédiée)" },
+  { champ: "coinsWeek", dans: "gameStates", sansRetrait: "seau daté {week, coins} (règle dédiée)" },
+  { champ: "bossBattle", dans: "gameStates", sansRetrait: "compteurs monotones par boss ; changer de boss remplace l'objet en bloc" },
+  { champ: "weeklyQuests", dans: "config", sansRetrait: "seau daté {generatedForWeek, assignments} (règle dédiée)" },
+  { champ: "weeklyChallenge", dans: "config", sansRetrait: "seau daté {weekKey, challenges} (règle dédiée)" },
+  { champ: "boss", dans: "config", sansRetrait: "objet remplacé en bloc (même boss → état vaincu conservé, sinon le plus récent)" },
+];
+
+console.log("· objets — complétude : tout champ-objet doit être classé");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const declares = new Set(OBJETS.map((o) => `${o.dans}.${o.champ}`));
+  const scan = (obj, dans) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+      if (!declares.has(`${dans}.${k}`))
+        fail(`champ-objet « ${dans}.${k} » non classé : rien ne dit si un geste de l'app en RETIRE `
+           + `une SOUS-CLÉ. Si oui, une union par clé ne peut pas l'exprimer et le retrait sera `
+           + `ressuscité par l'autre copie (c'était « completed », v2.16.82). `
+           + `Ajoute-le à OBJETS dans scripts/check-merge-parity.mjs.`);
+    }
+  };
+  scan(fusion.config, "config");
+  scan(fusion.gameStates[0], "gameStates");
+}
+
+console.log("· objets — un retrait de sous-clé exprimé par le côté frais doit survivre");
+{
+  const avecObjet = (savedAt, gsBase, cfgBase, pl, o, valeur) =>
+    o.dans === "config"
+      ? mkFam(savedAt, gsBase, { ...cfgBase, [o.champ]: valeur }, pl)
+      : mkFam(savedAt, { ...gsBase, [o.champ]: valeur }, cfgBase, pl);
+  const lit = (fam, o) => (o.dans === "config" ? fam.config[o.champ] : fam.gameStates[0][o.champ]) || {};
+  for (const o of OBJETS) {
+    if (o.sansRetrait) {
+      if (typeof o.sansRetrait !== "string" || !o.sansRetrait.length)
+        fail(`champ-objet « ${o.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+      continue;
+    }
+    if (!o.valeurNulle && !o.derniereEcriture)
+      fail(`champ-objet « ${o.champ} » — ni \`sansRetrait\`, ni \`valeurNulle\`, ni \`derniereEcriture\` : classe-le.`);
+    // Le côté FRAIS a retiré la sous-clé `slot` ; le côté périmé la porte encore, garnie.
+    const garni = { [o.slot]: "valeur_perimee", ...(o.garde ? { [o.garde]: "voisin" } : {}) };
+    const retire = o.valeurNulle
+      ? { [o.slot]: null, ...(o.garde ? { [o.garde]: "voisin" } : {}) }   // clé présente, valeur nulle
+      : { ...(o.garde ? { [o.garde]: "voisin" } : {}) };                   // clé supprimée
+    const fFrais = avecObjet("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, retire);
+    const fPerime = avecObjet("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, garni);
+    for (const [sens, base, inc] of [["frais en base", fFrais, fPerime], ["frais en incoming", fPerime, fFrais]]) {
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = lit(fn(base, inc), o);
+        if (out[o.slot])
+          fail(`${nom} mergeFamily (${sens}) — ${o.dans}.${o.champ} : la sous-clé « ${o.slot} » a été `
+             + `retirée par le côté frais et l'autre copie la ressuscite (${JSON.stringify(out[o.slot])}). `
+             + `Une union par clé ne sait pas exprimer un retrait : il faut que le retrait s'écrive `
+             + `comme une VALEUR sur la clé, ou remplacer l'objet en bloc, dans src/merge.js ET `
+             + `server-merge.cjs.`);
+        if (o.garde && out[o.garde] !== "voisin")
+          fail(`${nom} mergeFamily (${sens}) — ${o.dans}.${o.champ} : le retrait a emporté la sous-clé `
+             + `« ${o.garde} », qui n'était pas visée. Le mécanisme de retrait est trop large.`);
+      }
+    }
+  }
+}
+
+// ── TOMBSTONE DATÉ DE « ↩️ ANNULER » ────────────────────────────────────────
+// v2.16.82 — `completed` est classé `sansRetrait` dans CHAINES, avec la raison « une quête accomplie
+// ne se dé-accomplit pas ». C'était FAUX : le portail parent a un bouton « ↩️ Annuler » sur toute
+// carte validée (`handleDeComplete`, App.jsx ~2917), qui retire la clé et reprend l'XP et les pièces.
+// L'union la ramenait toujours. Le classement de `completed` devient donc un tombstone daté, et sa
+// particularité — le tombstone ne doit PAS être définitif, la quête pouvant être refaite le MÊME
+// jour sous la même clé — mérite sa propre section : la formule générique de CHAINES ne sait pas
+// exprimer « le tombstone perd contre une complétion plus récente ».
+console.log("· « ↩️ Annuler » — l'annulation tient, et une quête refaite la même journée la bat");
+{
+  const K = "t1#2026-08-14";
+  const FAIT = "2026-08-14T10:00:00.000Z";
+  const ANNUL = Date.parse(FAIT) + 60_000;
+  const REFAIT = new Date(ANNUL + 60_000).toISOString();
+  const cas = [
+    ["annulée, la copie d'en face l'a encore",
+     { completed: [], completedAt: { [K]: FAIT }, deCompleted: { [K]: ANNUL } },
+     { completed: [K], completedAt: { [K]: FAIT } }, false],
+    ["refaite APRÈS l'annulation, même clé, même jour",
+     { completed: [K], completedAt: { [K]: REFAIT }, deCompleted: { [K]: ANNUL } },
+     { completed: [K], completedAt: { [K]: FAIT }, deCompleted: { [K]: ANNUL } }, true],
+    ["jamais annulée",
+     { completed: [K], completedAt: { [K]: FAIT } }, { completed: [], completedAt: {} }, true],
+    ["héritée (aucun `completedAt`), puis annulée",
+     { completed: [], deCompleted: { [K]: ANNUL } }, { completed: [K] }, false],
+  ];
+  for (const [nom, X, Y, attendu] of cas) {
+    for (const [sens, u, v] of [["a,b", X, Y], ["b,a", Y, X]]) {
+      for (const pref of [true, false]) {
+        const rc = client.mergeGS(u, v, pref), rs = server.mergeGS(u, v, pref);
+        if (!same(rc, rs)) fail(`« ↩️ Annuler » (${nom}, ${sens}, preferIncoming=${pref}) — client ≠ serveur.`);
+        if (rc.completed.includes(K) !== attendu)
+          fail(`mergeGS (${nom}, ${sens}, preferIncoming=${pref}) — « ${K} » ${attendu ? "a disparu de" : "est encore dans"} `
+             + `\`completed\`. Le tombstone daté \`deCompleted\` doit l'emporter sur l'union UNIQUEMENT quand `
+             + `l'annulation est plus récente que la complétion (\`completedAt\`), dans les deux copies.`);
+      }
+    }
+  }
+  // `completedAt` doit garder l'horodatage le PLUS RÉCENT, sinon une quête refaite resterait
+  // annulée du côté serveur (l'état stocké y est toujours en `a`).
+  for (const [sens, u, v] of [["a,b", { completedAt: { [K]: REFAIT } }, { completedAt: { [K]: FAIT } }],
+                              ["b,a", { completedAt: { [K]: FAIT } }, { completedAt: { [K]: REFAIT } }]])
+    for (const pref of [true, false])
+      if (client.mergeGS(u, v, pref).completedAt[K] !== REFAIT)
+        fail(`mergeGS (${sens}, preferIncoming=${pref}) — \`completedAt\` ne garde pas l'horodatage le plus `
+           + `récent : une quête refaite après annulation resterait annulée pour toujours.`);
 }
 
 // ── ÉPOQUE DE RESET : le seul retrait qui porte sur TOUT l'état ─────────────

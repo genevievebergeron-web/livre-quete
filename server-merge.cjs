@@ -116,7 +116,39 @@ const mergeGS = (a, b, preferIncoming) => {
     if (aVieux && !bVieux) return { ...b, resetAt: _resetAt };
     if (bVieux && !aVieux) return { ...a, resetAt: _resetAt };
   }
-  const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]);
+  // v2.16.82 — miroir EXACT du correctif client (src/merge.js) : `completedAt` en union par clé où
+  // l'horodatage le plus RÉCENT gagne (l'ordre du spread ne regardait pas `preferIncoming`, et ici
+  // c'est l'état STOCKÉ qui est en `a` — une re-validation n'aurait jamais pu s'inscrire), et
+  // `deCompleted`, tombstone daté du bouton « ↩️ Annuler » du portail parent. `completed` est une
+  // union de chaînes : un état d'où la clé a disparu n'exprime aucun retrait, donc l'annulation était
+  // systématiquement défaite par la copie d'en face. Le tombstone ne l'emporte que s'il est plus
+  // récent que la complétion, pour qu'une quête refaite le même jour (même `doneKey`) tienne.
+  const _completedAt = (() => {
+    const A = a.completedAt || {}, B = b.completedAt || {}, out = { ...A };
+    for (const k of Object.keys(B)) {
+      const prev = out[k];
+      if (prev === undefined) { out[k] = B[k]; continue; }
+      const tp = Date.parse(prev), tb = Date.parse(B[k]);
+      out[k] = (Number.isNaN(tp) || (!Number.isNaN(tb) && tb > tp)) ? B[k] : prev;
+    }
+    return out;
+  })();
+  const deCompleted = (() => {
+    const A = a.deCompleted || {}, B = b.deCompleted || {}, out = { ...A };
+    for (const k of Object.keys(B)) out[k] = Math.max(Number(out[k]) || 0, Number(B[k]) || 0);
+    const cles = Object.keys(out);
+    if (cles.length <= 400) return out;
+    const garde = cles.sort((x, y) => (out[x] || 0) - (out[y] || 0)).slice(-400);
+    const borne = {}; for (const k of garde) borne[k] = out[k];
+    return borne;
+  })();
+  const _annulee = (k) => {
+    const t = Number(deCompleted[k]) || 0;
+    if (!t) return false;
+    const fait = Date.parse(_completedAt[k]);
+    return t > (Number.isNaN(fait) ? 0 : fait);
+  };
+  const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]).filter((k) => !_annulee(k));
   const refusedKeys = _uniq([...(a.refusedKeys||[]), ...(b.refusedKeys||[])]).slice(-400); // v1.64.0 — tombstone des refus
   const _refusedSet = new Set(refusedKeys);
   // v2.16.81 — MIROIR de src/merge.js : `owned` était une union pure, donc le retrait de
@@ -139,7 +171,6 @@ const mergeGS = (a, b, preferIncoming) => {
   const _aCfg = !!a.avatar?.configured, _bCfg = !!b.avatar?.configured;
   const avatarConfigured = (_aCfg && _bCfg) ? _byKey(a.avatar, b.avatar)
     : _bCfg ? b.avatar : (_aCfg ? a.avatar : _byKey(a.avatar, b.avatar));
-  const _completedAt = { ...(b.completedAt || {}), ...(a.completedAt || {}) }; // v2.16.65 — hissé : borne de plausibilité de mergeXpLog
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.16.67 — miroir du client (v2.7.0) : le serveur ne transportait pas du tout ce tombstone
   // v2.16.76 — miroir du correctif client (src/merge.js) : `hiddenRewards` n'a de sens que pour le
   // jour inscrit dans `hiddenWeek`, or la liste était en union sans fin et le jour en « l'incoming
@@ -163,6 +194,7 @@ const mergeGS = (a, b, preferIncoming) => {
     coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
     resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max)
     completed,
+    deCompleted, // v2.16.82 — tombstone daté de « ↩️ Annuler »
     completedAt: _completedAt,
     xpLog: mergeXpLog(a.xpLog, b.xpLog, _completedAt), // v2.16.65 — miroir du merge client : union par `id`, multiplicité MAX (jamais la somme) pour l'hérité, + réparation des journaux déjà gonflés
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées

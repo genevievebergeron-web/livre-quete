@@ -92,6 +92,7 @@ export const migrateGameState = (gs) => {
     petNickname: gs.petNickname || {}, // v2.4.2 — surnom personnalisé par familier {petId:string}
     dismissedAnnouncements: gs.dismissedAnnouncements || [], // v2.6.0 — annonces parent archivées par l'enfant
     completedAt: gs.completedAt || {}, // v1.60.0 — horodatage de complétion {doneKey:ISO}
+    deCompleted: gs.deCompleted || {}, // v2.16.82 — tombstone daté de « ↩️ Annuler » (portail parent) {doneKey:ts}
     // v2.16.32 — Backlog #13 : journal d'XP horodaté toutes sources (voir appendXpLog).
     // v2.16.65 — réparé au chargement (sans drapeau, idempotent, même patron que `activeDaysFromCompleted`) :
     // l'ancienne fusion concaténait le journal et le doublait à chaque synchro jusqu'au plafond de 500.

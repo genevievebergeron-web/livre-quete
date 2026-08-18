@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.82", date:"2026-08-18", features:[
+    "\u21a9\ufe0f Quand un parent annulait une qu\u00eate d\u00e9j\u00e0 valid\u00e9e (le petit bouton \u00ab \u21a9\ufe0f Annuler \u00bb), l'XP et les pi\u00e8ces \u00e9taient bien repris\u2026 mais la qu\u00eate revenait coch\u00e9e quelques secondes plus tard, et chaque nouveau clic reprenait encore des points. L'annulation tient maintenant pour de bon \u2014 et si tu refais la qu\u00eate la m\u00eame journ\u00e9e, elle recompte normalement.",
+  ]},
   { version:"2.16.81", date:"2026-08-17", features:[
     "\u21a9\ufe0f Quand tu tapais « J'ai changé d'idée » sur une récompense, tu récupérais bien tes pièces… mais la récompense restait quand même dans tes affaires, pour toujours. Deux d'entre vous traînaient encore des récompenses rendues en juin et en juillet. C'est nettoyé, et ça ne reviendra plus.",
     "\ud83d\udd04 Le bouton « Reset complet » du portail parent ne remettait presque rien à zéro : l'XP, les quêtes accomplies, les objets et les badges revenaient du nuage juste après. Un reset est maintenant un vrai reset.",
