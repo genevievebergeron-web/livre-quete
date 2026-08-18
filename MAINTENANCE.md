@@ -1278,3 +1278,54 @@ rejeu des vrais modules du dépôt sur le vrai JSON de prod — 155 assertions, 
 - Rien de neuf. Les points hérités restent : la restauration des soldes du 28 juillet, le ménage
   des 26 doublons de `customTasks`, les 67 assignations en double, `config.weekPersist` mort, et
   le clic « Soirée cinéma » ci-dessus.
+
+---
+
+## Passage du 2026-08-17 (nuit, routine autonome, 16e passage) — Phase 1 propre, 3 bugs de fusion sur les listes de chaînes
+
+**Phase 0** : `git pull` déjà à jour (`ce37e3d`, v2.16.80), `npm run build` propre. `PROJET-ETAT.md`
+vérifié contre `git log` : les 7 dernières versions (v2.16.74 → v2.16.80) ont chacune leur entrée
+dédiée, la ligne d'en-tête était bien à `v2.16.80` = `HEAD`. Aucun trou à combler.
+
+**Phase 1** — lecture `GET /api/famille` (HTTP 200, `savedAt` 2026-08-17T10:35:08Z). ⚠️ **Le premier
+appel a mis plus de 60 s et rendu `{"erreur":"erreur serveur"}`** ; les deux suivants ont répondu en
+1,1 s puis 0,2 s. Démarrage à froid, pas un incident — mais à savoir : **un `curl` unique qui échoue
+sur cette API ne prouve rien**, il faut relancer avant de conclure « prod inaccessible ».
+- **14 `config.bugs`, identiques id pour id depuis le 31 juillet.** Tous déjà classés. Rien de neuf.
+- `errorLogs` **vide**. `coinOffers` / `teamInvites` / `repairEvents` / `momentRequests` /
+  `removalRequests` / `removedProposals` / `childTaskProposals` tous **vides**. 9 annonces (intactes :
+  les tombstones de la v2.16.80 n'existent pas encore en prod, comme prévu).
+- `feed` : 60 entrées, dernier événement réel au 7 août, aucun message de signalement neuf.
+- **Aucun bug à corriger → pas de Phase 2.**
+
+**Phase 3 — comment le sujet a été trouvé.** Backlog écrit toujours épuisé, chantier 24 toujours sans
+candidat autonome. La piste **était nommée par la v2.16.80** : « aucun contrôle ne regarde la fusion
+des listes de CHAÎNES ». Méthode : lister les listes de chaînes réellement présentes dans les
+instantanés de prod (23), puis pour chacune **chercher dans l'app un geste qui en RETIRE un élément**
+(`grep` des `filter`/`splice` par champ) plutôt que relire les règles de fusion. Deux gestes trouvés,
+tous deux avec preuve dans la donnée, plus un troisième sorti du garde-fou écrit ensuite.
+
+- **`owned`** — « J'ai changé d'idée » retire l'id, l'union le ramenait. **3 récompenses remboursées
+  encore possédées en prod** : `rw_depanneur` + `rw_bonbon` chez Elli (20 juillet), `rw_depanneur`
+  chez Antoine DR (15 juin). Pièces rendues **et** récompense gardée, depuis deux mois.
+- **`handleResetPlayer`** — « Reset complet » ne remettait à zéro que `coins` (12 champs sur 13
+  revenaient du nuage ; côté serveur le reset ne pouvait même pas être accepté).
+- **`selectedRewards`** — un `&& n.length` qui diverge de sa règle jumelle `customRewards` : décocher
+  la dernière récompense se faisait annuler en silence.
+
+Voir `PROJET-ETAT.md`, entrée **v2.16.81** (mécanismes, correctifs, garde-fou du 5e étage, preuves de
+sensibilité, 171 vérifications de non-régression sur la vraie donnée).
+
+**Pas de vérification navigateur** : `preview_start` refusé en session planifiée (14e passage
+d'affilée, « Dev servers can't be started from unattended sessions »). Vérification par rejeu des
+vrais modules du dépôt sur le vrai JSON de prod.
+
+### 💡 À signaler à Gen (ajout de ce passage)
+- **Rien à faire de ta part pour les 3 récompenses fantômes** : elles disparaissent d'`owned` toutes
+  seules à la première fusion après le déploiement. C'est bien l'état correct (elles ont été
+  remboursées, les pièces sont déjà rendues depuis longtemps).
+- **`handleResetPlayer` fonctionne enfin pour de vrai.** Si tu as déjà cliqué « Reset complet » sur un
+  enfant par le passé en pensant que ça n'avait pas marché : ça n'avait effectivement pas marché.
+  Maintenant oui, et c'est irréversible — le dialogue de confirmation dit la vérité désormais.
+- Les points hérités restent : restauration des soldes du 28 juillet, ménage des 26 doublons de
+  `customTasks`, les 67 assignations en double, `config.weekPersist` mort, le clic « Soirée cinéma ».

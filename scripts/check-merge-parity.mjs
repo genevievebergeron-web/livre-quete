@@ -49,6 +49,7 @@ const same = (a, b) => JSON.stringify(norm(a)) === JSON.stringify(norm(b));
 // seul moyen de voir une règle manquante (un champ identique des deux côtés
 // donne le même résultat même sans règle du tout).
 const gsA = {
+  resetAt: 1755000000000, // v2.16.81 — même valeur dans gsB : voir l'exemption de `memeValeur` plus bas
   xp: 900, coins: 120, coinsLifetime: 900, coinsWeek: { week: "2026-08-14", coins: 40 },
   completed: ["t1#2026-08-14"], completedAt: { "t1#2026-08-14": "2026-08-14T10:00:00.000Z" },
   xpLog: [{ id: "x1", date: "2026-08-14", amount: 20, source: "quete" }],
@@ -127,7 +128,13 @@ const memeValeur = (a, b, quoi, exempt = {}) => {
   }
 };
 console.log("· fixtures — chaque champ connu doit se contredire entre A et B");
-memeValeur(gsA, gsB, "gameStates");
+// v2.16.81 — `resetAt` est le SEUL champ légitimement exempté, et pour une raison de fond : ce
+// n'est pas un contenu, c'est une ÉPOQUE. Deux valeurs différentes font retourner à `mergeGS` un
+// côté ENTIER (voir sa tête), donc tous les contrôles champ-par-champ ci-dessous deviendraient
+// vides de sens — le garde-fou passerait au vert en ne surveillant plus rien. Il porte donc la
+// même valeur des deux côtés ici, et son arbitrage a sa propre section dédiée (« époque de
+// reset »), qui le met justement en contradiction.
+memeValeur(gsA, gsB, "gameStates", { resetAt: true });
 
 console.log("· mergeGS — champ par champ, dans les deux sens et les deux préférences");
 for (const [la, a, lb, b] of [["A", gsA, "B", gsB], ["B", gsB, "A", gsA]]) {
@@ -706,6 +713,148 @@ for (const l of LISTES) {
            + `Applique le tombstone dans src/merge.js ET server-merge.cjs.`);
     }
   }
+}
+
+// ── LISTES DE CHAÎNES : le 5e étage, celui du RETRAIT ──────────────────────
+// v2.16.81 — les quatre formes d'objet sont couvertes (plate, arbitrée en bloc, clé par clé,
+// tableau unionné par `id`). Restait la plus banale et la moins regardée : le tableau de CHAÎNES,
+// une quinzaine de champs tous en `_uniq([...a, ...b])`. La question « quelles listes de chaînes
+// connaissent un RETRAIT, et ce retrait survit-il ? » n'avait jamais été posée une seule fois —
+// alors que `boughtRewards` et `refusals`, dans la MÊME fonction, sont explicitement en
+// dernière-écriture-gagne, ce qui prouve que la question se pose.
+// Réponse mesurée sur la prod du 17 août : `owned` avait trois retraits jamais appliqués
+// (`rw_depanneur` et `rw_bonbon` chez Elli, remboursés le 20 juillet ; `rw_depanneur` chez
+// Antoine DR, remboursé le 15 juin) — « J'ai changé d'idée » rend les pièces et l'enfant garde
+// quand même la récompense, pour toujours.
+// Une union est le BON choix quand la liste ne fait que grandir (tombstones, badges, jours actifs).
+// Elle est fausse dès qu'un geste retire un élément. Chaque liste doit donc se classer, et une
+// liste non classée fait échouer le contrôle de complétude.
+const CHAINES = [
+  // ── gameStates ── monotones : aucun chemin de l'app n'en retire un élément
+  { champ: "completed", dans: "gameStates", sansRetrait: "une quête accomplie ne se dé-accomplit pas (le reset passe par l'époque)" },
+  { champ: "activeDays", dans: "gameStates", sansRetrait: "un jour actif ne se retire jamais (série 🔥)" },
+  { champ: "badges", dans: "gameStates", sansRetrait: "un badge gagné ne se reprend pas" },
+  { champ: "pending", dans: "gameStates", sansRetrait: "le retrait passe par `completed`/`refusedKeys`, filtrés dans la règle elle-même" },
+  { champ: "refusedKeys", dans: "gameStates", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "refundedRewards", dans: "gameStates", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedCalendarIds", dans: "gameStates", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedRoutineIds", dans: "gameStates", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "consumedCelebrationIds", dans: "gameStates", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "dismissedAnnouncements", dans: "gameStates", sansRetrait: "archiver une annonce ne s'annule pas" },
+  { champ: "hiddenRewards", dans: "gameStates", sansRetrait: "seau daté (v2.16.76) : le retrait s'exprime par un `hiddenWeek` plus frais, pas par l'union" },
+  // ── gameStates ── retrait réel
+  { champ: "owned", dans: "gameStates", tombstone: "refundedRewards",
+    retire: "rw_depanneur", marque: "rw_depanneur#111", garde: "item_perso",
+    gsPlus: { rewardBuyTs: { rw_depanneur: 111 } },
+    // ⚠️ `rewardBuyTs` voyage avec `boughtRewards` (dernière-écriture-gagne) : la marque doit être
+    // posée du côté FRAIS, sinon la clé `id#estampille` ne se reconstitue pas et le contrôle ment.
+    pourquoi: "« J'ai changé d'idée » (App.jsx ~3575/3580) retire l'id d'`owned`" },
+  // ── gameStates ── pas des unions : dernière-écriture-gagne, le retrait tient par construction
+  { champ: "boughtRewards", dans: "gameStates", derniereEcriture: true, retire: "rw_ecran", garde: null },
+  { champ: "refusals", dans: "gameStates", derniereEcriture: true, retire: "r-a", garde: null },
+  // ── config ──
+  { champ: "seenVersions", dans: "config", sansRetrait: "journal des versions vues (ne fait que grandir)" },
+  { champ: "selectedRewards", dans: "config", derniereEcriture: true, retire: "rw_ecran", garde: null },
+  { champ: "removedAssignments", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedCustomTasks", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedRemovalRequests", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedProposals", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedAnnouncements", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "removedMomentRequests", dans: "config", sansRetrait: "tombstone (ne fait que grandir)" },
+  { champ: "starterThemes", dans: "config", sansRetrait: "posé à la création du joueur, jamais réduit" },
+];
+
+console.log("· listes de chaînes — complétude : toute liste de chaînes doit être classée");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const declarees = new Set(CHAINES.map((l) => `${l.dans}.${l.champ}`));
+  const scan = (obj, dans) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!Array.isArray(v) || !v.length) continue;
+      if (typeof v[0] !== "string") continue;
+      if (!declarees.has(`${dans}.${k}`))
+        fail(`liste de chaînes « ${dans}.${k} » non classée : rien ne dit si un geste de l'app en `
+           + `RETIRE un élément. Si oui, une union pure ne peut pas l'exprimer et le retrait sera `
+           + `ressuscité par l'autre copie à la synchro suivante (c'était « owned », v2.16.81). `
+           + `Ajoute-la à CHAINES dans scripts/check-merge-parity.mjs.`);
+    }
+  };
+  scan(fusion.config, "config");
+  scan(fusion.gameStates[0], "gameStates");
+}
+
+console.log("· listes de chaînes — un retrait exprimé par le côté frais doit survivre");
+{
+  const avecChaine = (savedAt, gsBase, cfgBase, pl, l, valeurs, plus = {}) =>
+    l.dans === "config"
+      ? mkFam(savedAt, gsBase, { ...cfgBase, [l.champ]: valeurs, ...plus }, pl)
+      : mkFam(savedAt, { ...gsBase, [l.champ]: valeurs, ...plus }, cfgBase, pl);
+  const lit = (fam, l) => (l.dans === "config" ? fam.config[l.champ] : fam.gameStates[0][l.champ]) || [];
+  for (const l of CHAINES) {
+    if (l.sansRetrait) {
+      if (typeof l.sansRetrait !== "string" || !l.sansRetrait.length)
+        fail(`liste de chaînes « ${l.champ} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+      continue;
+    }
+    if (!l.tombstone && !l.derniereEcriture)
+      fail(`liste de chaînes « ${l.champ} » — ni \`sansRetrait\`, ni \`tombstone\`, ni \`derniereEcriture\` : classe-la.`);
+    // Le côté FRAIS a retiré l'élément ; le côté périmé l'a encore. Sans mécanisme de retrait,
+    // l'union le ramène — exactement le défaut d'`owned`.
+    const restant = l.garde ? [l.garde] : [];
+    const plusFrais = { ...(l.gsPlus || {}), ...(l.tombstone ? { [l.tombstone]: [l.marque] } : {}) };
+    const plusPerime = { ...(l.gsPlus || {}) };
+    const fFrais = avecChaine("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, restant, plusFrais);
+    const fPerime = avecChaine("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [...restant, l.retire], plusPerime);
+    for (const [sens, base, inc] of [["frais en base", fFrais, fPerime], ["frais en incoming", fPerime, fFrais]]) {
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = lit(fn(base, inc), l);
+        if (out.includes(l.retire))
+          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.champ} : « ${l.retire} » a été RETIRÉ par le `
+             + `côté frais et l'autre copie le ressuscite. Une union de chaînes ne sait pas exprimer un `
+             + `retrait : il faut un tombstone (ici \`${l.tombstone || "?"}\`) ou la dernière-écriture-gagne, `
+             + `dans src/merge.js ET server-merge.cjs.`);
+        if (l.garde && !out.includes(l.garde))
+          fail(`${nom} mergeFamily (${sens}) — ${l.dans}.${l.champ} : le retrait a emporté « ${l.garde} », `
+             + `qui n'était pas visé. Le mécanisme de retrait est trop large.`);
+      }
+    }
+  }
+}
+
+// ── ÉPOQUE DE RESET : le seul retrait qui porte sur TOUT l'état ─────────────
+// v2.16.81 — « Reset complet » (portail parent) écrit un état vide. Un état vide n'exprime aucun
+// retrait face à des `Math.max` et à des unions : mesuré sur la prod du 17 août, 12 des 13 champs
+// revenaient du nuage, et côté serveur le reset ne pouvait même pas être accepté. `resetAt` en fait
+// une époque. Ce contrôle est aussi la contrepartie de son exemption dans `memeValeur` : le champ y
+// porte la même valeur des deux côtés, il doit donc être mis en contradiction ICI.
+console.log("· époque de reset — le côté qui a vu le reset le plus récent gagne ENTIÈREMENT");
+{
+  const vide = { resetAt: 1755999999999, xp: 0, coins: 0, coinsLifetime: 0, completed: [], pending: [],
+                 owned: [], equipped: {}, boughtRewards: [], badges: [], activeDays: [], refusedKeys: [] };
+  const plein = { ...gsA, resetAt: 1755000000000 }; // a vu un reset PLUS ANCIEN
+  const champs = ["xp", "coinsLifetime", "completed", "owned", "badges", "activeDays", "refusedKeys"];
+  for (const [sens, x, y] of [["reset en a", vide, plein], ["reset en b", plein, vide]]) {
+    for (const pref of [true, false]) {
+      const rc = client.mergeGS(x, y, pref), rs = server.mergeGS(x, y, pref);
+      if (!same(rc, rs)) fail(`époque de reset (${sens}, preferIncoming=${pref}) — client ≠ serveur.`);
+      for (const f of champs) {
+        const v = rc[f];
+        const reste = Array.isArray(v) ? v.length : (v || 0);
+        if (reste)
+          fail(`mergeGS (${sens}, preferIncoming=${pref}) — « ${f} » vaut encore ${JSON.stringify(v)} après un `
+             + `reset plus récent. Un état vide n'exprime aucun retrait face à un max()/une union : c'est `
+             + `\`resetAt\` qui doit trancher, en tête de mergeGS, dans les deux copies.`);
+      }
+      if ((rc.resetAt || 0) !== 1755999999999)
+        fail(`mergeGS (${sens}, preferIncoming=${pref}) — l'époque \`resetAt\` ne se propage pas : le prochain `
+           + `appareil qui pousse son vieil état ferait revenir toute la progression.`);
+    }
+  }
+  // À époque ÉGALE, rien ne court-circuite : la fusion normale doit reprendre la main.
+  const n1 = client.mergeGS(gsA, gsB, true), n2 = server.mergeGS(gsA, gsB, true);
+  if (!same(n1, n2)) fail("époque égale — client ≠ serveur.");
+  if ((n1.completed || []).length < 2)
+    fail("époque égale — la fusion normale ne s'applique plus (l'époque court-circuite alors qu'elle ne devrait pas).");
 }
 
 if (failures) {

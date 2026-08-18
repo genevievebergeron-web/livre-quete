@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.80";
+export const APP_VERSION = "2.16.81";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3760,7 +3760,13 @@ export default function App() {
     // `coinsWeek` sans drapeau — donc l'ancien reset hebdomadaire réarmé sur les pièces regagnées
     // depuis. Le drapeau voyage maintenant avec l'état plutôt que d'être seulement reposé au prochain
     // chargement. Voir le bloc d'historique en tête de `migrateGameState`.
-    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,coinsLifetime:0,coinsWeek:{week:custodyWeekKey()},noCoinsResetV1:true,completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
+    // v2.16.81 — `resetAt` : sans lui, ce reset ne remettait à zéro QUE `coins`. Un état vide
+    // n'exprime aucun retrait face à des `Math.max` (xp, coinsLifetime) et à des unions
+    // (completed, owned, badges, activeDays, refusedKeys…) : mesuré sur la prod du 17 août, 12 des
+    // 13 champs revenaient du nuage à la synchro suivante, et côté serveur le reset ne pouvait même
+    // pas être accepté (`mergeFamily(existing, data)` met le stocké en base). L'estampille fait du
+    // reset une ÉPOQUE que `mergeGS` sait arbitrer — voir la tête de `mergeGS` dans `src/merge.js`.
+    setGameStates(gs=>{ const n=[...gs]; n[playerIdx]={xp:0,coins:0,coinsLifetime:0,coinsWeek:{week:custodyWeekKey()},noCoinsResetV1:true,resetAt:Date.now(),completed:[],pending:[],owned:[],equipped:{},boughtRewards:[],badges:[],avatar:n[playerIdx].avatar}; persist(config,n); return n; });
     logAction(`🔄 Reset complet: ${player?.name}`,"#D97070");
     showToast(`🔄 ${player?.name} réinitialisé`,"#D97070");
   },[config,persist,logAction,showToast]);

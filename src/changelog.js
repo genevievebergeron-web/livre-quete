@@ -6,6 +6,11 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.81", date:"2026-08-17", features:[
+    "\u21a9\ufe0f Quand tu tapais « J'ai changé d'idée » sur une récompense, tu récupérais bien tes pièces… mais la récompense restait quand même dans tes affaires, pour toujours. Deux d'entre vous traînaient encore des récompenses rendues en juin et en juillet. C'est nettoyé, et ça ne reviendra plus.",
+    "\ud83d\udd04 Le bouton « Reset complet » du portail parent ne remettait presque rien à zéro : l'XP, les quêtes accomplies, les objets et les badges revenaient du nuage juste après. Un reset est maintenant un vrai reset.",
+    "\ud83c\udf81 Si ton parent décochait la toute dernière récompense de la liste, son ancienne sélection revenait toute seule. Corrigé.",
+  ]},
   { version:"2.16.80", date:"2026-08-17", features:[
     "🗑️ Une annonce supprimée par ton parent revenait toute seule à la synchro suivante — en fait elle n'a jamais pu être supprimée pour de bon. C'est réglé : quand elle part, elle part.",
     "🙅 Quand ton parent refusait ta demande « Je ne veux plus de cette tâche », la demande réapparaissait dans son portail à chaque synchro, encore et encore. Le refus tient maintenant.",

@@ -105,9 +105,29 @@ const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
 };
 const mergeGS = (a, b, preferIncoming) => {
   a = a || {}; b = b || {};
+  // v2.16.81 — MIROIR de src/merge.js. ÉPOQUE DE RESET : un état VIDE n'exprime aucun retrait face
+  // à des max() et des unions, donc « Reset complet » ne remettait à zéro que `coins`. Ici c'était
+  // même sans appel : `mergeFamily(existing, data)` met toujours le stocké en `a`, donc le reset
+  // n'atteignait JAMAIS le nuage. Le côté qui a vu le reset le plus récent gagne entièrement.
+  const _resetAt = Math.max(Number(a.resetAt) || 0, Number(b.resetAt) || 0);
+  if (_resetAt > 0) {
+    const aVieux = (Number(a.resetAt) || 0) < _resetAt;
+    const bVieux = (Number(b.resetAt) || 0) < _resetAt;
+    if (aVieux && !bVieux) return { ...b, resetAt: _resetAt };
+    if (bVieux && !aVieux) return { ...a, resetAt: _resetAt };
+  }
   const completed = _uniq([...(a.completed||[]), ...(b.completed||[])]);
   const refusedKeys = _uniq([...(a.refusedKeys||[]), ...(b.refusedKeys||[])]).slice(-400); // v1.64.0 — tombstone des refus
   const _refusedSet = new Set(refusedKeys);
+  // v2.16.81 — MIROIR de src/merge.js : `owned` était une union pure, donc le retrait de
+  // « J'ai changé d'idée » ne survivait pas. `refundedRewards` sert de tombstone (keyé sur l'achat).
+  const _refunded = _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200);
+  const _rewardBuyTs = preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {});
+  const _disowned = (id) => {
+    const stamp = _rewardBuyTs[id];
+    if (stamp != null) return _refunded.includes(id + "#" + String(stamp));
+    return _refunded.some((k) => typeof k === "string" && k.startsWith(id + "#"));
+  };
   // v2.16.79 — MIROIR de src/merge.js. Objets fusionnés CLÉ PAR CLÉ : chaque sous-clé de l'incoming
   // gagnait, même périmée, sans jamais regarder `preferIncoming`. L'union par clé est conservée (un
   // appareil peut connaître une clé que l'autre ignore) ; seul l'ordre du spread s'inverse quand
@@ -141,16 +161,17 @@ const mergeGS = (a, b, preferIncoming) => {
     // v2.5.26 — miroir du fix client v2.5.3 : sans ça, le spread ...b laissait n'importe quel client
     // (même un vieux, pas à jour) écraser coinsWeek côté serveur. On garde la semaine la plus récente.
     coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
+    resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max)
     completed,
     completedAt: _completedAt,
     xpLog: mergeXpLog(a.xpLog, b.xpLog, _completedAt), // v2.16.65 — miroir du merge client : union par `id`, multiplicité MAX (jamais la somme) pour l'hérité, + réparation des journaux déjà gonflés
     pending: _uniq([...(a.pending||[]), ...(b.pending||[])]).filter(k => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
-    owned: _uniq([...(a.owned||[]), ...(b.owned||[])]),
+    owned: _uniq([...(a.owned||[]), ...(b.owned||[])]).filter((id) => !_disowned(id)), // v2.16.81 — voir `_disowned`
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins)
-    rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}), // v2.16.62 — voyage avec boughtRewards (même règle) : une résurrection ramène l'ancienne estampille, déjà tombstonée
-    refundedRewards: _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62
+    rewardBuyTs: _rewardBuyTs, // v2.16.62 — voyage avec boughtRewards (même règle) : une résurrection ramène l'ancienne estampille, déjà tombstonée ; hoisté en v2.16.81
+    refundedRewards: _refunded, // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62 ; hoisté en v2.16.81
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: _byKey(a.equipped, b.equipped), // v2.16.79 — voir `_byKey` ci-dessus ; signalement `bug_56gb01a` (« il me mais tougour un casque de chevalier »)
     calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
@@ -313,7 +334,9 @@ const mergeFamily = (base, incoming) => {
     // v2.16.56 — miroir du merge client : récompenses cochées par le parent = DERNIÈRE ÉCRITURE GAGNE.
     // En union, aucun décochage ne survivait à une synchro. Une liste vide ne peut pas écraser une
     // liste réelle.
-    selectedRewards:(() => { const n=newerC.selectedRewards, o=(preferIncoming?bC:iC).selectedRewards; if (Array.isArray(n)&&n.length) return _uniq(n); if (Array.isArray(o)&&o.length) return _uniq(o); return []; })(),
+    // v2.16.81 — MIROIR : `&& n.length` retiré (revert silencieux quand le parent décoche la
+    // dernière récompense). Voir la note complète dans src/merge.js.
+    selectedRewards:(() => { const n=newerC.selectedRewards, o=(preferIncoming?bC:iC).selectedRewards; if (Array.isArray(n)) return _uniq(n); if (Array.isArray(o)) return _uniq(o); return []; })(),
     feed: (() => { const m=new Map(); for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); else m.set(f.id,{ ...f, likes:[...(f.likes||[])] }); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
     // v2.6.0 — miroir du merge client : quêtes de réparation 🕊️, union-by-id exactly-once
     repairEvents: (() => { const m=new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),

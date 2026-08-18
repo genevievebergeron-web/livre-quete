@@ -47,9 +47,38 @@ export const _mergeCalendar = (a, b, removedIds) => {
 // Fusion d'un état de joueur — non régressive (max XP/pièces, union des listes)
 export const mergeGS = (a, b, preferIncoming) => {
   a = a || {}; b = b || {};
+  // v2.16.81 — ÉPOQUE DE RESET. « Reset complet » (portail parent, `handleResetPlayer`) promet
+  // « XP, pièces et tâches seront à 0 » et remet effectivement tout l'état du joueur à vide en
+  // local. Mais la fusion, elle, ne savait pas ce qu'est un reset : `xp`/`coinsLifetime` en max(),
+  // `completed`/`owned`/`badges`/`activeDays`/`refusedKeys`… en union — un état VIDE n'exprime donc
+  // AUCUN retrait. Mesuré sur la donnée de prod du 17 août (Elli Le Pickle) : sur 13 champs, un
+  // seul (`coins`, dernière-écriture-gagne) tombait vraiment à 0 ; 2659 XP, 105 quêtes accomplies,
+  // 27 objets, 21 badges et 18 jours actifs revenaient tous du nuage à la synchro suivante. Côté
+  // serveur c'était pire : `mergeFamily(existing, data)` met le stocké en `a`, donc le reset ne
+  // pouvait même pas atteindre le nuage. Le bouton ne remettait rien à zéro pour de bon.
+  // Un reset est une ÉPOQUE, pas un contenu : le côté qui a vu le reset le plus récent gagne
+  // ENTIÈREMENT, l'autre ne contribue rien (c'est précisément ce que « complet » veut dire).
+  const _resetAt = Math.max(Number(a.resetAt) || 0, Number(b.resetAt) || 0);
+  if (_resetAt > 0) {
+    const aVieux = (Number(a.resetAt) || 0) < _resetAt;
+    const bVieux = (Number(b.resetAt) || 0) < _resetAt;
+    if (aVieux && !bVieux) return { ...b, resetAt: _resetAt };
+    if (bVieux && !aVieux) return { ...a, resetAt: _resetAt };
+  }
   const completed = _uniq([...(a.completed || []), ...(b.completed || [])]);
   const refusedKeys = _uniq([...(a.refusedKeys || []), ...(b.refusedKeys || [])]).slice(-400); // v1.64.0 — tombstone des demandes refusées
   const _refusedSet = new Set(refusedKeys);
+  // v2.16.81 — hoistés (le littéral les lisait en place) : `owned` s'appuie dessus, voir plus bas.
+  const _refunded = _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200);
+  const _rewardBuyTs = preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {});
+  // « cet id est-il un achat REMBOURSÉ et pas encore racheté ? » — mêmes deux branches que
+  // `handleRefundReward` : avec estampille on exige la clé exacte, sans estampille (états d'avant
+  // la v2.16.62) tout tombstone portant cet id compte.
+  const _disowned = (id) => {
+    const stamp = _rewardBuyTs[id];
+    if (stamp != null) return _refunded.includes(id + "#" + String(stamp));
+    return _refunded.some((k) => typeof k === "string" && k.startsWith(id + "#"));
+  };
   const removedCalendarIds = _uniq([...(a.removedCalendarIds || []), ...(b.removedCalendarIds || [])]).slice(-400); // v2.7.0 — tombstone des événements calendrier supprimés
   // v2.16.79 — objets fusionnés CLÉ PAR CLÉ (`{...a.X, ...b.X}`) : chaque sous-clé présente chez
   // l'incoming gagnait, même périmée, sans jamais regarder `preferIncoming`. C'est le spread naïf
@@ -107,6 +136,7 @@ export const mergeGS = (a, b, preferIncoming) => {
     // Bug v2.5.3 : un vieux device synquant avec un coinsWeek d'une semaine passée déclenchait un
     // reset spurieux à la prochaine migration. Fix : on garde la semaine la plus récente (lexicographique).
     coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
+    resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max), voir la tête de mergeGS
     completed,
     completedAt: _completedAt, // v1.60.0 — horodatage de complétion (union)
     // v2.16.65 — l'ancienne CONCATÉNATION doublait le journal à chaque synchro (2 → 4 → 8 → … → 500).
@@ -118,13 +148,24 @@ export const mergeGS = (a, b, preferIncoming) => {
     pending: _uniq([...(a.pending || []), ...(b.pending || [])]).filter((k) => !completed.includes(k) && !_refusedSet.has(k)), // v1.64.0 — exclut les refusées (sinon l'union les ré-ajoutait au portail parent)
     refusedKeys,
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []), // v1.64.0 — file consommable du message drôle de refus
-    owned: _uniq([...(a.owned || []), ...(b.owned || [])]),
+    // v2.16.81 — `owned` est une union pure depuis toujours, et une union ne sait pas exprimer un
+    // retrait. « J'ai changé d'idée » (App.jsx ~3575/3580) retire l'id d'`owned` ET de
+    // `boughtRewards` : le second tient (dernière-écriture-gagne), le premier revenait TOUJOURS du
+    // nuage. Constaté dans la donnée de prod du 17 août : `rw_depanneur` + `rw_bonbon` chez Elli
+    // (remboursés la semaine du 20 juillet) et `rw_depanneur` chez Antoine DR (15 juin) étaient
+    // encore dans `owned`, un mois et deux mois plus tard.
+    // Pas de nouveau tombstone : `refundedRewards` EST déjà le tombstone du remboursement, keyé sur
+    // l'achat (`id#rewardBuyTs[id]`) depuis la v2.16.62. On soustrait donc de l'union les ids dont
+    // l'ACHAT COURANT est remboursé — un vrai rachat pose une estampille neuve, la clé ne
+    // correspond plus, l'objet reste possédé. `_disowned` reprend mot pour mot les deux branches du
+    // handler de remboursement, y compris l'état legacy sans estampille.
+    owned: _uniq([...(a.owned || []), ...(b.owned || [])]).filter((id) => !_disowned(id)),
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (voyage avec coins)
     // v2.16.62 — l'estampille d'achat VOYAGE AVEC `boughtRewards` (exactement la même règle) : une
     // résurrection par instantané périmé ramène donc l'ANCIENNE estampille, déjà tombstonée, au lieu
     // de rouvrir un remboursement. Union interdite ici — il faut la valeur du même côté que l'achat.
-    rewardBuyTs: preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {}),
-    refundedRewards: _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200), // v1.69.0 — tombstone « déjà remboursé » (union increvable → fin des pièces infinies) ; keyé sur l'achat depuis v2.16.62
+    rewardBuyTs: _rewardBuyTs,
+    refundedRewards: _refunded, // v1.69.0 — tombstone « déjà remboursé » (union increvable → fin des pièces infinies) ; keyé sur l'achat depuis v2.16.62 ; hoisté en v2.16.81 (`owned` s'en sert)
     badges: _uniq([...(a.badges || []), ...(b.badges || [])]),
     // v2.16.79 — voir `_byKey` en tête de `mergeGS`. `equipped` porte ce que l'enfant a sur le dos
     // (chapeau, armure, familier, skin, thème) ; `onEquip` (App.jsx:2907) écrit la sous-clé du slot,
@@ -380,10 +421,20 @@ export const mergeFamily = (base, incoming) => {
     // d'événements — même patron que `pin`/`mode`/`routineEnd` juste plus bas. Une liste vide ou
     // absente ne peut pas écraser une liste réelle (sinon un appareil jamais passé par l'assistant
     // effacerait la sélection de la famille).
+    // v2.16.81 — le `&& n.length` a sauté. Cette règle et `customRewards` (plus bas) existent pour
+    // la MÊME raison — permettre au parent de RETIRER, ce qu'une union ne sait pas faire — et le
+    // commentaire de `customRewards` énonce la distinction qui compte : `[]` (« il n'y en a plus »,
+    // ça tient) ≠ `undefined` (« je ne connais pas le champ », n'efface rien). `Array.isArray`
+    // tranche déjà cette distinction ; `&& n.length` ajoutait seulement le REVERT silencieux du
+    // seul cas qu'il attrape — le parent décoche la DERNIÈRE récompense, et l'ancienne sélection
+    // revient du nuage. Trouvé par le contrôle « listes de chaînes » de ce même passage.
+    // Aucun risque de boutique vide : en aval, une liste vide vaut « pas de filtre » et rend TOUT
+    // le catalogue (`shopRewardPool`, catalog.js:133 ; l'assistant recharge aussi les défauts,
+    // setupwizard.jsx:53). Honorer `[]` ne peut donc jamais retirer une récompense de l'écran.
     selectedRewards: (() => {
       const n = newerC.selectedRewards, o = (newer === base ? iC : bC).selectedRewards;
-      if (Array.isArray(n) && n.length) return _uniq(n);
-      if (Array.isArray(o) && o.length) return _uniq(o);
+      if (Array.isArray(n)) return _uniq(n);
+      if (Array.isArray(o)) return _uniq(o);
       return [];
     })(),
     feed: (() => { // fil de famille : union par id, likes unionnés, 60 plus récents
