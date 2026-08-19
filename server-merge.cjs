@@ -239,7 +239,11 @@ const mergeGS = (a, b, preferIncoming) => {
     pendingCelebrations: (() => { const consumed = new Set([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]); const seen = new Set(); const out = []; for (const c of [...(a.pendingCelebrations||[]), ...(b.pendingCelebrations||[])]) { if (!c || !c.id || consumed.has(c.id) || seen.has(c.id)) continue; seen.add(c.id); out.push(c); } return out; })(),
     petXp: mergePetXp(a.petXp, b.petXp),
     petDay: (() => { const A=a.petDay||{}, B=b.petDay||{}; if (A.day && A.day===B.day) return { day:A.day, xp:Math.max(A.xp||0,B.xp||0) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
-    petEvo: (() => { const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(),
+    // v2.16.88 — voir src/merge.js : `_byKey` aux DEUX niveaux (le côté frais gagne sur un palier en
+    // collision, un palier connu d'un seul côté survit). L'ancienne règle gardait toujours `a`.
+    petEvo: (() => { const A=a.petEvo||{}, B=b.petEvo||{}, out={};
+      for (const k of new Set([...Object.keys(A), ...Object.keys(B)])) out[k]=_byKey(A[k], B[k]);
+      return out; })(),
     // v2.15.7 — port du correctif client (App.jsx, mergeGS) : ce bloc utilisait `preferIncoming`
     // (basé sur le savedAt GLOBAL de tout le blob famille), plus grossier que la comparaison par
     // energyTs déjà faite côté client — un vrai désaccord entre les deux moitiés de la fusion.

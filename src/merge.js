@@ -284,7 +284,23 @@ export const mergeGS = (a, b, preferIncoming) => {
     pendingCelebrations: (()=>{ const consumed=new Set([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]); const seen=new Set(); const out=[]; for(const c of [...(a.pendingCelebrations||[]), ...(b.pendingCelebrations||[])]){ if(!c||!c.id||consumed.has(c.id)||seen.has(c.id))continue; seen.add(c.id); out.push(c); } return out; })(),
     petXp: mergePetXp(a.petXp, b.petXp), // XP des familiers : max par familier (ne fait que monter)
     petDay: (()=>{ const A=a.petDay||{}, B=b.petDay||{}; if(A.day&&A.day===B.day) return {day:A.day, xp:Math.max(A.xp||0,B.xp||0)}; return ((B.day||"")>=(A.day||""))?(B.day?B:A):(A.day?A:B); })(), // v1.52.0 — plafond quotidien familier (merge-safe)
-    petEvo: (()=>{ const out={...(a.petEvo||{})}; const B=b.petEvo||{}; for(const k in B){ out[k]={...(B[k]||{}), ...(out[k]||{})}; } return out; })(), // v1.57.0 — voies d'évolution choisies (collant : 1er choix gagne)
+    // v1.57.0 — voies d'évolution choisies par familier, `{petId:{1:element,2:…,3:…}}`.
+    // v2.16.88 — l'ancienne règle (`out[k]={...B[k], ...out[k]}`) donnait TOUJOURS la victoire au
+    // côté `a`, sans jamais regarder `preferIncoming` : « collant, 1er choix gagne ». Le mot « 1er »
+    // était faux — `a`, ce n'est pas le premier choix dans le temps, c'est la copie que l'appelant a
+    // mise en premier, et chaque appelant y met la SIENNE. Client : `mergeFamily(local, remote)`
+    // (App.jsx ~2393) met le local en `a`. Serveur : `mergeFamily(existing, data)` met le stocké en
+    // `a`. Chacun gardait donc son propre élément, pour toujours, et la divergence ne se refermait
+    // JAMAIS — rejoué sur les vrais modules : nuage « eau », tablette en retard « feu », la tablette
+    // affiche « feu » à vie pendant que le nuage et les autres appareils restent à « eau ». Le trou
+    // était atteignable sans rien faire d'anormal : `petPendingTier` (pets.js:188) rouvre le choix
+    // sur toute tablette qui n'a pas encore reçu la synchro, et l'enfant repropose en toute bonne foi.
+    // Règle : `_byKey` aux DEUX niveaux — sur un palier en collision, le côté FRAIS gagne ; un palier
+    // que seul l'autre côté connaît survit (un palier acquis ne se perd jamais). La « collance » est
+    // conservée là où elle vit vraiment : l'UI ne repropose jamais un palier déjà choisi (`taken`).
+    petEvo: (()=>{ const A=a.petEvo||{}, B=b.petEvo||{}, out={};
+      for(const k of new Set([...Object.keys(A), ...Object.keys(B)])) out[k]=_byKey(A[k], B[k]);
+      return out; })(),
     petNickname: _byKey(a.petNickname, b.petNickname), // v2.4.2 — surnom par familier (union par petId) ; v2.16.79 — RENOMMER un familier déjà nommé est une collision sur la même sous-clé : le côté frais gagne, voir `_byKey`
     // Énergie : consommable → l'horodatage energyTs arbitre directement (pas le flag coarse preferIncoming).
     // Bug v2.5.3 : preferIncoming basé sur savedAt global pouvait annuler une consommation d'énergie

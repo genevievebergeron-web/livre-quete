@@ -76,7 +76,7 @@ const gsA = {
   // v2.16.86 — `badges` : porté par la prod, par AUCUNE fixture, donc invisible au 8e étage.
   consumedCelebrationIds: ["c_a"], pendingCelebrations: [{ id: "c_p_a", badges: ["b_a"] }],
   petXp: { dragon: 40 }, petDay: { day: "2026-08-14", xp: 25 },
-  petEvo: { dragon: { path: "feu" } }, petNickname: { dragon: "Flamme" },
+  petEvo: { dragon: { 1: "feu" } }, petNickname: { dragon: "Flamme" },
   energy: 60, energyTs: "2026-08-14T12:00:00.000Z", lastFedDay: "2026-08-14",
   activeDays: ["2026-08-14"], leagueTier: "or",
   sessionMinutes: { day: "2026-08-15", minutes: 42 },
@@ -109,7 +109,7 @@ const gsB = {
   ritualCelebrated: { day: "2026-08-14", ids: ["rt2"] },
   consumedCelebrationIds: ["c_b"], pendingCelebrations: [{ id: "c_p_b", badges: ["b_b"] }],
   petXp: { dragon: 10, chat: 5 }, petDay: { day: "2026-08-14", xp: 10 },
-  petEvo: { dragon: { path: "glace" } }, petNickname: { chat: "Minou" },
+  petEvo: { dragon: { 1: "glace" } }, petNickname: { chat: "Minou" },
   energy: 95, energyTs: "2026-08-14T12:01:00.000Z", lastFedDay: "2026-08-13",
   activeDays: ["2026-08-13"], leagueTier: "bronze",
   sessionMinutes: { day: "2026-08-15", minutes: 5 },
@@ -347,8 +347,56 @@ const SCALAIRES_TOLERES = new Map(); // `config.feed` → ["emoji", "playerId", 
 
   console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}) — aucun angle mort`);
   let toleres = 0;
+  // v2.16.88 — SOUS LE PLAFOND. Jusqu'ici, le relevé de prod s'arrêtait exactement là où s'arrêtent
+  // les recensements qu'il surveille : un niveau sous une racine, plus les éléments de liste. Une
+  // comparaison ne peut RIEN reprocher à un plafond qu'elle partage — une structure plus profonde
+  // était invisible des DEUX côtés à la fois, donc muette. `releve-schema-prod.mjs` descend
+  // maintenant plus bas, en écrivant `*` à la place de chaque clé (jamais un nom que la famille
+  // aurait choisi). Les chemins qui en viennent portent au moins un `*`, et c'est ici qu'ils passent.
+  //
+  // Toléré sans fiche : UN seul `*`, en bout de chemin, de nature scalaire — c'est le contenu simple
+  // d'un objet, arbitré par la règle de cet objet (le diff schéma/règles garantit qu'il en a une, et
+  // le 6e étage mesure les objets fusionnés clé par clé). ⚠️ cette tolérance est encore une PROMESSE,
+  // pas une mesure : tous les objets de premier niveau ne sont pas au 6e étage. C'est la même dette
+  // que « il voyage avec son élément » avant la v2.16.87, et elle se solde de la même façon — en la
+  // croisant, pas en la répétant. Le compte est imprimé pour qu'elle ne s'oublie pas.
+  //
+  // Tout le reste — un `*` NON scalaire, ou un DEUXIÈME niveau de `*` — décrit une structure qu'aucun
+  // recensement n'atteint : il faut nommer qui l'arbitre, par le chemin de son ancêtre NOMMÉ.
+  const SOUS_LE_PLAFOND = {
+    "config.announcements[].playerTasks":
+      "10e étage, forme B — la liste de tâches par joueur est recensée en `playerTasks.*` et son "
+      + "absence de retrait est fichée (le contenu d'une annonce est figé à l'envoi).",
+    "gameStates.house":
+      "arbitré EN BLOC (dernière-écriture-gagne, src/merge.js ~243) : `placed` et ses meubles viennent "
+      + "du même côté que `floor`/`wallpaper`, il n'y a rien à arbitrer plus bas. 12e étage, fiche `enBloc`.",
+    "gameStates.petEvo":
+      "12e étage — les DEUX niveaux sont mesurés : sur un palier en collision le côté frais gagne, et "
+      + "un palier connu d'un seul côté survit. C'est ce chemin qui a fait naître l'étage (v2.16.88).",
+  };
+  let sousPlafondToleres = 0;
+  for (const [chemin, nat] of Object.entries(schemaProd.champs)) {
+    if (!chemin.includes("*")) continue;
+    const simple = nat === "scalaire" && chemin.endsWith(".*") && chemin.split("*").length === 2;
+    const ancetre = chemin.slice(0, chemin.indexOf(".*"));
+    if (simple && !(ancetre in SOUS_LE_PLAFOND)) { sousPlafondToleres++; continue; }
+    if (ancetre in SOUS_LE_PLAFOND) continue;
+    fail(`« ${chemin} » (${nat}) vit SOUS le plafond des recensements : les étages s'arrêtent un cran `
+       + `au-dessus, donc aucun ne peut le voir. Ajoute une fiche « ${ancetre} » à SOUS_LE_PLAFOND qui `
+       + `nomme la règle qui l'arbitre — soit un étage qui le MESURE, soit un arbitrage EN BLOC qui `
+       + `rend la profondeur sans objet.`);
+  }
+  for (const ancetre of Object.keys(SOUS_LE_PLAFOND)) {
+    if (!Object.keys(schemaProd.champs).some((c) => c.startsWith(`${ancetre}.*`)))
+      fail(`SOUS_LE_PLAFOND fiche « ${ancetre} », que le relevé de prod ne porte plus. Fiche périmée : `
+         + `retire-la, sinon elle couvrira un jour un chemin homonyme sans que personne l'ait relu.`);
+  }
+  console.log(`    (${sousPlafondToleres} scalaires sous le plafond, arbitrés par la règle de leur objet `
+    + `— tolérance encore SUPPOSÉE, à mesurer comme l'a été celle du 11e étage)`);
+
   for (const [chemin, nat] of Object.entries(schemaProd.champs)) {
     if (chemin in vus) continue;
+    if (chemin.includes("*")) continue;                 // déjà tranchés juste au-dessus
     const premierNiveau = chemin.split(".").length === 2 && !chemin.includes("[");
     if (!premierNiveau && nat === "scalaire") {
       toleres++;
@@ -682,6 +730,71 @@ console.log("· avatar — une apparence NON configurée ne gagne jamais, même 
       if (!same(out, cfgOui))
         fail(`${nom} mergeFamily (${sens}) — gameStates[0].avatar : l'apparence NON configurée a gagné `
            + `(${JSON.stringify(out)}). Le verrou \`configured\` doit passer avant la fraîcheur.`);
+    }
+  }
+}
+
+// ── 12e ÉTAGE : LES OBJETS À DEUX NIVEAUX ──────────────────────────────────
+// v2.16.88 — le 6e étage met en collision la sous-clé d'un objet de premier niveau (`equipped.hat`,
+// `settings.calm`…). Il ne descend jamais d'un cran de plus. Or `petEvo` vaut `{petId:{palier:élément}}`
+// et se fusionne à DEUX niveaux : la collision qui compte est celle de `petEvo.<petId>.<palier>`, que
+// le 6e étage ne voit pas et que le contrôle de retrait (« un retrait de SOUS-CLÉ survit-il ») ne
+// regarde pas non plus (il ne juge que la disparition). Les fixtures se contredisaient pourtant DÉJÀ
+// sur cette sous-sous-clé depuis toujours — personne ne lisait le résultat.
+//
+// Ce que l'étage a trouvé le soir de sa naissance : la règle rendait toujours le côté `a`, sans
+// jamais regarder `preferIncoming`. Comme chaque appelant met SA copie en `a` (client : le local ;
+// serveur : le stocké), les deux côtés gardaient chacun leur élément et la divergence ne se refermait
+// jamais. Voir le commentaire de `petEvo` dans src/merge.js.
+//
+// L'étage est complet par RECENSEMENT, pas par bonne volonté : tout objet qui contient un objet, dans
+// la fusion des fixtures, doit avoir une fiche ici. Deux fiches possibles :
+//   • une mesure (`sousCle`/`frais`/`perime`/`orpheline`) — le côté frais doit gagner dans les DEUX
+//     sens, et la sous-sous-clé que seul l'autre côté connaît doit survivre ;
+//   • `enBloc: "raison"` — l'objet entier vient d'un seul côté, donc ses deux niveaux voyagent
+//     ensemble et il n'y a rien à arbitrer plus bas. Dis POURQUOI, et la raison doit nommer la règle.
+const OBJETS_DEUX_NIVEAUX = [
+  { champ: "petEvo", cleDyn: "dragon", sousCle: "1", frais: "el_FRAIS", perime: "el_PERIME",
+    orpheline: ["2", "el_ORPHELIN"] },
+  { champ: "house", enBloc: "`house` est arbitré EN BLOC (dernière-écriture-gagne, src/merge.js ~243) : "
+    + "`placed` ne peut pas diverger de `floor`/`wallpaper`, les trois viennent du même côté. C'est "
+    + "voulu — une union par slot ressusciterait le meuble que l'enfant vient de retirer (v2.16.72)." },
+];
+console.log("· objets à DEUX niveaux — sur une sous-sous-clé en collision, la fraîche doit gagner");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const estObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const declares = new Set(OBJETS_DEUX_NIVEAUX.map((o) => `gameStates.${o.champ}`));
+  for (const [k, v] of Object.entries(fusion.gameStates[0])) {
+    if (!estObj(v) || !Object.values(v).some(estObj)) continue;
+    if (!declares.has(`gameStates.${k}`))
+      fail(`« gameStates.${k} » est un objet qui contient un OBJET, et aucune fiche du 12e étage ne le `
+         + `classe. Le 6e étage s'arrête à la sous-clé : une collision sur la sous-SOUS-clé n'est `
+         + `surveillée nulle part. Mesure-la, ou déclare \`enBloc\` avec la règle qui le justifie.`);
+  }
+  for (const o of OBJETS_DEUX_NIVEAUX) {
+    if (o.enBloc) continue;
+    const objFrais  = { [o.cleDyn]: { [o.sousCle]: o.frais } };
+    const objPerime = { [o.cleDyn]: { [o.sousCle]: o.perime, [o.orpheline[0]]: o.orpheline[1] } };
+    if (same(o.frais, o.perime))
+      fail(`fixture deux-niveaux « ${o.champ} » — la sous-sous-clé porte la MÊME valeur des deux `
+         + `côtés : il n'y a pas de collision, le contrôle ne surveille rien.`);
+    const fA = mkFam("2026-08-15T12:00:00.000Z", { ...gsA, [o.champ]: objFrais },  famA.config, plA);
+    const fB = mkFam("2026-08-14T12:00:00.000Z", { ...gsB, [o.champ]: objPerime }, famB.config, plB);
+    for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+      const rc = client.mergeFamily(base, inc).gameStates[0][o.champ];
+      const rs = server.mergeFamily(base, inc).gameStates[0][o.champ];
+      if (!same(rc, rs))
+        fail(`mergeFamily (${sens}) — gameStates[0].${o.champ} : client ≠ serveur (dérive entre les deux copies).`);
+      if (same(rc?.[o.cleDyn]?.[o.sousCle], o.perime))
+        fail(`mergeFamily (${sens}) — gameStates[0].${o.champ}.<clé>.${o.sousCle} : la sous-sous-clé `
+           + `PÉRIMÉE a gagné. La règle arbitre le 2e niveau sans regarder \`preferIncoming\` : chaque `
+           + `appelant met SA copie en \`a\`, donc les deux côtés gardent la leur et la divergence ne `
+           + `se referme JAMAIS. Passe \`_byKey\` aux deux niveaux, dans src/merge.js ET server-merge.cjs.`);
+      if (!same(rc?.[o.cleDyn]?.[o.orpheline[0]], o.orpheline[1]))
+        fail(`mergeFamily (${sens}) — gameStates[0].${o.champ}.<clé>.${o.orpheline[0]} : la sous-sous-clé `
+           + `que SEUL le côté périmé connaissait a disparu. La règle remplace le sous-objet entier au `
+           + `lieu de le fusionner clé par clé : un palier acquis ne doit jamais se perdre.`);
     }
   }
 }
