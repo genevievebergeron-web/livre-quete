@@ -364,7 +364,13 @@ export const _mergePlayer = (a, b, preferIncoming = false) => {
   const w = preferIncoming ? b : a, o = preferIncoming ? a : b; // w = écriture la plus récente
   const frais = (k) => (k in w ? w[k] : o[k]);
   return {
-    ...a, ...b,
+    // v2.16.87 — l'ordre des deux spreads était `{...a, ...b}` : un champ que ce littéral ne nomme
+    // PAS prenait toujours `b`, l'incoming, sans le moindre égard pour la fraîcheur. Les sept
+    // champs que la prod porte sont tous nommés plus bas, donc rien de visible ne cassait — mais
+    // c'était vrai par accident, et le 11e étage du garde-fou de fusion le mesure maintenant :
+    // huitième champ ajouté un jour = tablette en retard qui écrase la valeur fraîche, en silence.
+    // Périmé d'abord, frais ensuite : ce que la règle ne nomme pas suit quand même son élément.
+    ...o, ...w,
     name: w.name || o.name,
     color: w.color || o.color,
     morningLock: frais("morningLock"),
@@ -696,8 +702,13 @@ export const mergeFamily = (base, incoming) => {
         if (!c || c.playerId == null) return;
         const ex = cm.get(c.playerId);
         if (!ex) { cm.set(c.playerId, {...c}); return; }
+        // v2.16.87 — même défaut que `_mergePlayer`, dans la même forme de code : `{...ex, ...c}`
+        // donnait TOUJOURS l'incoming aux champs que ce littéral ne nomme pas. Ici il y en a un
+        // vrai en prod, `playerName`. Il n'est lu nulle part aujourd'hui (👤 à trancher), donc
+        // personne ne pouvait le voir — mais il est ÉCRIT, et une tablette en retard le réécrivait.
+        const perime = preferIncoming ? ex : c, recent = preferIncoming ? c : ex;
         cm.set(c.playerId, {
-          ...ex, ...c,
+          ...perime, ...recent,
           text: preferIncoming ? (c.text ?? ex.text) : (ex.text ?? c.text),
           emoji: preferIncoming ? (c.emoji ?? ex.emoji) : (ex.emoji ?? c.emoji),
           checkins: {...(ex.checkins||{}), ...(c.checkins||{})},

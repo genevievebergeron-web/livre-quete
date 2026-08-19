@@ -298,7 +298,9 @@ const mergeGS = (a, b, preferIncoming) => {
 const _mergePlayer = (a, b, preferIncoming = false) => {
   const w = preferIncoming ? b : a, o = preferIncoming ? a : b;
   const frais = (k) => (k in w ? w[k] : o[k]);
-  return { ...a, ...b, name:w.name||o.name, color:w.color||o.color,
+  // v2.16.87 — périmé d'abord, frais ensuite (voir le commentaire de src/merge.js) : un champ que
+  // ce littéral ne nomme pas prenait TOUJOURS l'incoming, quelle que soit la fraîcheur.
+  return { ...o, ...w, name:w.name||o.name, color:w.color||o.color,
     morningLock: frais("morningLock"), dailyMinutesLimit: frais("dailyMinutesLimit"),
     pseudo: w.pseudo || o.pseudo,
     themeId:(w.themeId && w.themeId!=="none") ? w.themeId : (o.themeId && o.themeId!=="none") ? o.themeId : (w.themeId||o.themeId||"none"),
@@ -438,7 +440,9 @@ const mergeFamily = (base, incoming) => {
         if (!c || c.playerId == null) return;
         const ex = cm.get(c.playerId);
         if (!ex) { cm.set(c.playerId, {...c}); return; }
-        cm.set(c.playerId, { ...ex, ...c,
+        // v2.16.87 — périmé d'abord, frais ensuite (voir le commentaire de src/merge.js).
+        const perime = preferIncoming ? ex : c, recent = preferIncoming ? c : ex;
+        cm.set(c.playerId, { ...perime, ...recent,
           text: preferIncoming ? (c.text ?? ex.text) : (ex.text ?? c.text),
           emoji: preferIncoming ? (c.emoji ?? ex.emoji) : (ex.emoji ?? c.emoji),
           checkins: {...(ex.checkins||{}), ...(c.checkins||{})} });

@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Structure de la prod, sans aucune donnée de famille. Régénérer avec scripts/releve-schema-prod.mjs.",
-  "releveLe": "2026-08-18",
+  "releveLe": "2026-08-19",
   "champs": {
     "config.announcements": "listeObjets",
     "config.announcements[].countdownDoneText": "scalaire",

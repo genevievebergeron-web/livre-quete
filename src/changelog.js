@@ -6,6 +6,12 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  // 2.16.85 et 2.16.86 n'ont jamais été livrées : ce sont les numéros des deux passages d'audit
+  // des 18 et 19 août, qui n'ont touché que le garde-fou de fusion (scripts/, jamais servi au
+  // navigateur). Reprendre l'un des deux ici ferait qu'une même étiquette désignerait deux choses.
+  { version:"2.16.87", date:"2026-08-19", features:[
+    "🛠️ Petite fondation technique (rien de visible pour toi).",
+  ]},
   { version:"2.16.84", date:"2026-08-18", features:[
     "\u2764\ufe0f Quand tu retirais ton coeur d'un message du fil de famille, il revenait tout seul quelques secondes plus tard — et il revenait pour toujours. Corrigé : un coeur retiré reste retiré, et tu peux le remettre quand tu veux.",
   ]},

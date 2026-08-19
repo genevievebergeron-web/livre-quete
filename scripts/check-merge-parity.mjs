@@ -305,9 +305,16 @@ console.log("· drapeaux de migration — `true` d'un côté, ABSENT de l'autre 
 // Strict sur ce que les étages classent vraiment :
 //   • tout champ de PREMIER niveau (étages 1-3 + le diff schéma/règles de fusion)
 //   • tout chemin NON scalaire, à n'importe quel niveau (étages 4-10 : listes, objets, nichés)
-// Informatif pour le reste : un scalaire DANS un élément voyage avec son élément, aucun étage ne
-// le classe séparément. Et un chemin que les fixtures ont en plus n'est pas une faute — un champ
-// neuf existe forcément dans le code avant d'apparaître dans un relevé de prod.
+// Toléré pour le reste : un scalaire DANS un élément voyage avec son élément, aucun étage ne le
+// classe séparément. Et un chemin que les fixtures ont en plus n'est pas une faute — un champ neuf
+// existe forcément dans le code avant d'apparaître dans un relevé de prod.
+//
+// v2.16.87 — cette tolérance était une PROMESSE, exactement comme l'exemption `estDrapeau` l'était
+// avant d'être mesurée. « Il voyage avec son élément » n'est vrai que si l'élément est pris EN BLOC.
+// Dès qu'une liste est fusionnée champ par champ, un scalaire que la règle ne nomme pas ne suit plus
+// son élément — et rien ne croisait les deux. Les chemins tolérés sont donc collectés ici et rendus
+// au 11e étage, qui MESURE la tolérance liste par liste au lieu de la supposer.
+const SCALAIRES_TOLERES = new Map(); // `config.feed` → ["emoji", "playerId", …]
 {
   const schemaProd = require(path.join(ROOT, "scripts/schema-prod.json"));
   const estObj = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -343,15 +350,24 @@ console.log("· drapeaux de migration — `true` d'un côté, ABSENT de l'autre 
   for (const [chemin, nat] of Object.entries(schemaProd.champs)) {
     if (chemin in vus) continue;
     const premierNiveau = chemin.split(".").length === 2 && !chemin.includes("[");
-    if (!premierNiveau && nat === "scalaire") { toleres++; continue; }
+    if (!premierNiveau && nat === "scalaire") {
+      toleres++;
+      const m = chemin.match(/^(.*)\[\]\.([^.]+)$/);
+      if (!m) { fail(`« ${chemin} » est un scalaire toléré d'une forme que le 11e étage ne sait pas `
+                   + `croiser (il attend « <liste>[].<champ> »). Classe-le à la main.`); continue; }
+      if (!SCALAIRES_TOLERES.has(m[1])) SCALAIRES_TOLERES.set(m[1], []);
+      SCALAIRES_TOLERES.get(m[1]).push(m[2]);
+      continue;
+    }
     fail(`« ${chemin} » (${nat}) existe en PROD et dans AUCUNE fixture : tous les contrôles de `
        + `complétude ci-dessous lisent la fusion de famA/famB, donc aucun ne peut le voir. Porte-le `
        + `dans les fixtures (avec des valeurs qui se contredisent), puis classe-le à l'étage qui `
        + `correspond. Si le champ a disparu de l'app, régénère plutôt le relevé : `
        + `node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);
   }
-  if (toleres) console.log(`    (${toleres} scalaires dans un élément non portés par les fixtures — `
-    + `ils voyagent avec leur élément, aucun étage ne les classe séparément)`);
+  if (toleres) console.log(`    (${toleres} scalaires dans un élément non portés par les fixtures, `
+    + `sur ${SCALAIRES_TOLERES.size} listes — la tolérance « ils voyagent avec leur élément » est `
+    + `MESURÉE au 11e étage, plus supposée)`);
 }
 
 console.log("· mergeFamily — instantanés complets, dans les deux sens");
@@ -731,35 +747,44 @@ const litElemDe = (fam, l, id) => {
 const LISTES = [
   // ── config ──
   { champ: "momentRequests", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "mm1", status: "planifie", plannedDate: "2026-08-20", calId: "cal_2", createdAt: "2026-08-10" },
     perime: { id: "mm1", status: "planifie", plannedDate: "2026-08-16", calId: "cal_1", createdAt: "2026-08-10" },
     modifieEnPlace: true, // statut ET date réécrits par le portail parent (« 📅 Prévu », « ✔ Fait »)
     tombstone: "removedMomentRequests", supprime: { id: "mmX", status: "attente", rewardId: "rw", playerId: "p1", createdAt: "2026-08-09" } },
   { champ: "announcements", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "aa1", text: "FRAIS", createdAt: "2026-08-15" },
     perime: { id: "aa1", text: "périmé", createdAt: "2026-08-15" },
     modifieEnPlace: "créée puis supprimée, jamais réécrite — « renvoyer » crée une COPIE à nouvel id (v2.15.1)",
     tombstone: "removedAnnouncements", supprime: { id: "aaX", text: "supprimée par le parent", createdAt: "2026-08-11" } },
   { champ: "removalRequests", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "rr1", instanceId: "asZ", note: "FRAIS" },
     perime: { id: "rr1", instanceId: "asZ", note: "périmé" },
     modifieEnPlace: "écrite par l'enfant, consommée par le parent (approuver/refuser) — jamais modifiée",
     tombstone: "removedRemovalRequests", supprime: { id: "rrX", instanceId: "asZ", note: "refusée par le parent" } },
   { champ: "assignments", cle: "instanceId", dans: "config",
-    frais:  { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2] },
-    perime: { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0] },
+    temoinHorsBloc: 0,
+    // v2.16.87 — `time` diffère : sans un scalaire qui se contredit, le 11e étage n'a aucune ancre
+    // à laquelle comparer son témoin (seul `days`, un tableau, différait — et un tableau ne dit pas
+    // de quel CÔTÉ vient l'élément). C'est un vrai champ de la prod, pas une forme inventée.
+    frais:  { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2], time: "07:30" },
+    perime: { instanceId: "az1", taskId: "tkZ", playerIds: ["p1"], days: [0], time: "08:15" },
     modifieEnPlace: "ajoutée ou retirée en entier ; le report des récurrentes (carryOverUnfinishedTasks) ne réécrit QUE `weeklyQuests.assignments`, couvert par OBJETS_ARBITRES",
     tombstone: "removedAssignments", supprime: { instanceId: "azX", taskId: "tkZ", playerIds: ["p1"], days: [3] } },
   // v2.16.85 — les deux listes d'objets NICHÉES de la prod. Le recensement de premier niveau ne
   // pouvait pas les voir ; `weeklyQuests.assignments` (155 éléments) était réputée « couverte par
   // OBJETS_ARBITRES », ce qui est vrai du CONTENEUR et n'a jamais rien testé de l'ÉLÉMENT.
   { champ: "assignments", cle: "instanceId", dans: "config",
+    temoinHorsBloc: 0,
     conteneur: { cle: "weeklyQuests", fixe: { generatedForWeek: "2026-08-14" } },
-    frais:  { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2], isRecurring: true },
-    perime: { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0], isRecurring: true },
+    frais:  { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0, 2], isRecurring: true, time: "07:30" },
+    perime: { instanceId: "wz1", taskId: "tkZ", playerIds: ["p1"], days: [0], isRecurring: true, time: "08:15" },
     modifieEnPlace: true, // le report des récurrentes (carryOverUnfinishedTasks, App.jsx ~2569) et le ménage des orphelines (migrations.js ~254) réécrivent `days` en place
     tombstone: "removedAssignments", supprime: { instanceId: "wzX", taskId: "tkZ", playerIds: ["p1"], days: [3], isRecurring: true } },
   { champ: "challenges", cle: "playerId", dans: "config",
+    temoinHorsBloc: 0,
     conteneur: { cle: "weeklyChallenge", fixe: { weekKey: "2026-08-14" } },
     // Un SEUL champ diffère : sinon l'élément fusionné diffère du périmé par l'autre champ et le
     // contrôle passe au vert sans rien voir (leçon « fixture identique = contrôle inerte »).
@@ -768,14 +793,17 @@ const LISTES = [
     modifieEnPlace: true, // « 💾 Enregistrer le défi » (parentpanel.jsx ~463 → handleUpdateChallenge) réécrit texte et emoji en cours de semaine
     sansSuppression: "aucun écran ne retire le défi d'un enfant : le portail parent ne propose que d'en réécrire le texte, et la bascule de semaine se règle par `weekKey` (le défi d'une autre semaine est ignoré à la lecture, App.jsx ~2540)" },
   { champ: "customTasks", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "cz1", label: "FRAIS" }, perime: { id: "cz1", label: "périmé" },
     modifieEnPlace: "créée puis supprimée ; aucun écran ne réécrit une tâche perso existante",
     tombstone: "removedCustomTasks", supprime: { id: "czX", label: "supprimée" } },
   { champ: "childTaskProposals", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "pz1", label: "FRAIS" }, perime: { id: "pz1", label: "périmé" },
     modifieEnPlace: "écrite par l'enfant, consommée par le parent — jamais modifiée",
     tombstone: "removedProposals", supprime: { id: "pzX", label: "consommée" } },
   { champ: "feed", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais:  { id: "fz1", ts: 5, text: "FRAIS", likes: ["p1"] },
     perime: { id: "fz1", ts: 5, text: "périmé", likes: ["p2"] },
     // v2.16.84 — la raison écrite ici était FAUSSE : « ils s'unionnent » répond à l'AJOUT et ne dit
@@ -783,43 +811,59 @@ const LISTES = [
     modifieEnPlace: "seuls les `likes` bougent (ajout par union, retrait par tombstone daté `unlikes`, v2.16.84) — le texte est figé à l'écriture",
     sansSuppression: "journal d'événements : aucun écran n'efface une entrée (troncature à 60)" },
   { champ: "bugs", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais: { id: "bz1", ts: 5, text: "FRAIS" }, perime: { id: "bz1", ts: 5, text: "périmé" },
     modifieEnPlace: "signalement figé à l'envoi par l'enfant",
     sansSuppression: "aucun bouton ne supprime un signalement (troncature à 60)" },
   { champ: "errorLogs", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais: { id: "ez1", ts: 5, msg: "FRAIS" }, perime: { id: "ez1", ts: 5, msg: "périmé" },
     modifieEnPlace: "trace technique figée à la capture",
     sansSuppression: "aucun bouton ne vide le journal (troncature à 80)" },
   { champ: "repairEvents", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais: { id: "rz1", ts: 5, v: "FRAIS" }, perime: { id: "rz1", ts: 5, v: "périmé" },
     modifieEnPlace: "événement exactly-once, figé à l'écriture",
     sansSuppression: "journal collectif, aucune suppression (troncature à 100)" },
   { champ: "teamInvites", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais: { id: "tz1", status: "pending", createdAt: 2, note: "FRAIS" },
     perime: { id: "tz1", status: "pending", createdAt: 2, note: "périmé" },
     modifieEnPlace: "seul le `status` bouge, et sa résolution est COLLANTE par choix (v2.16.35) — une règle de fraîcheur la casserait",
     sansSuppression: "péremption automatique à 2 jours une fois résolue" },
   { champ: "coinOffers", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
     frais: { id: "oz1", status: "pending", ts: 2, note: "FRAIS" },
     perime: { id: "oz1", status: "pending", ts: 2, note: "périmé" },
     modifieEnPlace: "même règle collante que teamInvites",
     sansSuppression: "péremption automatique à 2 jours une fois résolue" },
   { champ: "customRewards", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
+    // v2.16.87 — `frais`/`perime` ne servent pas au 4e étage (`modifieEnPlace` n'est pas `true`) mais
+    // au 11e : sans deux copies qui se contredisent, le témoin n'a aucun côté à suivre.
+    frais: { id: "cw1", label: "FRAIS", coins: 20 }, perime: { id: "cw1", label: "périmé", coins: 20 },
     modifieEnPlace: "liste ENTIÈRE en dernière-écriture-gagne depuis la v2.16.73 — pas une union par id",
     sansSuppression: "le retrait passe par le remplacement de la liste entière (v2.16.73)" },
   { champ: "updateFeedEntries", cle: "version", dans: "config",
+    temoinHorsBloc: 0,
+    frais:  { type: "update", version: "2.16.70", features: ["FRAIS"], ts: "2026-08-15" },
+    perime: { type: "update", version: "2.16.70", features: ["périmé"], ts: "2026-08-06" },
     modifieEnPlace: "reconstruit à chaque chargement depuis CHANGELOG (dedupeUpdateFeed)",
     sansSuppression: "reconstruit au chargement — une union le regonflerait (incident des ~5127 entrées, v2.5.29)" },
   { champ: "players", cle: "id", dans: "config",
+    temoinHorsBloc: 0,
+    frais: plA, perime: plB, // les deux joueurs se contredisent déjà sur chaque champ (v2.16.77)
     modifieEnPlace: "fusionné champ par champ par `_mergePlayer` — trois contrôles dédiés plus haut",
     sansSuppression: "un joueur ne se supprime pas depuis l'app" },
   // ── gameStates ──
   { champ: "routines", cle: "id", dans: "gameStates",
+    temoinHorsBloc: 0,
     frais:  { id: "rtz", name: "FRAIS", taskIds: ["as1", "as2"] },
     perime: { id: "rtz", name: "périmé", taskIds: ["as1"] },
     modifieEnPlace: true, // renommer / changer l'émoji / ajouter une quête (v2.16.70)
     tombstone: "removedRoutineIds", cleTombstone: "id", supprime: { id: "rtX", name: "rituel supprimé", taskIds: [] } },
   { champ: "calendar", cle: "id", dans: "gameStates",
+    temoinHorsBloc: 0,
     // Arbitré par `updatedAt` (v2.7.0), pas par la fraîcheur de la famille : le plus grand va donc
     // du côté frais, même règle de cohérence que pour `gsA`/`gsB` plus haut.
     frais:  { id: "cvz", updatedAt: 9, title: "FRAIS" },
@@ -827,10 +871,14 @@ const LISTES = [
     modifieEnPlace: true, // modifier un événement du calendrier
     tombstone: "removedCalendarIds", cleTombstone: "id", supprime: { id: "cvX", updatedAt: 3, title: "événement supprimé" } },
   { champ: "pendingCelebrations", cle: "id", dans: "gameStates",
+    temoinHorsBloc: 0,
     frais: { id: "pcz", label: "FRAIS" }, perime: { id: "pcz", label: "périmé" },
     modifieEnPlace: "file consommable : une célébration est écrite puis consommée, jamais réécrite",
     tombstone: "consumedCelebrationIds", cleTombstone: "id", supprime: { id: "pcX", label: "déjà fêtée" } },
   { champ: "xpLog", cle: "id", dans: "gameStates",
+    temoinHorsBloc: 0,
+    frais:  { id: "xz1", amount: 9, date: "2026-08-15", source: "FRAIS" },
+    perime: { id: "xz1", amount: 4, date: "2026-08-14", source: "périmé" },
     modifieEnPlace: "fusionné par `mergeXpLog` (union par id + multiplicité MAX, v2.16.65) — entrée figée à l'écriture",
     sansSuppression: "journal d'XP, aucune suppression (réparation des journaux gonflés seulement)" },
 ];
@@ -1605,6 +1653,95 @@ console.log("· listes nichées — le nombre de sens où un retrait ressuscite 
       fail(`liste nichée « ${nom} » — la fiche annonce \`ressuscite: ${l.ressuscite}\` et la mesure `
          + `en trouve ${vus} (sur 4). Si une règle de fusion vient de changer, c'est une bonne `
          + `nouvelle à écrire ; sinon la fiche ment, et son \`sansRetrait\` ne protège plus rien.`);
+  }
+}
+
+// ── 11e ÉTAGE : LA TOLÉRANCE « IL VOYAGE AVEC SON ÉLÉMENT » EST-ELLE VRAIE ? ──
+// v2.16.87 — c'est mot pour mot la piste que la v2.16.86 s'était laissée : « le contrôle tolère les
+// scalaires DANS un élément (39 aujourd'hui) au motif qu'ils voyagent avec leur élément — vrai tant
+// que l'élément est pris en bloc, FAUX dès qu'une liste est fusionnée clé par clé, et rien ne croise
+// les deux ».
+//
+// Les dix étages précédents classent des CHEMINS. Celui-ci ne classe rien : il vérifie la seule
+// phrase sur laquelle repose tout ce que le contrôle « fixtures vs schéma de prod » laisse passer.
+// Un scalaire toléré n'a aucun étage à lui — sa seule protection est que son élément arrive entier
+// du côté qui gagne. Si la règle de fusion reconstruit l'élément champ par champ, un champ qu'elle
+// ne nomme pas prend le côté que le littéral décide, pas celui de l'élément : la tolérance devient
+// un trou, et un trou d'autant plus tranquille que personne ne le relit.
+//
+// LA MESURE : on pose dans chaque liste un élément présent des DEUX côtés (même clé), qui porte en
+// plus un champ témoin qu'AUCUNE règle ne connaît. Puis on regarde de quel côté le témoin ressort,
+// comparé au côté d'où vient le reste de l'élément (l'« ancre » : le premier champ scalaire qui
+// diffère vraiment entre les deux copies).
+//   • témoin du même côté que l'ancre, dans les 4 sens → l'élément voyage en bloc, la tolérance
+//     tient, et elle tient de façon MESURÉE.
+//   • témoin absent, ou du côté opposé → la tolérance est FAUSSE pour cette liste : chacun de ses
+//     scalaires de prod doit alors être porté par les fixtures et arbitré nommément.
+// `temoinHorsBloc` est un CHIFFRE rejoué à chaque build (sur 4 : 2 sens × 2 implémentations), même
+// discipline qu'au 10e étage — une fiche en prose peut dériver en silence, un chiffre non.
+//
+// RÉSULTAT DU JOUR : `config.players` est la seule liste hors bloc, et elle l'est dans les 4 sens.
+// `_mergePlayer` (src/merge.js:363) commence par `{ ...a, ...b }` puis ré-arbitre nommément `name`,
+// `color`, `morningLock`, `dailyMinutesLimit`, `pseudo`, `themeId`, `themeChosenAt`,
+// `starterThemes` : un champ hors de cette liste prend TOUJOURS `b`, l'incoming, quelle que soit la
+// fraîcheur. Aucun bug vivant — les sept champs que la prod porte sous `config.players[]` sont tous
+// dans le littéral, donc aucun n'est toléré (ils sont dans les fixtures depuis la v2.16.77). Mais
+// c'était vrai par accident : le jour où un huitième champ apparaît, il serait toléré en silence
+// par le contrôle du haut ET mal fusionné par `_mergePlayer`. Le croisement ci-dessous est ce qui
+// transforme cet accident en garantie.
+console.log("· scalaires tolérés — le témoin doit ressortir du même côté que son élément");
+{
+  const TEMOIN = "__temoinFusion";
+  for (const l of LISTES) {
+    const chemin = cheminListe(l);
+    if (!l.frais || !l.perime)
+      { fail(`liste « ${chemin} » — pas de fixtures \`frais\`/\`perime\` : le 11e étage ne peut pas `
+           + `mesurer si un scalaire non nommé par la règle voyage avec son élément.`); continue; }
+    if (typeof l.temoinHorsBloc !== "number")
+      fail(`liste « ${chemin} » — \`temoinHorsBloc\` (nombre de sens sur 4) est OBLIGATOIRE : c'est `
+         + `lui qui empêche la tolérance du contrôle « fixtures vs schéma de prod » de redevenir une `
+         + `simple promesse.`);
+    // L'ancre : un champ scalaire qui diffère VRAIMENT entre les deux copies. Sans elle, on saurait
+    // où est passé le témoin mais pas où est passé le reste — et c'est la comparaison des deux qui
+    // fait le contrôle (leçon « fixture identique = contrôle inerte »).
+    const ancre = Object.keys(l.frais).find((k) => k !== l.cle && k !== TEMOIN
+      && (l.frais[k] === null || typeof l.frais[k] !== "object") && !same(l.frais[k], l.perime[k]));
+    if (!ancre)
+      { fail(`liste « ${chemin} » — aucun champ scalaire ne diffère entre \`frais\` et \`perime\` : `
+           + `le témoin n'a aucun côté auquel se comparer, le contrôle serait inerte.`); continue; }
+    const elA = { ...l.frais, [TEMOIN]: "FRAIS" };
+    const elB = { ...l.perime, [TEMOIN]: "PERIME" };
+    const fA = avecListe("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, [elA]);
+    const fB = avecListe("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [elB]);
+    let horsBloc = 0;
+    for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+      for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = litListe(fn(base, inc), l).find((e) => e && e[l.cle] === elA[l.cle]);
+        if (!out)
+          { fail(`${impl} mergeFamily (${sens}) — ${chemin}[${l.cle}=${elA[l.cle]}] : l'élément a `
+               + `disparu de la fusion alors qu'il était présent des DEUX côtés.`); continue; }
+        const coteAncre = same(out[ancre], l.frais[ancre]) ? "FRAIS"
+                        : same(out[ancre], l.perime[ancre]) ? "PERIME" : null;
+        if (coteAncre === null)
+          { fail(`${impl} mergeFamily (${sens}) — ${chemin} : l'ancre « ${ancre} » ne ressort d'aucun `
+               + `des deux côtés (${JSON.stringify(out[ancre])}). Choisis une fixture dont ce champ `
+               + `n'est pas recalculé, sinon le témoin n'a pas de référence.`); continue; }
+        if (out[TEMOIN] !== coteAncre) horsBloc++;
+      }
+    }
+    const toleres = SCALAIRES_TOLERES.get(chemin) || [];
+    if (horsBloc !== l.temoinHorsBloc)
+      fail(`liste « ${chemin} » — la fiche annonce \`temoinHorsBloc: ${l.temoinHorsBloc}\` et la `
+         + `mesure en trouve ${horsBloc} (sur 4). Si une règle de fusion vient de changer, c'est une `
+         + `bonne nouvelle à écrire ; sinon la fiche ment, et la tolérance du contrôle « fixtures vs `
+         + `schéma de prod » ne repose plus sur rien.`);
+    if (horsBloc > 0 && toleres.length)
+      fail(`liste « ${chemin} » — ses éléments NE voyagent PAS en bloc (${horsBloc} sens sur 4), et `
+         + `pourtant ${toleres.length} de ses scalaires de prod ne sont portés par aucune fixture : `
+         + `${toleres.join(", ")}. Le contrôle « fixtures vs schéma de prod » les laisse passer au `
+         + `motif qu'ils suivent leur élément — c'est faux ici. Porte-les dans famA/famB avec des `
+         + `valeurs qui se contredisent, et arbitre-les nommément dans src/merge.js ET `
+         + `server-merge.cjs.`);
   }
 }
 
