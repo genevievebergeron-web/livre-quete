@@ -4,6 +4,52 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-19 (routine autonome, nuit, 28e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, 175 096 octets, `savedAt` `2026-08-19T08:31:40Z`. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, dernière activité le 9 août, aucun message signalant un problème.
+- **Aucune Phase 2.** 28e nuit propre d'affilée côté signalements.
+
+### 📊 Ce que la prod a appris au garde-fou cette nuit (Phase 3)
+
+La piste laissée par la v2.16.88 était chiffrée : **18 chemins `X.*` scalaires** étaient tolérés par le
+contrôle « fixtures vs schéma de prod » au motif que « la règle de leur objet les arbitre ». Le croisement
+demandé — cette liste contre `OBJETS_PAR_CLE` — donne **4 sur 18**. Les quatorze autres tenaient par
+habitude d'écriture, et le 6e étage sur lequel la tolérance s'appuyait ne répond pas à cette question-là :
+il demande « une sous-clé RETIRÉE survit-elle ? », jamais « à sous-clé en COLLISION, laquelle gagne ? ».
+
+Mesurés en rejouant les vrais modules, trois objets tranchaient par **l'ordre des arguments de l'appelant** :
+
+| objet | à clé d'arbitrage ÉGALE | ce que ça vaut en prod |
+|---|---|---|
+| `gameStates.coinsWeek` | rendait l'objet ENTIER du côté `a` — 7 jours sur 7 | `coins` est mort depuis la v2.16.45 (`migrateGameState` réécrit `{week}` seul) |
+| `config.boss` | `{...a, ...b}` : les six descripteurs non nommés (`id`, `name`, `emoji`, `hpMax`, `image`, `difficulty`) prenaient toujours l'incoming | `handleLaunchBoss` les écrit dans le même littéral que `startedAt` : égaux par construction |
+| `gameStates.calendar[]` | `>=` sur `[...a, ...b]` : à `updatedAt` égal, le SECOND argument gagnait | **61 des 61** événements de la prod n'ont aucun `updatedAt`, donc l'égalité est le cas ORDINAIRE ; mais deux copies d'un même id ne peuvent pas diverger sans qu'une édition écrive un `updatedAt` neuf |
+
+**Aucun bug vivant** : dans les trois cas la donnée de prod ne porte pas la sous-clé qui divergerait. Les
+trois sont réparés quand même — `a`, ce n'est ni le plus vieux ni le plus frais, c'est la copie que
+l'appelant a mise en premier (le client son local, le serveur son stocké), et une divergence de cette
+famille ne se referme jamais toute seule (v2.16.76, v2.16.78, v2.16.79, v2.16.87, v2.16.88).
+
+**13e étage** (`SOUS_CLES`) : complet par RECENSEMENT sur les 18. Chaque objet toléré doit dire QUI
+l'arbitre, en `mesureAilleurs` (et la table nommée doit vraiment porter le champ), `frais` (clé
+d'arbitrage à ÉGALITÉ, la sous-clé fraîche gagne dans les 4 mesures) ou `convergent` (la règle combine :
+même résultat quel que soit l'ordre). La tolérance `ordreSansImportance` — trois seaux dont les listes ne
+sont lues qu'à `.includes()` — échoue si elle ne sert à rien, pour ne pas devenir un blanc-seing.
+
+Falsifié branche par branche : ancienne règle remise (les trois crient), fiche retirée (la complétude
+crie), fiche périmée, fiche qui pointe dans une table qui ne porte pas le champ, clé d'arbitrage mise en
+désaccord, tolérance d'ordre inutile.
+
+**Relevé de prod** : régénéré sur la donnée du 19 août — 208 chemins, **aucun ajout, aucun disparu,
+aucune nature changée** depuis celui d'hier.
+
+---
 ## Passage du 2026-08-19 (routine autonome, nuit, 26e passage)
 
 ### 🌐 Lecture de l'API de production

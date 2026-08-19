@@ -315,6 +315,7 @@ console.log("· drapeaux de migration — `true` d'un côté, ABSENT de l'autre 
 // son élément — et rien ne croisait les deux. Les chemins tolérés sont donc collectés ici et rendus
 // au 11e étage, qui MESURE la tolérance liste par liste au lieu de la supposer.
 const SCALAIRES_TOLERES = new Map(); // `config.feed` → ["emoji", "playerId", …]
+const SOUS_CLES_TOLEREES = new Set(); // v2.16.89 — `gameStates.coinsWeek`, `config.boss`, … (13e étage)
 {
   const schemaProd = require(path.join(ROOT, "scripts/schema-prod.json"));
   const estObj = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -379,7 +380,10 @@ const SCALAIRES_TOLERES = new Map(); // `config.feed` → ["emoji", "playerId", 
     if (!chemin.includes("*")) continue;
     const simple = nat === "scalaire" && chemin.endsWith(".*") && chemin.split("*").length === 2;
     const ancetre = chemin.slice(0, chemin.indexOf(".*"));
-    if (simple && !(ancetre in SOUS_LE_PLAFOND)) { sousPlafondToleres++; continue; }
+    // v2.16.89 — les ancêtres tolérés ne sont plus seulement COMPTÉS, ils sont collectés et rendus
+    // au 13e étage, qui MESURE l'arbitrage de leur sous-clé au lieu de le supposer. Même solde de
+    // dette que celui de la v2.16.87 pour « il voyage avec son élément ».
+    if (simple && !(ancetre in SOUS_LE_PLAFOND)) { sousPlafondToleres++; SOUS_CLES_TOLEREES.add(ancetre); continue; }
     if (ancetre in SOUS_LE_PLAFOND) continue;
     fail(`« ${chemin} » (${nat}) vit SOUS le plafond des recensements : les étages s'arrêtent un cran `
        + `au-dessus, donc aucun ne peut le voir. Ajoute une fiche « ${ancetre} » à SOUS_LE_PLAFOND qui `
@@ -391,8 +395,8 @@ const SCALAIRES_TOLERES = new Map(); // `config.feed` → ["emoji", "playerId", 
       fail(`SOUS_LE_PLAFOND fiche « ${ancetre} », que le relevé de prod ne porte plus. Fiche périmée : `
          + `retire-la, sinon elle couvrira un jour un chemin homonyme sans que personne l'ait relu.`);
   }
-  console.log(`    (${sousPlafondToleres} scalaires sous le plafond, arbitrés par la règle de leur objet `
-    + `— tolérance encore SUPPOSÉE, à mesurer comme l'a été celle du 11e étage)`);
+  console.log(`    (${sousPlafondToleres} scalaires sous le plafond, sur ${SOUS_CLES_TOLEREES.size} objets `
+    + `— la tolérance « la règle de leur objet les arbitre » est MESURÉE au 13e étage, plus supposée)`);
 
   for (const [chemin, nat] of Object.entries(schemaProd.champs)) {
     if (chemin in vus) continue;
@@ -1855,6 +1859,179 @@ console.log("· scalaires tolérés — le témoin doit ressortir du même côt�
          + `motif qu'ils suivent leur élément — c'est faux ici. Porte-les dans famA/famB avec des `
          + `valeurs qui se contredisent, et arbitre-les nommément dans src/merge.js ET `
          + `server-merge.cjs.`);
+  }
+}
+
+
+// ── 13e ÉTAGE : les SOUS-CLÉS d'un objet, mesurées au lieu d'être supposées ──
+// v2.16.89 — c'est mot pour mot la piste laissée par la v2.16.88 : « 18 chemins `X.*` scalaires
+// sont tolérés PARCE QUE la règle de leur objet les arbitre, et c'est exactement la promesse que
+// le 11e étage a dû mesurer pour la tolérance jumelle ». La promesse s'appuyait sur le 6e étage —
+// mais le 6e ne répond pas à cette question-là : il demande « une sous-clé RETIRÉE survit-elle ? »,
+// jamais « à sous-clé en COLLISION, laquelle gagne ? ». Et il ne couvre que quatre objets sur les
+// dix-huit (`OBJETS_PAR_CLE`) ; les autres tiennent par habitude d'écriture.
+//
+// Trois classements possibles, et chacun MORD :
+//   • `mesureAilleurs: "table"` — un étage existant met déjà cette sous-clé en collision. On vérifie
+//     que la table nommée porte VRAIMENT le champ (une fiche qui pointe dans le vide est un faux).
+//   • `frais: {cle, sousCle}`   — à clé d'arbitrage ÉGALE (le cas qui dure toute la semaine), la
+//     valeur FRAÎCHE de `sousCle` doit gagner dans les deux sens, client et serveur.
+//   • `convergent: {attendu}`   — la règle COMBINE les deux côtés (union, max). Le résultat doit
+//     être le même dans les deux sens ET dans les deux copies : un rendu qui dépend de l'ordre des
+//     arguments désigne l'appelant, pas la donnée (défaut de `petEvo` v2.16.88, `coinsWeek` ici).
+//
+// Ce que la mesure a trouvé le soir de sa naissance : `coinsWeek` rendait l'objet ENTIER du côté
+// `a` à semaine égale, `config.boss` donnait ses six descripteurs non nommés à l'incoming, et
+// `_mergeCalendar` tranchait l'égalité d'`updatedAt` (61 des 61 événements de la prod) par « le
+// second argument gagne ». Aucun bug vivant — la donnée de prod ne porte aujourd'hui aucune des
+// sous-clés qui divergeraient — mais les trois sont réparés, et la promesse est devenue un chiffre.
+const TEMOIN_SC = "__sousCle";
+const SOUS_CLES = [
+  { chemin: "gameStates.equipped",    mesureAilleurs: "OBJETS_PAR_CLE", champ: "equipped" },
+  { chemin: "gameStates.settings",    mesureAilleurs: "OBJETS_PAR_CLE", champ: "settings" },
+  { chemin: "gameStates.avatar",      mesureAilleurs: "OBJETS_PAR_CLE", champ: "avatar" },
+  { chemin: "gameStates.petNickname", mesureAilleurs: "OBJETS_PAR_CLE", champ: "petNickname" },
+  { chemin: "config.weeklyQuests",    mesureAilleurs: "OBJETS_ARBITRES", champ: "weeklyQuests" },
+  { chemin: "config.weeklyChallenge", mesureAilleurs: "OBJETS_ARBITRES", champ: "weeklyChallenge" },
+
+  // ── `frais` : à clé d'arbitrage ÉGALE, la sous-clé fraîche doit gagner ───
+  { chemin: "gameStates.coinsWeek", dans: "gameStates", champ: "coinsWeek",
+    frais: { cle: "week", sousCle: "coins" },
+    valeurFraiche: { week: "2026-08-14", coins: 40 }, valeurPerimee: { week: "2026-08-14", coins: 99 },
+    pourquoi: "seau daté {week, coins}. `coins` est mort depuis la v2.16.45 (`migrateGameState` réécrit `{week}` seul), mais la règle doit savoir l'arbitrer le jour où un vieux client en réécrit un." },
+  { chemin: "config.boss", dans: "config", champ: "boss",
+    frais: { cle: "startedAt", sousCle: "hpMax" },
+    valeurFraiche: { id: "yeti", name: "Yéti", emoji: "❄️", image: "/b.png", difficulty: "costaud", hpMax: 308, startedAt: "2026-07-24T23:45:37.905Z", lastHitTs: "2026-08-15T00:00:00.000Z", defeatedAt: null },
+    valeurPerimee: { id: "yeti", name: "Yéti", emoji: "❄️", image: "/b.png", difficulty: "costaud", hpMax: 120, startedAt: "2026-07-24T23:45:37.905Z", lastHitTs: "2026-08-14T00:00:00.000Z", defeatedAt: null },
+    pourquoi: "`handleLaunchBoss` (App.jsx ~3087) écrit les six descripteurs dans le MÊME littéral que `startedAt` : à `startedAt` égal ils sont égaux par construction, donc rien ne diverge en prod. C'est une habitude d'écriture, pas une règle — la règle doit tenir sans elle." },
+  { chemin: "gameStates.calendar[].recur", dans: "gameStates", champ: "calendar",
+    // La clé d'arbitrage est `updatedAt`, pas `id` : `id` ne fait que rapprocher les deux copies.
+    // Elle est ABSENTE des deux côtés — c'est le cas de 61 événements sur 61 en prod, donc l'égalité
+    // n'est pas un cas limite ici, c'est le cas ordinaire.
+    frais: { cle: "updatedAt", sousCle: "recur" },
+    poser: (el) => ({ calendar: [el], removedCalendarIds: [] }),
+    lire: (gs) => (gs.calendar || []).find((e) => e && e.id === "e13"),
+    valeurFraiche: { id: "e13", type: "evenement", label: "Frais", date: "2026-08-15", recur: { freq: "weekly", day: 2 } },
+    valeurPerimee: { id: "e13", type: "sante", label: "Périmé", date: "2026-08-14", recur: { freq: "daily" } },
+    pourquoi: "sous-objet dans un élément : il voyage avec son élément, arbitré par `updatedAt` — ABSENT des 61 événements de la prod, donc l'égalité (`0` contre `0`) est le cas NORMAL, pas le cas rare." },
+
+  // ── `convergent` : la règle combine, le résultat ne dépend pas de l'ordre ─
+  { chemin: "gameStates.petXp", dans: "gameStates", champ: "petXp",
+    valeurFraiche: { dragon: 40 }, valeurPerimee: { dragon: 10, chat: 5 },
+    convergent: { dragon: 40, chat: 5 }, pourquoi: "max par familier (monotone)" },
+  { chemin: "gameStates.completedAt", dans: "gameStates", champ: "completedAt",
+    valeurFraiche: { "t13#2026-08-14": "2026-08-15T10:00:00.000Z" },
+    valeurPerimee: { "t13#2026-08-14": "2026-08-14T10:00:00.000Z", "t14#2026-08-01": "2026-08-01T10:00:00.000Z" },
+    convergent: { "t13#2026-08-14": "2026-08-15T10:00:00.000Z", "t14#2026-08-01": "2026-08-01T10:00:00.000Z" },
+    pourquoi: "union par clé, horodatage le plus récent (v2.16.82)" },
+  { chemin: "gameStates.dailyClaimed", dans: "gameStates", champ: "dailyClaimed",
+    valeurFraiche: { day: "2026-08-14", ids: ["o3"] }, valeurPerimee: { day: "2026-08-14", ids: ["o6"] },
+    convergent: { day: "2026-08-14", ids: ["o3", "o6"] }, pourquoi: "jour ÉGAL → union des ids (ordre du tableau non significatif : la seule lecture est `.includes()` — App.jsx:1311, :2550, :341)", ordreSansImportance: true },
+  { chemin: "gameStates.ritualCelebrated", dans: "gameStates", champ: "ritualCelebrated",
+    valeurFraiche: { day: "2026-08-14", ids: ["rt1"] }, valeurPerimee: { day: "2026-08-14", ids: ["rt2"] },
+    convergent: { day: "2026-08-14", ids: ["rt1", "rt2"] }, pourquoi: "jour ÉGAL → union des ids (ordre du tableau non significatif : la seule lecture est `.includes()` — App.jsx:1311, :2550, :341)", ordreSansImportance: true },
+  { chemin: "gameStates.challengeTiers", dans: "gameStates", champ: "challengeTiers",
+    valeurFraiche: { week: "2026-08-14", tiers: [3] }, valeurPerimee: { week: "2026-08-14", tiers: [5, 7] },
+    convergent: { week: "2026-08-14", tiers: [3, 5, 7] }, pourquoi: "semaine ÉGALE → union des paliers (ordre du tableau non significatif : la seule lecture est `.includes()` — App.jsx:1311, :2550, :341)", ordreSansImportance: true },
+  { chemin: "gameStates.petDay", dans: "gameStates", champ: "petDay",
+    valeurFraiche: { day: "2026-08-14", xp: 25 }, valeurPerimee: { day: "2026-08-14", xp: 10 },
+    convergent: { day: "2026-08-14", xp: 25 }, pourquoi: "jour ÉGAL → max (plafond quotidien)" },
+  { chemin: "gameStates.sessionMinutes", dans: "gameStates", champ: "sessionMinutes",
+    valeurFraiche: { day: "2026-08-15", minutes: 42 }, valeurPerimee: { day: "2026-08-15", minutes: 5 },
+    convergent: { day: "2026-08-15", minutes: 42 }, pourquoi: "jour ÉGAL → max (budget-temps)" },
+  { chemin: "gameStates.bossBattle", dans: "gameStates", champ: "bossBattle",
+    valeurFraiche: { bossId: "2026-08-01", earned: 5, spent: 2, dmg: 30 },
+    valeurPerimee: { bossId: "2026-08-01", earned: 9, spent: 1, dmg: 10 },
+    convergent: { bossId: "2026-08-01", earned: 9, spent: 2, dmg: 30 }, pourquoi: "bossId ÉGAL → max sur chaque compteur monotone" },
+  { chemin: "config.weeklyChallenge.challenges[].checkins", dans: "config", champ: "weeklyChallenge",
+    poser: (v) => ({ weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "Défi", emoji: "⭐", checkins: v }] } }),
+    lire: (cfg) => cfg.weeklyChallenge?.challenges?.[0]?.checkins,
+    valeurFraiche: { "2026-08-15": true }, valeurPerimee: { "2026-08-14": true },
+    convergent: { "2026-08-14": true, "2026-08-15": true },
+    pourquoi: "union des journées cochées. Une journée ne peut pas se contredire : le SEUL appel est `onChallengeCheckin(todayC, true)` (App.jsx:1326) — aucune UI ne décoche, le panneau parent n'affiche les 7 jours qu'en lecture (parentpanel.jsx ~472)." },
+];
+console.log("· sous-clés d'objet — complétude : tout objet toléré `X.*` doit dire qui l'arbitre");
+{
+  const fiches = new Map(SOUS_CLES.map((f) => [f.chemin, f]));
+  for (const anc of SOUS_CLES_TOLEREES)
+    if (!fiches.has(anc))
+      fail(`« ${anc}.* » est toléré par le contrôle « fixtures vs schéma de prod » au motif que la `
+         + `RÈGLE DE SON OBJET l'arbitre — et aucune fiche du 13e étage ne dit laquelle. Ajoute-la : `
+         + `\`mesureAilleurs\` si un étage met déjà cette sous-clé en collision, \`frais\` si la clé `
+         + `d'arbitrage doit être mise à ÉGALITÉ, \`convergent\` si la règle combine les deux côtés.`);
+  for (const f of SOUS_CLES)
+    if (!SOUS_CLES_TOLEREES.has(f.chemin))
+      fail(`13e étage — fiche « ${f.chemin} », que le relevé de prod ne tolère plus (champ disparu, `
+         + `ou passé sous une autre règle). Fiche périmée : retire-la, sinon elle couvrira un jour un `
+         + `chemin homonyme sans que personne l'ait relu.`);
+}
+
+console.log("· sous-clés d'objet — à clé d'arbitrage ÉGALE, la sous-clé FRAÎCHE doit gagner");
+{
+  const TABLES = { OBJETS_PAR_CLE, OBJETS_ARBITRES };
+  const poseF = (f, v) => (f.poser ? f.poser(v) : { [f.champ]: v });
+  const litF = (f, racine) => (f.lire ? f.lire(racine) : racine[f.champ]);
+  for (const f of SOUS_CLES) {
+    if (f.mesureAilleurs) {
+      const t = TABLES[f.mesureAilleurs];
+      if (!t) { fail(`13e étage — fiche « ${f.chemin} » renvoie à « ${f.mesureAilleurs} », qui n'existe pas.`); continue; }
+      if (!t.some((o) => o.champ === f.champ))
+        fail(`13e étage — fiche « ${f.chemin} » dit que « ${f.mesureAilleurs} » met « ${f.champ} » en `
+           + `collision, et cette table ne le porte pas. La fiche pointe dans le vide : soit tu ajoutes `
+           + `le champ à la table, soit tu MESURES la sous-clé ici.`);
+      continue;
+    }
+    if (same(f.valeurFraiche, f.valeurPerimee))
+      { fail(`13e étage — fiche « ${f.chemin} » : les deux copies sont identiques, la mesure ne `
+           + `surveille rien (leçon « fixture identique = contrôle inerte »).`); continue; }
+    if (f.frais && f.frais.cle && !same(f.valeurFraiche[f.frais.cle], f.valeurPerimee[f.frais.cle]))
+      { fail(`13e étage — fiche « ${f.chemin} » : la clé d'arbitrage « ${f.frais.cle} » DIFFÈRE entre `
+           + `les deux copies. C'est le cas rare, déjà couvert ailleurs : mets-la à ÉGALITÉ, sinon la `
+           + `mesure ne voit jamais les 7 jours sur 7 où elle ne bouge pas.`); continue; }
+    const cfgF = f.dans === "config" ? { ...famA.config, ...poseF(f, f.valeurFraiche) } : famA.config;
+    const cfgP = f.dans === "config" ? { ...famB.config, ...poseF(f, f.valeurPerimee) } : famB.config;
+    const gsF  = f.dans === "gameStates" ? { ...gsA, ...poseF(f, f.valeurFraiche) } : gsA;
+    const gsP  = f.dans === "gameStates" ? { ...gsB, ...poseF(f, f.valeurPerimee) } : gsB;
+    const fA = mkFam("2026-08-15T12:00:00.000Z", gsF, cfgF, plA);
+    const fB = mkFam("2026-08-14T12:00:00.000Z", gsP, cfgP, plB);
+    let ordreDifferent = 0; // v2.16.89 — voir la vérification de `ordreSansImportance` en fin de fiche
+    for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+      for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const out = fn(base, inc);
+        const rec = litF(f, f.dans === "config" ? out.config : out.gameStates[0]);
+        if (rec == null)
+          { fail(`${impl} (${sens}) — ${f.chemin} : l'objet a DISPARU de la fusion alors qu'il était `
+               + `présent des deux côtés.`); continue; }
+        if (f.convergent) {
+          // `ordreSansImportance` n'est pas une exemption confortable : le contrôle vérifie plus bas
+          // qu'une fiche qui la porte en a VRAIMENT besoin, sinon elle serait un blanc-seing muet.
+          const trie = (v) => (f.ordreSansImportance ? norm(JSON.parse(JSON.stringify(v), (k, x) => (Array.isArray(x) ? [...x].sort() : x))) : v);
+          if (f.ordreSansImportance && !same(rec, f.convergent)) ordreDifferent++;
+          if (!same(trie(rec), trie(f.convergent)))
+            fail(`${impl} (${sens}) — ${f.chemin} : la fusion rend ${JSON.stringify(rec)} au lieu du `
+               + `résultat annoncé ${JSON.stringify(f.convergent)}. Une règle qui COMBINE doit rendre `
+               + `la même chose quel que soit l'ordre des arguments — sinon c'est l'appelant qui `
+               + `tranche (le client met son local en \`a\`, le serveur son stocké), et la divergence `
+               + `ne se referme jamais. Raison fichée : ${f.pourquoi}`);
+          continue;
+        }
+        const attendu = f.valeurFraiche[f.frais.sousCle];
+        if (!same(rec[f.frais.sousCle], attendu))
+          fail(`${impl} (${sens}) — ${f.chemin} (sous-clé « ${f.frais.sousCle} ») : la fusion rend `
+             + `${JSON.stringify(rec[f.frais.sousCle])}, la valeur FRAÎCHE est ${JSON.stringify(attendu)}. `
+             + `À « ${f.frais.cle} » ÉGAL, la règle ne regarde pas \`preferIncoming\` : elle rend le `
+             + `côté que l'APPELANT a mis en premier. Corrige-la dans src/merge.js ET server-merge.cjs. `
+             + `Raison fichée : ${f.pourquoi}`);
+      }
+    }
+    // Une tolérance qui ne tolère rien est un blanc-seing : elle passe au vert aujourd'hui et
+    // couvrira demain une vraie divergence d'ordre que personne n'aura décidé d'accepter. Si la
+    // comparaison STRICTE passait déjà, la déclaration doit sauter (leçon « la tolérance d'un
+    // garde-fou est une promesse », v2.16.87).
+    if (f.ordreSansImportance && ordreDifferent === 0)
+      fail(`13e étage — fiche « ${f.chemin} » déclare \`ordreSansImportance\` alors que la fusion rend `
+         + `déjà le tableau dans le MÊME ordre dans les quatre mesures. La tolérance ne sert à rien : `
+         + `retire-la, sinon elle couvrira un jour un désordre que personne n'a accepté.`);
   }
 }
 

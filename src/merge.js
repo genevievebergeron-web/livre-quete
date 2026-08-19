@@ -32,15 +32,26 @@ export const mergeBossBattle = (a, b) => {
 // « premier id vu gagne ». Avant : si un appareil modifiait/supprimait un événement pendant qu'un
 // autre pas encore synchronisé renvoyait l'ancienne version, le merge pouvait faire réapparaître
 // l'ancienne version modifiée, ou ressusciter un événement supprimé.
-export const _mergeCalendar = (a, b, removedIds) => {
+// v2.16.89 — `updatedAt` ÉGAL (le cas de TOUS les événements de la prod : 61 sur 61 n'en portent
+// aucun, donc `0 >= 0` des deux côtés) : `>=` sur un parcours `[...a, ...b]` donnait la version
+// arrivée en DERNIER, c'est-à-dire `b` — le second argument de l'appelant, jamais le plus frais.
+// Or chaque appelant met SA copie en premier (le client son local, le serveur son stocké), donc
+// « le second gagne » désigne deux versions opposées selon le côté : le client afficherait celle
+// du nuage pendant que le nuage garderait celle du client. Même défaut, mot pour mot, que
+// `petEvo` en v2.16.88 et `hiddenWeek` en v2.16.76. On parcourt maintenant le côté FRAIS d'abord
+// et on tranche l'égalité en sa faveur (`>` au lieu de `>=`) : un `updatedAt` strictement plus
+// grand continue de gagner d'où qu'il vienne, et à égalité c'est la fraîcheur de la famille qui
+// départage, dans les deux copies et dans les deux sens.
+export const _mergeCalendar = (a, b, removedIds, preferIncoming) => {
   const rm = removedIds ? new Set(removedIds) : null;
   const byId = new Map(); const noId = []; const seenRaw = new Set();
-  for (const e of [...(a || []), ...(b || [])]) {
+  const frais = preferIncoming ? (b || []) : (a || []), perime = preferIncoming ? (a || []) : (b || []);
+  for (const e of [...frais, ...perime]) {
     if (!e) continue;
     if (e.id == null) { const k = JSON.stringify(e); if (!seenRaw.has(k)) { seenRaw.add(k); noId.push(e); } continue; }
     if (rm && rm.has(e.id)) continue; // suppression (tombstone) gagne sur une version pas encore synchronisée
     const prev = byId.get(e.id);
-    if (!prev || (e.updatedAt || 0) >= (prev.updatedAt || 0)) byId.set(e.id, e);
+    if (!prev || (e.updatedAt || 0) > (prev.updatedAt || 0)) byId.set(e.id, e);
   }
   return [...byId.values(), ...noId];
 };
@@ -182,7 +193,18 @@ export const mergeGS = (a, b, preferIncoming) => {
     // coinsWeek doit être géré EXPLICITEMENT — sinon le spread ...b l'écrase toujours par l'incoming.
     // Bug v2.5.3 : un vieux device synquant avec un coinsWeek d'une semaine passée déclenchait un
     // reset spurieux à la prochaine migration. Fix : on garde la semaine la plus récente (lexicographique).
-    coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||""); return aw>=bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
+    // v2.16.89 — `aw >= bw` rendait l'objet ENTIER du côté `a` à semaine ÉGALE, c'est-à-dire 7 jours
+    // sur 7 : la seule chose qu'un `>=` sur la clé d'arbitrage ne sait PAS départager, c'est l'égalité,
+    // et c'est justement le cas qui dure toute la semaine. `a`, ce n'est pas « le plus ancien » ni
+    // « le plus frais », c'est la copie que l'appelant a mise en premier — le client son local, le
+    // serveur son stocké — donc à semaine égale chaque côté gardait la SIENNE. Aucune divergence
+    // vivante aujourd'hui (`migrateGameState` réécrit `coinsWeek` en `{week}` seul, sans `coins`,
+    // depuis la v2.16.45), mais la règle ne sait pas arbitrer une seconde sous-clé et rien ne le
+    // disait. Égalité tranchée par la fraîcheur, comme `hiddenWeek` (v2.16.76) et `weeklyQuests`
+    // (v2.16.78) ; semaines différentes : la plus récente gagne, inchangé.
+    coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||"");
+      if (aw === bw) return (preferIncoming ? (b.coinsWeek||a.coinsWeek) : (a.coinsWeek||b.coinsWeek)) || {week:aw};
+      return aw>bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max), voir la tête de mergeGS
     completed,
     deCompleted, // v2.16.82 — tombstone daté de « ↩️ Annuler » (voir plus haut)
@@ -222,7 +244,7 @@ export const mergeGS = (a, b, preferIncoming) => {
     // ancien casque. C'est le signalement `bug_56gb01a` du 28 juillet, mot pour mot (« je veut maitre
     // un nouvaut masque mais il me mais tougour un casque de chevalier »).
     equipped: _byKey(a.equipped, b.equipped),
-    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
+    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds, preferIncoming),
     removedCalendarIds,
     avatar: avatarConfigured,
     // v2.16.72 — « Ma maison » (v2.8.0) n'avait de règle dans AUCUNE des deux fusions : `house` tombait
@@ -561,7 +583,18 @@ export const mergeFamily = (base, incoming) => {
       // coup, même plus vieille. Or c'est elle qui pilote la régénération des PV de la famille
       // (`bosses.jsx:131-133`) : une date reculée redonne des PV au boss après un coup encaissé.
       // On garde la plus récente des deux, comme le serveur le fait déjà.
-      if (a.startedAt === b.startedAt) { const lastHitTs = [a.lastHitTs, b.lastHitTs].filter(Boolean).sort().pop() || a.lastHitTs; return { ...a, ...b, defeatedAt: a.defeatedAt || b.defeatedAt, lastHitTs }; }
+      // v2.16.89 — `{...a, ...b}` : les sous-clés que ce littéral ne NOMME pas (`id`, `name`, `emoji`,
+      // `hpMax`, `image`, `difficulty`) prenaient toujours l'incoming, sans regarder `preferIncoming` —
+      // exactement le défaut de `_byKey` avant la v2.16.79 et celui de `challenges[].playerName` en
+      // v2.16.87. Rien ne diverge aujourd'hui : `handleLaunchBoss` (App.jsx ~3087) écrit ces six
+      // descripteurs dans le MÊME littéral que `startedAt`, donc à `startedAt` égal ils sont égaux
+      // par construction. Mais c'était une promesse que rien ne mesurait, et la seule chose qui la
+      // tient est une habitude d'écriture. Ordre du spread piloté par la fraîcheur, comme partout ailleurs.
+      if (a.startedAt === b.startedAt) {
+        const lastHitTs = [a.lastHitTs, b.lastHitTs].filter(Boolean).sort().pop() || a.lastHitTs;
+        const perime = preferIncoming ? a : b, frais = preferIncoming ? b : a;
+        return { ...perime, ...frais, defeatedAt: a.defeatedAt || b.defeatedAt, lastHitTs };
+      }
       return (new Date(b.startedAt||0) >= new Date(a.startedAt||0)) ? b : a;
     })(),
     // PIN parent : dernière écriture gagne (permet de le changer / réinitialiser depuis n'importe quel appareil)

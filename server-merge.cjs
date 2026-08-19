@@ -84,15 +84,19 @@ const isValidCustodyWeekKey = (v) => {
 // s'en était aperçu parce qu'aucun événement n'avait jamais été supprimé en prod
 // (`removedCalendarIds` vide chez les 4 enfants) — mais la v2.16.67 ajoute une deuxième façon
 // d'en retirer un (décocher un enfant dans le formulaire), donc le trou devait être bouché.
-const _mergeCalendar = (a, b, removedIds) => {
+// v2.16.89 — port du correctif client : à `updatedAt` ÉGAL (61 des 61 événements de la prod n'en
+// portent aucun), `>=` sur `[...a, ...b]` rendait le SECOND argument de l'appelant, pas le côté
+// frais — et chaque appelant met sa propre copie en premier. Voir src/merge.js pour le détail.
+const _mergeCalendar = (a, b, removedIds, preferIncoming) => {
   const rm = removedIds ? new Set(removedIds) : null;
   const byId = new Map(); const noId = []; const seenRaw = new Set();
-  for (const e of [...(a || []), ...(b || [])]) {
+  const frais = preferIncoming ? (b || []) : (a || []), perime = preferIncoming ? (a || []) : (b || []);
+  for (const e of [...frais, ...perime]) {
     if (!e) continue;
     if (e.id == null) { const k = JSON.stringify(e); if (!seenRaw.has(k)) { seenRaw.add(k); noId.push(e); } continue; }
     if (rm && rm.has(e.id)) continue;
     const prev = byId.get(e.id);
-    if (!prev || (e.updatedAt || 0) >= (prev.updatedAt || 0)) byId.set(e.id, e);
+    if (!prev || (e.updatedAt || 0) > (prev.updatedAt || 0)) byId.set(e.id, e);
   }
   return [...byId.values(), ...noId];
 };
@@ -191,7 +195,18 @@ const mergeGS = (a, b, preferIncoming) => {
     coinsLifetime: Math.max(a.coinsLifetime || 0, b.coinsLifetime || 0), // v2.5.26 — miroir du merge client (jamais décrémenté)
     // v2.5.26 — miroir du fix client v2.5.3 : sans ça, le spread ...b laissait n'importe quel client
     // (même un vieux, pas à jour) écraser coinsWeek côté serveur. On garde la semaine la plus récente.
-    coinsWeek: (() => { const aw = (a.coinsWeek?.week || ""); const bw = (b.coinsWeek?.week || ""); return aw >= bw ? (a.coinsWeek || { week: aw }) : (b.coinsWeek || { week: bw }); })(),
+    // v2.16.89 — port du correctif client. `aw >= bw` rendait l'objet ENTIER du côté `a` à semaine ÉGALE, c'est-à-dire 7 jours
+    // sur 7 : la seule chose qu'un `>=` sur la clé d'arbitrage ne sait PAS départager, c'est l'égalité,
+    // et c'est justement le cas qui dure toute la semaine. `a`, ce n'est pas « le plus ancien » ni
+    // « le plus frais », c'est la copie que l'appelant a mise en premier — le client son local, le
+    // serveur son stocké — donc à semaine égale chaque côté gardait la SIENNE. Aucune divergence
+    // vivante aujourd'hui (`migrateGameState` réécrit `coinsWeek` en `{week}` seul, sans `coins`,
+    // depuis la v2.16.45), mais la règle ne sait pas arbitrer une seconde sous-clé et rien ne le
+    // disait. Égalité tranchée par la fraîcheur, comme `hiddenWeek` (v2.16.76) et `weeklyQuests`
+    // (v2.16.78) ; semaines différentes : la plus récente gagne, inchangé.
+    coinsWeek: (()=>{ const aw=(a.coinsWeek?.week||""); const bw=(b.coinsWeek?.week||"");
+      if (aw === bw) return (preferIncoming ? (b.coinsWeek||a.coinsWeek) : (a.coinsWeek||b.coinsWeek)) || {week:aw};
+      return aw>bw ? (a.coinsWeek||{week:aw}) : (b.coinsWeek||{week:bw}); })(),
     resetAt: _resetAt || undefined, // v2.16.81 — l'époque de reset se propage (max)
     completed,
     deCompleted, // v2.16.82 — tombstone daté de « ↩️ Annuler »
@@ -206,7 +221,7 @@ const mergeGS = (a, b, preferIncoming) => {
     refundedRewards: _refunded, // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62 ; hoisté en v2.16.81
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: _byKey(a.equipped, b.equipped), // v2.16.79 — voir `_byKey` ci-dessus ; signalement `bug_56gb01a` (« il me mais tougour un casque de chevalier »)
-    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds),
+    calendar: _mergeCalendar(a.calendar, b.calendar, removedCalendarIds, preferIncoming),
     removedCalendarIds,
     avatar: avatarConfigured,
     // v2.16.72 — MIROIR de src/merge.js : « Ma maison » n'avait de règle dans aucune des deux copies.
@@ -396,7 +411,18 @@ const mergeFamily = (base, incoming) => {
     // Même union-by-id que `bugs`, même plafond que le client (80).
     errorLogs: (() => { const m=new Map(); for (const x of [...(bC.errorLogs||[]), ...(iC.errorLogs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,80); })(),
     boss: (() => { const a=bC.boss, b=iC.boss; if (!a) return b||null; if (!b) return a;
-      if (a.startedAt===b.startedAt) { const lastHitTs=[a.lastHitTs,b.lastHitTs].filter(Boolean).sort().pop()||a.lastHitTs; return { ...a, ...b, defeatedAt:a.defeatedAt||b.defeatedAt, lastHitTs }; }
+      // v2.16.89 — `{...a, ...b}` : les sous-clés que ce littéral ne NOMME pas (`id`, `name`, `emoji`,
+      // `hpMax`, `image`, `difficulty`) prenaient toujours l'incoming, sans regarder `preferIncoming` —
+      // exactement le défaut de `_byKey` avant la v2.16.79 et celui de `challenges[].playerName` en
+      // v2.16.87. Rien ne diverge aujourd'hui : `handleLaunchBoss` (App.jsx ~3087) écrit ces six
+      // descripteurs dans le MÊME littéral que `startedAt`, donc à `startedAt` égal ils sont égaux
+      // par construction. Mais c'était une promesse que rien ne mesurait, et la seule chose qui la
+      // tient est une habitude d'écriture. Ordre du spread piloté par la fraîcheur, comme partout ailleurs.
+      if (a.startedAt === b.startedAt) {
+        const lastHitTs = [a.lastHitTs, b.lastHitTs].filter(Boolean).sort().pop() || a.lastHitTs;
+        const perime = preferIncoming ? a : b, frais = preferIncoming ? b : a;
+        return { ...perime, ...frais, defeatedAt: a.defeatedAt || b.defeatedAt, lastHitTs };
+      }
       return (new Date(b.startedAt||0) >= new Date(a.startedAt||0)) ? b : a; })(),
     pin: newerC.pin || bC.pin || iC.pin || "1146",
     mode: newerC.mode || bC.mode || iC.mode || "routine",
