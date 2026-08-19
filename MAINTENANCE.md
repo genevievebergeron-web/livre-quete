@@ -4,6 +4,43 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-19 (routine autonome, nuit, 26e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, 175 837 octets, `savedAt` `2026-08-18T10:43:05Z`. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, dernier événement le 24 juillet, aucun message signalant un problème.
+- **Aucune Phase 2.** 26e nuit propre d'affilée côté signalements.
+
+### 📊 Ce que la prod a appris au garde-fou cette nuit (Phase 3)
+
+Le passage a servi à rendre le recensement du garde-fou **indépendant des fixtures** — il en dépendait
+entièrement, et ça coûtait dans les deux sens.
+
+- **La prod porte, les fixtures pas.** `gameStates.pendingCelebrations[].badges` existe en production
+  et n'était dans **aucune** fixture : le 8e étage ne pouvait pas le voir, depuis toujours. Même
+  classe que `feed[].likeTs`/`unlikes`, restés hors de portée une nuit entière (v2.16.85). Onze
+  champs de premier niveau manquaient aussi, dont **dix drapeaux de migration sans aucune règle de
+  fusion** — sans conséquence vivante (ils ne s'écrivent jamais qu'à `true`), mais si un appareil
+  sans drapeau l'effaçait chez celui qui l'a, la migration **repartirait**, et plusieurs suppriment
+  des assignations ou vident `pending`.
+- **Les fixtures portent, la prod pas.** `house.deco` et `calendar[].title` étaient des formes
+  **inventées** : ni la prod ni le code ne les portent (l'app écrit `{floor, placed, wallpaper}` et
+  `{id, type, label, date, recur}`). Le 10e étage a crié sur la première, et la classer aurait gravé
+  un faux durable dans le fichier.
+
+`scripts/schema-prod.json` fige désormais la structure de la prod (185 chemins, 8,5 Ko, **noms de
+champs et natures seulement — aucune donnée de famille**, vérifié : zéro clé dynamique, zéro valeur).
+`scripts/releve-schema-prod.mjs` le régénère depuis un `GET`. **À refaire à chaque passage où le
+`GET` réussit** : un relevé qui vieillit est un contrôle qui s'endort.
+
+Détail complet (10e étage, mesures, falsifications) dans `PROJET-ETAT.md`, entrée du 19 août.
+
+---
+
 ## Passage du 2026-08-18 (routine autonome, nuit, 25e passage)
 
 ### 🌐 Lecture de l'API de production

@@ -59,7 +59,10 @@ const gsA = {
   // v2.16.75 — `updatedAt` du côté FRAIS : voir la note « cohérence de fraîcheur » plus bas.
   // v2.16.85 — `recur` porté des DEUX côtés : c'est un sous-OBJET dans un élément de liste, et le
   // 9e étage ne peut recenser que ce que la fusion des fixtures fait apparaître (leçon de la v2.16.84).
-  calendar: [{ id: "e1", updatedAt: 9, title: "A", recur: { freq: "weekly", day: 2 } }], removedCalendarIds: ["e0"],
+  // v2.16.86 — forme RÉELLE d'un événement (App.jsx ~3065) : {id, type, label, date, recur}.
+  // La fixture disait `title`, un champ que ni la prod ni le code ne portent (même classe que
+  // l'ancien `house.deco`) — et n'avait ni `date` ni `type`, qui existent tous les deux.
+  calendar: [{ id: "e1", updatedAt: 9, type: "evenement", label: "A", date: "2026-08-15", recur: { freq: "weekly", day: 2 } }], removedCalendarIds: ["e0"],
   avatar: { configured: true, skin: "a" }, pin: "1111", mode: "routine",
   removedRoutineIds: ["r_old"],
   routines: [{ id: "rt1", name: "Matin A", taskIds: ["as1"] }],
@@ -67,9 +70,11 @@ const gsA = {
   // pas sur la fraîcheur de la famille. Le jour le plus récent va donc du côté FRAIS (famA), même
   // raison que `calendar.updatedAt` juste au-dessus : sans ça le contrôle crierait au loup.
   activeRoutineId: "rt1", hiddenRewards: ["rw_h_a"], hiddenWeek: "2026-08-14",
+  noCoinsResetV1: true, petMigV2: true, rotativeCleanupV1: true, // drapeaux : `true` ici, ABSENTS de gsB
   dailyClaimed: { day: "2026-08-14", ids: ["o3"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt1"] },
-  consumedCelebrationIds: ["c_a"], pendingCelebrations: [{ id: "c_p_a" }],
+  // v2.16.86 — `badges` : porté par la prod, par AUCUNE fixture, donc invisible au 8e étage.
+  consumedCelebrationIds: ["c_a"], pendingCelebrations: [{ id: "c_p_a", badges: ["b_a"] }],
   petXp: { dragon: 40 }, petDay: { day: "2026-08-14", xp: 25 },
   petEvo: { dragon: { path: "feu" } }, petNickname: { dragon: "Flamme" },
   energy: 60, energyTs: "2026-08-14T12:00:00.000Z", lastFedDay: "2026-08-14",
@@ -78,7 +83,10 @@ const gsA = {
   bossBattle: { bossId: "2026-08-01", earned: 5, spent: 2, dmg: 30 },
   settings: { calm: true }, dismissedAnnouncements: ["an_a"],
   challengeTiers: { week: "2026-08-14", tiers: [3] },
-  house: { deco: ["tapis_a"] }, lastSeenDay: "2026-08-15",
+  // v2.16.86 — forme RÉELLE de `house` en prod (relevé du 18 août) : {floor, placed, wallpaper}.
+  // L'ancienne fixture inventait une liste `house.deco` qui n'existe ni en prod ni dans le code —
+  // le recensement du 10e étage a crié dessus, et la classer aurait gravé un faux dans le fichier.
+  house: { floor: "df1", placed: { rug: "dr1" }, wallpaper: "dw1" }, lastSeenDay: "2026-08-15",
   // v2.16.74 — valeurs croisées EXPRÈS (A gagne sur menage, B sur cuisine, defi seulement chez B) :
   // un MAX clé par clé doit rendre un objet différent des DEUX entrées, sinon un spread naïf
   // passerait inaperçu.
@@ -92,14 +100,14 @@ const gsB = {
   pending: ["t4#2026-08-15"], refusedKeys: ["t8#2026-08-02"], refusals: ["r-b"],
   owned: ["item_b"], boughtRewards: ["rw_bonbon"], rewardBuyTs: { rw_bonbon: 222 },
   refundedRewards: ["rw_new"], badges: ["b_b"], equipped: { cape: "c_b" },
-  calendar: [{ id: "e1", updatedAt: 5, title: "B", recur: { freq: "daily" } }], removedCalendarIds: ["e2"],
+  calendar: [{ id: "e1", updatedAt: 5, type: "sante", label: "B", date: "2026-08-14", recur: { freq: "daily" } }], removedCalendarIds: ["e2"],
   avatar: { configured: false, skin: "b" }, pin: "2222", mode: "semaine",
   removedRoutineIds: ["r_other"],
   routines: [{ id: "rt1", name: "Matin B", taskIds: ["as1", "as2"] }],
   activeRoutineId: "rt2", hiddenRewards: ["rw_h_b"], hiddenWeek: "2026-08-07", // v2.16.76 — jour PÉRIMÉ ici, voir famA
   dailyClaimed: { day: "2026-08-14", ids: ["o6"] },
   ritualCelebrated: { day: "2026-08-14", ids: ["rt2"] },
-  consumedCelebrationIds: ["c_b"], pendingCelebrations: [{ id: "c_p_b" }],
+  consumedCelebrationIds: ["c_b"], pendingCelebrations: [{ id: "c_p_b", badges: ["b_b"] }],
   petXp: { dragon: 10, chat: 5 }, petDay: { day: "2026-08-14", xp: 10 },
   petEvo: { dragon: { path: "glace" } }, petNickname: { chat: "Minou" },
   energy: 95, energyTs: "2026-08-14T12:01:00.000Z", lastFedDay: "2026-08-13",
@@ -108,7 +116,7 @@ const gsB = {
   bossBattle: { bossId: "2026-08-01", earned: 9, spent: 1, dmg: 10 },
   settings: { sound: false }, dismissedAnnouncements: ["an_b"],
   challengeTiers: { week: "2026-08-07", tiers: [3, 5, 7] },
-  house: { deco: ["tapis_b"] }, lastSeenDay: "2026-08-14",
+  house: { floor: "df2", placed: { lamp: "dl1" }, wallpaper: "dw2" }, lastSeenDay: "2026-08-14",
   catCounts: { menage: 4, cuisine: 9, defi: 2 },
 };
 
@@ -136,7 +144,15 @@ console.log("· fixtures — chaque champ connu doit se contredire entre A et B"
 // vides de sens — le garde-fou passerait au vert en ne surveillant plus rien. Il porte donc la
 // même valeur des deux côtés ici, et son arbitrage a sa propre section dédiée (« époque de
 // reset »), qui le met justement en contradiction.
-memeValeur(gsA, gsB, "gameStates", { resetAt: true });
+// v2.16.86 — les drapeaux de migration (`noCoinsResetV1`, `petMigV2`, `rotativeCleanupV1`) sont la
+// seconde exemption légitime, et pour une raison de FORME : `migrations.js` ne les écrit qu'à
+// `true`, jamais à `false`. Ils n'ont donc pas de seconde valeur avec laquelle se contredire, et
+// leur donner `false` en fixture inventerait un état que l'app ne produit pas. Leur vraie
+// collision est `true` contre ABSENT — mesurée juste en dessous, pour que cette exemption reste
+// un fait vérifié et pas une promesse (leçon de la v2.16.85 sur les fixtures inertes).
+memeValeur(gsA, gsB, "gameStates", { resetAt: true, noCoinsResetV1: true, petMigV2: true, rotativeCleanupV1: true });
+
+
 
 console.log("· mergeGS — champ par champ, dans les deux sens et les deux préférences");
 for (const [la, a, lb, b] of [["A", gsA, "B", gsB], ["B", gsB, "A", gsA]]) {
@@ -183,7 +199,18 @@ const mkFam = (savedAt, gs, cfgExtra, pl) => ({
     ...cfgExtra,
   },
 });
+// v2.16.86 — champs de premier niveau que la PROD porte et qu'aucune fixture n'avait : le contrôle
+// « fixtures vs schéma de prod » plus bas les a nommés un par un. La collision réelle d'un drapeau
+// de migration est `true` d'un côté / ABSENT de l'autre — jamais `false` : `migrations.js` ne les
+// écrit qu'à `true` (l'écrire `false` en fixture inventerait un cas que l'app ne produit pas, et
+// ferait crier `estDrapeau` pour rien). `weekPersist` n'est pas un drapeau : c'est un réglage de
+// l'assistant (`setupwizard.jsx` ~146), qui vaut vraiment `true` ou `false`.
+const DRAPEAUX_A = { createdAt: "2026-06-01", weekPersist: true, colorToneDownV1: true,
+  rotativeCleanupV1: true, orphanAssignCleanupV1: true, orphanAssignCleanupV2: true,
+  routineOrphanCleanupV1: true, updateFeedRebuildV1: true };
+const DRAPEAUX_B = { createdAt: "2026-06-02", weekPersist: false };
 const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
+  ...DRAPEAUX_A,
   announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
                    playerTasks: { p1: ["vider le lave-vaisselle"] } }],
   childTaskProposals: [{ id: "pr1", label: "Proposition A" }], removedProposals: ["pr0"],
@@ -202,6 +229,7 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
 }, plA);
 const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
+  ...DRAPEAUX_B,
   announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
                    playerTasks: { p1: ["sortir le recyclage"] } }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
@@ -228,6 +256,103 @@ memeValeur(famA.config, famB.config, "config", {
   // parité champ par champ ci-dessus reste leur contrôle.
   coinOffers: 1, teamInvites: 1, momentRequests: 1,
 });
+
+console.log("· drapeaux de migration — `true` d'un côté, ABSENT de l'autre : `true` doit tenir");
+{
+  // C'est la seule collision qu'un drapeau peut vraiment produire (une tablette qui n'a jamais
+  // tourné la migration n'a pas la clé du tout — JSON ne transporte pas `undefined`). Si elle
+  // tombait du mauvais côté, la migration REPARTIRAIT sur cet appareil : plusieurs d'entre elles
+  // suppriment des assignations ou vident `pending`, donc c'est une perte de données, pas un
+  // simple recalcul.
+  const DRAPEAUX_GS = ["noCoinsResetV1", "petMigV2", "rotativeCleanupV1"];
+  const DRAPEAUX_CFG = ["colorToneDownV1", "rotativeCleanupV1", "orphanAssignCleanupV1",
+                        "orphanAssignCleanupV2", "routineOrphanCleanupV1", "updateFeedRebuildV1"];
+  const sansCle = (o, k) => { const c = { ...o }; delete c[k]; return c; };
+  for (const k of DRAPEAUX_GS) {
+    const avec = mkFam("2026-08-15T12:00:00.000Z", gsA, {}, plA);
+    const sans = mkFam("2026-08-14T12:00:00.000Z", sansCle(gsB, k), {}, plB);
+    for (const [sens, base, inc] of [["drapeau en base", avec, sans], ["drapeau en incoming", sans, avec]])
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]])
+        if (fn(base, inc).gameStates[0][k] !== true)
+          fail(`${nom} mergeFamily (${sens}) — gameStates.${k} : un appareil qui n'a PAS le drapeau `
+             + `l'efface chez celui qui l'a. La migration repartirait sur cet appareil, et `
+             + `plusieurs d'entre elles suppriment des données. Le drapeau doit survivre à `
+             + `l'absence d'en face.`);
+  }
+  for (const k of DRAPEAUX_CFG) {
+    const avec = mkFam("2026-08-15T12:00:00.000Z", gsA, { ...DRAPEAUX_A }, plA);
+    const sans = mkFam("2026-08-14T12:00:00.000Z", gsB, sansCle(DRAPEAUX_A, k), plB);
+    for (const [sens, base, inc] of [["drapeau en base", avec, sans], ["drapeau en incoming", sans, avec]])
+      for (const [nom, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]])
+        if (fn(base, inc).config[k] !== true)
+          fail(`${nom} mergeFamily (${sens}) — config.${k} : même problème côté config.`);
+  }
+}
+
+
+// ── FIXTURES vs SCHÉMA DE PROD : un recensement ne vaut que par ses entrées ──
+// v2.16.86 — les dix étages ci-dessous recensent la FUSION DES FIXTURES. Un champ que ni `famA`
+// ni `famB` ne porte est donc invisible à TOUS les contrôles de complétude, quel que soit leur
+// nombre. Ça s'est payé deux fois, dans les deux sens :
+//   • la prod porte, les fixtures pas — `feed[].likeTs`/`unlikes` sont restés hors de portée une
+//     nuit entière (v2.16.85), et `pendingCelebrations[].badges` depuis toujours (trouvé ICI).
+//   • les fixtures portent, la prod pas — `house.deco` et `calendar[].title` étaient des formes
+//     INVENTÉES, absentes du code comme de la prod ; le 10e étage a crié sur la première, et la
+//     classer aurait gravé un faux durable (v2.16.86).
+// `scripts/schema-prod.json` fige la structure de la prod (noms de champs et natures, AUCUNE
+// donnée de famille) ; on la régénère avec `scripts/releve-schema-prod.mjs` après un `GET`.
+//
+// Strict sur ce que les étages classent vraiment :
+//   • tout champ de PREMIER niveau (étages 1-3 + le diff schéma/règles de fusion)
+//   • tout chemin NON scalaire, à n'importe quel niveau (étages 4-10 : listes, objets, nichés)
+// Informatif pour le reste : un scalaire DANS un élément voyage avec son élément, aucun étage ne
+// le classe séparément. Et un chemin que les fixtures ont en plus n'est pas une faute — un champ
+// neuf existe forcément dans le code avant d'apparaître dans un relevé de prod.
+{
+  const schemaProd = require(path.join(ROOT, "scripts/schema-prod.json"));
+  const estObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const natureDe = (v) => {
+    if (Array.isArray(v)) return v.length ? (v.some(estObj) ? "listeObjets" : "liste") : "listeVide";
+    if (estObj(v)) return Object.values(v).some(Array.isArray) ? "objetDeListes" : "objet";
+    return "scalaire";
+  };
+  const RICHESSE = { scalaire: 0, listeVide: 1, liste: 2, objet: 2, objetDeListes: 3, listeObjets: 3 };
+  const vus = {};
+  const pose = (c, n) => { if (vus[c] === undefined || RICHESSE[n] > RICHESSE[vus[c]]) vus[c] = n; };
+  // MÊME parcours que `scripts/releve-schema-prod.mjs` : les deux relevés doivent être comparables.
+  const releve = (racine, dans) => {
+    for (const [k, v] of Object.entries(racine || {})) {
+      pose(`${dans}.${k}`, natureDe(v));
+      if (estObj(v)) for (const [k2, v2] of Object.entries(v)) {
+        if (!Array.isArray(v2)) continue;
+        pose(`${dans}.${k}.${k2}`, natureDe(v2));
+        for (const el of v2) if (estObj(el))
+          for (const [sk, sv] of Object.entries(el)) pose(`${dans}.${k}.${k2}[].${sk}`, natureDe(sv));
+      }
+      if (!Array.isArray(v)) continue;
+      for (const el of v) if (estObj(el))
+        for (const [sk, sv] of Object.entries(el)) pose(`${dans}.${k}[].${sk}`, natureDe(sv));
+    }
+  };
+  const fusion = client.mergeFamily(famA, famB);
+  releve(fusion.config, "config");
+  for (const gs of fusion.gameStates) releve(gs, "gameStates");
+
+  console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}) — aucun angle mort`);
+  let toleres = 0;
+  for (const [chemin, nat] of Object.entries(schemaProd.champs)) {
+    if (chemin in vus) continue;
+    const premierNiveau = chemin.split(".").length === 2 && !chemin.includes("[");
+    if (!premierNiveau && nat === "scalaire") { toleres++; continue; }
+    fail(`« ${chemin} » (${nat}) existe en PROD et dans AUCUNE fixture : tous les contrôles de `
+       + `complétude ci-dessous lisent la fusion de famA/famB, donc aucun ne peut le voir. Porte-le `
+       + `dans les fixtures (avec des valeurs qui se contredisent), puis classe-le à l'étage qui `
+       + `correspond. Si le champ a disparu de l'app, régénère plutôt le relevé : `
+       + `node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);
+  }
+  if (toleres) console.log(`    (${toleres} scalaires dans un élément non portés par les fixtures — `
+    + `ils voyagent avec leur élément, aucun étage ne les classe séparément)`);
+}
 
 console.log("· mergeFamily — instantanés complets, dans les deux sens");
 for (const [la, a, lb, b] of [["A", famA, "B", famB], ["B", famB, "A", famA]]) {
@@ -263,6 +388,12 @@ const NAIF_ASSUME = {
   // Date de création de la famille : écrite une fois, jamais modifiée, donc identique
   // des deux côtés dans la vraie vie.
   createdAt: "immuable après la création",
+  // v2.16.86 — réglage de l'assistant (`setupwizard.jsx` ~146), pas un drapeau : il vaut vraiment
+  // `true` ou `false`, et le spread naïf laisse donc la copie périmée gagner. Sans conséquence
+  // AUJOURD'HUI parce que le champ est ÉCRIT et jamais LU (champ mort constaté en v2.16.73, et
+  // toujours en attente d'une décision de Gen). Le jour où quelqu'un le branche, il lui faut une
+  // vraie règle — ce n'est pas une exemption de fond, c'est un sursis documenté.
+  weekPersist: "écrit par l'assistant, lu NULLE PART : champ mort (décision de Gen en attente)",
   // Drapeaux de migration (`colorToneDownV1`, `rotativeCleanupV1`, `orphanAssignCleanupV1/V2`,
   // `routineOrphanCleanupV1`, `updateFeedRebuildV1`…) : ne valent JAMAIS que `true`, et une
   // clé absente d'`iC` n'efface pas celle de `bC` avec un spread. Vérifié en v2.16.72.
@@ -1153,6 +1284,11 @@ const SOUS_LISTES = [
     sansRetrait: "même raison : le contenu d'une annonce est figé à l'envoi" },
   { liste: "updateFeedEntries", cle: "version", dans: "config", champ: "features",
     sansRetrait: "reconstruit à chaque chargement depuis CHANGELOG (`dedupeUpdateFeed`)" },
+  // v2.16.86 — trouvé par le contrôle « fixtures vs schéma de prod » : la prod porte ce champ, et
+  // AUCUNE fixture ne le portait, donc aucune complétude ne pouvait le voir (exactement le trou que
+  // la v2.16.85 s'était noté après `feed[].likeTs`/`unlikes`).
+  { liste: "pendingCelebrations", cle: "id", dans: "gameStates", champ: "badges",
+    sansRetrait: "une fête différée est créée d'un bloc au moment de l'événement (App.jsx ~2462/2562/2719) et n'est jamais réécrite ; la consommation vide la file ENTIÈRE (`pendingCelebrations:[]` + `consumedCelebrationIds`, ~2848), elle ne retouche pas l'intérieur d'un élément" },
   { liste: "routines", cle: "id", dans: "gameStates", champ: "taskIds",
     elementEnBloc: "l'élément entier vient du côté frais (v2.16.70/78) : retirer une quête d'un rituel tient par construction" },
   // v2.16.85 — la seule sous-liste NICHÉE de la prod, et la seule que le recensement de la v2.16.84
@@ -1322,6 +1458,153 @@ console.log("· sous-objets — un retrait de sous-clé exprimé par le côté f
              + `sous-clé « ${VOISIN} », qui n'était pas visée. Le mécanisme de retrait est trop large.`);
       }
     }
+  }
+}
+
+// ── 10e ÉTAGE : LES LISTES NICHÉES DANS UN OBJET ───────────────────────────
+// v2.16.86 — c'est mot pour mot la piste que la v2.16.85 s'était laissée : « le 9e étage ne classe
+// QUE les objets ; un sous-objet qui contiendrait lui-même une LISTE n'est vérifié qu'au niveau de
+// ses clés, pas de leur contenu — la question "retirer une tâche d'une annonce" n'a pas d'étage ».
+// Le relevé de la prod du 18 août montre que le trou est plus large que l'exemple qui l'a nommé :
+// QUATRE listes vivent dans un objet, et aucun recensement ne pouvait les voir.
+//   • 5e étage  — listes de chaînes de PREMIER niveau (`config.X`, `gameStates.X`)
+//   • 6e étage  — objets : « une SOUS-CLÉ retirée survit-elle ? ». `dailyClaimed` y est classé
+//                 `sansRetrait` avec la raison « seau daté {day, ids} : un jour neuf repart à
+//                 vide » — vraie de la CLÉ `ids`, muette sur son CONTENU.
+//   • 8e étage  — listes de chaînes DANS un élément de liste (`feed[].likes`)
+//   • 9e étage  — objets DANS un élément (`announcements[].playerTasks`), au niveau des clés
+// Personne ne descendait dans une liste qui vit sous un objet. Les quatre de la prod :
+//   `gameStates.dailyClaimed.ids`, `gameStates.ritualCelebrated.ids`,
+//   `gameStates.challengeTiers.tiers` (forme A : sous un objet de premier niveau) et
+//   `config.announcements[].playerTasks.<idJoueur>` (forme B : sous un objet, dans un élément).
+//
+// MESURÉ en rejouant les vrais modules : les QUATRE ressuscitent un retrait — les trois seaux datés
+// dans les 4 sens (à `day`/`week` ÉGALE, `_uniq([...A, ...B])` ne sait pas exprimer un retrait), et
+// `playerTasks` dans 2 sens sur 4 (l'union par id d'`announcements` garde la PREMIÈRE copie vue).
+// AUCUN bug vivant : les trois seaux ne sont écrits qu'en ajout (`[...dc.ids, obj.id]` App.jsx:3707,
+// `[...rc, ...fresh]` :349, `[...claimed, ...due]` :2561 — le retrait passe par la bascule de
+// `day`/`week`, qui a sa règle), et le contenu d'une annonce est figé à l'envoi. Même état que
+// `completed` avant la v2.16.82 : correct par accident, surveillé par rien.
+//
+// Ce que cet étage ajoute par rapport aux 8 précédents : `ressuscite` est un CHIFFRE VÉRIFIÉ, pas
+// une note en prose. Les fiches `⚠️ mesuré` du 9e étage peuvent dériver en silence dès que
+// quelqu'un touche une règle de fusion ; ici la mesure est rejouée à chaque build et doit tomber
+// juste. Un `sansRetrait` reste donc honnête même quand personne ne le relit.
+//   • `sansRetrait: "raison"`  — aucun geste ne retire d'ÉLÉMENT de cette liste (dis POURQUOI)
+//   • `objetEnBloc: "raison"`  — l'objet porteur vient ENTIER du côté frais (retrait acquis)
+//   • `ressuscite: n`          — sens (sur 4) où un retrait est ressuscité, OBLIGATOIRE et vérifié
+const LISTES_NICHEES = [
+  // Forme A — la liste vit dans un objet de premier niveau. `fixe` porte la clé d'arbitrage du
+  // seau, posée ÉGALE des deux côtés : c'est le cas normal (deux tablettes le même jour), et
+  // justement le seul où l'union décide de quelque chose.
+  { dans: "gameStates", objet: "dailyClaimed", champ: "ids", fixe: { day: "2026-08-14" },
+    ressuscite: 4,
+    sansRetrait: "seul écrivain : `handleClaimDaily` (App.jsx ~3707) fait `ids:[...dc.ids, obj.id]` et sort tôt si l'id y est déjà — ajout pur. Le vidage n'est pas un retrait d'élément : c'est la bascule de `day`, arbitrée par la règle du seau" },
+  { dans: "gameStates", objet: "ritualCelebrated", champ: "ids", fixe: { day: "2026-08-14" },
+    ressuscite: 4,
+    sansRetrait: "seul écrivain : la célébration de rituel (App.jsx ~349) fait `ids:[...rc, ...fresh.map(r=>r.id)]` — ajout pur, `rc` déjà vidé si le jour a changé" },
+  { dans: "gameStates", objet: "challengeTiers", champ: "tiers", fixe: { week: "2026-08-14" },
+    valeurs: { garde: 3, retire: 5 },
+    ressuscite: 4,
+    sansRetrait: "seul écrivain : le versement des paliers du défi (App.jsx ~2561) fait `tiers:[...claimed, ...due.map(t=>t.days)]` — ajout pur ; un palier atteint ne se dé-atteint pas" },
+  // Forme B — la liste vit dans un sous-objet, DANS un élément de liste. Les clés du sous-objet
+  // sont des ids de joueur (dynamiques) : le recensement les regroupe en `playerTasks.*`.
+  { dans: "config", liste: "announcements", cle: "id", objet: "playerTasks", cleDyn: "p1",
+    ressuscite: 2,
+    sansRetrait: "le contenu d'une annonce est figé à l'envoi : `playerTasks` n'est construit qu'une fois, au moment d'envoyer (parentpanel.jsx ~772-793), et l'annonce n'est ensuite que supprimée ou RECOPIÉE à nouvel id (« renvoyer »). Aucun écran ne modifie la liste de tâches d'une annonce vivante. ⚠️ le jour où « modifier une annonce » existe, l'union par id d'`announcements` rend la PREMIÈRE copie vue : il faudra un élément remplacé en bloc, pas une retouche de l'union" },
+];
+
+console.log("· listes nichées — complétude : toute liste DANS un objet doit être classée");
+{
+  const fusion = client.mergeFamily(famA, famB);
+  const primitives = (v) => Array.isArray(v) && v.length && v.every((x) => !x || typeof x !== "object");
+  const declarees = new Set(LISTES_NICHEES.map((l) => (l.liste
+    ? `${l.dans}.${l.liste}[].${l.objet}.*`
+    : `${l.dans}.${l.objet}.${l.champ}`)));
+  for (const dans of ["config", "gameStates"]) {
+    const racine = dans === "config" ? fusion.config : fusion.gameStates[0];
+    // Forme A — un objet de premier niveau qui contient une liste de valeurs simples. Les listes
+    // d'OBJETS nichées (`weeklyQuests.assignments`…) sont déjà vues par `listesDObjets`.
+    for (const [k, v] of Object.entries(racine || {})) {
+      if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+      for (const [k2, v2] of Object.entries(v)) {
+        if (!primitives(v2)) continue;
+        if (!declarees.has(`${dans}.${k}.${k2}`))
+          fail(`liste nichée « ${dans}.${k}.${k2} » non classée : rien ne dit si un geste de l'app en `
+             + `RETIRE un élément. Le 6e étage classe l'OBJET « ${k} » et s'arrête à ses clés — il ne `
+             + `regarde jamais le CONTENU d'une liste posée dessous, et une union y ressuscite ses `
+             + `retraits exactement comme au premier niveau. Ajoute-la à LISTES_NICHEES.`);
+      }
+    }
+    // Forme B — une liste sous un sous-objet, dans un élément de liste.
+    for (const { chemin, elems } of listesDObjets(racine, dans))
+      for (const el of elems) {
+        if (!el || typeof el !== "object" || Array.isArray(el)) continue;
+        for (const [sk, sv] of Object.entries(el)) {
+          if (!sv || typeof sv !== "object" || Array.isArray(sv)) continue;
+          if (!Object.values(sv).some(primitives)) continue;
+          if (!declarees.has(`${chemin}[].${sk}.*`))
+            fail(`liste nichée « ${chemin}[].${sk}.* » non classée : le 9e étage classe le sous-objet `
+               + `« ${sk} » et ne pose la question qu'au niveau de ses CLÉS. Retirer un élément d'une `
+               + `des listes qu'il porte est une autre question, et personne ne la pose. `
+               + `Ajoute-la à LISTES_NICHEES.`);
+        }
+      }
+  }
+}
+
+console.log("· listes nichées — le nombre de sens où un retrait ressuscite doit être exact");
+{
+  const ID = "ln1";
+  const poseNichee = (savedAt, gsBase, cfgBase, pl, l, elems) => {
+    if (l.liste) {
+      const el = { [l.cle]: ID, ts: 5, updatedAt: 5, createdAt: "2026-08-14",
+                   [l.objet]: { [l.cleDyn]: elems } };
+      return poseListe(savedAt, gsBase, cfgBase, pl, l, [el]);
+    }
+    const bloc = { [l.objet]: { ...(l.fixe || {}), [l.champ]: elems } };
+    return l.dans === "config"
+      ? mkFam(savedAt, gsBase, { ...cfgBase, ...bloc }, pl)
+      : mkFam(savedAt, { ...gsBase, ...bloc }, cfgBase, pl);
+  };
+  const litNichee = (fam, l) => {
+    if (l.liste) return ((litElemDe(fam, l, ID) || {})[l.objet] || {})[l.cleDyn] || [];
+    const racine = l.dans === "config" ? fam.config : fam.gameStates[0];
+    return ((racine || {})[l.objet] || {})[l.champ] || [];
+  };
+  for (const l of LISTES_NICHEES) {
+    const nom = l.liste ? `${l.dans}.${l.liste}[].${l.objet}.${l.cleDyn}` : `${l.dans}.${l.objet}.${l.champ}`;
+    if (l.sansRetrait) {
+      if (typeof l.sansRetrait !== "string" || !l.sansRetrait.length)
+        fail(`liste nichée « ${nom} » — \`sansRetrait\` doit dire POURQUOI aucun retrait n'existe.`);
+    } else if (!l.objetEnBloc) {
+      fail(`liste nichée « ${nom} » — ni \`sansRetrait\`, ni \`objetEnBloc\` : classe-la.`);
+    }
+    if (typeof l.ressuscite !== "number")
+      fail(`liste nichée « ${nom} » — \`ressuscite\` (nombre de sens sur 4) est OBLIGATOIRE : c'est `
+         + `lui qui empêche la fiche de dériver quand une règle de fusion change.`);
+    const { garde: GARDE = "temoin_garde", retire: RETIRE = "cible_retiree" } = l.valeurs || {};
+    const fFrais = poseNichee("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, [GARDE]);
+    const fPerime = poseNichee("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, [GARDE, RETIRE]);
+    let vus = 0;
+    for (const [sens, base, inc] of [["frais en base", fFrais, fPerime], ["frais en incoming", fPerime, fFrais]]) {
+      for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+        const vals = litNichee(fn(base, inc), l);
+        if (vals.includes(RETIRE)) vus++;
+        if (!vals.includes(GARDE))
+          fail(`${impl} mergeFamily (${sens}) — ${nom} : le témoin « ${GARDE} », que personne n'a `
+             + `retiré, a disparu. La règle emporte plus que sa cible.`);
+        if (!l.sansRetrait && vals.includes(RETIRE))
+          fail(`${impl} mergeFamily (${sens}) — ${nom} : « ${RETIRE} » a été RETIRÉ par le côté frais `
+             + `et l'autre copie le ressuscite, alors que la fiche promet \`objetEnBloc\`. Une liste `
+             + `nichée ne sait pas plus exprimer un retrait qu'une liste de premier niveau : remplace `
+             + `l'objet porteur en bloc ou pose un tombstone daté, dans src/merge.js ET server-merge.cjs.`);
+      }
+    }
+    if (vus !== l.ressuscite)
+      fail(`liste nichée « ${nom} » — la fiche annonce \`ressuscite: ${l.ressuscite}\` et la mesure `
+         + `en trouve ${vus} (sur 4). Si une règle de fusion vient de changer, c'est une bonne `
+         + `nouvelle à écrire ; sinon la fiche ment, et son \`sansRetrait\` ne protège plus rien.`);
   }
 }
 
