@@ -9,6 +9,9 @@ export const CHANGELOG = [
   // 2.16.85 et 2.16.86 n'ont jamais été livrées : ce sont les numéros des deux passages d'audit
   // des 18 et 19 août, qui n'ont touché que le garde-fou de fusion (scripts/, jamais servi au
   // navigateur). Reprendre l'un des deux ici ferait qu'une même étiquette désignerait deux choses.
+  { version:"2.16.90", date:"2026-08-20", features:[
+    "\u26a1 Ton \u00e9nergie et l'heure o\u00f9 elle a \u00e9t\u00e9 not\u00e9e pouvaient rester diff\u00e9rentes d'une tablette \u00e0 l'autre, pour toujours. Corrig\u00e9 : les deux tablettes tombent maintenant d'accord.",
+  ]},
   { version:"2.16.89", date:"2026-08-19", features:[
     "\ud83d\udee0\ufe0f Petite fondation technique (rien de visible pour toi).",
   ]},

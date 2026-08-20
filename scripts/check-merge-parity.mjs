@@ -2035,6 +2035,202 @@ console.log("· sous-clés d'objet — à clé d'arbitrage ÉGALE, la sous-clé 
   }
 }
 
+// ── 14e ÉTAGE : les clés DATÉES, recensées par la FORME ────────────────────
+// v2.16.90 — piste laissée par la v2.16.89, mot pour mot : « le 13e étage classe
+// `config.weeklyChallenge` en `mesureAilleurs: OBJETS_ARBITRES`, et cette table-là n'a AUCUN
+// recensement — c'est une liste écrite à la main, deux entrées, choisies un soir de juillet.
+// Or elle est censée couvrir "tout objet arbitré sur une seule de ses clés", et les seaux datés
+// de `gameStates` (`dailyClaimed`, `petDay`, `sessionMinutes`…) sont exactement cette forme sans
+// y être. Le 13e étage vient de les mesurer un par un, mais rien n'oblige un seau NEUF à y entrer :
+// croiser `OBJETS_ARBITRES` avec les objets qui portent une clé de date dira ce qui manque. »
+//
+// Le croisement demandait un recensement, et le 13e ne pouvait pas le fournir : sa complétude est
+// pilotée par `SOUS_CLES_TOLEREES`, c'est-à-dire par le RELEVÉ DE PROD. Un seau daté ajouté au code
+// n'entre donc dans le champ de vision de personne tant qu'il n'a pas été écrit par une vraie
+// famille ET que le relevé n'a pas été régénéré. Entre les deux, il n'a aucun juge — exactement la
+// dette que la v2.16.86 avait soldée pour les listes en rendant leur recensement indépendant des
+// fixtures.
+//
+// Ce recensement-ci ne demande rien à la prod : il parcourt la SORTIE de `mergeFamily` et retient
+// tout objet qui porte au moins une valeur en forme de date ET au moins une autre clé — la forme
+// même de « objet arbitré sur une seule de ses clés ». Chaque chemin trouvé doit se classer, et la
+// complétude joue dans les DEUX SENS (un chemin non classé crie ; une fiche que le parcours ne
+// trouve plus crie aussi, sinon elle couvrirait un jour un homonyme sans que personne l'ait relue).
+const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+const SEAUX_DATES = [
+  // Les deux RACINES : leurs champs sont classés un par un par les étages 1-3, mais une clé datée
+  // posée à plat n'est plus le verrou d'un objet — c'est une clé d'arbitrage SÉPARÉE de ce qu'elle
+  // arbitre. C'est tout le bug `hiddenWeek`/`hiddenRewards` de la v2.16.76 : chaque règle paraît
+  // saine seule, la paire est cassée dans les deux sens. Détail dans `CLES_RACINE` juste en dessous.
+  { chemin: "config",     racine: true },
+  { chemin: "gameStates", racine: true },
+  // ÉLÉMENTS de liste : la date voyage avec son élément, et c'est le registre `LISTES` (4e étage)
+  // qui tranche « la copie fraîche gagne-t-elle sur le même id ? » et « comment s'exprime un
+  // retrait ? ». On vérifie ici que la liste y est VRAIMENT inscrite — une fiche qui pointe dans
+  // le vide est un faux, leçon du 13e étage.
+  { chemin: "config.announcements[]",     element: "announcements" },
+  { chemin: "config.players[]",           element: "players" },
+  { chemin: "config.updateFeedEntries[]", element: "updateFeedEntries" },
+  { chemin: "gameStates.calendar[]",      element: "calendar" },
+  { chemin: "gameStates.xpLog[]",         element: "xpLog" },
+  // SEAUX DATÉS proprement dits : un objet, une clé d'arbitrage datée, du contenu à côté. Chacun
+  // doit être MESURÉ au 13e étage (fiche `frais`/`convergent`) ou porté par `OBJETS_ARBITRES`.
+  { chemin: "config.boss",               fiche: true },
+  { chemin: "config.weeklyQuests",       fiche: true },
+  { chemin: "config.weeklyChallenge",    fiche: true },
+  { chemin: "gameStates.bossBattle",     fiche: true },
+  { chemin: "gameStates.challengeTiers", fiche: true },
+  { chemin: "gameStates.coinsWeek",      fiche: true },
+  { chemin: "gameStates.dailyClaimed",   fiche: true },
+  { chemin: "gameStates.petDay",         fiche: true },
+  { chemin: "gameStates.ritualCelebrated", fiche: true },
+  { chemin: "gameStates.sessionMinutes", fiche: true },
+];
+// Une clé datée posée à plat sur une racine doit dire CE QU'ELLE ARBITRE, et la paire est mesurée
+// ensemble : une règle qui combine doit rendre la même chose quel que soit l'ordre des arguments,
+// sinon c'est l'appelant qui tranche (le client met son local en `a`, le serveur son stocké) et la
+// divergence ne se referme jamais toute seule.
+const CLES_RACINE = [
+  { dans: "config", cle: "createdAt", exempteDans: "NAIF_ASSUME",
+    pourquoi: "écrite une fois par l'assistant (`setupwizard.jsx` ~154) et jamais réécrite : les deux "
+      + "copies la portent identique par construction. Le spread naïf est ASSUMÉ nommément, et c'est "
+      + "cette exemption-là qui en répond — pas une mesure de plus ici." },
+  { dans: "gameStates", cle: "hiddenWeek", arbitre: ["hiddenRewards"],
+    A: { hiddenWeek: "2026-08-15", hiddenRewards: ["rw_a"] },
+    B: { hiddenWeek: "2026-08-15", hiddenRewards: ["rw_b"] },
+    attendu: { hiddenWeek: "2026-08-15", hiddenRewards: ["rw_a", "rw_b"] },
+    ordreSansImportance: true,
+    pourquoi: "seau daté ÉCLATÉ en deux clés plates (v2.16.76). Jour égal → union des ids ; l'ordre du "
+      + "tableau n'est pas significatif, la seule lecture est `.includes()` (App.jsx ~415)." },
+  { dans: "gameStates", cle: "energyTs", arbitre: ["energy"],
+    A: { energy: 60, energyTs: "2026-08-15T08:03:00.000Z" },
+    B: { energy: 60, energyTs: "2026-08-15T08:00:00.000Z" },
+    attendu: { energy: 60, energyTs: "2026-08-15T08:03:00.000Z" },
+    pourquoi: "l'énergie et son horodatage sont indissociables (`currentEnergy` recalcule la "
+      + "régénération DEPUIS lui). À énergie ÉGALE dans la fenêtre de 5 min — deux copies d'un même "
+      + "enfant s'assoient très souvent sur la même valeur — la règle rendait le timestamp du côté que "
+      + "l'APPELANT avait mis en premier (v2.16.90). Le plus RÉCENT gagne : il crédite le moins de "
+      + "régénération, donc il reste du côté « jamais généreux » de la règle, et il converge." },
+  { dans: "gameStates", cle: "lastFedDay", arbitre: [],
+    A: { lastFedDay: "2026-08-15" }, B: { lastFedDay: "2026-08-14" },
+    attendu: { lastFedDay: "2026-08-15" },
+    pourquoi: "verrou anti-double-paiement du repas quotidien (App.jsx ~3727) : il ne doit JAMAIS "
+      + "reculer, sinon un second repas repaie l'énergie. Ce qu'il garde (`petXp`, `petDay`) est "
+      + "monotone et se fusionne en max, donc il n'y a pas de compagnon à lui apparier." },
+  { dans: "gameStates", cle: "lastSeenDay", arbitre: [],
+    A: { lastSeenDay: "2026-08-15" }, B: { lastSeenDay: "2026-08-14" },
+    attendu: { lastSeenDay: "2026-08-15" },
+    pourquoi: "marqueur d'affichage (v2.16.72) : sa seule lecture est le toast « 🌅 Nouvelle "
+      + "journée! » (App.jsx:361). Aucun compagnon — il ne garde rien, il n'annonce que lui-même." },
+];
+
+console.log("· clés datées — recensement PAR LA FORME, indépendant du relevé de prod");
+{
+  const trouves = new Map();
+  const parcours = (v, chemin) => {
+    if (Array.isArray(v)) { for (const el of v) parcours(el, chemin + "[]"); return; }
+    if (!v || typeof v !== "object") return;
+    const cles = Object.keys(v);
+    const datees = cles.filter((k) => typeof v[k] === "string" && DATE_RE.test(v[k]));
+    if (datees.length && datees.length < cles.length) {
+      if (!trouves.has(chemin)) trouves.set(chemin, new Set());
+      datees.forEach((k) => trouves.get(chemin).add(k));
+    }
+    for (const k of cles) parcours(v[k], chemin + "." + k);
+  };
+  const out = client.mergeFamily(famA, famB);
+  parcours(out.config, "config");
+  for (const gs of out.gameStates) parcours(gs, "gameStates");
+
+  const fiches = new Map(SEAUX_DATES.map((s) => [s.chemin, s]));
+  for (const [chemin, datees] of trouves) {
+    const f = fiches.get(chemin);
+    if (!f) { fail(`« ${chemin} » porte une clé en forme de date (${[...datees].join(", ")}) à côté `
+       + `d'autres champs — la forme même d'un objet arbitré sur UNE de ses clés — et aucune fiche du `
+       + `14e étage ne le classe. Ajoute-la : \`racine\` (ses clés datées se déclarent dans `
+       + `CLES_RACINE), \`element\` (la date voyage avec son élément, la liste est au registre `
+       + `LISTES), ou \`fiche\` (le seau est mesuré au 13e étage ou porté par OBJETS_ARBITRES).`); continue; }
+    if (f.element && !LISTES.some((l) => l.champ === f.element))
+      fail(`14e étage — « ${chemin} » se repose sur la liste « ${f.element} » du registre LISTES, qui `
+         + `ne la porte pas. La fiche pointe dans le vide : inscris la liste, ou mesure la date ici.`);
+    if (f.fiche) {
+      const auTreize = SOUS_CLES.some((s) => s.chemin === chemin);
+      const champ = chemin.split(".").pop();
+      const arbitre = OBJETS_ARBITRES.some((o) => o.champ === champ);
+      if (!auTreize && !arbitre)
+        fail(`14e étage — « ${chemin} » est un seau daté et RIEN ne le mesure : ni fiche au 13e étage `
+           + `(SOUS_CLES), ni entrée dans OBJETS_ARBITRES. C'est précisément le trou que ce `
+           + `recensement existe pour fermer — un seau neuf ne doit pas pouvoir entrer sans juge.`);
+    }
+  }
+  for (const s of SEAUX_DATES)
+    if (!trouves.has(s.chemin))
+      fail(`14e étage — fiche « ${s.chemin} », que le parcours ne trouve plus (champ disparu, ou `
+         + `fixture qui ne porte plus de date). Fiche périmée : retire-la, sinon elle couvrira un `
+         + `jour un chemin homonyme sans que personne l'ait relu.`);
+  console.log(`    (${trouves.size} objets à clé datée recensés dans la sortie de mergeFamily)`);
+
+  // Complétude des clés de RACINE : chaque clé datée posée à plat doit avoir sa fiche, et
+  // réciproquement. C'est là que vit la question neuve — « qu'est-ce que cette date arbitre ? ».
+  const parCle = new Map(CLES_RACINE.map((c) => [`${c.dans}.${c.cle}`, c]));
+  for (const s of SEAUX_DATES) {
+    if (!s.racine) continue;
+    for (const cle of trouves.get(s.chemin) || [])
+      if (!parCle.has(`${s.chemin}.${cle}`))
+        fail(`« ${s.chemin}.${cle} » est une clé DATÉE posée à plat sur une racine : elle n'est plus `
+           + `le verrou d'un objet, elle arbitre à distance. Dis ce qu'elle garde dans CLES_RACINE `
+           + `(\`arbitre: [...]\`, mesuré ensemble) ou pourquoi elle ne garde rien (\`arbitre: []\`).`);
+  }
+  for (const c of CLES_RACINE)
+    if (!(trouves.get(c.dans) || new Set()).has(c.cle))
+      fail(`CLES_RACINE fiche « ${c.dans}.${c.cle} », que le parcours ne trouve plus. Fiche périmée.`);
+}
+
+console.log("· clés datées de racine — la PAIRE date + contenu doit converger, dans les deux sens");
+for (const c of CLES_RACINE) {
+  if (c.exempteDans) {
+    const tables = { NAIF_ASSUME };
+    const t = tables[c.exempteDans];
+    if (!t) { fail(`CLES_RACINE — « ${c.cle} » renvoie à « ${c.exempteDans} », qui n'existe pas.`); continue; }
+    if (!(c.cle in t))
+      fail(`CLES_RACINE — « ${c.cle} » se dit exemptée par « ${c.exempteDans} », et cette table ne la `
+         + `porte pas. La fiche pointe dans le vide : soit l'exemption existe et se justifie là-bas, `
+         + `soit il faut MESURER la clé ici.`);
+    continue;
+  }
+  const champs = [c.cle, ...c.arbitre];
+  if (champs.every((k) => same(c.A[k], c.B[k])))
+    { fail(`CLES_RACINE — fiche « ${c.cle} » : les deux copies sont d'accord sur tout ce qu'elle `
+         + `mesure. Le contrôle ne surveille rien (leçon « fixture identique = contrôle inerte »).`); continue; }
+  const gsF = { ...gsA, ...c.A }, gsP = { ...gsB, ...c.B };
+  const cfgF = c.dans === "config" ? { ...famA.config, ...c.A } : famA.config;
+  const cfgP = c.dans === "config" ? { ...famB.config, ...c.B } : famB.config;
+  const fA = mkFam("2026-08-15T12:00:00.000Z", c.dans === "gameStates" ? gsF : gsA, cfgF, plA);
+  const fB = mkFam("2026-08-14T12:00:00.000Z", c.dans === "gameStates" ? gsP : gsB, cfgP, plB);
+  let ordreDifferent = 0;
+  for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+    for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const out = fn(base, inc);
+      const racine = c.dans === "config" ? out.config : out.gameStates[0];
+      const rendu = {}; for (const k of champs) rendu[k] = racine[k];
+      const trie = (v) => (c.ordreSansImportance
+        ? norm(JSON.parse(JSON.stringify(v), (k, x) => (Array.isArray(x) ? [...x].sort() : x))) : v);
+      if (c.ordreSansImportance && !same(rendu, c.attendu)) ordreDifferent++;
+      if (!same(trie(rendu), trie(c.attendu)))
+        fail(`${impl} (${sens}) — « ${c.dans}.${c.cle} » et ce qu'elle arbitre : la fusion rend `
+           + `${JSON.stringify(rendu)} au lieu de ${JSON.stringify(c.attendu)}. Une clé datée et son `
+           + `contenu forment UNE règle : si le résultat change avec l'ordre des arguments, c'est `
+           + `l'APPELANT qui tranche (le client met son local en \`a\`, le serveur son stocké), donc `
+           + `les deux copies gardent chacune la sienne et l'écart ne se referme jamais. Corrige dans `
+           + `src/merge.js ET server-merge.cjs. Raison fichée : ${c.pourquoi}`);
+    }
+  }
+  if (c.ordreSansImportance && ordreDifferent === 0)
+    fail(`CLES_RACINE — fiche « ${c.cle} » déclare \`ordreSansImportance\` alors que la fusion rend `
+       + `déjà le même tableau dans les quatre mesures. La tolérance ne sert à rien : retire-la, `
+       + `sinon elle couvrira un jour un désordre que personne n'a accepté.`);
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

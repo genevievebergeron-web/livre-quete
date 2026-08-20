@@ -268,8 +268,23 @@ const mergeGS = (a, b, preferIncoming) => {
     energy: (() => { const aT=a.energyTs?new Date(a.energyTs).getTime():0, bT=b.energyTs?new Date(b.energyTs).getTime():0;
       if (Math.abs(aT-bT) <= 5*60*1000) return Math.min(a.energy??100, b.energy??100);
       return bT>=aT ? (b.energy??a.energy??100) : (a.energy??b.energy??100); })(),
-    energyTs: (() => { const aT=a.energyTs?new Date(a.energyTs).getTime():0, bT=b.energyTs?new Date(b.energyTs).getTime():0;
-      if (Math.abs(aT-bT) <= 5*60*1000) return (a.energy??100) <= (b.energy??100) ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
+    // v2.16.90 — dans la fenêtre de 5 min, `a.energy <= b.energy ? a.energyTs : b.energyTs` ne sait
+    // pas départager l'ÉGALITÉ des deux énergies : il rend alors le timestamp du côté que l'APPELANT a
+    // mis en PREMIER (le client son local, le serveur son stocké), donc chaque copie garde le sien et
+    // la divergence ne se referme jamais toute seule — le défaut de `hiddenWeek` (v2.16.76), `petEvo`
+    // (v2.16.88), `coinsWeek` et `_mergeCalendar` (v2.16.89), mot pour mot. Et l'égalité n'est pas un
+    // cas de laboratoire : deux copies d'un même enfant s'assoient très souvent sur la même valeur
+    // (pleine à 100, ou fraîchement synchronisée) avec chacune son horodatage. À énergie ÉGALE, c'est
+    // donc le timestamp le plus RÉCENT qui gagne : `currentEnergy` compte la régénération DEPUIS lui,
+    // donc le plus récent en crédite le MOINS — il reste du côté « jamais généreux » que toute cette
+    // règle défend, et il ne dépend d'aucun ordre d'arguments.
+    energyTs: (() => { const aT=a.energyTs?new Date(a.energyTs).getTime():0; const bT=b.energyTs?new Date(b.energyTs).getTime():0;
+      if (Math.abs(aT-bT) <= 5*60*1000) {
+        const eA=a.energy??100, eB=b.energy??100;
+        if (eA !== eB) return eA < eB ? (a.energyTs??b.energyTs??null) : (b.energyTs??a.energyTs??null);
+        if (!a.energyTs || !b.energyTs) return a.energyTs ?? b.energyTs ?? null;
+        if (aT !== bT) return aT > bT ? a.energyTs : b.energyTs;
+        return a.energyTs >= b.energyTs ? a.energyTs : b.energyTs; } // même instant, deux écritures : converger quand même
       return bT>=aT ? (b.energyTs??a.energyTs??null) : (a.energyTs??b.energyTs??null); })(),
     lastFedDay: [a.lastFedDay, b.lastFedDay].filter(Boolean).sort().pop() || null,
     // v2.16.72 — MIROIR de src/merge.js : le jour ne recule jamais (sinon le toast « Nouvelle
