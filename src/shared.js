@@ -121,14 +121,14 @@ export const sanitizeXpLog = (xpLog, completedAt) => {
     const g = Object.values(counts).reduce((a, b) => { while (b) { [a, b] = [b, a % b]; } return a; }, 0);
     const target = g >= 2 ? Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, n / g])) : null;
     const total = target ? Object.values(target).reduce((a, b) => a + b, 0) : 0;
-    if (target && total <= limit) { for (const [k, n] of Object.entries(target)) keepCount[date + " " + k] = n; }
+    if (target && total <= limit) { for (const [k, n] of Object.entries(target)) keepCount[date + "\u0000" + k] = n; }
     drop.add(date); // marque la journée comme sous quota (keepCount décide quoi survit)
   }
   if (!drop.size) return log;
   const seen = {};
   return log.filter((e) => {
     if (!e || e.id || e.source !== "quete" || !drop.has(e.date)) return true;
-    const k = e.date + " " + _xpLogKey(e);
+    const k = e.date + "\u0000" + _xpLogKey(e);
     const quota = keepCount[k] || 0;
     seen[k] = (seen[k] || 0) + 1;
     return seen[k] <= quota;

@@ -12,9 +12,13 @@ export const CHANGELOG = [
   { version:"2.16.91", date:"2026-08-20", features:[
     "\ud83c\udf1f Ton d\u00e9fi perso de la semaine pass\u00e9e revenait se coller sur la semaine en cours, et il y restait. Corrig\u00e9 : chaque semaine repart avec les d\u00e9fis que le parent a choisis pour elle.",
   ]},
-  // 2.16.85 et 2.16.86 n'ont jamais été livrées : ce sont les numéros des deux passages d'audit
-  // des 18 et 19 août, qui n'ont touché que le garde-fou de fusion (scripts/, jamais servi au
-  // navigateur). Reprendre l'un des deux ici ferait qu'une même étiquette désignerait deux choses.
+  // 2.16.85, 2.16.86, 2.16.93 et 2.16.94 n'ont jamais été livrées : ce sont les numéros des quatre
+  // passages d'audit (18, 19, 20 et 21 août), qui n'ont touché que les garde-fous (scripts/, jamais
+  // servi au navigateur). Reprendre l'un d'eux ici ferait qu'une même étiquette désignerait deux
+  // choses. Le 21 août a aussi corrigé DEUX octets de `src/shared.js` — un NUL brut écrit dans une
+  // chaîne, remplacé par `\u0000` — mais le programme se comporte exactement pareil (rejoué sur
+  // huit journaux d'XP : sortie identique au caractère près), donc il n'y a rien à annoncer à un
+  // enfant, et rien qui justifie de faire croire à une nouvelle version.
   { version:"2.16.90", date:"2026-08-20", features:[
     "\u26a1 Ton \u00e9nergie et l'heure o\u00f9 elle a \u00e9t\u00e9 not\u00e9e pouvaient rester diff\u00e9rentes d'une tablette \u00e0 l'autre, pour toujours. Corrig\u00e9 : les deux tablettes tombent maintenant d'accord.",
   ]},

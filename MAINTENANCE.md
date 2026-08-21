@@ -4,6 +4,50 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-21 (routine autonome, nuit, 34e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, 173 102 octets. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, rien qui signale un problème.
+- **Aucune Phase 2.** 34e nuit propre d'affilée côté signalements.
+
+### 🔎 Le piège de méthode trouvé cette nuit — à lire avant tout recensement au `grep`
+
+`src/shared.js` portait **deux octets NUL bruts**, écrits littéralement dans une chaîne
+(`date + "<NUL>" + k`, le séparateur de clé de `sanitizeXpLog`). La valeur du séparateur est un bon
+choix ; l'erreur est qu'il était dans le SOURCE au lieu d'y être échappé. Conséquence : `file`
+classait le fichier en « data » et **`grep` le sautait en silence** — pas de ligne
+« Binary file … matches », rien du tout.
+
+`src/shared.js` est le fichier le plus importé du projet (`GLOBAL_CSS`, `todayStamp`, `weekKey`,
+`streakOf`, `dayOfDoneKey`, `appendXpLog`, `activeDaysFromCompleted`, `sanitizeXpLog`…). **Chaque
+recensement fait au `grep` depuis que ces octets existent l'excluait donc sans le dire** : « qui lit
+ce champ ? », « où ce geste est-il écrit ? », « ce champ est-il consommé quelque part ? ». Un
+recensement qui saute un fichier SANS le signaler ne rend pas une réponse incomplète — il rend une
+réponse fausse, avec l'assurance d'une réponse complète.
+
+C'est ainsi qu'il a été trouvé, d'ailleurs : en cherchant `streakOf`, `grep` a répondu que la
+fonction était importée par deux fichiers et définie par aucun. Elle est bel et bien définie, ligne
+69 de `shared.js`.
+
+**Corrigé** : les deux octets sont maintenant `\u0000`. Le programme se comporte exactement pareil
+(rejoué sur huit journaux d'XP, dont les cas qui forcent le passage sous quota : sortie identique au
+caractère près, et les 29 exports inchangés). **Et l'angle mort ne peut plus revenir en silence** :
+`scripts/check-sources-lisibles.mjs` refuse tout fichier de texte suivi par git qui porterait un NUL
+ou de l'UTF-8 invalide, et il tourne dans `npm run build`. Il est falsifiable — un témoin lui donne
+les deux formes qu'il prétend voir, plus un fichier sain (accents, tiret, emoji) qu'il ne doit PAS
+signaler — et il a été vérifié en réinjectant l'octet : il crie, code de sortie 1.
+
+**Réflexe à garder** : `grep` qui répond « aucun consommateur » n'est une preuve que si le
+recensement sait quels fichiers il a lus. 76 fichiers de texte sont suivis ; le compte est imprimé à
+chaque build.
+
+---
+
 ## Passage du 2026-08-21 (routine autonome, nuit, 33e passage)
 
 ### 🌐 Lecture de l'API de production

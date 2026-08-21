@@ -2866,6 +2866,138 @@ console.log("· estampille d'achat — une récompense RACHETÉE après rembours
   }
 }
 
+// ── 18e ÉTAGE : mergeGS mesuré sur SES DEUX préférences, pas sur celle que les savedAt choisissent ──
+// v2.16.94 — piste laissée par la v2.16.93, mot pour mot : « le 17e étage mesure `mergeFamily`, aux
+// quatre points — et `mergeFamily` choisit `preferIncoming` lui-même, à partir des `savedAt`. Or
+// `mergeGS` porte ce drapeau dans 36 endroits, et le seul contrôle qui l'exerce dans ses DEUX
+// positions ne compare que client contre serveur : il demande aux deux copies d'être d'accord,
+// jamais à la valeur rendue de venir d'un des deux côtés. Une invention qui ne vit que dans la
+// branche `preferIncoming` que les `savedAt` des fixtures ne choisissent pas est donc invisible aux
+// dix-sept étages. Rejouer le croisement du 17e étage sur `mergeGS(a, b, pref)` pour `pref` VRAI et
+// FAUX dirait si cette branche-là invente. »
+//
+// C'est fait, sur les QUATRE quadrants — (A,B,vrai), (A,B,faux), (B,A,vrai), (B,A,faux) — et la
+// réponse est encore ZÉRO. Le quadrant que `mergeFamily` ne peut pas produire seul est celui où la
+// copie de BASE est la fraîche ET où l'incoming est préféré : les `savedAt` ne le choisissent
+// jamais, et il est maintenant mesuré comme les trois autres.
+//
+// Ce que le chemin a montré en plus, et que les dix-sept étages ne demandaient à personne : la
+// fusion est symétrique par son CONTENU, pas par l'ORDRE de ses listes. `mergeGS(A,B,vrai)` et
+// `mergeGS(B,A,faux)` désignent la MÊME copie fraîche — le résultat doit être le même — et
+// quatorze listes en reviennent avec le même ensemble rangé autrement, parce que l'union
+// concatène `a` puis `b` sans regarder `preferIncoming`. Aujourd'hui c'est sans conséquence
+// (aucune de ces listes n'est lue par son RANG : toutes le sont par appartenance, ou vidées en
+// bloc), donc c'est fiché plutôt que corrigé. Ce qui est mesuré ici, c'est que la différence
+// s'arrête à l'ordre — le jour où elle atteint le contenu, elle crie.
+const ORDRE_LIBRE = {
+  // Tombstones et registres lus par appartenance (`includes` / `Set`) — le rang n'entre dans
+  // aucune règle (vérifié : aucun accès `[0]`, `.at()` ni tri dans les consommateurs).
+  completed: "lue par appartenance (`includes`) pour cocher une quête",
+  pending: "lue par appartenance pour afficher l'attente de validation",
+  refusedKeys: "tombstone, lu par appartenance",
+  refundedRewards: "tombstone `id#estampille`, lu par appartenance",
+  removedCalendarIds: "tombstone, lu par appartenance",
+  removedRoutineIds: "tombstone, lu par appartenance",
+  dismissedAnnouncements: "tombstone, lu par appartenance",
+  consumedCelebrationIds: "tombstone, lu par appartenance",
+  dailyClaimed: "`{day, ids}` — `ids` lue par appartenance",
+  ritualCelebrated: "`{day, ids}` — `ids` lue par appartenance",
+  activeDays: "`streakOf` et `activeDaysThisWeek` en font un `Set` avant de compter",
+  // Listes AFFICHÉES, jamais indexées.
+  owned: "inventaire affiché en liste, jamais indexé",
+  badges: "tablette de badges affichée en liste, jamais indexée",
+  pendingCelebrations: "file vidée EN BLOC (`pendingCelebrations: []`), jamais dépilée une à une",
+};
+
+const _triProfond = (v) => {
+  if (Array.isArray(v)) return v.map(_triProfond).map((x) => JSON.stringify(x)).sort().map((s) => JSON.parse(s));
+  if (v && typeof v === "object") { const o = {}; for (const k of Object.keys(v).sort()) o[k] = _triProfond(v[k]); return o; }
+  return v;
+};
+const _valeursGS = (gs) => _cheminsValues(gs, "gs", new Map());
+const _inventionsGS = (a, b, sortie) => {
+  const va = _valeursGS(a), vb = _valeursGS(b), out = [];
+  for (const [chemin, vals] of _valeursGS(sortie)) {
+    const admis = new Set([...(va.get(chemin) || []), ...(vb.get(chemin) || [])]);
+    const inventees = [...vals].filter((v) => !admis.has(v));
+    if (inventees.length) out.push({ chemin, inventees, admis: [...admis] });
+  }
+  return out;
+};
+
+console.log("· mergeGS — valeurs INVENTÉES, dans les QUATRE quadrants (ordre × préférence)");
+{
+  // TÉMOIN : même exigence qu'au 17e étage — un détecteur qui ne trouve rien n'apprend rien tant
+  // qu'on n'a pas vu qu'il SAIT trouver. On mesure le DELTA que le trucage ajoute, jamais un jeu
+  // absolu, pour que le témoin reste muet le jour où une invention légitime sera fichée.
+  const vraie = client.mergeGS(gsA, gsB, true);
+  const avant = new Set(_inventionsGS(gsA, gsB, vraie).map((x) => x.chemin));
+  const apres = _inventionsGS(gsA, gsB, { ...vraie, house: "MAISON_INVENTEE", coins: -1 }).map((x) => x.chemin);
+  const delta = apres.filter((c) => !avant.has(c)).sort();
+  if (JSON.stringify(delta) !== JSON.stringify(["gs.coins", "gs.house"]))
+    fail(`18e étage — le TÉMOIN ne ressort pas comme prévu (delta : ${JSON.stringify(delta)}, `
+       + `attendu ["gs.coins","gs.house"]). Le détecteur d'inventions au niveau \`mergeGS\` ne sait `
+       + `plus voir une valeur fabriquée : son « zéro » sur les quatre quadrants ne prouverait rien.`);
+
+  let quadrants = 0, inventes = 0;
+  for (const [la, a, lb, b] of [["A", gsA, "B", gsB], ["B", gsB, "A", gsA]])
+    for (const pref of [true, false])
+      for (const [impl, fn] of [["client", client.mergeGS], ["serveur", server.mergeGS]]) {
+        quadrants++;
+        for (const { chemin, inventees, admis } of _inventionsGS(a, b, fn(a, b, pref))) {
+          inventes++;
+          fail(`${impl} mergeGS(${la},${lb},preferIncoming=${pref}) — « ${chemin} » vaut `
+             + `${inventees.join(" ")}, une valeur qu'AUCUNE des deux copies ne porte (elles disent `
+             + `${admis.join(" ") || "rien à ce chemin"}). Le 17e étage ne pouvait pas la voir : il `
+             + `mesure \`mergeFamily\`, qui choisit \`preferIncoming\` à partir des \`savedAt\` et ne `
+             + `visite donc jamais le quadrant « base fraîche ET incoming préféré ». Corrige dans `
+             + `src/merge.js ET server-merge.cjs.`);
+        }
+      }
+  console.log(`    (${_valeursGS(client.mergeGS(gsA, gsB, true)).size} chemins-valeurs, `
+    + `${quadrants} quadrants, ${inventes} inventés)`);
+}
+
+console.log("· mergeGS — les deux façons de désigner la MÊME copie fraîche doivent converger");
+{
+  // `mergeGS(A,B,vrai)` et `mergeGS(B,A,faux)` disent tous deux « B est la copie fraîche ». Le
+  // résultat doit être le même : sinon c'est l'APPELANT qui tranche (le client met son local en
+  // `a`, le serveur son stocké), et les deux copies ne se rejoignent jamais — la forme exacte de
+  // la v2.16.89. Le contenu est mesuré STRICTEMENT ; seul l'ordre des listes fichées est toléré.
+  const utiles = new Set();
+  for (const [designation, q1, q2] of [
+    ["B fraîche", [gsA, gsB, true], [gsB, gsA, false]],
+    ["A fraîche", [gsA, gsB, false], [gsB, gsA, true]],
+  ]) {
+    for (const [impl, fn] of [["client", client.mergeGS], ["serveur", server.mergeGS]]) {
+      const r1 = fn(...q1), r2 = fn(...q2);
+      for (const k of new Set([...Object.keys(r1), ...Object.keys(r2)])) {
+        if (same(r1[k], r2[k])) continue;
+        if (!same(_triProfond(r1[k]), _triProfond(r2[k])))
+          fail(`${impl} (${designation}) — « ${k} » : les deux façons de désigner la même copie `
+             + `fraîche rendent un CONTENU différent (${JSON.stringify(r1[k])} vs `
+             + `${JSON.stringify(r2[k])}). Ce n'est pas un ordre : c'est l'ordre des ARGUMENTS qui `
+             + `tranche, et le client met son local en \`a\` là où le serveur met son stocké. La `
+             + `divergence ne se referme donc jamais, sans un seul message d'erreur.`);
+        else if (!ORDRE_LIBRE[k])
+          fail(`${impl} (${designation}) — « ${k} » revient avec le même ensemble dans un ORDRE `
+             + `différent selon l'ordre des arguments. Si son rang n'entre dans aucune règle, `
+             + `fiche-la dans ORDRE_LIBRE avec la façon dont elle est lue ; s'il en entre une, `
+             + `c'est un bug : l'union doit concaténer selon \`preferIncoming\`, pas selon \`a\`.`);
+        else utiles.add(k);
+      }
+    }
+  }
+  for (const k of Object.keys(ORDRE_LIBRE)) {
+    if (!ORDRE_LIBRE[k]) fail(`18e étage — fiche ORDRE_LIBRE « ${k} » sans raison écrite.`);
+    if (!utiles.has(k))
+      fail(`18e étage — fiche ORDRE_LIBRE « ${k} », dont la fusion rend déjà le MÊME ordre dans les `
+         + `deux sens. Une tolérance qui ne tolère rien est un blanc-seing : retire-la, sinon elle `
+         + `couvrira un jour un désordre que personne n'a accepté (leçon v2.16.87).`);
+  }
+  console.log(`    (${utiles.size} listes tolérées sur l'ordre, contenu identique partout)`);
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
