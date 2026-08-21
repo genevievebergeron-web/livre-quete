@@ -478,6 +478,10 @@ const mergeFamily = (base, incoming) => {
       const bWC = bC.weeklyChallenge, iWC = iC.weeklyChallenge;
       if (!bWC) return iWC || null;
       if (!iWC) return bWC;
+      // v2.16.91 — voir le commentaire de src/merge.js : les deux copies branchent maintenant sur
+      // l'égalité de `weekKey`, comme les neuf autres seaux datés de la fusion.
+      if ((bWC.weekKey||"") !== (iWC.weekKey||""))
+        return (iWC.weekKey||"") >= (bWC.weekKey||"") ? iWC : bWC;
       const weekKey = (iWC.weekKey||"") >= (bWC.weekKey||"") ? (iWC.weekKey||bWC.weekKey) : bWC.weekKey;
       const cm = new Map();
       (bWC.challenges||[]).forEach(c => { if (c && c.playerId != null) cm.set(c.playerId, {...c}); });

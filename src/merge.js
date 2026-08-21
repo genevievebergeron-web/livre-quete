@@ -759,6 +759,19 @@ export const mergeFamily = (base, incoming) => {
       const bWC = bC.weeklyChallenge, iWC = iC.weeklyChallenge;
       if (!bWC) return iWC || null;
       if (!iWC) return bWC;
+      // v2.16.91 — `weekKey` était arbitré (la semaine la plus récente gagne) et `challenges`
+      // unionné SANS JAMAIS regarder si les deux copies parlaient de la même semaine. Sur les dix
+      // seaux datés de la fusion, c'était le seul : `dailyClaimed`, `ritualCelebrated`, `petDay`,
+      // `sessionMinutes`, `challengeTiers`, `coinsWeek`, `bossBattle`, `boss` et `weeklyQuests`
+      // branchent tous sur l'égalité de leur clé et rendent le côté frais SEUL quand elle diffère.
+      // Ici, le défi qu'un enfant avait la semaine passée était réétiqueté à la semaine en cours et
+      // s'y réinstallait — définitivement, puisque chaque fusion le recopiait. Les deux écrivains
+      // d'`App.jsx` avaient le même trou (`{...prev, weekKey:cwk}` sur des `challenges` périmés) :
+      // corrigés au même endroit. `checkins` ne se perd pas au passage — il n'est lu que par
+      // `challengeDaysCount`/`hasPerfectChallengeWeek`, qui ne comptent QUE les jours de la semaine
+      // demandée (v2.16.53) ; ce qui part est du contenu d'une semaine révolue, jamais un paiement.
+      if ((bWC.weekKey||"") !== (iWC.weekKey||""))
+        return (iWC.weekKey||"") >= (bWC.weekKey||"") ? iWC : bWC;
       const weekKey = (iWC.weekKey||"") >= (bWC.weekKey||"") ? (iWC.weekKey||bWC.weekKey) : bWC.weekKey;
       const cm = new Map();
       (bWC.challenges||[]).forEach(c => { if (c && c.playerId != null) cm.set(c.playerId, {...c}); });

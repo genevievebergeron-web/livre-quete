@@ -150,7 +150,8 @@ console.log("· fixtures — chaque champ connu doit se contredire entre A et B"
 // leur donner `false` en fixture inventerait un état que l'app ne produit pas. Leur vraie
 // collision est `true` contre ABSENT — mesurée juste en dessous, pour que cette exemption reste
 // un fait vérifié et pas une promesse (leçon de la v2.16.85 sur les fixtures inertes).
-memeValeur(gsA, gsB, "gameStates", { resetAt: true, noCoinsResetV1: true, petMigV2: true, rotativeCleanupV1: true });
+const EXEMPT_GS = { resetAt: true, noCoinsResetV1: true, petMigV2: true, rotativeCleanupV1: true };
+memeValeur(gsA, gsB, "gameStates", EXEMPT_GS);
 
 
 
@@ -186,7 +187,8 @@ const plB = {
   morningLock: { enabled: false, start: "07:00", end: "10:00" },
   dailyMinutesLimit: null, // `null` est une VALEUR (« aucune limite »), pas une absence
 };
-memeValeur(plA, plB, "players[0]", { id: "clé de rapprochement de mergeFamily" });
+const EXEMPT_PL = { id: "clé de rapprochement de mergeFamily" };
+memeValeur(plA, plB, "players[0]", EXEMPT_PL);
 
 const mkFam = (savedAt, gs, cfgExtra, pl) => ({
   savedAt,
@@ -245,7 +247,7 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   weeklyChallenge: { weekKey: "2026-08-07", challenges: [{ playerId: "p1", text: "B", checkins: { "2026-08-07": true } }] },
 }, plB);
 
-memeValeur(famA.config, famB.config, "config", {
+const EXEMPT_CFG = {
   // Structurels, volontairement identiques : ce sont les supports sur lesquels les
   // autres champs s'accrochent (une assignation `as1`, sa tâche `tk1`), pas des champs
   // dont la fusion est en jeu ici. (`players` n'en fait plus partie depuis la v2.16.77 :
@@ -255,7 +257,8 @@ memeValeur(famA.config, famB.config, "config", {
   // Volontairement vides des deux côtés : rien à départager par construction, la
   // parité champ par champ ci-dessus reste leur contrôle.
   coinOffers: 1, teamInvites: 1, momentRequests: 1,
-});
+};
+memeValeur(famA.config, famB.config, "config", EXEMPT_CFG);
 
 console.log("· drapeaux de migration — `true` d'un côté, ABSENT de l'autre : `true` doit tenir");
 {
@@ -2229,6 +2232,281 @@ for (const c of CLES_RACINE) {
     fail(`CLES_RACINE — fiche « ${c.cle} » déclare \`ordreSansImportance\` alors que la fusion rend `
        + `déjà le même tableau dans les quatre mesures. La tolérance ne sert à rien : retire-la, `
        + `sinon elle couvrira un jour un désordre que personne n'a accepté.`);
+}
+
+// ── 15e ÉTAGE : les chemins qu'AUCUNE fixture ne contredit ──────────────────
+// v2.16.91 — piste laissée par la v2.16.90, mot pour mot : « le 14e étage recense par la FORME
+// d'une valeur (une chaîne qui commence par YYYY-MM-DD), donc un seau daté dont la fixture ne
+// porte PAS de date lui reste invisible. `mergeGS` et `mergeFamily` rendent pourtant un littéral
+// dont TOUTES les clés sont connues du code : croiser les clés de la SORTIE avec celles que les
+// fixtures alimentent vraiment dirait quels champs traversent tous les étages sans qu'aucune
+// fixture ne les contredise. »
+//
+// C'est la généralisation de `memeValeur`, qui ne pose la question qu'au PREMIER niveau des trois
+// racines (`config`, `gameStates`, `players[0]`). Tout ce qui vit plus bas y échappait : un champ
+// identique des deux côtés est écarté en silence par CHAQUE étage au-dessus (« rien à départager »),
+// donc il paraît surveillé par quatorze contrôles et ne l'est par aucun.
+//
+// Le recensement ne demande rien à la prod et rien aux fiches : il parcourt la SORTIE de
+// `mergeFamily(famA, famB)`, relit les DEUX fixtures au même chemin, et retient tout chemin où
+// elles disent la même chose. Chaque chemin retenu doit se classer, et la complétude joue dans les
+// DEUX SENS (un chemin non classé crie ; une fiche que le parcours ne trouve plus crie aussi).
+//
+// Cinq classements, et chacun MORD :
+//   • `rapprochement` — clé de jointure d'une liste : elle DOIT être identique, sinon les deux
+//     éléments ne se rencontrent jamais. La fiche nomme la liste, qui doit être au registre LISTES
+//     avec cette `cle`.
+//   • `arbitrage`     — clé datée d'un seau : le 13e étage la met délibérément à ÉGALITÉ (« le cas
+//     qui dure 7 jours sur 7 ») en promettant que le cas où elle DIFFÈRE est « déjà couvert
+//     ailleurs ». Il ne l'était nulle part. Il est MESURÉ ici.
+//   • `figeALaCreation` — le chemin vit dans un élément de liste que le registre déclare jamais
+//     réécrit (`modifieEnPlace !== true`) : identique par construction. La fiche nomme la liste, et
+//     le jour où quelqu'un passe cette liste en `modifieEnPlace: true`, la fiche cesse d'être vraie
+//     et l'étage crie.
+//   • `mesureAilleurs` — une table dédiée bâtit ses PROPRES fixtures contradictoires pour ce
+//     chemin. La table doit exister et porter le champ (une fiche qui pointe dans le vide est un faux).
+//   • `support`       — échafaudage de la fixture elle-même. Le champ de PREMIER niveau doit être
+//     nommé dans la table d'exemption de `memeValeur` qui correspond à sa racine.
+//
+// Ce que la mesure a trouvé le soir de sa naissance : `config.weeklyChallenge` arbitrait sa
+// `weekKey` (la semaine la plus récente gagne) puis unionnait ses `challenges` SANS JAMAIS
+// comparer les deux semaines. Sur les dix seaux datés de la fusion, c'était le seul — les neuf
+// autres rendent le côté frais SEUL dès que leur clé diffère. Le défi personnel d'un enfant écrit
+// la semaine passée était donc réétiqueté à la semaine en cours et s'y réinstallait à chaque
+// synchro. Les deux écrivains d'`App.jsx` portaient le même trou et sont corrigés avec la règle.
+const SANS_CONTRADICTION = [
+  // ── clés de jointure ────────────────────────────────────────────────────
+  { chemin: "config.assignments[].instanceId", rapprochement: { liste: "assignments", cle: "instanceId" } },
+  { chemin: "config.customTasks[].id",         rapprochement: { liste: "customTasks", cle: "id" } },
+  { chemin: "config.feed[].id",                rapprochement: { liste: "feed", cle: "id" } },
+  { chemin: "config.players[].id",             rapprochement: { liste: "players", cle: "id" } },
+  { chemin: "config.weeklyChallenge.challenges[].playerId", rapprochement: { liste: "challenges", cle: "playerId" } },
+  { chemin: "gameStates.calendar[].id",        rapprochement: { liste: "calendar", cle: "id" } },
+  { chemin: "gameStates.routines[].id",        rapprochement: { liste: "routines", cle: "id" } },
+
+  // ── clés datées : délibérément égales (13e étage) ; le cas où elles DIFFÈRENT
+  //    est mesuré juste en dessous, sur le recensement COMPLET du 14e étage ───
+  { chemin: "config.boss.startedAt",            arbitrage: "config.boss" },
+  { chemin: "gameStates.bossBattle.bossId",     arbitrage: "gameStates.bossBattle" },
+  { chemin: "gameStates.dailyClaimed.day",      arbitrage: "gameStates.dailyClaimed" },
+  { chemin: "gameStates.petDay.day",            arbitrage: "gameStates.petDay" },
+  { chemin: "gameStates.ritualCelebrated.day",  arbitrage: "gameStates.ritualCelebrated" },
+  { chemin: "gameStates.sessionMinutes.day",    arbitrage: "gameStates.sessionMinutes" },
+
+  // ── figés à la création : le registre dit qu'aucun écran ne les réécrit ──
+  { chemin: "config.assignments[].days[]",   figeALaCreation: "assignments" },
+  { chemin: "config.assignments[].taskId",   figeALaCreation: "assignments" },
+  { chemin: "config.customTasks[].label",    figeALaCreation: "customTasks" },
+  { chemin: "config.feed[].ts",              figeALaCreation: "feed" },
+  { chemin: "config.removalRequests[].instanceId", figeALaCreation: "removalRequests" },
+
+  // ── mesurés par une table dédiée, avec SES fixtures ─────────────────────
+  { chemin: "config.announcements[].sharedTasks[]",     mesureAilleurs: "SOUS_LISTES", liste: "announcements", champ: "sharedTasks" },
+  { chemin: "config.announcements[].targetPlayerIds[]", mesureAilleurs: "SOUS_LISTES", liste: "announcements", champ: "targetPlayerIds" },
+  { chemin: "config.assignments[].playerIds[]",         mesureAilleurs: "SOUS_LISTES", liste: "assignments", champ: "playerIds" },
+  { chemin: "gameStates.deCompleted", mesureAilleurs: "SECTION", section: "tombstone daté de « ↩️ Annuler »",
+    pourquoi: "absent des deux fixtures principales (la fusion rend `{}`) — la section dédiée bâtit "
+      + "ses propres copies contradictoires, avec un tombstone d'un seul côté." },
+
+  // ── échafaudage : le champ de premier niveau est exempté par `memeValeur` ──
+  { chemin: "config.mode",       support: "EXEMPT_CFG" },
+  { chemin: "config.pin",        support: "EXEMPT_CFG" },
+  { chemin: "config.routineEnd", support: "EXEMPT_CFG" },
+  { chemin: "gameStates.noCoinsResetV1",   support: "EXEMPT_GS" },
+  { chemin: "gameStates.petMigV2",         support: "EXEMPT_GS" },
+  { chemin: "gameStates.rotativeCleanupV1", support: "EXEMPT_GS" },
+  { chemin: "gameStates.resetAt",          support: "EXEMPT_GS" },
+  { chemin: "config.weeklyQuests.assignments[].playerIds[]", support: "EXEMPT_PL", via: "id",
+    pourquoi: "ne porte pas un contenu, mais une RÉFÉRENCE à `players[].id` — la clé de rapprochement "
+      + "de `mergeFamily`, que `EXEMPT_PL` tient identique par nécessité. La contredire ferait pointer "
+      + "les deux assignations sur des enfants différents, et il n'y aurait plus rien à départager." },
+  { chemin: "config.weeklyQuests.assignments[].taskId", support: "EXEMPT_CFG", via: "customTasks",
+    pourquoi: "pointe la tâche structurelle `tk1`, exemptée à la racine (même raison)." },
+  { chemin: "config.updateFeedEntries[].type", figeALaCreation: "updateFeedEntries" },
+];
+
+console.log("· chemins que les fixtures ne contredisent JAMAIS — recensement par la SORTIE");
+{
+  const cheminsDe = (v, chemin, acc) => {
+    if (Array.isArray(v)) { for (const el of v) cheminsDe(el, chemin + "[]", acc); return acc; }
+    if (v && typeof v === "object" && Object.keys(v).length) {
+      for (const k of Object.keys(v)) cheminsDe(v[k], chemin + "." + k, acc);
+      return acc;
+    }
+    if (!acc.has(chemin)) acc.set(chemin, []);
+    acc.get(chemin).push(v);
+    return acc;
+  };
+  const releve = (fam) => {
+    const acc = new Map();
+    cheminsDe(fam.config, "config", acc);
+    for (const gs of fam.gameStates) cheminsDe(gs, "gameStates", acc);
+    return acc;
+  };
+  const tri = (l) => (l || []).map((x) => JSON.stringify(norm(x))).sort();
+  const sortie = releve(client.mergeFamily(famA, famB)), A = releve(famA), B = releve(famB);
+  const inertes = new Set();
+  for (const chemin of sortie.keys())
+    if (same(tri(A.get(chemin)), tri(B.get(chemin)))) inertes.add(chemin);
+
+  const fiches = new Map(SANS_CONTRADICTION.map((f) => [f.chemin, f]));
+  for (const chemin of [...inertes].sort())
+    if (!fiches.has(chemin))
+      fail(`« ${chemin} » porte la MÊME valeur dans les deux fixtures : les quatorze étages `
+         + `au-dessus l'écartent tous en silence (« rien à départager »). Il paraît surveillé et ne `
+         + `l'est par personne. Donne-lui deux valeurs contradictoires, ou classe-le au 15e étage : `
+         + `\`rapprochement\` (clé de jointure), \`arbitrage\` (clé datée, MESURÉE ici quand elle `
+         + `diffère), \`figeALaCreation\` (élément jamais réécrit), \`mesureAilleurs\` (une table `
+         + `dédiée le contredit), ou \`support\` (échafaudage exempté par \`memeValeur\`).`);
+  for (const f of SANS_CONTRADICTION)
+    if (!inertes.has(f.chemin))
+      fail(`15e étage — fiche « ${f.chemin} », que les fixtures contredisent maintenant (ou que la `
+         + `sortie ne porte plus). Fiche périmée : retire-la, sinon elle couvrira un jour un chemin `
+         + `homonyme sans que personne l'ait relu.`);
+  console.log(`    (${sortie.size} chemins dans la sortie, ${inertes.size} sans contradiction, tous classés)`);
+
+  // Les fiches qui POINTENT quelque part doivent pointer sur du réel.
+  const TABLES = { SOUS_LISTES, EXEMPT_CFG, EXEMPT_GS, EXEMPT_PL };
+  for (const f of SANS_CONTRADICTION) {
+    if (f.rapprochement) {
+      const { liste, cle } = f.rapprochement;
+      if (liste === "players") continue; // fusionnée par `_mergePlayer`, pas par le registre LISTES
+      if (!LISTES.some((l) => l.champ === liste && l.cle === cle))
+        fail(`15e étage — « ${f.chemin} » se dit clé de jointure de « ${liste} » (cle « ${cle} »), et `
+           + `le registre LISTES ne porte pas ce couple. La fiche pointe dans le vide : soit la liste `
+           + `s'y inscrit, soit la clé n'en est pas une et le champ doit se contredire.`);
+      continue;
+    }
+    if (f.figeALaCreation) {
+      const l = LISTES.find((x) => x.champ === f.figeALaCreation && !x.conteneur);
+      if (!l) { fail(`15e étage — « ${f.chemin} » renvoie à la liste « ${f.figeALaCreation} », absente `
+         + `du registre LISTES.`); continue; }
+      if (l.modifieEnPlace === true)
+        fail(`15e étage — « ${f.chemin} » se dit figé à la création, et LISTES déclare « `
+           + `${f.figeALaCreation} » RÉÉCRITE EN PLACE (\`modifieEnPlace: true\`). Un champ qu'un écran `
+           + `réécrit doit être arbitré, donc contredit par les fixtures : la fiche est devenue fausse.`);
+      continue;
+    }
+    if (f.mesureAilleurs === "SECTION") {
+      if (!f.pourquoi) fail(`15e étage — « ${f.chemin} » renvoie à une section dédiée sans dire laquelle.`);
+      continue;
+    }
+    if (f.mesureAilleurs) {
+      const t = TABLES[f.mesureAilleurs];
+      if (!t) { fail(`15e étage — « ${f.chemin} » renvoie à « ${f.mesureAilleurs} », qui n'existe pas.`); continue; }
+      if (!t.some((x) => x.liste === f.liste && x.champ === f.champ))
+        fail(`15e étage — « ${f.chemin} » dit que « ${f.mesureAilleurs} » contredit « ${f.liste}[].`
+           + `${f.champ} », et cette table ne porte pas le couple. La fiche pointe dans le vide.`);
+      continue;
+    }
+    if (f.support) {
+      const t = TABLES[f.support];
+      if (!t) { fail(`15e étage — « ${f.chemin} » renvoie à « ${f.support} », qui n'existe pas.`); continue; }
+      const premier = f.via || f.chemin.split(".")[1].replace(/\[\]$/, "");
+      if (!(premier in t))
+        fail(`15e étage — « ${f.chemin} » se dit échafaudage exempté par « ${f.support} », et cette `
+           + `table n'exempte pas « ${premier} ». La fiche pointe dans le vide : soit l'exemption `
+           + `existe là-bas et se justifie, soit le champ doit se contredire.`);
+      continue;
+    }
+    if (!f.arbitrage) fail(`15e étage — fiche « ${f.chemin} » sans classement.`);
+  }
+}
+
+// La promesse du 13e étage (« mets la clé à ÉGALITÉ, le cas où elle diffère est déjà couvert
+// ailleurs ») devient un CHIFFRE. Elle n'était couverte NULLE PART, et c'est là que vivait le bug
+// de la v2.16.91. Le recensement n'est pas écrit à la main : il est pris sur les seaux datés du
+// 14e étage (`fiche: true`), donc un seau neuf entre ici le jour où il entre là-bas.
+const CLE_DIFFERENTE = [
+  { chemin: "config.boss", dans: "config", champ: "boss", cle: "startedAt",
+    frais:  { startedAt: "2026-08-14T00:00:00.000Z", hp: 100, hpMax: 100 },
+    perime: { startedAt: "2026-08-07T00:00:00.000Z", hp: 3, hpMax: 300, defeatedAt: "2026-08-08T00:00:00.000Z" },
+    pourquoi: "un boss neuf ne doit rien hériter du précédent : les PV et le `defeatedAt` de l'ancien "
+      + "l'afficheraient déjà entamé, ou déjà vaincu, le jour de son lancement." },
+  { chemin: "config.weeklyQuests", dans: "config", champ: "weeklyQuests", cle: "generatedForWeek",
+    frais:  { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] },
+    perime: { generatedForWeek: "2026-08-07", assignments: [{ instanceId: "wq9", taskId: "tk1", playerIds: ["p1"], days: [3] }] },
+    pourquoi: "les rotatives d'une semaine de garde révolue reviendraient dans la semaine en cours." },
+  { chemin: "config.weeklyChallenge", dans: "config", champ: "weeklyChallenge", cle: "weekKey",
+    frais:  { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "Frais", emoji: "📖", checkins: {} }] },
+    perime: { weekKey: "2026-08-07", challenges: [{ playerId: "p1", text: "Périmé", emoji: "🛏️", checkins: {} },
+                                                  { playerId: "p2", text: "Périmé p2", emoji: "🍽️", checkins: {} }] },
+    pourquoi: "le seul des dix seaux qui unionnait son contenu sans regarder sa clé (v2.16.91) : le défi "
+      + "perso d'un enfant écrit la semaine passée était réétiqueté à la semaine en cours et s'y "
+      + "réinstallait à chaque synchro, pour chaque enfant que le parent n'avait pas encore reservi. "
+      + "Aucun paiement en jeu — les paliers se comptent par semaine (`challengeDaysCount`) — mais "
+      + "l'enfant et le parent voyaient un défi que personne n'avait choisi pour cette semaine-là." },
+  { chemin: "gameStates.bossBattle", dans: "gameStates", champ: "bossBattle", cle: "bossId",
+    frais:  { bossId: "2026-08-14T00:00:00.000Z", earned: 0, spent: 0, dmg: 0 },
+    perime: { bossId: "2026-08-07T00:00:00.000Z", earned: 9, spent: 9, dmg: 99 },
+    pourquoi: "jetons et dégâts sont comptés PAR boss : les reporter donnerait des jetons jamais gagnés." },
+  { chemin: "gameStates.challengeTiers", dans: "gameStates", champ: "challengeTiers", cle: "week",
+    frais:  { week: "2026-08-14", tiers: [] }, perime: { week: "2026-08-07", tiers: [3, 5, 7] },
+    pourquoi: "les paliers payés la semaine passée passeraient pour payés cette semaine, et les "
+      + "nouveaux ne le seraient jamais (`claimed.includes`, App.jsx ~2547)." },
+  { chemin: "gameStates.coinsWeek", dans: "gameStates", champ: "coinsWeek", cle: "week",
+    frais:  { week: "2026-08-14", coins: 0 }, perime: { week: "2026-08-07", coins: 99 },
+    pourquoi: "bug v2.5.3, mot pour mot : un vieil appareil qui resynchronise avec la semaine passée "
+      + "déclenchait la remise à zéro hebdomadaire des pièces." },
+  { chemin: "gameStates.dailyClaimed", dans: "gameStates", champ: "dailyClaimed", cle: "day",
+    frais:  { day: "2026-08-15", ids: [] }, perime: { day: "2026-08-14", ids: ["o3", "o6"] },
+    pourquoi: "les coffres réclamés hier bloqueraient ceux d'aujourd'hui (`.includes()`, App.jsx:1311)." },
+  { chemin: "gameStates.petDay", dans: "gameStates", champ: "petDay", cle: "day",
+    frais:  { day: "2026-08-15", xp: 0 }, perime: { day: "2026-08-14", xp: 99 },
+    pourquoi: "le plafond quotidien du familier repartirait déjà atteint." },
+  { chemin: "gameStates.ritualCelebrated", dans: "gameStates", champ: "ritualCelebrated", cle: "day",
+    frais:  { day: "2026-08-15", ids: [] }, perime: { day: "2026-08-14", ids: ["rt1"] },
+    pourquoi: "un rituel fêté hier serait tenu pour déjà fêté aujourd'hui." },
+  { chemin: "gameStates.sessionMinutes", dans: "gameStates", champ: "sessionMinutes", cle: "day",
+    frais:  { day: "2026-08-15", minutes: 0 }, perime: { day: "2026-08-14", minutes: 200 },
+    pourquoi: "le budget-temps quotidien du parent (`dailyMinutesLimit`) repartirait déjà épuisé." },
+];
+
+console.log("· seaux datés — complétude : tout seau du 14e étage doit être mesuré clé DIFFÉRENTE");
+{
+  const mesures = new Map(CLE_DIFFERENTE.map((c) => [c.chemin, c]));
+  for (const s of SEAUX_DATES) {
+    if (!s.fiche) continue;
+    if (!mesures.has(s.chemin))
+      fail(`« ${s.chemin} » est un seau daté recensé au 14e étage, et RIEN ne dit ce qu'il rend quand `
+         + `sa clé DIFFÈRE. Le 13e étage met délibérément la clé à ÉGALITÉ et renvoie l'autre cas à `
+         + `« déjà couvert ailleurs » — ailleurs, c'est ici. Ajoute sa fiche à CLE_DIFFERENTE.`);
+  }
+  for (const c of CLE_DIFFERENTE)
+    if (!SEAUX_DATES.some((s) => s.fiche && s.chemin === c.chemin))
+      fail(`15e étage — fiche « ${c.chemin} », que le 14e étage ne recense plus comme seau daté. `
+         + `Fiche périmée : retire-la.`);
+  // Le classement `arbitrage` du recensement ci-dessus ne vaut que s'il pointe ici.
+  for (const f of SANS_CONTRADICTION)
+    if (f.arbitrage && !mesures.has(f.arbitrage))
+      fail(`15e étage — « ${f.chemin} » se dit clé d'arbitrage de « ${f.arbitrage} », et CLE_DIFFERENTE `
+         + `ne mesure pas ce seau. La fiche pointe dans le vide.`);
+}
+
+console.log("· seaux datés — clé DIFFÉRENTE : le côté frais est rendu SEUL, dans les deux sens");
+for (const c of CLE_DIFFERENTE) {
+  if (same(c.frais[c.cle], c.perime[c.cle]))
+    { fail(`15e étage — fiche « ${c.chemin} » : la clé « ${c.cle} » est ÉGALE des deux côtés. C'est le `
+         + `cas que le 13e étage mesure déjà ; celui-ci n'existe que pour l'autre.`); continue; }
+  const gsF = c.dans === "gameStates" ? { ...gsA, [c.champ]: c.frais } : gsA;
+  const gsP = c.dans === "gameStates" ? { ...gsB, [c.champ]: c.perime } : gsB;
+  const cfgF = c.dans === "config" ? { ...famA.config, [c.champ]: c.frais } : famA.config;
+  const cfgP = c.dans === "config" ? { ...famB.config, [c.champ]: c.perime } : famB.config;
+  const fA = mkFam("2026-08-15T12:00:00.000Z", gsF, cfgF, plA);
+  const fB = mkFam("2026-08-14T12:00:00.000Z", gsP, cfgP, plB);
+  for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+    for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const out = fn(base, inc);
+      const rendu = c.dans === "config" ? out.config[c.champ] : out.gameStates[0][c.champ];
+      if (!same(rendu, c.frais))
+        fail(`${impl} (${sens}) — « ${c.chemin} » : les deux copies sont sur des « ${c.cle} » `
+           + `DIFFÉRENTS, et la fusion rend ${JSON.stringify(rendu)} au lieu du côté frais SEUL `
+           + `(${JSON.stringify(c.frais)}). Un seau daté repart VIDE quand sa clé change : combiner `
+           + `les deux, c'est réétiqueter du contenu périmé à la clé courante — et il s'y réinstalle à `
+           + `chaque synchro, puisque chaque fusion le recopie. Corrige dans src/merge.js ET `
+           + `server-merge.cjs. Raison fichée : ${c.pourquoi}`);
+    }
+  }
 }
 
 if (failures) {

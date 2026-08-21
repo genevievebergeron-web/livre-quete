@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.91", date:"2026-08-20", features:[
+    "\ud83c\udf1f Ton d\u00e9fi perso de la semaine pass\u00e9e revenait se coller sur la semaine en cours, et il y restait. Corrig\u00e9 : chaque semaine repart avec les d\u00e9fis que le parent a choisis pour elle.",
+  ]},
   // 2.16.85 et 2.16.86 n'ont jamais été livrées : ce sont les numéros des deux passages d'audit
   // des 18 et 19 août, qui n'ont touché que le garde-fou de fusion (scripts/, jamais servi au
   // navigateur). Reprendre l'un des deux ici ferait qu'une même étiquette désignerait deux choses.

@@ -93,7 +93,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.16.90";
+export const APP_VERSION = "2.16.91";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -3455,7 +3455,15 @@ export default function App() {
   // Lot 7C — cocher le défi personnel du jour
   const handleChallengeCheckin = useCallback((playerId, date, val)=>{
     const cwk = custodyWeekKey();
-    const prev = config.weeklyChallenge || { weekKey: cwk, challenges: [] };
+    // v2.16.91 — `{...prev, weekKey:cwk}` plus bas réétiquetait à la semaine EN COURS des défis
+    // écrits pour une semaine révolue : au premier geste après le changement de semaine, le défi
+    // de la semaine passée redevenait celui de cette semaine-ci, pour chaque enfant que le parent
+    // n'avait pas encore reservi. Même trou que la règle de fusion (corrigée dans src/merge.js et
+    // server-merge.cjs) : un seau daté repart VIDE quand sa clé change. Ce qui part n'est jamais
+    // un paiement — les paliers se comptent par semaine (`challengeDaysCount`, App.jsx ~2543).
+    const stocke = config.weeklyChallenge;
+    const prev = (stocke && (!stocke.weekKey || stocke.weekKey === cwk))
+      ? stocke : { weekKey: cwk, challenges: [] };
     const idx = prev.challenges.findIndex(c=>c.playerId===playerId);
     let challenges;
     if(idx>=0){
@@ -3471,7 +3479,11 @@ export default function App() {
   // Lot 7C — parent met à jour le texte du défi
   const handleUpdateChallenge = useCallback((playerId, text, emoji)=>{
     const cwk = custodyWeekKey();
-    const prev = config.weeklyChallenge || { weekKey: cwk, challenges: [] };
+    // v2.16.91 — même repli que `handleChallengeCheckin` ci-dessus : un seau daté repart VIDE
+    // quand sa clé change, au lieu d'être réétiqueté à la semaine en cours.
+    const stocke = config.weeklyChallenge;
+    const prev = (stocke && (!stocke.weekKey || stocke.weekKey === cwk))
+      ? stocke : { weekKey: cwk, challenges: [] };
     const idx = prev.challenges.findIndex(c=>c.playerId===playerId);
     let challenges;
     if(idx>=0){
