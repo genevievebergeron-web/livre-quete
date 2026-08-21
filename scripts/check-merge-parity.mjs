@@ -91,6 +91,16 @@ const gsA = {
   // un MAX clé par clé doit rendre un objet différent des DEUX entrées, sinon un spread naïf
   // passerait inaperçu.
   catCounts: { menage: 12, cuisine: 3 },
+  // v2.16.93 — `deCompleted` porté par les DEUX côtés, MÊME clé, estampilles qui se contredisent :
+  // la prod le porte et aucune fixture ne l'avait, mais le contrôle « fixtures vs schéma de prod »
+  // ne pouvait pas le voir — il mesurait la SORTIE de la fusion, qui FABRIQUE `{}` par défaut.
+  // Clé absente de `completed` des deux côtés : le tombstone doit apparaître dans la sortie sans
+  // rien annuler ici (son mordant est mesuré par sa section dédiée, « ↩️ Annuler »).
+  // Estampilles CROISÉES avec gsB (A gagne sur tdc1, B sur tdc2), même patron que `catCounts` :
+  // un max clé par clé rend un objet différent des DEUX entrées. Sans ce croisement, le résultat
+  // serait égal à l'une des deux copies et le contrôle « le périmé a gagné » ne saurait pas
+  // distinguer un max d'un dernier-écriture-gagne — il criait au loup sur la règle correcte.
+  deCompleted: { "tdc1#2026-08-01": 999, "tdc2#2026-08-01": 111 },
 };
 const gsB = {
   ...gsA,
@@ -118,6 +128,9 @@ const gsB = {
   challengeTiers: { week: "2026-08-07", tiers: [3, 5, 7] },
   house: { floor: "df2", placed: { lamp: "dl1" }, wallpaper: "dw2" }, lastSeenDay: "2026-08-14",
   catCounts: { menage: 4, cuisine: 9, defi: 2 },
+  // v2.16.93 — MÊME clé que gsA, estampille plus GRANDE du côté PÉRIMÉ : le max doit gagner quel
+  // que soit le sens, sinon une annulation de parent se ferait effacer par la copie d'en face.
+  deCompleted: { "tdc1#2026-08-01": 111, "tdc2#2026-08-01": 999 },
 };
 
 // ── Les fixtures doivent VRAIMENT se contredire ────────────────────────────
@@ -216,6 +229,13 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   announcements: [{ id: "an1", createdAt: "2026-08-14", text: "A", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
                    playerTasks: { p1: ["vider le lave-vaisselle"] } }],
   childTaskProposals: [{ id: "pr1", label: "Proposition A" }], removedProposals: ["pr0"],
+  // v2.16.93 — les trois tombstones du portail parent (v2.16.80) : la prod les porte, aucune
+  // fixture ne les avait, et le contrôle « fixtures vs schéma de prod » les croyait couverts parce
+  // qu'il mesurait la SORTIE — où la fusion FABRIQUE `[]` par défaut. Ids qui ne visent aucun
+  // élément des fixtures : ce qu'on mesure ici est l'UNION des deux listes (5e étage), le mordant
+  // du tombstone sur sa liste ayant sa propre section (4e étage, fixtures dédiées).
+  removedAnnouncements: ["an_supprimee_a"], removedMomentRequests: ["mm_supprimee_a"],
+  removedRemovalRequests: ["rr_supprimee_a"],
   removalRequests: [{ id: "rq1", instanceId: "as1" }],
   customRewards: [{ id: "cr1", label: "Maison A", coins: 20 }], theme: "minecraft",
   updateFeedEntries: [{ type: "update", version: "2.16.70", features: ["a"], ts: "2026-08-15" }],
@@ -235,6 +255,8 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
                    playerTasks: { p1: ["sortir le recyclage"] } }],
   childTaskProposals: [{ id: "pr2", label: "Proposition B" }], removedProposals: ["pr3"],
+  removedAnnouncements: ["an_supprimee_b"], removedMomentRequests: ["mm_supprimee_b"],
+  removedRemovalRequests: ["rr_supprimee_b"],
   removalRequests: [{ id: "rq2", instanceId: "as1" }],
   customRewards: [{ id: "cr2", label: "Maison B", coins: 30 }], theme: "foret",
   updateFeedEntries: [{ type: "update", version: "2.16.41", features: ["b"], ts: "2026-08-06" }],
@@ -345,9 +367,19 @@ const SOUS_CLES_TOLEREES = new Set(); // v2.16.89 — `gameStates.coinsWeek`, `c
         for (const [sk, sv] of Object.entries(el)) pose(`${dans}.${k}[].${sk}`, natureDe(sv));
     }
   };
-  const fusion = client.mergeFamily(famA, famB);
-  releve(fusion.config, "config");
-  for (const gs of fusion.gameStates) releve(gs, "gameStates");
+  // v2.16.93 — ce relevé se prenait sur la SORTIE de `mergeFamily(famA, famB)`, alors que la
+  // question qu'il pose est « les FIXTURES portent-elles ce que la prod porte ? ». La fusion
+  // FABRIQUE des défauts pour des champs qu'aucune des deux entrées ne porte (`deCompleted` → `{}`,
+  // les trois tombstones du portail parent → `[]`) : mesuré sur la sortie, le contrôle voyait ces
+  // quatre champs « couverts » et ne pouvait pas dire qu'aucune fixture ne les alimentait — le
+  // défaut de la fusion BLANCHISSAIT le trou que le contrôle existe pour trouver. C'est la même
+  // faute que « le relevé au même plafond que le surveillé » (v2.16.88), déplacée d'un cran : un
+  // contrôle ne peut rien reprocher à une donnée qu'il lit APRÈS la transformation surveillée.
+  // Il lit donc les deux ENTRÉES, et rien d'autre.
+  for (const fam of [famA, famB]) {
+    releve(fam.config, "config");
+    for (const gs of fam.gameStates) releve(gs, "gameStates");
+  }
 
   console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}) — aucun angle mort`);
   let toleres = 0;
@@ -2326,9 +2358,6 @@ const SANS_CONTRADICTION = [
   { chemin: "config.announcements[].sharedTasks[]",     mesureAilleurs: "SOUS_LISTES", liste: "announcements", champ: "sharedTasks" },
   { chemin: "config.announcements[].targetPlayerIds[]", mesureAilleurs: "SOUS_LISTES", liste: "announcements", champ: "targetPlayerIds" },
   { chemin: "config.assignments[].playerIds[]",         mesureAilleurs: "SOUS_LISTES", liste: "assignments", champ: "playerIds" },
-  { chemin: "gameStates.deCompleted", mesureAilleurs: "SECTION", section: "tombstone daté de « ↩️ Annuler »",
-    pourquoi: "absent des deux fixtures principales (la fusion rend `{}`) — la section dédiée bâtit "
-      + "ses propres copies contradictoires, avec un tombstone d'un seul côté." },
 
   // ── échafaudage : le champ de premier niveau est exempté par `memeValeur` ──
   { chemin: "config.mode",       support: "EXEMPT_CFG" },
@@ -2674,6 +2703,119 @@ console.log("· chemins d'ENTRÉE que la fusion jette — complétude, aux quatr
   }
   for (const f of JETES_PAR_LA_FUSION)
     if (!f.pourquoi) fail(`16e étage — fiche « ${f.chemin} » sans raison écrite.`);
+}
+
+// ── 17e ÉTAGE : les valeurs que la fusion INVENTE au lieu d'en choisir une ───
+// v2.16.93 — piste laissée par la v2.16.92, mot pour mot : « le 16e étage compare l'ENTRÉE à la
+// SORTIE par le CHEMIN — il dit qu'un chemin survit, jamais que sa VALEUR est celle d'un des deux
+// côtés. Une règle qui rendrait un chemin présent mais avec une valeur qu'aucune des deux fixtures
+// ne porte (un défaut, un `0`, une chaîne vide reconstruite) passe donc les seize étages en
+// silence. Croiser, pour chaque chemin de la sortie, la valeur rendue avec l'ensemble {valeur de A,
+// valeur de B} dirait quels champs la fusion INVENTE plutôt que d'arbitrer. »
+//
+// C'est fait, et la réponse d'aujourd'hui est ZÉRO : aux quatre points de mesure, chaque valeur
+// rendue vient de l'une des deux copies. Un résultat, pas un abandon — il est gravé pour qu'il
+// cesse d'être vrai bruyamment le jour où il cesse d'être vrai.
+//
+// Une invention n'est pas une faute en soi (un défaut de migration en est une, et `deCompleted`
+// en était une jusqu'à ce que les fixtures le portent) : c'est une valeur que PERSONNE n'a écrite,
+// donc que ni le relevé de prod ni les seize étages ne peuvent rattacher à un geste. Toute
+// invention doit donc être FICHÉE, avec la raison qui la rend voulue.
+//
+// Ce que cet étage ajoute aux seize autres : ils mesurent tous QUEL CÔTÉ gagne, en supposant que
+// le résultat vient forcément d'un côté. Celui-ci mesure cette supposition-là.
+//
+// Les éléments de liste sont repérés par leur clé de jointure (`[id=f1]`), pas par leur rang :
+// sans ça, une valeur recalculée dans un élément serait blanchie par un élément VOISIN qui porte
+// la même valeur — le même blanchiment que celui que la v2.16.93 vient de retirer au contrôle
+// « fixtures vs schéma de prod », une couche plus bas.
+const VALEURS_RECALCULEES = [
+  // { chemin: "…", pourquoi: "…" } — vide aujourd'hui, et le compte imprimé le dit.
+];
+
+const _clesJointure = ["id", "instanceId", "playerId", "version"];
+const _cheminsValues = (v, chemin, acc) => {
+  if (Array.isArray(v)) {
+    for (const el of v) {
+      let cle = null;
+      if (el && typeof el === "object" && !Array.isArray(el))
+        for (const k of _clesJointure) if (el[k] != null) { cle = `${k}=${el[k]}`; break; }
+      _cheminsValues(el, chemin + (cle ? `[${cle}]` : "[]"), acc);
+    }
+    return acc;
+  }
+  if (v && typeof v === "object" && Object.keys(v).length) {
+    for (const k of Object.keys(v)) _cheminsValues(v[k], chemin + "." + k, acc);
+    return acc;
+  }
+  if (!acc.has(chemin)) acc.set(chemin, new Set());
+  acc.get(chemin).add(JSON.stringify(v));
+  return acc;
+};
+const _valeursDe = (fam) => {
+  const acc = new Map();
+  _cheminsValues(fam.config, "config", acc);
+  for (const gs of fam.gameStates || []) _cheminsValues(gs, "gameStates", acc);
+  return acc;
+};
+// Rend la liste des chemins dont la valeur rendue n'est portée par AUCUNE des deux entrées.
+const _inventions = (fa, fb, sortie) => {
+  const va = _valeursDe(fa), vb = _valeursDe(fb), out = [];
+  for (const [chemin, vals] of _valeursDe(sortie)) {
+    const admis = new Set([...(va.get(chemin) || []), ...(vb.get(chemin) || [])]);
+    const inventees = [...vals].filter((v) => !admis.has(v));
+    if (inventees.length) out.push({ chemin, inventees, admis: [...admis] });
+  }
+  return out;
+};
+
+console.log("· valeurs INVENTÉES par la fusion — aux quatre points de mesure");
+{
+  // TÉMOIN d'abord : un détecteur qui ne trouve rien n'apprend rien tant qu'on n'a pas vu qu'il
+  // SAIT trouver. On lui donne une fusion truquée qui recalcule un champ (`pin`, que ni A ni B ne
+  // porte à cette valeur) et une autre qui fabrique un défaut sous un chemin neuf. Les deux doivent
+  // ressortir, et RIEN d'autre — sinon le détecteur crie au loup et son zéro ne vaut rien.
+  // On mesure le DELTA que le trucage ajoute, jamais un jeu absolu : le jour où une invention
+  // légitime sera fichée, le témoin doit continuer à ne parler que du trucage.
+  const vraie = client.mergeFamily(famA, famB);
+  const avant = new Set(_inventions(famA, famB, vraie).map((x) => x.chemin));
+  const temoin = { ...vraie, config: { ...vraie.config, pin: "0000", theme: "" } };
+  const apres = _inventions(famA, famB, temoin).map((x) => x.chemin);
+  const delta = apres.filter((c) => !avant.has(c)).sort();
+  if (JSON.stringify(delta) !== JSON.stringify(["config.pin", "config.theme"]))
+    fail(`17e étage — le TÉMOIN ne ressort pas comme prévu (delta : ${JSON.stringify(delta)}, `
+       + `attendu ["config.pin","config.theme"]). Le détecteur d'inventions ne sait plus voir une `
+       + `valeur fabriquée : son « zéro » sur la vraie fusion ne prouverait alors rien du tout.`);
+
+  const fiches = new Map(VALEURS_RECALCULEES.map((f) => [f.chemin, f]));
+  const vuesPartout = new Set();
+  for (const [nom, fa, fb, out] of [
+    ["client AB", famA, famB, client.mergeFamily(famA, famB)],
+    ["client BA", famB, famA, client.mergeFamily(famB, famA)],
+    ["serveur AB", famA, famB, server.mergeFamily(famA, famB)],
+    ["serveur BA", famB, famA, server.mergeFamily(famB, famA)],
+  ]) {
+    for (const { chemin, inventees, admis } of _inventions(fa, fb, out)) {
+      vuesPartout.add(chemin);
+      if (fiches.has(chemin)) continue;
+      fail(`${nom} — « ${chemin} » vaut ${inventees.join(" ")}, une valeur qu'AUCUNE des deux copies `
+         + `ne porte (elles disent ${admis.join(" ") || "rien à ce chemin"}). Les seize étages `
+         + `au-dessus mesurent QUEL CÔTÉ gagne : aucun ne voit une valeur que la fusion FABRIQUE. `
+         + `C'est une donnée que personne n'a écrite — ni un geste d'enfant, ni un geste de parent. `
+         + `Si c'est voulu (un défaut de migration, une borne), fiche-la dans VALEURS_RECALCULEES `
+         + `avec sa raison. Sinon, c'est la fusion qui écrase les deux copies : corrige dans `
+         + `src/merge.js ET server-merge.cjs.`);
+    }
+  }
+  for (const f of VALEURS_RECALCULEES)
+    if (!vuesPartout.has(f.chemin))
+      fail(`17e étage — fiche « ${f.chemin} », que la fusion n'invente plus (ou que les fixtures `
+         + `portent maintenant). Fiche périmée : retire-la, sinon elle couvrira un jour une `
+         + `invention homonyme sans que personne l'ait relue.`);
+  for (const f of VALEURS_RECALCULEES)
+    if (!f.pourquoi) fail(`17e étage — fiche « ${f.chemin} » sans raison écrite.`);
+  console.log(`    (${_valeursDe(client.mergeFamily(famA, famB)).size} chemins-valeurs, `
+    + `${vuesPartout.size} inventés, ${VALEURS_RECALCULEES.length} fichés)`);
 }
 
 console.log("· estampille d'achat — une récompense RACHETÉE après remboursement doit survivre");

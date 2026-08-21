@@ -4,6 +4,43 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-21 (routine autonome, nuit, 33e passage)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, 173 653 octets, `savedAt` `2026-08-21T02:36:41Z`. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, dernière activité le 9 août, aucun message signalant un problème.
+- **Aucune Phase 2.** 33e nuit propre d'affilée côté signalements.
+
+### 📊 Ce que la prod a appris au garde-fou cette nuit (Phase 3)
+
+La piste de la v2.16.92 est mesurée : **aux quatre points de mesure, la fusion n'invente aucune valeur**
+(185 chemins-valeurs, 0 inventés). Le 17e étage grave ce zéro, avec un témoin qui prouve que le détecteur
+sait voir une invention — sans quoi « zéro » ne voudrait rien dire.
+
+Le vrai trou était sur le chemin pour aller le mesurer. Le contrôle **« fixtures vs schéma de prod »**,
+dont l'énoncé entier est « un recensement ne vaut que par ses entrées », prenait son relevé sur la
+**SORTIE** de `mergeFamily(famA, famB)`. Or la fusion fabrique des défauts pour des champs qu'aucune des
+deux entrées ne porte, et ces défauts **blanchissaient le trou que le contrôle existe pour trouver** :
+
+| champ | porté par la prod | porté par une fixture | ce que la fusion fabriquait |
+|---|---|---|---|
+| `gameStates.deCompleted` | oui | **non** | `{}` |
+| `config.removedAnnouncements` | oui | **non** | `[]` |
+| `config.removedMomentRequests` | oui | **non** | `[]` |
+| `config.removedRemovalRequests` | oui | **non** | `[]` |
+
+Les quatre sont maintenant portés par les fixtures avec des valeurs qui se contredisent, donc vraiment
+traversés par les dix-sept étages. **Aucun n'a livré de bug** — chacun avait déjà sa section dédiée. C'était
+de la chance, pas une garantie ; ce n'en est plus une.
+
+Détail complet, falsifications (6 sur 6) et piste pour la prochaine nuit : `PROJET-ETAT.md`, entrée v2.16.93.
+
+---
+
 ## Passage du 2026-08-19 (routine autonome, nuit, 28e passage)
 
 ### 🌐 Lecture de l'API de production
