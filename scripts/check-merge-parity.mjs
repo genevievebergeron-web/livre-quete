@@ -432,6 +432,24 @@ for (const [la, a, lb, b] of [["A", famA, "B", famB], ["B", famB, "A", famA]]) {
     if (!same(rc.config[k], rs.config[k]))
       fail(`mergeFamily(${la},${lb}) — config.${k} : client ${JSON.stringify(rc.config[k])} ≠ serveur ${JSON.stringify(rs.config[k])}`);
   }
+  // v2.16.92 — la comparaison ci-dessus passe par `same`, donc par `JSON.stringify`, qui EFFACE
+  // une clé dont la valeur est `undefined` : un champ que SEULE une des deux copies nomme y est
+  // strictement invisible tant qu'aucune fixture ne lui donne de valeur. C'est la leçon « fixture
+  // identique = contrôle inerte », appliquée à la comparaison elle-même. Ce qu'il a trouvé le soir
+  // de sa naissance : `custodySchedule`, une règle que seul `server-merge.cjs` portait depuis la
+  // v2.16.71 — c'est-à-dire depuis le commit qui a créé CE garde-fou — sur un champ qui n'existe
+  // ni dans `src/merge.js`, ni dans l'app, ni dans le relevé de prod. Retirée.
+  for (const [ou, oc, os] of [["config", rc.config, rs.config],
+                             ["gameStates[0]", rc.gameStates[0] || {}, rs.gameStates[0] || {}],
+                             ["config.players[0]", rc.config.players[0] || {}, rs.config.players[0] || {}]]) {
+    for (const k of new Set([...Object.keys(oc), ...Object.keys(os)])) {
+      if ((k in oc) !== (k in os))
+        fail(`mergeFamily(${la},${lb}) — ${ou}.${k} : une seule des deux copies NOMME ce champ `
+           + `(client ${k in oc ? "oui" : "non"}, serveur ${k in os ? "oui" : "non"}). Tant qu'aucune `
+           + `fixture ne lui donne de valeur, la comparaison de VALEURS passe au vert : soit la règle `
+           + `manque dans une des deux copies, soit elle est de trop dans l'autre.`);
+    }
+  }
   if (!same(rc.savedAt, rs.savedAt)) fail(`mergeFamily(${la},${lb}) — savedAt : ${rc.savedAt} ≠ ${rs.savedAt}`);
   if (!same(rc.seenVersions, rs.seenVersions)) fail(`mergeFamily(${la},${lb}) — seenVersions`);
   if (!same(rc.gameStates, rs.gameStates)) fail(`mergeFamily(${la},${lb}) — gameStates`);
@@ -1122,8 +1140,12 @@ const CHAINES = [
   { champ: "owned", dans: "gameStates", tombstone: "refundedRewards",
     retire: "rw_depanneur", marque: "rw_depanneur#111", garde: "item_perso",
     gsPlus: { rewardBuyTs: { rw_depanneur: 111 } },
-    // ⚠️ `rewardBuyTs` voyage avec `boughtRewards` (dernière-écriture-gagne) : la marque doit être
-    // posée du côté FRAIS, sinon la clé `id#estampille` ne se reconstitue pas et le contrôle ment.
+    // v2.16.92 — cette note disait, jusqu'ici : « ⚠️ `rewardBuyTs` voyage avec `boughtRewards`
+    // (dernière-écriture-gagne) : la marque doit être posée du côté FRAIS, sinon la clé
+    // `id#estampille` ne se reconstitue pas et le contrôle ment. » C'était le CONTOURNEMENT d'un
+    // bug, écrit en toutes lettres à côté de lui pendant neuf jours. L'estampille s'unionne
+    // maintenant par id (plus grande gagnante), donc elle se reconstitue quel que soit le côté qui
+    // la porte — la section « estampille d'achat » plus bas mesure exactement ça.
     pourquoi: "« J'ai changé d'idée » (App.jsx ~3575/3580) retire l'id d'`owned`" },
   // ── gameStates ── pas des unions : dernière-écriture-gagne, le retrait tient par construction
   { champ: "boughtRewards", dans: "gameStates", derniereEcriture: true, retire: "rw_ecran", garde: null },
@@ -2505,6 +2527,199 @@ for (const c of CLE_DIFFERENTE) {
            + `les deux, c'est réétiqueter du contenu périmé à la clé courante — et il s'y réinstalle à `
            + `chaque synchro, puisque chaque fusion le recopie. Corrige dans src/merge.js ET `
            + `server-merge.cjs. Raison fichée : ${c.pourquoi}`);
+    }
+  }
+}
+
+// ── 16e ÉTAGE : les chemins que l'ENTRÉE porte et que la SORTIE jette ───────
+// v2.16.92 — piste laissée par la v2.16.91, mot pour mot : « le recensement du 15e étage est pris
+// sur UNE SEULE fusion, `mergeFamily(famA, famB)`. Or tout le reste du fichier mesure en QUATRE
+// points (deux sens × deux copies) précisément parce que le résultat dépend de l'ordre des
+// arguments et de `preferIncoming` — un chemin que seule la sortie de `mergeFamily(famB, famA)`
+// porte n'est donc recensé par personne. »
+//
+// Mesuré, et la réponse est NON : les deux sens rendent exactement le même jeu de chemins (le
+// contrôle juste en dessous le grave, pour que ça cesse d'être vrai bruyamment le jour où ça
+// cesse d'être vrai). Mais la question a ouvert la bonne porte d'à côté : les quinze étages
+// recensent tous la SORTIE. Un chemin que les fixtures portent et que la fusion ne rend PAS n'est
+// vu par aucun d'eux — ni par le 15e (il ne parcourt que la sortie), ni par le relevé de prod (il
+// compare des formes, pas une survie), ni par les contrôles de retrait (ils demandent qu'un
+// retrait tienne, jamais qu'une donnée non retirée survive).
+//
+// Ce que la mesure a trouvé le soir de sa naissance : TROIS chemins jetés, dont deux délibérés et
+// fichés ci-dessous — et `gameStates.rewardBuyTs.<id>`, qui ne l'était pas. L'estampille d'achat
+// voyageait EN BLOC avec `boughtRewards`, alors que les deux champs que `_disowned` croise avec
+// elle (`owned`, `refundedRewards`) sont des unions increvables : le côté qui perdait l'arbitrage
+// emportait sa marque, `_disowned` retombait sur sa branche legacy (« sans estampille, tout
+// tombstone portant cet id compte »), et la récompense RACHETÉE après un remboursement était
+// re-tombstonée par le vieil achat puis retirée d'`owned`. Le garde-fou contournait déjà le
+// défaut en toutes lettres, à la fiche `owned` de `CHAINES` : « la marque doit être posée du côté
+// FRAIS, sinon la clé `id#estampille` ne se reconstitue pas et le contrôle ment ».
+//
+// Deux classements, et chacun MORD :
+//   • `enBloc` — le champ NOMMÉ est arbitré dernière-écriture-gagne sur l'objet entier, donc ce qui
+//     vit dessous ne survit que du côté gagnant. La fiche nomme ce champ, qui doit vraiment être
+//     l'ancêtre du chemin jeté.
+//   • `seauDate` — le chemin vit sous un seau daté dont la clé DIFFÈRE entre les deux fixtures :
+//     le côté frais est rendu SEUL (13e/14e étages). La fiche nomme le seau, qui doit être au
+//     registre `CLE_DIFFERENTE` — le jour où quelqu'un l'en retire, la fiche cesse d'être vraie.
+const JETES_PAR_LA_FUSION = [
+  { chemin: "gameStates.house.placed.lamp", enBloc: "house",
+    pourquoi: "« Ma maison » est arbitrée dernière-écriture-gagne sur l'objet ENTIER (v2.16.72) : "
+      + "surtout pas d'union par slot, sinon retirer un meuble le ressusciterait." },
+  { chemin: "config.weeklyChallenge.challenges[].checkins.2026-08-07", seauDate: "config.weeklyChallenge",
+    pourquoi: "les deux copies parlent de SEMAINES différentes (v2.16.91) : un seau daté repart VIDE "
+      + "quand sa clé change. Ce qui part est le contenu d'une semaine révolue, jamais un paiement — "
+      + "les paliers se comptent par semaine (`challengeDaysCount`)." },
+];
+
+console.log("· recensement du 15e étage — le même dans les DEUX sens, et dans les deux copies");
+{
+  const cheminsDe = (v, chemin, acc) => {
+    if (Array.isArray(v)) { for (const el of v) cheminsDe(el, chemin + "[]", acc); return acc; }
+    if (v && typeof v === "object" && Object.keys(v).length) {
+      for (const k of Object.keys(v)) cheminsDe(v[k], chemin + "." + k, acc);
+      return acc;
+    }
+    if (!acc.has(chemin)) acc.set(chemin, []);
+    acc.get(chemin).push(v);
+    return acc;
+  };
+  const releve = (fam) => {
+    const acc = new Map();
+    cheminsDe(fam.config, "config", acc);
+    for (const gs of fam.gameStates) cheminsDe(gs, "gameStates", acc);
+    return acc;
+  };
+  const jeux = [["client AB", client.mergeFamily(famA, famB)], ["client BA", client.mergeFamily(famB, famA)],
+                ["serveur AB", server.mergeFamily(famA, famB)], ["serveur BA", server.mergeFamily(famB, famA)]];
+  const [nomRef, outRef] = jeux[0];
+  const ref = new Set(releve(outRef).keys());
+  for (const [nom, out] of jeux.slice(1)) {
+    const ici = new Set(releve(out).keys());
+    const manquants = [...ref].filter((c) => !ici.has(c)), enPlus = [...ici].filter((c) => !ref.has(c));
+    if (manquants.length || enPlus.length)
+      fail(`le recensement de la SORTIE dépend du point de mesure : « ${nomRef} » et « ${nom} » ne `
+         + `rendent pas les mêmes chemins (absents ici : ${manquants.join(", ") || "aucun"} ; en plus `
+         + `ici : ${enPlus.join(", ") || "aucun"}). Le 15e étage ne mesure QU'UN point : tout chemin `
+         + `qu'un seul des quatre porte échappe à son classement. Fais-le recenser sur les quatre, `
+         + `ou explique pourquoi ce chemin n'existe que d'un côté.`);
+  }
+  console.log(`    (${ref.size} chemins, identiques aux quatre points de mesure)`);
+}
+
+console.log("· chemins d'ENTRÉE que la fusion jette — complétude, aux quatre points de mesure");
+{
+  const cheminsDe = (v, chemin, acc) => {
+    if (Array.isArray(v)) { for (const el of v) cheminsDe(el, chemin + "[]", acc); return acc; }
+    if (v && typeof v === "object" && Object.keys(v).length) {
+      for (const k of Object.keys(v)) cheminsDe(v[k], chemin + "." + k, acc);
+      return acc;
+    }
+    if (!acc.has(chemin)) acc.set(chemin, []);
+    acc.get(chemin).push(v);
+    return acc;
+  };
+  const releve = (fam) => {
+    const acc = new Map();
+    cheminsDe(fam.config, "config", acc);
+    for (const gs of fam.gameStates) cheminsDe(gs, "gameStates", acc);
+    return acc;
+  };
+  const entree = new Set([...releve(famA).keys(), ...releve(famB).keys()]);
+  const fiches = new Map(JETES_PAR_LA_FUSION.map((f) => [f.chemin, f]));
+  const jetesPartout = new Set();
+  for (const [nom, out] of [["client AB", client.mergeFamily(famA, famB)], ["client BA", client.mergeFamily(famB, famA)],
+                            ["serveur AB", server.mergeFamily(famA, famB)], ["serveur BA", server.mergeFamily(famB, famA)]]) {
+    const sortie = releve(out);
+    for (const chemin of entree) {
+      if (sortie.has(chemin)) continue;
+      jetesPartout.add(chemin);
+      if (fiches.has(chemin)) continue;
+      fail(`${nom} — « ${chemin} » est porté par une fixture et la fusion ne le rend PAS. Les quinze `
+         + `étages au-dessus recensent tous la SORTIE : un chemin jeté n'est vu par aucun d'eux, et `
+         + `les contrôles de retrait demandent qu'un retrait TIENNE, jamais qu'une donnée non retirée `
+         + `SURVIVE. Si l'abandon est voulu, classe-le au 16e étage (\`enBloc\` : le champ nommé est `
+         + `arbitré en entier ; \`seauDate\` : sa clé diffère, le côté frais est rendu seul). Sinon, `
+         + `c'est une donnée d'enfant qui disparaît à la synchro — corrige dans src/merge.js ET `
+         + `server-merge.cjs.`);
+    }
+  }
+  for (const f of JETES_PAR_LA_FUSION)
+    if (!jetesPartout.has(f.chemin))
+      fail(`16e étage — fiche « ${f.chemin} », que la fusion ne jette plus (ou que les fixtures ne `
+         + `portent plus). Fiche périmée : retire-la, sinon elle couvrira un jour un abandon `
+         + `homonyme sans que personne l'ait relu.`);
+  console.log(`    (${entree.size} chemins d'entrée, ${jetesPartout.size} jetés, tous classés)`);
+
+  // Les fiches doivent pointer sur du réel : l'ancêtre `enBloc` doit être un ancêtre, et le seau
+  // daté doit toujours être au registre du 14e étage.
+  for (const f of JETES_PAR_LA_FUSION) {
+    if (f.enBloc) {
+      const racine = f.chemin.split(".").slice(0, 2).join(".").replace(/\[\]$/, "");
+      const attendu = racine.split(".")[1];
+      if (attendu !== f.enBloc)
+        fail(`16e étage — « ${f.chemin} » se dit arbitré en bloc par « ${f.enBloc} », qui n'est pas `
+           + `son champ de premier niveau (« ${attendu} »).`);
+      continue;
+    }
+    if (f.seauDate) {
+      if (!CLE_DIFFERENTE.some((c) => c.chemin === f.seauDate))
+        fail(`16e étage — « ${f.chemin} » se dit sous le seau daté « ${f.seauDate} », que CLE_DIFFERENTE `
+           + `ne porte pas. Sans cette fiche-là, rien ne mesure que le côté frais est rendu SEUL, et `
+           + `l'abandon fiché ici n'a plus de raison.`);
+      continue;
+    }
+    fail(`16e étage — fiche « ${f.chemin} » sans classement (\`enBloc\` ou \`seauDate\`).`);
+  }
+  for (const f of JETES_PAR_LA_FUSION)
+    if (!f.pourquoi) fail(`16e étage — fiche « ${f.chemin} » sans raison écrite.`);
+}
+
+console.log("· estampille d'achat — une récompense RACHETÉE après remboursement doit survivre");
+{
+  // v2.16.92 — le cas exact rejoué sur la donnée de prod du 21 août : Antoine (« Le GOAT!!! ») a
+  // `refundedRewards: ["rw_bonbon#…"]` et `rewardBuyTs: {}`. Il rachète `rw_bonbon` sur sa tablette,
+  // une AUTRE tablette écrit dans la seconde qui suit (le `savedAt` est celui de la FAMILLE, pas du
+  // joueur), et sa copie perd l'arbitrage. `owned` est une union et garde l'objet ; l'estampille
+  // partait avec `boughtRewards`, et `_disowned` retombait alors sur sa branche legacy, où le
+  // tombstone du VIEIL achat suffit à disqualifier le neuf.
+  const VIEUX = 111, NEUF = 999;
+  const gsRachat = { ...gsB, owned: ["rw_bonbon"], boughtRewards: ["rw_bonbon"],
+                     rewardBuyTs: { rw_bonbon: NEUF }, refundedRewards: ["rw_bonbon#" + VIEUX] };
+  const gsNuage  = { ...gsA, owned: [], boughtRewards: [], rewardBuyTs: {},
+                     refundedRewards: ["rw_bonbon#" + VIEUX] };
+  const fRachat = mkFam("2026-08-14T12:00:00.000Z", gsRachat, famB.config, plB); // PÉRIMÉ
+  const fNuage  = mkFam("2026-08-15T12:00:00.000Z", gsNuage,  famA.config, plA); // FRAIS
+  for (const [sens, base, inc] of [["rachat en base", fRachat, fNuage], ["rachat en incoming", fNuage, fRachat]]) {
+    for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const gs = fn(base, inc).gameStates[0];
+      if (!(gs.owned || []).includes("rw_bonbon"))
+        fail(`${impl} (${sens}) — la récompense rachetée après remboursement a disparu d'\`owned\`. `
+           + `L'estampille NEUVE (${NEUF}) n'est connue que du côté périmé : si \`rewardBuyTs\` part en `
+           + `bloc, \`_disowned\` retombe sur sa branche legacy et le tombstone du vieil achat `
+           + `(rw_bonbon#${VIEUX}) suffit à retirer l'objet que l'union venait de préserver. `
+           + `\`rewardBuyTs\` doit s'unionner par id, plus grande estampille gagnante.`);
+      if (gs.rewardBuyTs?.rw_bonbon !== NEUF)
+        fail(`${impl} (${sens}) — \`rewardBuyTs.rw_bonbon\` vaut `
+           + `${JSON.stringify(gs.rewardBuyTs?.rw_bonbon ?? null)} au lieu de l'estampille la plus `
+           + `RÉCENTE (${NEUF}). Une estampille d'achat n'avance jamais à reculons.`);
+    }
+  }
+  // Le sens inverse compte autant : une estampille PÉRIMÉE ne doit jamais gagner sur la neuve,
+  // sinon la clé `id#estampille` retombe sur un tombstone déjà posé (crainte de la v2.16.62).
+  const fVieuxFrais = mkFam("2026-08-15T12:00:00.000Z",
+    { ...gsA, owned: ["rw_bonbon"], boughtRewards: ["rw_bonbon"], rewardBuyTs: { rw_bonbon: VIEUX }, refundedRewards: [] },
+    famA.config, plA);
+  const fNeufPerime = mkFam("2026-08-14T12:00:00.000Z",
+    { ...gsB, owned: ["rw_bonbon"], boughtRewards: ["rw_bonbon"], rewardBuyTs: { rw_bonbon: NEUF }, refundedRewards: [] },
+    famB.config, plB);
+  for (const [sens, base, inc] of [["neuf en base", fNeufPerime, fVieuxFrais], ["neuf en incoming", fVieuxFrais, fNeufPerime]]) {
+    for (const [impl, fn] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]]) {
+      const v = fn(base, inc).gameStates[0].rewardBuyTs?.rw_bonbon;
+      if (v !== NEUF)
+        fail(`${impl} (${sens}) — l'estampille PÉRIMÉE (${VIEUX}) a gagné sur la neuve (${NEUF}) : `
+           + `rendu ${JSON.stringify(v ?? null)}. Le max est la seule règle qui tienne dans les deux sens.`);
     }
   }
 }

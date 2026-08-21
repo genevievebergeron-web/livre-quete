@@ -129,7 +129,33 @@ export const mergeGS = (a, b, preferIncoming) => {
   const _refusedSet = new Set(refusedKeys);
   // v2.16.81 — hoistés (le littéral les lisait en place) : `owned` s'appuie dessus, voir plus bas.
   const _refunded = _uniq([...(a.refundedRewards || []), ...(b.refundedRewards || [])]).slice(-200);
-  const _rewardBuyTs = preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {});
+  // v2.16.92 — l'estampille voyageait EN BLOC avec `boughtRewards` (dernière-écriture-gagne), alors
+  // que les DEUX autres champs que `_disowned` croise avec elle — `owned` et `refundedRewards` —
+  // sont des unions increvables. Le côté qui perdait l'arbitrage emportait donc sa marque, et
+  // `_disowned` retombait sur sa branche LEGACY (« sans estampille, tout tombstone portant cet id
+  // compte ») : la récompense RACHETÉE après un remboursement était re-tombstonée par la marque du
+  // vieil achat et retirée d'`owned`, que l'union venait pourtant de préserver. Le garde-fou
+  // contournait déjà le défaut, en toutes lettres (« la marque doit être posée du côté FRAIS,
+  // sinon la clé `id#estampille` ne se reconstitue pas et le contrôle ment »).
+  // Règle : union par id, la PLUS GRANDE estampille gagne. `buyTs` est un `Date.now()` (App.jsx
+  // ~2890), donc il n'avance jamais à reculons : le max est toujours l'achat le plus récent, c'est
+  // exactement ce que la clé `id#estampille` doit nommer. La crainte de la v2.16.62 (« une
+  // résurrection par instantané périmé ramène l'ANCIENNE estampille, déjà tombstonée ») tient
+  // toujours : une marque périmée ne peut plus GAGNER, mais elle ne peut pas non plus effacer la
+  // neuve, et un id que le côté frais ne connaît pas garde la sienne au lieu de n'en avoir aucune.
+  const _rewardBuyTs = (() => {
+    const A = a.rewardBuyTs || {}, B = b.rewardBuyTs || {}, out = {};
+    for (const id of new Set([...Object.keys(A), ...Object.keys(B)])) {
+      const va = A[id], vb = B[id];
+      if (va == null) { out[id] = vb; continue; }
+      if (vb == null) { out[id] = va; continue; }
+      const na = Number(va), nb = Number(vb);
+      // Estampilles non numériques (jamais écrites par l'app) : on retombe sur le côté frais.
+      if (Number.isNaN(na) || Number.isNaN(nb)) { out[id] = preferIncoming ? vb : va; continue; }
+      out[id] = na >= nb ? va : vb;
+    }
+    return out;
+  })();
   // « cet id est-il un achat REMBOURSÉ et pas encore racheté ? » — mêmes deux branches que
   // `handleRefundReward` : avec estampille on exige la clé exacte, sans estampille (états d'avant
   // la v2.16.62) tout tombstone portant cet id compte.

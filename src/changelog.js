@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.92", date:"2026-08-21", features:[
+    "\ud83c\udf6c Une r\u00e9compense rachet\u00e9e apr\u00e8s un remboursement pouvait redispara\u00eetre toute seule \u00e0 la synchro suivante. Corrig\u00e9 : ce que tu rach\u00e8tes te reste.",
+  ]},
   { version:"2.16.91", date:"2026-08-20", features:[
     "\ud83c\udf1f Ton d\u00e9fi perso de la semaine pass\u00e9e revenait se coller sur la semaine en cours, et il y restait. Corrig\u00e9 : chaque semaine repart avec les d\u00e9fis que le parent a choisis pour elle.",
   ]},

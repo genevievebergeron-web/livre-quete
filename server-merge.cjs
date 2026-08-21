@@ -158,7 +158,21 @@ const mergeGS = (a, b, preferIncoming) => {
   // v2.16.81 — MIROIR de src/merge.js : `owned` était une union pure, donc le retrait de
   // « J'ai changé d'idée » ne survivait pas. `refundedRewards` sert de tombstone (keyé sur l'achat).
   const _refunded = _uniq([...(a.refundedRewards||[]), ...(b.refundedRewards||[])]).slice(-200);
-  const _rewardBuyTs = preferIncoming ? (b.rewardBuyTs || a.rewardBuyTs || {}) : (a.rewardBuyTs || b.rewardBuyTs || {});
+  // v2.16.92 — union par id, la PLUS GRANDE estampille gagne (voir src/merge.js pour le pourquoi
+  // complet) : `owned` et `refundedRewards` sont des unions, l'estampille qui les arbitre ne peut
+  // pas partir en bloc avec `boughtRewards` sans renvoyer `_disowned` à sa branche legacy.
+  const _rewardBuyTs = (() => {
+    const A = a.rewardBuyTs || {}, B = b.rewardBuyTs || {}, out = {};
+    for (const id of new Set([...Object.keys(A), ...Object.keys(B)])) {
+      const va = A[id], vb = B[id];
+      if (va == null) { out[id] = vb; continue; }
+      if (vb == null) { out[id] = va; continue; }
+      const na = Number(va), nb = Number(vb);
+      if (Number.isNaN(na) || Number.isNaN(nb)) { out[id] = preferIncoming ? vb : va; continue; }
+      out[id] = na >= nb ? va : vb;
+    }
+    return out;
+  })();
   const _disowned = (id) => {
     const stamp = _rewardBuyTs[id];
     if (stamp != null) return _refunded.includes(id + "#" + String(stamp));
@@ -217,7 +231,7 @@ const mergeGS = (a, b, preferIncoming) => {
     refusals: preferIncoming ? (b.refusals || a.refusals || []) : (a.refusals || b.refusals || []),
     owned: _uniq([...(a.owned||[]), ...(b.owned||[])]).filter((id) => !_disowned(id)), // v2.16.81 — voir `_disowned`
     boughtRewards: preferIncoming ? (b.boughtRewards || a.boughtRewards || []) : (a.boughtRewards || b.boughtRewards || []), // v1.63.0 — dernière-écriture-gagne (avec coins)
-    rewardBuyTs: _rewardBuyTs, // v2.16.62 — voyage avec boughtRewards (même règle) : une résurrection ramène l'ancienne estampille, déjà tombstonée ; hoisté en v2.16.81
+    rewardBuyTs: _rewardBuyTs, // v2.16.92 — union par id, plus grande estampille (voir src/merge.js) ; hoisté en v2.16.81
     refundedRewards: _refunded, // v1.69.0 — tombstone « déjà remboursé » (union) → fin des pièces infinies ; keyé sur l'achat depuis v2.16.62 ; hoisté en v2.16.81
     badges: _uniq([...(a.badges||[]), ...(b.badges||[])]),
     equipped: _byKey(a.equipped, b.equipped), // v2.16.79 — voir `_byKey` ci-dessus ; signalement `bug_56gb01a` (« il me mais tougour un casque de chevalier »)
@@ -498,7 +512,6 @@ const mergeFamily = (base, incoming) => {
       });
       return { weekKey, challenges:[...cm.values()] };
     })(),
-    custodySchedule: newerC.custodySchedule || bC.custodySchedule || iC.custodySchedule,
   };
   // v2.16.52 — même union que le `mergeFamily` du client (src/merge.js) : `seenVersions` (versions
   // du changelog déjà annoncées) est passé dans `config`, et le spread naïf `{...bC,...iC}` en
