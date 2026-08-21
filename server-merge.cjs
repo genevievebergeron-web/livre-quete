@@ -14,6 +14,17 @@
    et échoue à la moindre divergence. C'est ce garde-fou qui manquait — six
    règles avaient dérivé sans que rien ne le signale.
    ═══════════════════════════════════════════════════════════════ */
+// v2.16.95 — 19e étage : un tri BORNÉ doit être TOTAL. Les huit listes triées puis coupées
+// (`feed`, `bugs`, `errorLogs`, `announcements`, `repairEvents`, `momentRequests`, `coinOffers`,
+// `teamInvites`) trient sur une DATE, puis gardent les N premières. À date ÉGALE, `Array.sort`
+// est stable : l'ordre rendu est celui de la concaténation, donc celui des ARGUMENTS — et le
+// client met son local en `a` là où le serveur met son stocké. Quand le plafond mord, les deux
+// copies gardent alors des sous-ensembles DIFFÉRENTS, pour toujours et sans un seul message.
+// Les ex aequo ne sont pas un cas d'école : `announcements` trie sur `createdAt` à la JOURNÉE
+// (9 annonces en prod, 5 dates distinctes), et `momentRequests` fait pareil. Départager sur
+// `id` ne change pas la règle de rétention (« les N plus récentes ») : il la rend totale.
+// Chaque élément vient d'une `Map` clavée par `id`, donc `id` est présent et unique.
+const _departageId = (a, b) => String((a && a.id) ?? "").localeCompare(String((b && b.id) ?? ""));
 const _uniq = (a) => [...new Set(a || [])];
 
 // v2.16.65 — MIROIR EXACT de sanitizeXpLog/mergeXpLog (src/shared.js). Les deux moitiés doivent
@@ -353,7 +364,7 @@ const _mergePlayer = (a, b, preferIncoming = false) => {
     pseudo: w.pseudo || o.pseudo,
     themeId:(w.themeId && w.themeId!=="none") ? w.themeId : (o.themeId && o.themeId!=="none") ? o.themeId : (w.themeId||o.themeId||"none"),
     themeChosenAt: w.themeChosenAt || o.themeChosenAt,
-    starterThemes:_uniq([...(a.starterThemes||[]), ...(b.starterThemes||[])]).slice(0,4) };
+    starterThemes:_uniq([...(w.starterThemes||[]), ...(o.starterThemes||[])]).slice(0,4) };
 };
 const mergeFamily = (base, incoming) => {
   if (!base) return incoming; if (!incoming) return base;
@@ -402,7 +413,7 @@ const mergeFamily = (base, incoming) => {
   const propMap = new Map();
   [...(bC.childTaskProposals||[]), ...(iC.childTaskProposals||[])].forEach(p => { if (p && p.id && !_rmProp.has(p.id)) propMap.set(p.id, p); });
   // v2.16.35 — miroir du merge client : invitations "en équipe" enfant→enfant, union-by-id + statut COLLANT
-  const teamInvites = (() => { const m=new Map(); for (const inv of [...(bC.teamInvites||[]), ...(iC.teamInvites||[])]) { if (!inv||inv.id==null) continue; const prev=m.get(inv.id); if (!prev) m.set(inv.id,{ ...inv }); else if (prev.status==="pending"&&inv.status&&inv.status!=="pending") m.set(inv.id,{ ...inv }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(inv=>inv.status==="pending"||(inv.createdAt||0)>cut).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,40); })();
+  const teamInvites = (() => { const m=new Map(); for (const inv of [...(bC.teamInvites||[]), ...(iC.teamInvites||[])]) { if (!inv||inv.id==null) continue; const prev=m.get(inv.id); if (!prev) m.set(inv.id,{ ...inv }); else if (prev.status==="pending"&&inv.status&&inv.status!=="pending") m.set(inv.id,{ ...inv }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(inv=>inv.status==="pending"||(inv.createdAt||0)>cut).sort((a, b) => ((b.createdAt||0)-(a.createdAt||0)) || _departageId(a, b)).slice(0, 40); })();
   const config = {
     ...bC, ...iC, players, assignments:[...assignMap.values()], removedAssignments, customTasks:[...taskMap.values()], removedCustomTasks, teamInvites,
     removalRequests:[...reqMap.values()], removedRemovalRequests, childTaskProposals:[...propMap.values()], removedProposals,
@@ -412,7 +423,7 @@ const mergeFamily = (base, incoming) => {
     // annonce supprimée par le parent (et le serveur, qui met toujours sa copie en base, le faisait
     // systématiquement — la suppression ne pouvait pas marcher).
     removedAnnouncements,
-    announcements: (() => { const m=new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    announcements: (() => { const m=new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a, b) => ((b.createdAt||"").localeCompare(a.createdAt||"")) || _departageId(a, b)).slice(0, 20); })(),
     // v2.16.56 — miroir du merge client : récompenses cochées par le parent = DERNIÈRE ÉCRITURE GAGNE.
     // En union, aucun décochage ne survivait à une synchro. Une liste vide ne peut pas écraser une
     // liste réelle.
@@ -422,23 +433,23 @@ const mergeFamily = (base, incoming) => {
     // v2.16.84 — miroir du merge client : le ❤️ est un TOGGLE, l'union ne savait pas exprimer le
     // retrait du coeur (204/204 ressuscités sur la prod du 18 août). Tombstone DATÉ `unlikes`, qui
     // ne bat le coeur que s'il est plus récent que `likeTs` (ré-aimer doit refonctionner).
-    feed: (() => { const m=new Map(); const maxPar=(A,B)=>{ const o={...(A||{})}; for (const [k,v] of Object.entries(B||{})) if ((Number(v)||0)>(Number(o[k])||0)) o[k]=v; return o; }; for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) { prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); prev.likeTs=maxPar(prev.likeTs,f.likeTs); prev.unlikes=maxPar(prev.unlikes,f.unlikes); } else m.set(f.id,{ ...f, likes:[...(f.likes||[])], likeTs:{...(f.likeTs||{})}, unlikes:{...(f.unlikes||{})} }); } return [...m.values()].map(f=>{ const e={ ...f, likes:f.likes.filter(q=>(Number(f.unlikes[q])||0)<=(Number(f.likeTs[q])||0)) }; if(!Object.keys(e.likeTs).length) delete e.likeTs; if(!Object.keys(e.unlikes).length) delete e.unlikes; return e; }).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
+    feed: (() => { const m=new Map(); const maxPar=(A,B)=>{ const o={...(A||{})}; for (const [k,v] of Object.entries(B||{})) if ((Number(v)||0)>(Number(o[k])||0)) o[k]=v; return o; }; for (const f of [...(bC.feed||[]), ...(iC.feed||[])]) { if (!f||f.id==null) continue; const prev=m.get(f.id); if (prev) { prev.likes=_uniq([...(prev.likes||[]),...(f.likes||[])]); prev.likeTs=maxPar(prev.likeTs,f.likeTs); prev.unlikes=maxPar(prev.unlikes,f.unlikes); } else m.set(f.id,{ ...f, likes:[...(f.likes||[])], likeTs:{...(f.likeTs||{})}, unlikes:{...(f.unlikes||{})} }); } return [...m.values()].map(f=>{ const e={ ...f, likes:f.likes.filter(q=>(Number(f.unlikes[q])||0)<=(Number(f.likeTs[q])||0)) }; if(!Object.keys(e.likeTs).length) delete e.likeTs; if(!Object.keys(e.unlikes).length) delete e.unlikes; return e; }).sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 60); })(),
     // v2.6.0 — miroir du merge client : quêtes de réparation 🕊️, union-by-id exactly-once
-    repairEvents: (() => { const m=new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
+    repairEvents: (() => { const m=new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 100); })(),
     // v2.6.2 — miroir du merge client : récompenses "moment" à planifier, union-by-id + statut MONOTONE
     // v2.16.80 — miroir du merge client : (A) à statut ÉGAL la règle gardait la PREMIÈRE copie vue,
     // donc la BASE, donc la copie du serveur : re-planifier la date d'un moment déjà « planifie » ne
     // pouvait jamais être acceptée par le nuage (même défaut que `routines` avant la v2.16.70).
     // (B) tombstone `removedMomentRequests` pour la demande annulée par remboursement.
     removedMomentRequests,
-    momentRequests: (() => { const rank={attente:0,planifie:1,fait:2}; const m=new Map(); for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) { if (!r||r.id==null||_rmMom.has(r.id)) continue; const prev=m.get(r.id); if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id,r); else if ((rank[r.status]||0)===(rank[prev.status]||0)) { if (r.plannedDate && !prev.plannedDate) m.set(r.id,r); else if (!(prev.plannedDate && !r.plannedDate) && preferIncoming) m.set(r.id,r); } } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60); })(),
-    coinOffers: (() => { const m=new Map(); for (const o of [...(bC.coinOffers||[]), ...(iC.coinOffers||[])]) { if (!o||o.id==null) continue; const prev=m.get(o.id); if (!prev) m.set(o.id,{ ...o }); else if (prev.status==="pending"&&o.status&&o.status!=="pending") m.set(o.id,{ ...o }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(o=>o.status==="pending"||(o.ts||0)>cut).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,40); })(),
-    bugs: (() => { const m=new Map(); for (const x of [...(bC.bugs||[]), ...(iC.bugs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60); })(),
+    momentRequests: (() => { const rank={attente:0,planifie:1,fait:2}; const m=new Map(); for (const r of [...(bC.momentRequests||[]), ...(iC.momentRequests||[])]) { if (!r||r.id==null||_rmMom.has(r.id)) continue; const prev=m.get(r.id); if (!prev || (rank[r.status]||0) > (rank[prev.status]||0)) m.set(r.id,r); else if ((rank[r.status]||0)===(rank[prev.status]||0)) { if (r.plannedDate && !prev.plannedDate) m.set(r.id,r); else if (!(prev.plannedDate && !r.plannedDate) && preferIncoming) m.set(r.id,r); } } return [...m.values()].sort((a, b) => ((b.createdAt||"").localeCompare(a.createdAt||"")) || _departageId(a, b)).slice(0, 60); })(),
+    coinOffers: (() => { const m=new Map(); for (const o of [...(bC.coinOffers||[]), ...(iC.coinOffers||[])]) { if (!o||o.id==null) continue; const prev=m.get(o.id); if (!prev) m.set(o.id,{ ...o }); else if (prev.status==="pending"&&o.status&&o.status!=="pending") m.set(o.id,{ ...o }); } const cut=Date.now()-2*864e5; return [...m.values()].filter(o=>o.status==="pending"||(o.ts||0)>cut).sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 40); })(),
+    bugs: (() => { const m=new Map(); for (const x of [...(bC.bugs||[]), ...(iC.bugs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 60); })(),
     // v2.16.42 — miroir du merge client (merge.js, v1.90.0) qui MANQUAIT ici : les logs
     // techniques tombaient dans le `{...bC, ...iC}` ci-dessus, donc un appareil poussant
     // une config sans erreurs écrasait purement et simplement celles d'un autre appareil.
     // Même union-by-id que `bugs`, même plafond que le client (80).
-    errorLogs: (() => { const m=new Map(); for (const x of [...(bC.errorLogs||[]), ...(iC.errorLogs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,80); })(),
+    errorLogs: (() => { const m=new Map(); for (const x of [...(bC.errorLogs||[]), ...(iC.errorLogs||[])]) { if (x&&x.id!=null&&!m.has(x.id)) m.set(x.id,x); } return [...m.values()].sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 80); })(),
     boss: (() => { const a=bC.boss, b=iC.boss; if (!a) return b||null; if (!b) return a;
       // v2.16.89 — `{...a, ...b}` : les sous-clés que ce littéral ne NOMME pas (`id`, `name`, `emoji`,
       // `hpMax`, `image`, `difficulty`) prenaient toujours l'incoming, sans regarder `preferIncoming` —

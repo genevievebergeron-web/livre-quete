@@ -2998,6 +2998,203 @@ console.log("· mergeGS — les deux façons de désigner la MÊME copie fraîch
   console.log(`    (${utiles.size} listes tolérées sur l'ordre, contenu identique partout)`);
 }
 
+// ── 19e ÉTAGE : LES UNIONS BORNÉES, MESURÉES EN FORÇANT LEUR PLAFOND ───────
+// v2.16.95 — piste laissée par la v2.16.94, mot pour mot : « le 18e étage tolère l'ordre parce
+// qu'aucune de ces listes n'est lue par son rang — mais ONZE d'entre elles sont
+// `_uniq([...a, ...b]).slice(-N)`, et `slice(-N)` garde la QUEUE de la concaténation. Quand
+// l'union dépasse le plafond, ce sont donc les entrées du côté que l'APPELANT a mis en premier
+// qui tombent. Rejouer le croisement en FORÇANT une liste au-delà de son plafond dirait
+// lesquelles des onze divergent vraiment. »
+//
+// C'est fait — et le 18e étage ne pouvait pas le voir : ses fixtures portent UNE entrée par
+// liste, donc aucun plafond ne mord jamais, donc les deux ordres d'arguments rendent le même
+// ensemble et la comparaison sort verte. C'est la forme exacte de « la fixture qui ne
+// collisionne jamais » (v2.16.91), un cran plus loin : ici la fixture ne DÉBORDE jamais.
+//
+// Deux familles en sortent, et une seule est un choix de produit :
+//
+//   (1) Les unions NON triées, `_uniq([...a, ...b]).slice(-N)` — ONZE listes. Elles divergent
+//       avec ou sans ex aequo : `slice(-N)` garde la queue, donc le côté que l'appelant a mis
+//       en second. Le client met son local en `a`, le serveur son stocké : les deux tablettes
+//       gardent des sous-ensembles DIFFÉRENTS, et un tombstone perdu ressuscite ce qu'il
+//       supprimait. **Latent aujourd'hui** (le plus rempli en prod le 21 août est
+//       `config.removedAssignments`, 335/800, 42 %), mais il croît. CE QUI DOIT SURVIVRE À UN
+//       PLAFOND EST UNE DÉCISION DE GEN (👤) — les plus récentes ? la plupart de ces listes ne
+//       portent aucune date ; ou monter les plafonds. Fiché ci-dessous, pas décidé ici.
+//
+//   (2) Les unions TRIÉES puis coupées — huit listes. Elles convergent tant que la clé de tri
+//       est distincte, et divergent dès qu'il y a des EX AEQUO : `Array.sort` est stable, donc
+//       à clé égale l'ordre rendu est celui de la concaténation, donc celui des arguments.
+//       Ce n'était pas un cas d'école : `announcements` trie sur `createdAt` à la JOURNÉE
+//       (9 annonces en prod, 5 dates distinctes → 4 ex aequo) et `momentRequests` fait pareil.
+//       Ici il n'y avait AUCUN choix de produit à faire : la règle de rétention (« les N plus
+//       récentes ») est déjà écrite, elle était seulement non totale. Départagées sur `id` dans
+//       les deux copies (v2.16.95) — cet étage le mesure, ex aequo forcés.
+const PLAFOND_ORDRE_APPELANT = {
+  // (1) — chaque fiche porte son plafond et la façon dont sa liste est lue. Tant que la
+  // décision (👤) n'est pas prise, ces onze sont CONNUES divergentes : l'étage exige qu'elles
+  // le soient VRAIMENT (une fiche qui ne couvre plus rien est un blanc-seing, leçon v2.16.87).
+  "gs.refusedKeys": "400 — tombstone des demandes refusées, lu par appartenance",
+  "gs.refundedRewards": "200 — tombstone `id#estampille` du remboursement, lu par appartenance",
+  "gs.removedCalendarIds": "400 — tombstone des événements calendrier, lu par appartenance",
+  "gs.removedRoutineIds": "200 — tombstone des rituels supprimés, lu par appartenance",
+  "gs.consumedCelebrationIds": "300 — tombstone des célébrations déjà jouées, lu par appartenance",
+  "config.removedAssignments": "800 — tombstone d'assignation ; 335/800 en prod le 21 août, le plus rempli",
+  "config.removedCustomTasks": "1000 — tombstone de tâche maison ; 145/1000 en prod",
+  "config.removedProposals": "800 — tombstone des propositions d'enfant ; 0 en prod",
+  "config.removedAnnouncements": "200 — tombstone des annonces ; 0 en prod",
+  "config.removedMomentRequests": "200 — tombstone des demandes de moment ; 0 en prod",
+  "config.removedRemovalRequests": "400 — tombstone des demandes de retrait ; 0 en prod",
+};
+
+console.log("· unions bornées — forcer le plafond, puis exiger le MÊME sous-ensemble des deux côtés");
+{
+  // Élément générique pour les listes que les fixtures laissent VIDES des deux côtés
+  // (`coinOffers`, `teamInvites`, `momentRequests` : voir `EXEMPT_CFG`). Sans lui, l'étage
+  // mesurerait « 0 entrée » sur trois listes bornées et sortirait vert sans les avoir touchées —
+  // exactement le trou de la v2.16.88 (« le relevé au même plafond que le surveillé »).
+  // `status: "pending"` traverse les filtres de fraîcheur de `coinOffers`/`teamInvites`, qui
+  // jettent les résolues de plus de deux jours.
+  const RECENT = 1755000000000; // fixe : un garde-fou ne doit pas dépendre de l'heure qu'il est
+  const generique = (tag, i) => ({ id: `${tag}${i}`, status: "pending", ts: RECENT + i,
+                                   createdAt: `2026-08-${String((i % 28) + 1).padStart(2, "0")}` });
+  const gonfle = (liste, tag, n, exaequo) => {
+    const modele = (liste || []).find((x) => x != null);
+    const out = [...(liste || [])];
+    for (let i = 0; i < n; i++) {
+      if (modele && typeof modele === "object") {
+        const e = JSON.parse(JSON.stringify(modele));
+        let aId = false;
+        for (const k of ["id", "instanceId"]) if (k in e) { e[k] = `${tag}${i}`; aId = true; }
+        if (!aId) e.id = `${tag}${i}`;
+        if ("ts" in e) e.ts = exaequo ? RECENT : RECENT + i;
+        if ("createdAt" in e) e.createdAt = exaequo ? "2026-08-10"
+          : `2026-${String(1 + (i % 9)).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}`;
+        out.push(e);
+      } else if (modele !== undefined && typeof modele !== "object") {
+        out.push(`${tag}${i}`);              // liste de chaînes : l'entrée EST sa clé
+      } else {
+        const e = generique(tag, i);          // liste vide des deux côtés
+        if (exaequo) { e.ts = RECENT; e.createdAt = "2026-08-10"; }
+        out.push(e);
+      }
+    }
+    return out;
+  };
+  const empreinte = (x) => (x && typeof x === "object") ? JSON.stringify(norm(x)) : String(x);
+  const ensemble = (arr) => new Set((arr || []).map(empreinte));
+  const memeEnsemble = (s1, s2) => s1.size === s2.size && [...s1].every((x) => s2.has(x));
+
+  // Les deux niveaux où vit une union bornée, chacun avec ses DEUX façons de désigner la MÊME
+  // copie fraîche (17e/18e étages) : au niveau `mergeGS` c'est le drapeau `preferIncoming`, au
+  // niveau `mergeFamily` c'est l'ordre des arguments (les `savedAt` désignent toujours famA).
+  const NIVEAUX = [
+    { prefixe: "gs", cles: [...new Set([...Object.keys(gsA), ...Object.keys(gsB)])]
+        .filter((k) => Array.isArray(gsA[k]) || Array.isArray(gsB[k])),
+      monte: (k, n, ex) => [{ ...gsA, [k]: gonfle(gsA[k], "A", n, ex) },
+                            { ...gsB, [k]: gonfle(gsB[k], "B", n, ex) }],
+      sorties: (impl, [a, b], k) => [impl.mergeGS(a, b, true)[k], impl.mergeGS(b, a, false)[k]],
+      entrees: ([a, b], k) => [a[k], b[k]] },
+    { prefixe: "config", cles: [...new Set([...Object.keys(famA.config), ...Object.keys(famB.config)])]
+        .filter((k) => Array.isArray(famA.config[k]) || Array.isArray(famB.config[k])),
+      monte: (k, n, ex) => [{ ...famA, config: { ...famA.config, [k]: gonfle(famA.config[k], "A", n, ex) } },
+                            { ...famB, config: { ...famB.config, [k]: gonfle(famB.config[k], "B", n, ex) } }],
+      sorties: (impl, [a, b], k) => [impl.mergeFamily(a, b).config[k], impl.mergeFamily(b, a).config[k]],
+      entrees: ([a, b], k) => [a.config[k], b.config[k]] },
+    // v2.16.95 — TROISIÈME niveau, ajouté par la falsification de cet étage même : gonfleur
+    // aveuglé, l'étage a nommé `config.players`, et derrière lui `players[].starterThemes` — une
+    // union BORNÉE (`slice(0, 4)`, la plus petite du projet) qui vit un cran SOUS les deux
+    // niveaux ci-dessus. Un recensement qui s'arrête au niveau où il a commencé rend une réponse
+    // fausse avec l'assurance d'une réponse complète (v2.16.90, « recensement borné au premier
+    // niveau »). Les champs-listes d'un joueur sont donc gonflés et mesurés comme les autres.
+    { prefixe: "players[]", cles: [...new Set([...Object.keys(plA), ...Object.keys(plB)])]
+        .filter((k) => Array.isArray(plA[k]) || Array.isArray(plB[k])),
+      monte: (k, n, ex) => [
+        { ...famA, config: { ...famA.config, players: [{ ...plA, [k]: gonfle(plA[k], "A", n, ex) }] } },
+        { ...famB, config: { ...famB.config, players: [{ ...plB, [k]: gonfle(plB[k], "B", n, ex) }] } }],
+      sorties: (impl, [a, b], k) => [impl.mergeFamily(a, b).config.players[0][k],
+                                     impl.mergeFamily(b, a).config.players[0][k]],
+      entrees: ([a, b], k) => [a.config.players[0][k], b.config.players[0][k]] },
+  ];
+
+  // Un plafond se MESURE, il ne se lit pas dans le code : on gonfle à n puis à 2n, et une liste
+  // est BORNÉE si sa sortie garde la même taille alors que son entrée a doublé, tout en jetant.
+  // (Le `grep` du code aurait suffi hier — la v2.16.94 a montré qu'il peut sauter un fichier
+  // EN SILENCE. Cette mesure ne lit aucun source.)
+  const mesure = (niveau, k, n, ex, impl) => {
+    const entrees = niveau.monte(k, n, ex);
+    const [ea, eb] = niveau.entrees(entrees, k);
+    const union = new Set([...ensemble(ea), ...ensemble(eb)]);
+    const [r1, r2] = niveau.sorties(impl, entrees, k);
+    if (!Array.isArray(r1) || !Array.isArray(r2)) return null;
+    return { taille: r1.length, union: union.size, s1: ensemble(r1), s2: ensemble(r2) };
+  };
+
+  const vues = new Set();
+  let bornees = 0, mesures = 0;
+  for (const niveau of NIVEAUX)
+    for (const k of niveau.cles) {
+      const chemin = `${niveau.prefixe}.${k}`;
+      for (const ex of [false, true]) {
+        const p = mesure(niveau, k, 600, ex, client), q = mesure(niveau, k, 1200, ex, client);
+        if (!p || !q) continue;
+        mesures++;
+        // bornée = taille figée malgré une entrée doublée, sortie non vide, et des entrées jetées
+        if (!(p.taille === q.taille && p.taille > 0 && q.taille < q.union)) continue;
+        bornees++;
+        for (const [nom, impl] of [["client", client], ["serveur", server]]) {
+          const m = nom === "client" ? q : mesure(niveau, k, 1200, ex, server);
+          if (!m) continue;
+          if (memeEnsemble(m.s1, m.s2)) continue;
+          vues.add(chemin);
+          if (PLAFOND_ORDRE_APPELANT[chemin]) continue; // divergence CONNUE, en attente de Gen (👤)
+          const perdus = [...m.s1].filter((x) => !m.s2.has(x)).length;
+          fail(`${nom} — « ${chemin} » : au-delà de son plafond (${m.taille} sur ${m.union} en `
+             + `union), les deux façons de désigner la MÊME copie fraîche gardent des `
+             + `sous-ensembles DIFFÉRENTS (${perdus} entrées d'un côté seulement, ex aequo `
+             + `${ex ? "forcés" : "absents"}). C'est l'ordre des ARGUMENTS qui tranche ce qui `
+             + `tombe, et le client met son local en \`a\` là où le serveur met son stocké : les `
+             + `deux tablettes gardent une queue différente, pour toujours. Si la liste est `
+             + `triée, son tri n'est pas TOTAL — départage-le sur \`id\` (v2.16.95). Sinon, `
+             + `c'est le choix « ce qui survit à un plafond », qui appartient à Gen : fiche-la `
+             + `dans PLAFOND_ORDRE_APPELANT en même temps que tu le lui poses.`);
+        }
+      }
+    }
+
+  // Le détecteur doit SAVOIR trouver : sans ce témoin, « zéro nouvelle divergence » ne dit rien.
+  // On truque une liste bornée pour qu'elle rende deux sous-ensembles différents et on vérifie
+  // que la comparaison crie. (`feed` : bornée à 60, triée, et convergente depuis la v2.16.95.)
+  {
+    const [a, b] = NIVEAUX[1].monte("feed", 1200, true);
+    const s1 = ensemble(client.mergeFamily(a, b).config.feed);
+    const s2 = ensemble(client.mergeFamily(b, a).config.feed);
+    if (!memeEnsemble(s1, s2))
+      fail("19e étage — TÉMOIN : `config.feed`, ex aequo forcés, devrait converger depuis la "
+         + "v2.16.95 (tri départagé sur `id`) et ne converge pas.");
+    const truque = new Set([...s1].slice(1));
+    if (memeEnsemble(s1, truque))
+      fail("19e étage — TÉMOIN : la comparaison d'ensembles ne voit pas une entrée retirée. Son "
+         + "« zéro divergence » sur les listes bornées ne prouverait rien.");
+  }
+  // Et il doit VRAIMENT atteindre des plafonds : un gonfleur cassé mesurerait zéro liste bornée
+  // et sortirait vert (leçon v2.16.88 — le relevé au même plafond que ce qu'il surveille).
+  if (bornees < 2 * (Object.keys(PLAFOND_ORDRE_APPELANT).length + 5))
+    fail(`19e étage — seulement ${bornees} mesures ont atteint un plafond (sur ${mesures} listes `
+       + `× 2 régimes d'ex aequo). Le gonfleur n'atteint plus les plafonds : l'étage ne mesure `
+       + `plus rien et son silence est faux.`);
+  for (const chemin of Object.keys(PLAFOND_ORDRE_APPELANT)) {
+    if (!PLAFOND_ORDRE_APPELANT[chemin]) fail(`19e étage — fiche « ${chemin} » sans raison écrite.`);
+    if (!vues.has(chemin))
+      fail(`19e étage — fiche PLAFOND_ORDRE_APPELANT « ${chemin} », dont la mesure ne trouve PLUS `
+         + `de divergence au-delà du plafond. Soit la décision de Gen a été appliquée et la fiche `
+         + `doit partir, soit la mesure ne l'atteint plus. Une tolérance qui ne tolère rien est un `
+         + `blanc-seing (leçon v2.16.87).`);
+  }
+  console.log(`    (${mesures} listes × 2 régimes, ${bornees} au plafond, `
+    + `${vues.size} divergentes — toutes fichées, décision de Gen en attente)`);
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

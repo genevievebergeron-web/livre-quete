@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.95", date:"2026-08-21", features:[
+    "🎨 Le thème déjà sélectionné quand tu ouvres ton compte pour la première fois pouvait être différent d'une tablette à l'autre. Corrigé : les deux tablettes te proposent le même, et c'est le plus récent qui compte.",
+  ]},
   { version:"2.16.92", date:"2026-08-21", features:[
     "\ud83c\udf6c Une r\u00e9compense rachet\u00e9e apr\u00e8s un remboursement pouvait redispara\u00eetre toute seule \u00e0 la synchro suivante. Corrig\u00e9 : ce que tu rach\u00e8tes te reste.",
   ]},

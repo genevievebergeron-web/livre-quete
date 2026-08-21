@@ -12,6 +12,17 @@ import { isValidCustodyWeekKey } from "./recurring.js";
 import { weekKey, _uniq, mergeXpLog } from "./shared.js";
 import { currentEnergy } from "./energy.js";
 
+// v2.16.95 — 19e étage : un tri BORNÉ doit être TOTAL. Les huit listes triées puis coupées
+// (`feed`, `bugs`, `errorLogs`, `announcements`, `repairEvents`, `momentRequests`, `coinOffers`,
+// `teamInvites`) trient sur une DATE, puis gardent les N premières. À date ÉGALE, `Array.sort`
+// est stable : l'ordre rendu est celui de la concaténation, donc celui des ARGUMENTS — et le
+// client met son local en `a` là où le serveur met son stocké. Quand le plafond mord, les deux
+// copies gardent alors des sous-ensembles DIFFÉRENTS, pour toujours et sans un seul message.
+// Les ex aequo ne sont pas un cas d'école : `announcements` trie sur `createdAt` à la JOURNÉE
+// (9 annonces en prod, 5 dates distinctes), et `momentRequests` fait pareil. Départager sur
+// `id` ne change pas la règle de rétention (« les N plus récentes ») : il la rend totale.
+// Chaque élément vient d'une `Map` clavée par `id`, donc `id` est présent et unique.
+const _departageId = (a, b) => String((a && a.id) ?? "").localeCompare(String((b && b.id) ?? ""));
 export const isNewer = (a, b) => { // a plus récent que b ? (timestamps ISO, tolérant aux absents)
   if (!a) return false;
   if (!b) return true;
@@ -459,7 +470,14 @@ export const _mergePlayer = (a, b, preferIncoming = false) => {
            : (o.themeId && o.themeId !== "none") ? o.themeId
            : (w.themeId || o.themeId || "none"),
     themeChosenAt: w.themeChosenAt || o.themeChosenAt,
-    starterThemes: _uniq([...(a.starterThemes || []), ...(b.starterThemes || [])]).slice(0, 4),
+    // v2.16.95 — 19e étage : cette union était la seule du projet à être lue par son RANG
+    // (`loginscreen.jsx` ~130 et ~50 : `starterThemes[0]` est le thème PRÉSÉLECTIONNÉ au premier
+    // login de l'enfant), et elle concaténait `a` puis `b` — donc le côté que l'APPELANT met en
+    // premier. Le client met son local en `a`, le serveur son stocké : deux tablettes pouvaient
+    // présélectionner un thème DIFFÉRENT pour le même enfant. Même forme que la v2.16.89. Elle
+    // est aussi bornée (`slice(0, 4)`, la plus petite du projet) : la tête gagne, donc le frais
+    // gagne maintenant aussi sous le plafond. `w`/`o` = frais/périmé, comme partout ci-dessus.
+    starterThemes: _uniq([...(w.starterThemes || []), ...(o.starterThemes || [])]).slice(0, 4),
   };
 };
 // Fusion complète de deux instantanés famille { config, gameStates, savedAt }
@@ -533,7 +551,7 @@ export const mergeFamily = (base, incoming) => {
     else if (prevInv.status === "pending" && inv.status && inv.status !== "pending") teamInviteMap.set(inv.id, { ...inv });
   }
   const teamInvitesCutoff = Date.now() - 2 * 864e5;
-  const teamInvites = [...teamInviteMap.values()].filter(inv => inv.status === "pending" || (inv.createdAt || 0) > teamInvitesCutoff).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 40);
+  const teamInvites = [...teamInviteMap.values()].filter(inv => inv.status === "pending" || (inv.createdAt || 0) > teamInvitesCutoff).sort((a, b) => ((b.createdAt || 0) - (a.createdAt || 0)) || _departageId(a, b)).slice(0, 40);
   const newer = isNewer(incoming.savedAt, base.savedAt) ? incoming : base;
   const newerC = newer.config || {};
   const config = {
@@ -600,7 +618,7 @@ export const mergeFamily = (base, incoming) => {
         if (!Object.keys(e.likeTs).length) delete e.likeTs;
         if (!Object.keys(e.unlikes).length) delete e.unlikes;
         return e;
-      }).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
+      }).sort((a, b) => ((b.ts || 0) - (a.ts || 0)) || _departageId(a, b)).slice(0, 60);
     })(),
     coinOffers: (() => { // offres de pièces : union par id; une résolution (accepté/refusé) est COLLANTE
       const m = new Map();
@@ -612,10 +630,10 @@ export const mergeFamily = (base, incoming) => {
       }
       // on ne garde que les 40 plus récentes et on jette les résolues de plus de 2 jours
       const cutoff = Date.now() - 2 * 864e5;
-      return [...m.values()].filter(o => o.status === "pending" || (o.ts || 0) > cutoff).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 40);
+      return [...m.values()].filter(o => o.status === "pending" || (o.ts || 0) > cutoff).sort((a, b) => ((b.ts || 0) - (a.ts || 0)) || _departageId(a, b)).slice(0, 40);
     })(),
-    bugs: (() => { const m = new Map(); for (const x of [...(bC.bugs || []), ...(iC.bugs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60); })(), // v1.65.0 — bugs signalés : union par id (ne se perdent plus à la synchro)
-    errorLogs: (() => { const m = new Map(); for (const x of [...(bC.errorLogs || []), ...(iC.errorLogs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 80); })(), // v1.90.0 — logs techniques (erreurs JS) : même pattern que bugs, union par id
+    bugs: (() => { const m = new Map(); for (const x of [...(bC.bugs || []), ...(iC.bugs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => ((b.ts || 0) - (a.ts || 0)) || _departageId(a, b)).slice(0, 60); })(), // v1.65.0 — bugs signalés : union par id (ne se perdent plus à la synchro)
+    errorLogs: (() => { const m = new Map(); for (const x of [...(bC.errorLogs || []), ...(iC.errorLogs || [])]) { if (x && x.id != null && !m.has(x.id)) m.set(x.id, x); } return [...m.values()].sort((a, b) => ((b.ts || 0) - (a.ts || 0)) || _departageId(a, b)).slice(0, 80); })(), // v1.90.0 — logs techniques (erreurs JS) : même pattern que bugs, union par id
     boss: (() => { // même boss = garder l'état "vaincu" si l'un l'a vaincu; sinon le plus récent
       const a = bC.boss, b = iC.boss;
       if (!a) return b || null; if (!b) return a;
@@ -679,7 +697,7 @@ export const mergeFamily = (base, incoming) => {
     // qu'une annonce est CRÉÉE par un appareil et lue par les autres (une liste fraîche mais partielle
     // ne doit pas effacer l'annonce qu'un autre appareil vient d'écrire).
     removedAnnouncements,
-    announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,20); })(),
+    announcements: (() => { const m = new Map(); for (const a of [...(bC.announcements||[]), ...(iC.announcements||[])]) { if (a && a.id != null && !_rmAnn.has(a.id) && !m.has(a.id)) m.set(a.id, a); } return [...m.values()].sort((a, b) => ((b.createdAt||"").localeCompare(a.createdAt||"")) || _departageId(a, b)).slice(0, 20); })(),
     // v2.14.2 (correctif rattrapage Ursul/Antoine DR, 2026-07-28) — Lot 7 (semaine de garde) :
     // weeklyQuests n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}` ci-dessus
     // — iC (incoming) écrasait TOUJOURS bC, sans égard à la fraîcheur (même bug déjà corrigé pour
@@ -737,7 +755,7 @@ export const mergeFamily = (base, incoming) => {
     })(),
     // v2.6.0 — quêtes de réparation 🕊️ : union-by-id (id = instanceId de l'assignation) = effet
     // collectif exactly-once même après fusion multi-appareils. ⚠️ JAMAIS sur config.boss (merge shallow).
-    repairEvents: (() => { const m = new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,100); })(),
+    repairEvents: (() => { const m = new Map(); for (const e of [...(bC.repairEvents||[]), ...(iC.repairEvents||[])]) { if (e && e.id != null && !m.has(e.id)) m.set(e.id, e); } return [...m.values()].sort((a, b) => ((b.ts||0)-(a.ts||0)) || _departageId(a, b)).slice(0, 100); })(),
     // v2.6.2 — récompenses "moment" à planifier avec le parent : union-by-id + progression MONOTONE
     // du statut (attente < planifie < fait) — après fusion multi-appareils, un statut ne recule jamais
     // (le parent a pu le marquer "Fait" sur un appareil pendant qu'un autre pousse encore "attente").
@@ -771,7 +789,7 @@ export const mergeFamily = (base, incoming) => {
           else if (!(prev.plannedDate && !r.plannedDate) && preferIncoming) m.set(r.id, r);
         }
       }
-      return [...m.values()].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,60);
+      return [...m.values()].sort((a, b) => ((b.createdAt||"").localeCompare(a.createdAt||"")) || _departageId(a, b)).slice(0, 60);
     })(),
     // Bug live signalé par Gen (2026-07-25) : « défi de la semaine peut être coché à l'infini ».
     // Cause : weeklyChallenge n'était PAS listé ici, donc il retombait sur le spread naïf `{...bC,...iC}`
