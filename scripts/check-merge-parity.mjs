@@ -3195,6 +3195,157 @@ console.log("· unions bornées — forcer le plafond, puis exiger le MÊME sous
     + `${vues.size} divergentes — toutes fichées, décision de Gen en attente)`);
 }
 
+// ── 20e ÉTAGE : LES OBJETS BORNÉS, MESURÉS EN FORÇANT LEUR PLAFOND ─────────
+// v2.16.96 — piste laissée par la v2.16.95, mot pour mot : « `gs.deCompleted` est un OBJET borné
+// (`Object.keys(out).sort((x, y) => out[x] - out[y]).slice(-400)`). Le tri porte sur la VALEUR ;
+// à valeur égale, `sort` est stable et l'ordre des clés est celui de `{ ...A }` puis les nouvelles
+// de `B` — donc celui des arguments, exactement la famille (1) de ce soir, mais sur une structure
+// que le recensement de l'étage ne visite pas (il ne connaît que les tableaux). Étendre le
+// recensement aux OBJETS bornés dirait si la même divergence s'y trouve. »
+//
+// Le 19e étage filtre ses clés sur `Array.isArray` : un objet dont le nombre de CLÉS est plafonné
+// lui est invisible, quel que soit le nombre de nuits qu'il a passées à mesurer des listes. Cet
+// étage refait la même mesure — gonfler à n puis à 2n, une structure est bornée si sa sortie garde
+// la même taille alors que son entrée a doublé tout en jetant — sur les objets, aux trois mêmes
+// niveaux (`gameStates`, `config`, `config.players[]`), et exige que les DEUX façons de désigner
+// la même copie fraîche rendent les mêmes couples clé/valeur.
+const PLAFOND_ORDRE_APPELANT_OBJ = {
+};
+
+console.log("· objets bornés — forcer le plafond, puis exiger les MÊMES clés des deux côtés");
+{
+  const RECENT = 1755000000000; // fixe : un garde-fou ne doit pas dépendre de l'heure qu'il est
+  const estObjet = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+  // Gonfleur d'OBJET : n clés neuves, dont la valeur imite celle que la structure porte déjà
+  // (c'est la valeur qui sert de clé de tri quand un plafond coupe). `exaequo` fige cette valeur :
+  // c'est le régime où un tri stable retombe sur l'ordre des ARGUMENTS.
+  const gonfleObj = (obj, tag, n, exaequo) => {
+    const src = estObjet(obj) ? obj : {};
+    const out = { ...src };
+    const modele = Object.values(src).find((v) => v !== undefined);
+    for (let i = 0; i < n; i++) {
+      let v;
+      if (typeof modele === "number") v = exaequo ? RECENT : RECENT + i;
+      else if (typeof modele === "string") v = exaequo ? "2026-08-10T00:00:00.000Z"
+        : `2026-08-10T00:00:${String(i % 60).padStart(2, "0")}.000Z`;
+      else if (typeof modele === "boolean") v = true;
+      else if (estObjet(modele) || Array.isArray(modele)) v = JSON.parse(JSON.stringify(modele));
+      else v = exaequo ? RECENT : RECENT + i; // objet vide des deux côtés : valeur datée générique
+      out[`${tag}${i}`] = v;
+    }
+    return out;
+  };
+  // La question de CET étage est « quelles CLÉS survivent au plafond », et rien d'autre : on
+  // compare des ensembles de clés, pas des couples clé/valeur. Comparer les valeurs ferait crier
+  // ici ce que d'autres étages mesurent déjà et tolèrent en connaissance de cause — l'ORDRE d'une
+  // sous-liste (18e étage, 14 listes tolérées, contenu identique) et l'arbitrage d'un seau daté
+  // (14e étage). Un étage qui rejuge la question du voisin rend un faux positif, pas une trouvaille.
+  const ensembleObj = (o) => new Set(Object.keys(o || {}));
+  const memeEnsemble = (s1, s2) => s1.size === s2.size && [...s1].every((x) => s2.has(x));
+
+  const NIVEAUX_OBJ = [
+    { prefixe: "gs", cles: [...new Set([...Object.keys(gsA), ...Object.keys(gsB)])]
+        .filter((k) => estObjet(gsA[k]) || estObjet(gsB[k])),
+      monte: (k, n, ex) => [{ ...gsA, [k]: gonfleObj(gsA[k], "A", n, ex) },
+                            { ...gsB, [k]: gonfleObj(gsB[k], "B", n, ex) }],
+      sorties: (impl, [a, b], k) => [impl.mergeGS(a, b, true)[k], impl.mergeGS(b, a, false)[k]],
+      entrees: ([a, b], k) => [a[k], b[k]] },
+    { prefixe: "config", cles: [...new Set([...Object.keys(famA.config), ...Object.keys(famB.config)])]
+        .filter((k) => estObjet(famA.config[k]) || estObjet(famB.config[k])),
+      monte: (k, n, ex) => [{ ...famA, config: { ...famA.config, [k]: gonfleObj(famA.config[k], "A", n, ex) } },
+                            { ...famB, config: { ...famB.config, [k]: gonfleObj(famB.config[k], "B", n, ex) } }],
+      sorties: (impl, [a, b], k) => [impl.mergeFamily(a, b).config[k], impl.mergeFamily(b, a).config[k]],
+      entrees: ([a, b], k) => [a.config[k], b.config[k]] },
+    { prefixe: "players[]", cles: [...new Set([...Object.keys(plA), ...Object.keys(plB)])]
+        .filter((k) => estObjet(plA[k]) || estObjet(plB[k])),
+      monte: (k, n, ex) => [
+        { ...famA, config: { ...famA.config, players: [{ ...plA, [k]: gonfleObj(plA[k], "A", n, ex) }] } },
+        { ...famB, config: { ...famB.config, players: [{ ...plB, [k]: gonfleObj(plB[k], "B", n, ex) }] } }],
+      sorties: (impl, [a, b], k) => [impl.mergeFamily(a, b).config.players[0][k],
+                                     impl.mergeFamily(b, a).config.players[0][k]],
+      entrees: ([a, b], k) => [a.config.players[0][k], b.config.players[0][k]] },
+  ];
+
+  const mesureObj = (niveau, k, n, ex, impl) => {
+    let entrees, r1, r2;
+    try {
+      entrees = niveau.monte(k, n, ex);
+      [r1, r2] = niveau.sorties(impl, entrees, k);
+    } catch { return null; }
+    if (!estObjet(r1) || !estObjet(r2)) return null;
+    const [ea, eb] = niveau.entrees(entrees, k);
+    const union = new Set([...ensembleObj(ea), ...ensembleObj(eb)]);
+    return { taille: Object.keys(r1).length, union: union.size, s1: ensembleObj(r1), s2: ensembleObj(r2) };
+  };
+
+  const vues = new Set();
+  let bornes = 0, mesures = 0;
+  for (const niveau of NIVEAUX_OBJ)
+    for (const k of niveau.cles) {
+      const chemin = `${niveau.prefixe}.${k}`;
+      for (const ex of [false, true]) {
+        const z = mesureObj(niveau, k, 0, ex, client);
+        const p = mesureObj(niveau, k, 600, ex, client), q = mesureObj(niveau, k, 1200, ex, client);
+        if (!z || !p || !q) continue;
+        mesures++;
+        // Un PLAFOND, et pas une forme fixe. « Même taille en sortie alors que l'entrée a doublé »
+        // ne suffit pas à distinguer les deux : cinq objets de `gameStates` sont des seaux datés
+        // que la règle RECONSTRUIT (`{ day, ids }`, `{ week, … }`) — ils rendent 2 clés qu'on leur
+        // en donne 2 ou 2402, sans qu'aucun plafond n'ait choisi quoi que ce soit. Les compter
+        // ferait un compteur de sécurité qui ne peut jamais tomber : le gonfleur pourrait cesser
+        // d'atteindre le seul VRAI plafond du projet et l'étage sortirait vert quand même (leçon
+        // v2.16.88). Le discriminant est la mesure à n = 0 : sous un plafond, la sortie GROSSIT
+        // avec l'entrée jusqu'à buter ; une forme fixe rend la même taille dès l'entrée nue.
+        if (!(p.taille === q.taille && p.taille > 0 && q.taille < q.union && p.taille > z.taille)) continue;
+        bornes++;
+        for (const [nom, impl] of [["client", client], ["serveur", server]]) {
+          const m = nom === "client" ? q : mesureObj(niveau, k, 1200, ex, server);
+          if (!m) continue;
+          if (memeEnsemble(m.s1, m.s2)) continue;
+          vues.add(chemin);
+          if (PLAFOND_ORDRE_APPELANT_OBJ[chemin]) continue; // divergence CONNUE, en attente de Gen (👤)
+          const perdus = [...m.s1].filter((x) => !m.s2.has(x)).length;
+          fail(`${nom} — « ${chemin} » est un OBJET borné (${m.taille} clés sur ${m.union} en union) `
+             + `dont les deux façons de désigner la MÊME copie fraîche gardent des clés DIFFÉRENTES `
+             + `(${perdus} d'un côté seulement, ex aequo ${ex ? "forcés" : "absents"}). Le tri qui `
+             + `choisit ce qui survit n'est pas TOTAL : à valeur égale, \`sort\` est stable et l'ordre `
+             + `rendu est celui de \`{ ...A }\` puis des clés neuves de \`B\` — donc celui des `
+             + `ARGUMENTS, et le client met son local en \`a\` là où le serveur met son stocké. `
+             + `Départage-le sur la CLÉ, ou fiche le chemin dans PLAFOND_ORDRE_APPELANT_OBJ en même `
+             + `temps que tu poses la question à Gen.`);
+        }
+      }
+    }
+
+  // Le détecteur doit SAVOIR trouver : sans témoin, « zéro divergence » ne dit rien (leçon v2.16.87).
+  {
+    const [a, b] = NIVEAUX_OBJ[0].monte("deCompleted", 1200, true);
+    const s1 = ensembleObj(client.mergeGS(a, b, true).deCompleted);
+    const s2 = ensembleObj(client.mergeGS(b, a, false).deCompleted);
+    if (!memeEnsemble(s1, s2))
+      fail("20e étage — TÉMOIN : `gs.deCompleted`, ex aequo forcés, devrait converger depuis la "
+         + "v2.16.96 (tri départagé sur la clé) et ne converge pas.");
+    const truque = new Set([...s1].slice(1));
+    if (memeEnsemble(s1, truque))
+      fail("20e étage — TÉMOIN : la comparaison d'ensembles ne voit pas une clé retirée. Son "
+         + "« zéro divergence » sur les objets bornés ne prouverait rien.");
+  }
+  // Et il doit VRAIMENT atteindre un plafond : un gonfleur cassé mesurerait zéro objet borné et
+  // sortirait vert (leçon v2.16.88 — le relevé au même plafond que ce qu'il surveille).
+  if (bornes < 2)
+    fail(`20e étage — seulement ${bornes} mesures ont atteint un plafond (sur ${mesures} objets `
+       + `× 2 régimes d'ex aequo). Le gonfleur n'atteint plus les plafonds : l'étage ne mesure `
+       + `plus rien et son silence est faux.`);
+  for (const chemin of Object.keys(PLAFOND_ORDRE_APPELANT_OBJ)) {
+    if (!PLAFOND_ORDRE_APPELANT_OBJ[chemin]) fail(`20e étage — fiche « ${chemin} » sans raison écrite.`);
+    if (!vues.has(chemin))
+      fail(`20e étage — fiche PLAFOND_ORDRE_APPELANT_OBJ « ${chemin} », dont la mesure ne trouve `
+         + `PLUS de divergence au-delà du plafond. Une tolérance qui ne tolère rien est un `
+         + `blanc-seing (leçon v2.16.87).`);
+  }
+  console.log(`    (${mesures} objets × 2 régimes, ${bornes} au plafond, ${vues.size} divergents)`);
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");

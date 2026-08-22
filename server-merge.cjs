@@ -153,7 +153,8 @@ const mergeGS = (a, b, preferIncoming) => {
     for (const k of Object.keys(B)) out[k] = Math.max(Number(out[k]) || 0, Number(B[k]) || 0);
     const cles = Object.keys(out);
     if (cles.length <= 400) return out;
-    const garde = cles.sort((x, y) => (out[x] || 0) - (out[y] || 0)).slice(-400);
+    // v2.16.96 — 20e étage : tri borné rendu TOTAL (départage sur la clé). Voir `src/merge.js`.
+    const garde = cles.sort((x, y) => ((out[x] || 0) - (out[y] || 0)) || String(x).localeCompare(String(y))).slice(-400);
     const borne = {}; for (const k of garde) borne[k] = out[k];
     return borne;
   })();

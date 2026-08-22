@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.16.96", date:"2026-08-21", features:[
+    "\ud83d\udee0\ufe0f Petite fondation technique (rien de visible pour toi).",
+  ]},
   { version:"2.16.95", date:"2026-08-21", features:[
     "🎨 Le thème déjà sélectionné quand tu ouvres ton compte pour la première fois pouvait être différent d'une tablette à l'autre. Corrigé : les deux tablettes te proposent le même, et c'est le plus récent qui compte.",
   ]},

@@ -125,7 +125,14 @@ export const mergeGS = (a, b, preferIncoming) => {
     for (const k of Object.keys(B)) out[k] = Math.max(Number(out[k]) || 0, Number(B[k]) || 0);
     const cles = Object.keys(out);
     if (cles.length <= 400) return out;
-    const garde = cles.sort((x, y) => (out[x] || 0) - (out[y] || 0)).slice(-400); // borné, comme `refusedKeys`
+    // v2.16.96 — 20e étage : un tri BORNÉ doit être TOTAL, ici sur un OBJET. Le tri porte sur la
+    // VALEUR (l'horodatage de l'annulation) et garde les 400 plus récentes ; à valeur ÉGALE,
+    // `Array.sort` est stable, donc l'ordre rendu est celui de `Object.keys(out)` — soit les clés
+    // de `{ ...A }` puis les clés neuves de `B`, donc celui des ARGUMENTS. Or le client met son
+    // local en `a` là où le serveur met son stocké : au-delà de 400 clés, les deux copies
+    // gardaient des tombstones DIFFÉRENTS, et un `deCompleted` perdu, c'est une quête annulée qui
+    // revient cochée. Départager sur la CLÉ ne change pas la règle de rétention, il la rend totale.
+    const garde = cles.sort((x, y) => ((out[x] || 0) - (out[y] || 0)) || String(x).localeCompare(String(y))).slice(-400); // borné, comme `refusedKeys`
     const borne = {}; for (const k of garde) borne[k] = out[k];
     return borne;
   })();
