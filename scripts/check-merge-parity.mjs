@@ -3375,7 +3375,10 @@ const PLAFOND_ORDRE_APPELANT_NICHE = {
 console.log("· structures bornées nichées — parcourir SOUS le premier niveau, puis forcer le plafond");
 {
   const RECENT = 1755000000000; // fixe : un garde-fou ne doit pas dépendre de l'heure qu'il est
-  const ID_NICHE = "n21";
+  // DEUX identités, pas une : chaque liste traversée reçoit deux éléments en collision
+  // (voir `pose`). Un parcours qui n'en pose qu'un ne peut pas voir une règle qui traite le
+  // 2e élément autrement du 1er — la forme du bug de la v2.16.80.
+  const ID_NICHE = ["n21a", "n21b"];
   const estObjet = (v) => v != null && typeof v === "object" && !Array.isArray(v);
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
   // Les clés par lesquelles une règle de fusion rapproche deux éléments d'une même liste. Un
@@ -3474,21 +3477,33 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
     }
     const arr = [...(((noeud || {})[st.liste]) || [])];
     if (!arr.length) return noeud;
-    const el = clone(arr[0]) || {};
-    if (st.idk) el[st.idk] = ID_NICHE; // MÊME identité des deux côtés : la fusion doit arbitrer
-    arr[0] = pose(el, c, i + 1, tag, n, ex);
+    // DEUX éléments en collision, aux rangs 0 et 1, avec chacun la MÊME identité des deux côtés :
+    // la fusion doit arbitrer les deux. Avec un seul élément posé, une règle qui traite le 2e
+    // autrement du 1er (un `find` qui s'arrête, un `[0]` codé en dur, un tri qui ne départage que
+    // la tête) reste invisible — et c'est la forme du bug de la v2.16.80.
+    for (let r = 0; r < 2; r++) {
+      const el = clone(arr[r] !== undefined ? arr[r] : arr[0]) || {};
+      if (st.idk) el[st.idk] = ID_NICHE[r];
+      // Même tag pour les deux rangs : un tag distinct par rang a été essayé, et AUCUNE
+      // falsification ne le distingue du tag commun — ce que cet étage mesure est la divergence
+      // entre les deux ORDRES D'ARGUMENTS, et elle ne dépend pas des clés neuves d'un rang
+      // voisin. Une clause qu'aucun témoin n'exerce peut sauter sans que personne le voie
+      // (v2.16.96) : elle n'est donc pas écrite.
+      arr[r] = pose(el, c, i + 1, tag, n, ex);
+    }
     return { ...(noeud || {}), [st.liste]: arr };
   };
-  const lit = (noeud, c, i) => {
+  // `rang` s'applique à TOUS les pas de liste du chemin : rang 0 partout, puis rang 1 partout.
+  const lit = (noeud, c, i, rang) => {
     if (noeud == null) return undefined;
     const st = c.steps[i];
     if (st.k !== undefined) {
       const v = noeud[st.k];
-      return i === c.steps.length - 1 ? v : lit(v, c, i + 1);
+      return i === c.steps.length - 1 ? v : lit(v, c, i + 1, rang);
     }
     const arr = noeud[st.liste] || [];
-    const el = st.idk ? arr.find((x) => x && x[st.idk] === ID_NICHE) : arr[0];
-    return lit(el, c, i + 1);
+    const el = st.idk ? arr.find((x) => x && x[st.idk] === ID_NICHE[rang]) : arr[rang];
+    return lit(el, c, i + 1, rang);
   };
 
   const nomDe = (c) => `${c.racine}.` + c.steps
@@ -3499,12 +3514,12 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
     ? [pose(gsA, c, 0, "A", n, ex), pose(gsB, c, 0, "B", n, ex)]
     : [{ ...famA, config: pose(famA.config, c, 0, "A", n, ex) },
        { ...famB, config: pose(famB.config, c, 0, "B", n, ex) }];
-  const sorties = (impl, c, [a, b]) => c.racine === "gs"
-    ? [lit(impl.mergeGS(a, b, true), c, 0), lit(impl.mergeGS(b, a, false), c, 0)]
-    : [lit(impl.mergeFamily(a, b).config, c, 0), lit(impl.mergeFamily(b, a).config, c, 0)];
-  const entrees = (c, [a, b]) => c.racine === "gs"
-    ? [lit(a, c, 0), lit(b, c, 0)]
-    : [lit(a.config, c, 0), lit(b.config, c, 0)];
+  const sorties = (impl, c, [a, b], r) => c.racine === "gs"
+    ? [lit(impl.mergeGS(a, b, true), c, 0, r), lit(impl.mergeGS(b, a, false), c, 0, r)]
+    : [lit(impl.mergeFamily(a, b).config, c, 0, r), lit(impl.mergeFamily(b, a).config, c, 0, r)];
+  const entrees = (c, [a, b], r) => c.racine === "gs"
+    ? [lit(a, c, 0, r), lit(b, c, 0, r)]
+    : [lit(a.config, c, 0, r), lit(b.config, c, 0, r)];
 
   // Le discriminant est NOMMÉ, et pas recopié dans la boucle : les témoins ci-dessous s'en
   // servent tels quels, donc aucun d'eux ne peut prouver autre chose que ce que l'étage mesure
@@ -3512,27 +3527,33 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
   const estBorne = (z, p, q) =>
     p.taille === q.taille && p.taille > 0 && q.taille < q.union && p.taille > z.taille;
 
-  const mesureNiche = (c, n, ex, impl) => {
+  const mesureNiche = (c, n, ex, impl, rang = 0) => {
     const ens = c.forme === "liste" ? ensembleListe : ensembleObj;
     let ent, r1, r2;
-    try { ent = monte(c, n, ex); [r1, r2] = sorties(impl, c, ent); } catch { return null; }
+    try { ent = monte(c, n, ex); [r1, r2] = sorties(impl, c, ent, rang); } catch { return null; }
     const bonneForme = (v) => (c.forme === "liste" ? Array.isArray(v) : estObjet(v));
     if (!bonneForme(r1) || !bonneForme(r2)) return null;
-    const [ea, eb] = entrees(c, ent);
+    const [ea, eb] = entrees(c, ent, rang);
     const union = new Set([...ens(ea), ...ens(eb)]);
     const taille = c.forme === "liste" ? r1.length : Object.keys(r1).length;
     return { taille, union: union.size, s1: ens(r1), s2: ens(r2) };
   };
 
+  // Un chemin qui traverse une liste est mesuré DEUX fois : sur le 1er élément posé, puis sur le
+  // 2e. Un chemin qui n'en traverse aucune n'a qu'un rang.
+  const rangsDe = (c) => (c.steps.some((s) => s.liste !== undefined) ? [0, 1] : [0]);
   const vues = new Set();
+  const mesuresVues = new Set();   // `chemin|rang` : ce que la BOUCLE a réellement demandé
   let bornes = 0, mesures = 0;
   for (const c of chemins) {
     const chemin = nomDe(c);
+    for (const rang of rangsDe(c))
     for (const ex of [false, true]) {
-      const z = mesureNiche(c, 0, ex, client);
-      const p = mesureNiche(c, 600, ex, client), q = mesureNiche(c, 1200, ex, client);
+      const z = mesureNiche(c, 0, ex, client, rang);
+      const p = mesureNiche(c, 600, ex, client, rang), q = mesureNiche(c, 1200, ex, client, rang);
       if (!z || !p || !q) continue;
       mesures++;
+      mesuresVues.add(`${chemin}|${rang}`);
       // Même discriminant qu'au 20e étage : un PLAFOND, et pas une forme FIXE. « Même taille en
       // sortie alors que l'entrée a doublé » ne les distingue pas — un seau daté que la règle
       // RECONSTRUIT rend 2 clés qu'on lui en donne 2 ou 2402. La mesure à n = 0 est ce qui les
@@ -3541,14 +3562,15 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
       if (!estBorne(z, p, q)) continue;
       bornes++;
       for (const [nom, impl] of [["client", client], ["serveur", server]]) {
-        const m = nom === "client" ? q : mesureNiche(c, 1200, ex, server);
+        const m = nom === "client" ? q : mesureNiche(c, 1200, ex, server, rang);
         if (!m || memeEnsemble(m.s1, m.s2)) continue;
         vues.add(chemin);
         if (PLAFOND_ORDRE_APPELANT_NICHE[chemin]) continue; // divergence CONNUE, en attente de Gen (👤)
         const perdus = [...m.s1].filter((x) => !m.s2.has(x)).length;
         fail(`${nom} — « ${chemin} » est une structure bornée NICHÉE (${m.taille} sur ${m.union} en `
            + `union) dont les deux façons de désigner la MÊME copie fraîche gardent des contenus `
-           + `DIFFÉRENTS (${perdus} d'un côté seulement, ex aequo ${ex ? "forcés" : "absents"}). `
+           + `DIFFÉRENTS (${perdus} d'un côté seulement, ex aequo ${ex ? "forcés" : "absents"}, `
+           + `${rang === 0 ? "1er" : "2e"} élément des listes traversées). `
            + `Les 19e et 20e étages ne pouvaient pas le voir : ils énumèrent les clés de trois `
            + `niveaux et celle-ci vit dessous. Le tri qui choisit ce qui survit n'est pas TOTAL — `
            + `départage-le sur la clé, ou fiche le chemin dans PLAFOND_ORDRE_APPELANT_NICHE en `
@@ -3597,9 +3619,9 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
         parCle: (l) => [...new Set(l)].sort().slice(0, 50) },
     ];
     for (const t of trucs) {
-      const z1 = mesureNiche(t.c, 0, true, t.faux(t.parArgs));
-      const p1 = mesureNiche(t.c, 600, true, t.faux(t.parArgs));
-      const m1 = mesureNiche(t.c, 1200, true, t.faux(t.parArgs));
+      const z1 = mesureNiche(t.c, 0, true, t.faux(t.parArgs), 0);
+      const p1 = mesureNiche(t.c, 600, true, t.faux(t.parArgs), 0);
+      const m1 = mesureNiche(t.c, 1200, true, t.faux(t.parArgs), 0);
       if (!m1 || !z1 || !p1 || !estBorne(z1, p1, m1) || m1.taille !== 50)
         fail(`21e étage — TÉMOIN (${t.nom}) : l'implémentation truquée à plafond 50 n'est pas VUE `
            + `comme bornée par la mesure. Le gonfleur ou le discriminant est cassé, et le « zéro » `
@@ -3608,7 +3630,7 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
         fail(`21e étage — TÉMOIN (${t.nom}) : une coupe qui garde la TÊTE de la concaténation rend `
            + `forcément deux contenus différents selon l'ordre des arguments, et la comparaison ne `
            + `le voit pas. Son « zéro » ne prouverait rien.`);
-      const m2 = mesureNiche(t.c, 1200, true, t.faux(t.parCle));
+      const m2 = mesureNiche(t.c, 1200, true, t.faux(t.parCle), 0);
       if (m2 && !memeEnsemble(m2.s1, m2.s2))
         fail(`21e étage — TÉMOIN (${t.nom}) : un plafond départagé sur la clé converge par `
            + `construction, et le détecteur crie quand même. Il crierait sur n'importe quoi.`);
@@ -3617,14 +3639,68 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
       // troisième témoin, `estBorne` porterait une clause qui ne surveille rien et personne ne
       // le saurait le jour où elle sauterait (leçon v2.16.96, le compteur qui ne peut pas tomber).
       const fixe = t.faux(() => (t.c.forme === "liste" ? ["fx1", "fx2"] : { fx1: 1, fx2: 2 }));
-      const zf = mesureNiche(t.c, 0, true, fixe), pf = mesureNiche(t.c, 600, true, fixe);
-      const qf = mesureNiche(t.c, 1200, true, fixe);
+      const zf = mesureNiche(t.c, 0, true, fixe, 0), pf = mesureNiche(t.c, 600, true, fixe, 0);
+      const qf = mesureNiche(t.c, 1200, true, fixe, 0);
       if (zf && pf && qf && estBorne(zf, pf, qf))
         fail(`21e étage — TÉMOIN (${t.nom}) : une sortie de taille FIXE (2 entrées qu'on lui en `
            + `donne 2 ou 2402) est comptée comme BORNÉE. Le discriminant ne sépare plus un `
            + `plafond d'une forme que la règle reconstruit : l'étage compterait des structures `
            + `qu'aucun plafond ne touche, et son compteur ne pourrait plus tomber.`);
     }
+  }
+  // ── Le témoin de RANG : le 2e élément doit être arbitré, pas seulement le 1er ─────
+  // Les trois truqués ci-dessus traitent tous leurs éléments pareil : ils passeraient au vert
+  // même si le parcours n'en posait qu'un seul, comme avant. Ce quatrième truqué est le seul qui
+  // les SÉPARE — il départage son plafond sur la clé pour le PREMIER élément de la liste (il
+  // converge) et le laisse dans l'ordre des arguments pour tous les suivants (ils divergent).
+  // Le détecteur doit donc se taire au rang 0 et crier au rang 1. S'il se tait aux deux, le
+  // parcours a cessé de poser un 2e élément, et son « zéro » ne parlerait que de la tête des
+  // listes (leçon v2.16.89 : une fixture qui ne contredit rien est un contrôle inerte).
+  {
+    const c = { racine: "config", steps: [{ liste: "feed", idk: "id" }, { k: "likes" }], forme: "liste" };
+    const fauxRang = {
+      mergeFamily: (a, b) => {
+        const bi = new Map((b.config.feed || []).map((el) => [el.id, el]));
+        const feed = (a.config.feed || []).map((el, i) => {
+          const u = [...new Set([...(el.likes || []), ...(((bi.get(el.id) || {}).likes) || [])])];
+          return { ...el, likes: (i === 0 ? [...u].sort() : u).slice(0, 50) };
+        });
+        return { config: { ...a.config, feed } };
+      },
+    };
+    const mes = (rang) => [mesureNiche(c, 0, true, fauxRang, rang),
+                           mesureNiche(c, 600, true, fauxRang, rang),
+                           mesureNiche(c, 1200, true, fauxRang, rang)];
+    const [z0, p0, q0] = mes(0);
+    const [z1, p1, q1] = mes(1);
+    if (!z1 || !p1 || !q1)
+      fail("21e étage — TÉMOIN DE RANG : le 2e élément d'une liste traversée n'est pas mesurable. "
+         + "Le parcours n'en pose plus qu'un, et son « zéro » ne parlerait que de la tête des listes.");
+    else if (!estBorne(z1, p1, q1) || q1.taille !== 50)
+      fail("21e étage — TÉMOIN DE RANG : l'implémentation truquée à plafond 50 n'est pas vue comme "
+         + "bornée sur le 2e élément. Le gonfleur ne descend pas dans l'élément de rang 1.");
+    else if (memeEnsemble(q1.s1, q1.s2))
+      fail("21e étage — TÉMOIN DE RANG : une règle qui départage sur la clé pour le 1er élément "
+         + "SEULEMENT laisse le 2e dans l'ordre des arguments, et le détecteur ne le voit pas. "
+         + "C'est exactement la forme du bug de la v2.16.80, et son « zéro » ne prouverait rien.");
+    if (z0 && p0 && q0 && estBorne(z0, p0, q0) && !memeEnsemble(q0.s1, q0.s2))
+      fail("21e étage — TÉMOIN DE RANG : le 1er élément, dont le plafond EST départagé sur la clé, "
+         + "est vu divergent. Le détecteur crierait sur n'importe quel rang, et son cri au rang 1 "
+         + "ne dirait rien du 2e élément.");
+  }
+  // Le témoin de rang ci-dessus appelle `mesureNiche(..., 1)` DIRECTEMENT : il prouve que la
+  // machinerie sait mesurer le 2e élément, pas que la boucle le lui demande. Si `rangsDe`
+  // retombait à `[0]`, il resterait vert et l'étage ne parlerait plus que de la tête des listes
+  // — un garde-fou qui teste la règle ne teste pas son appelant (v2.16.83). Ce contrôle-ci
+  // regarde donc ce que la BOUCLE a demandé, chemin par chemin.
+  for (const c of chemins) {
+    if (!c.steps.some((s) => s.liste !== undefined)) continue;
+    const chemin = nomDe(c);
+    if (mesuresVues.has(`${chemin}|0`) && !mesuresVues.has(`${chemin}|1`))
+      fail(`21e étage — « ${chemin} » traverse une liste et n'a été mesuré que sur son 1er `
+         + `élément. La boucle ne demande plus le rang 1 : le témoin de rang, qui appelle la `
+         + `mesure directement, resterait vert, et le « zéro » de l'étage ne parlerait que de la `
+         + `tête des listes.`);
   }
   // Et le PARCOURS doit vraiment descendre. Les cinq chemins ci-dessous sont les formes que le
   // recensement doit atteindre : un objet sous un objet, un objet dans un élément, un objet sous
@@ -3647,8 +3723,8 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
          + `PLUS de divergence. Une tolérance qui ne tolère rien est un blanc-seing (v2.16.87).`);
   }
   if (process.env.DBG21) console.log(chemins.map((c) => `      ${nomDe(c)} (${c.forme})`).join("\n"));
-  console.log(`    (${chemins.length} structures nichées recensées, ${mesures} mesures (chemins × régimes), `
-    + `${bornes} au plafond, ${vues.size} divergentes)`);
+  console.log(`    (${chemins.length} structures nichées recensées, ${mesures} mesures `
+    + `(chemins × rangs × régimes), ${bornes} au plafond, ${vues.size} divergentes)`);
 }
 
 if (failures) {
