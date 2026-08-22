@@ -3346,6 +3346,311 @@ console.log("· objets bornés — forcer le plafond, puis exiger les MÊMES cl�
   console.log(`    (${mesures} objets × 2 régimes, ${bornes} au plafond, ${vues.size} divergents)`);
 }
 
+
+// ── 21e ÉTAGE : LES STRUCTURES BORNÉES QUI VIVENT UN CRAN PLUS BAS ──────────
+// v2.16.97 — piste laissée par la v2.16.96, mot pour mot : « le recensement des objets bornés
+// s'arrête aux trois mêmes niveaux que celui des listes — un objet borné qui vivrait DANS un
+// élément de liste ou DANS un autre objet n'est visité par personne, et c'est exactement la
+// forme du bug de la v2.16.84 (`feed[].likes`, un cran sous le recensement). Descendre le
+// gonfleur d'objets d'un niveau dirait s'il y en a un. »
+//
+// Les 19e et 20e étages énumèrent les clés de `gameStates`, de `config` et de `config.players[]`,
+// et s'arrêtent là. Cet étage remplace cette énumération à trois niveaux par un PARCOURS de la
+// forme, sans profondeur fixée : toute structure posée à deux crans ou plus d'une racine est
+// gonflée, poussée au-delà d'un plafond éventuel, et ses deux sorties doivent porter le même
+// contenu. Il descend donc là où le bug de la v2.16.84 vivait.
+//
+// Il couvre les DEUX formes, et pas seulement celle que la piste nommait : le 19e étage a
+// exactement le même angle mort que le 20e, un cran plus bas (`Array.isArray` filtré sur trois
+// niveaux de clés). Fermer l'un en laissant l'autre aurait rendu un « zéro » qui ne parle que de
+// la moitié des structures — et la moitié muette est justement celle où le bug de la v2.16.84
+// s'était logé.
+//
+// Quand le chemin traverse une LISTE, l'élément des deux côtés reçoit la MÊME identité : sans ça
+// l'union par id garde les deux éléments côte à côte, rien n'est arbitré, et l'étage sortirait
+// vert sans avoir touché à quoi que ce soit (« la fixture qui ne collisionne jamais », v2.16.91).
+const PLAFOND_ORDRE_APPELANT_NICHE = {
+};
+
+console.log("· structures bornées nichées — parcourir SOUS le premier niveau, puis forcer le plafond");
+{
+  const RECENT = 1755000000000; // fixe : un garde-fou ne doit pas dépendre de l'heure qu'il est
+  const ID_NICHE = "n21";
+  const estObjet = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+  const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  // Les clés par lesquelles une règle de fusion rapproche deux éléments d'une même liste. Un
+  // élément qui n'en porte aucune est quand même traversé (par son rang) : le recensement ne doit
+  // pas s'arrêter sur la forme même qu'il existe pour couvrir.
+  const CLES_ID = ["id", "instanceId", "version", "playerId"];
+  const cleId = (el) => (estObjet(el) ? CLES_ID.find((k) => k in el) || null : null);
+
+  // Gonfleur d'OBJET (20e étage) et gonfleur de LISTE (19e étage), à l'identique : la valeur des
+  // clés neuves et le contenu des éléments neufs imitent ce que la structure porte déjà, parce
+  // que c'est cette valeur qui sert de clé de tri quand un plafond coupe. `exaequo` la fige :
+  // c'est le régime où un tri stable retombe sur l'ordre des ARGUMENTS.
+  const gonfleObj = (obj, tag, n, exaequo) => {
+    const src = estObjet(obj) ? obj : {};
+    const out = { ...src };
+    const modele = Object.values(src).find((v) => v !== undefined);
+    for (let i = 0; i < n; i++) {
+      let v;
+      if (typeof modele === "number") v = exaequo ? RECENT : RECENT + i;
+      else if (typeof modele === "string") v = exaequo ? "2026-08-10T00:00:00.000Z"
+        : `2026-08-10T00:00:${String(i % 60).padStart(2, "0")}.000Z`;
+      else if (typeof modele === "boolean") v = true;
+      else if (estObjet(modele) || Array.isArray(modele)) v = JSON.parse(JSON.stringify(modele));
+      else v = exaequo ? RECENT : RECENT + i;
+      out[`${tag}${i}`] = v;
+    }
+    return out;
+  };
+  const gonfleListe = (liste, tag, n, exaequo) => {
+    const modele = (liste || []).find((x) => x != null);
+    const out = [...(liste || [])];
+    for (let i = 0; i < n; i++) {
+      if (modele && typeof modele === "object") {
+        const e = JSON.parse(JSON.stringify(modele));
+        let aId = false;
+        for (const k of CLES_ID) if (k in e) { e[k] = `${tag}${i}`; aId = true; }
+        if (!aId) e.id = `${tag}${i}`;
+        if ("ts" in e) e.ts = exaequo ? RECENT : RECENT + i;
+        if ("createdAt" in e) e.createdAt = exaequo ? "2026-08-10"
+          : `2026-${String(1 + (i % 9)).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}`;
+        out.push(e);
+      } else if (modele !== undefined) {
+        out.push(`${tag}${i}`);               // liste de chaînes : l'entrée EST sa clé
+      } else {
+        out.push(`${tag}${i}`);               // liste vide des deux côtés
+      }
+    }
+    return out;
+  };
+
+  // La question de cet étage est « QU'EST-CE QUI SURVIT au plafond », comme aux 19e et 20e :
+  // ensembles de clés pour un objet, ensembles d'empreintes pour une liste. Comparer autre chose
+  // ferait rejuger ici ce que les 14e et 18e étages mesurent déjà et tolèrent en connaissance de
+  // cause (l'ORDRE d'une sous-liste, l'arbitrage d'un seau daté) : un faux positif, pas une
+  // trouvaille.
+  const ensembleObj = (o) => new Set(Object.keys(o || {}));
+  const empreinte = (x) => (x && typeof x === "object") ? JSON.stringify(norm(x)) : String(x);
+  const ensembleListe = (arr) => new Set((arr || []).map(empreinte));
+  const memeEnsemble = (s1, s2) => s1.size === s2.size && [...s1].every((x) => s2.has(x));
+
+  // ── Recensement par la FORME, sur l'union des deux fixtures ──────────────
+  // `config.players[].X` est déjà mesuré par les 19e et 20e étages (c'est leur 3e niveau) : le
+  // remesurer ici rendrait deux fois la même divergence sous deux noms.
+  const chemins = [];
+  const recense = (racine, a, b, steps) => {
+    if (steps.length > 6) return; // garde-fou de récursion, jamais atteint par la forme réelle
+    const dejaVu = (s) => s.length === 2 && steps[0] && steps[0].liste === "players";
+    for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+      const va = (a || {})[k], vb = (b || {})[k];
+      if (estObjet(va) || estObjet(vb)) {
+        const s = [...steps, { k }];
+        if (s.length >= 2 && !dejaVu(s)) chemins.push({ racine, steps: s, forme: "objet" });
+        recense(racine, estObjet(va) ? va : {}, estObjet(vb) ? vb : {}, s);
+      } else if (Array.isArray(va) || Array.isArray(vb)) {
+        const s = [...steps, { k }];
+        if (s.length >= 2 && !dejaVu(s)) chemins.push({ racine, steps: s, forme: "liste" });
+        const ea = (va || [])[0], eb = (vb || [])[0];
+        if (!estObjet(ea) && !estObjet(eb)) continue;
+        recense(racine, estObjet(ea) ? ea : {}, estObjet(eb) ? eb : {},
+                [...steps, { liste: k, idk: cleId(ea) || cleId(eb) }]);
+      }
+    }
+  };
+  recense("gs", gsA, gsB, []);
+  recense("config", famA.config, famB.config, []);
+
+  // ── Poser / lire une structure au bout d'un chemin ───────────────────────
+  const pose = (noeud, c, i, tag, n, ex) => {
+    const st = c.steps[i];
+    if (st.k !== undefined) {
+      const suivant = (noeud || {})[st.k];
+      const val = i === c.steps.length - 1
+        ? (c.forme === "liste" ? gonfleListe(suivant, tag, n, ex) : gonfleObj(suivant, tag, n, ex))
+        : pose(suivant, c, i + 1, tag, n, ex);
+      return { ...(noeud || {}), [st.k]: val };
+    }
+    const arr = [...(((noeud || {})[st.liste]) || [])];
+    if (!arr.length) return noeud;
+    const el = clone(arr[0]) || {};
+    if (st.idk) el[st.idk] = ID_NICHE; // MÊME identité des deux côtés : la fusion doit arbitrer
+    arr[0] = pose(el, c, i + 1, tag, n, ex);
+    return { ...(noeud || {}), [st.liste]: arr };
+  };
+  const lit = (noeud, c, i) => {
+    if (noeud == null) return undefined;
+    const st = c.steps[i];
+    if (st.k !== undefined) {
+      const v = noeud[st.k];
+      return i === c.steps.length - 1 ? v : lit(v, c, i + 1);
+    }
+    const arr = noeud[st.liste] || [];
+    const el = st.idk ? arr.find((x) => x && x[st.idk] === ID_NICHE) : arr[0];
+    return lit(el, c, i + 1);
+  };
+
+  const nomDe = (c) => `${c.racine}.` + c.steps
+    .map((s) => (s.k !== undefined ? s.k : `${s.liste}[]`)).join(".");
+  // Les DEUX façons de désigner la MÊME copie fraîche (17e/18e étages) : au niveau `mergeGS`
+  // c'est le drapeau `preferIncoming`, au niveau `mergeFamily` l'ordre des arguments.
+  const monte = (c, n, ex) => c.racine === "gs"
+    ? [pose(gsA, c, 0, "A", n, ex), pose(gsB, c, 0, "B", n, ex)]
+    : [{ ...famA, config: pose(famA.config, c, 0, "A", n, ex) },
+       { ...famB, config: pose(famB.config, c, 0, "B", n, ex) }];
+  const sorties = (impl, c, [a, b]) => c.racine === "gs"
+    ? [lit(impl.mergeGS(a, b, true), c, 0), lit(impl.mergeGS(b, a, false), c, 0)]
+    : [lit(impl.mergeFamily(a, b).config, c, 0), lit(impl.mergeFamily(b, a).config, c, 0)];
+  const entrees = (c, [a, b]) => c.racine === "gs"
+    ? [lit(a, c, 0), lit(b, c, 0)]
+    : [lit(a.config, c, 0), lit(b.config, c, 0)];
+
+  // Le discriminant est NOMMÉ, et pas recopié dans la boucle : les témoins ci-dessous s'en
+  // servent tels quels, donc aucun d'eux ne peut prouver autre chose que ce que l'étage mesure
+  // vraiment (« la fixture identique = contrôle inerte », v2.16.89).
+  const estBorne = (z, p, q) =>
+    p.taille === q.taille && p.taille > 0 && q.taille < q.union && p.taille > z.taille;
+
+  const mesureNiche = (c, n, ex, impl) => {
+    const ens = c.forme === "liste" ? ensembleListe : ensembleObj;
+    let ent, r1, r2;
+    try { ent = monte(c, n, ex); [r1, r2] = sorties(impl, c, ent); } catch { return null; }
+    const bonneForme = (v) => (c.forme === "liste" ? Array.isArray(v) : estObjet(v));
+    if (!bonneForme(r1) || !bonneForme(r2)) return null;
+    const [ea, eb] = entrees(c, ent);
+    const union = new Set([...ens(ea), ...ens(eb)]);
+    const taille = c.forme === "liste" ? r1.length : Object.keys(r1).length;
+    return { taille, union: union.size, s1: ens(r1), s2: ens(r2) };
+  };
+
+  const vues = new Set();
+  let bornes = 0, mesures = 0;
+  for (const c of chemins) {
+    const chemin = nomDe(c);
+    for (const ex of [false, true]) {
+      const z = mesureNiche(c, 0, ex, client);
+      const p = mesureNiche(c, 600, ex, client), q = mesureNiche(c, 1200, ex, client);
+      if (!z || !p || !q) continue;
+      mesures++;
+      // Même discriminant qu'au 20e étage : un PLAFOND, et pas une forme FIXE. « Même taille en
+      // sortie alors que l'entrée a doublé » ne les distingue pas — un seau daté que la règle
+      // RECONSTRUIT rend 2 clés qu'on lui en donne 2 ou 2402. La mesure à n = 0 est ce qui les
+      // sépare : sous un plafond la sortie GROSSIT avec l'entrée jusqu'à buter, une forme fixe
+      // rend la même taille dès l'entrée nue (leçon v2.16.96).
+      if (!estBorne(z, p, q)) continue;
+      bornes++;
+      for (const [nom, impl] of [["client", client], ["serveur", server]]) {
+        const m = nom === "client" ? q : mesureNiche(c, 1200, ex, server);
+        if (!m || memeEnsemble(m.s1, m.s2)) continue;
+        vues.add(chemin);
+        if (PLAFOND_ORDRE_APPELANT_NICHE[chemin]) continue; // divergence CONNUE, en attente de Gen (👤)
+        const perdus = [...m.s1].filter((x) => !m.s2.has(x)).length;
+        fail(`${nom} — « ${chemin} » est une structure bornée NICHÉE (${m.taille} sur ${m.union} en `
+           + `union) dont les deux façons de désigner la MÊME copie fraîche gardent des contenus `
+           + `DIFFÉRENTS (${perdus} d'un côté seulement, ex aequo ${ex ? "forcés" : "absents"}). `
+           + `Les 19e et 20e étages ne pouvaient pas le voir : ils énumèrent les clés de trois `
+           + `niveaux et celle-ci vit dessous. Le tri qui choisit ce qui survit n'est pas TOTAL — `
+           + `départage-le sur la clé, ou fiche le chemin dans PLAFOND_ORDRE_APPELANT_NICHE en `
+           + `même temps que tu poses la question à Gen.`);
+      }
+    }
+  }
+
+  // ── Les deux témoins, et pourquoi ils ne sont pas un compteur ────────────
+  // Ici « zéro » est le résultat ATTENDU : aucune règle de fusion ne plafonne une structure
+  // nichée aujourd'hui (tous les `slice` du projet coupent au premier niveau, plus
+  // `players[].starterThemes` au troisième — mesurés par les 19e et 20e étages). Un étage dont
+  // le silence est l'issue normale ne peut donc PAS se garder par un compteur « au moins n
+  // structures atteintes » : ce compteur serait à zéro le jour de son écriture et ne pourrait
+  // jamais tomber — le faux garde-fou de la v2.16.96, exactement. Le détecteur se prouve sur des
+  // implémentations TRUQUÉES : une qui coupe dans l'ordre des arguments (il doit crier), une qui
+  // coupe sur un tri total (il doit se taire). Le jour où une règle plafonnera une structure
+  // nichée, la mesure la trouvera sans que ce fichier change.
+  {
+    const trucs = [
+      { nom: "objet niché", c: { racine: "gs", steps: [{ k: "house" }, { k: "placed" }], forme: "objet" },
+        faux: (coupe) => ({ mergeGS: (a, b) => ({ ...a, house: { ...(a.house || {}),
+          placed: coupe({ ...((a.house || {}).placed || {}), ...((b.house || {}).placed || {}) }) } }) }),
+        parArgs: (o) => Object.fromEntries(Object.keys(o).slice(0, 50).map((k) => [k, o[k]])),
+        parCle: (o) => Object.fromEntries(Object.keys(o).sort().slice(0, 50).map((k) => [k, o[k]])) },
+      // Le troisième truqué traverse une LISTE, et il est le seul à prouver la ligne « MÊME
+      // identité des deux côtés » : il rapproche les éléments par `id`, comme le vrai code. Si le
+      // parcours cessait de forcer l'identité, les deux éléments ne se rencontreraient plus, la
+      // structure nichée ne serait plus arbitrée du tout, et ce témoin cesserait de la voir bornée.
+      { nom: "liste dans un élément", forceId: true,
+        c: { racine: "config", steps: [{ liste: "feed", idk: "id" }, { k: "likes" }], forme: "liste" },
+        faux: (coupe) => ({ mergeFamily: (a, b) => {
+          const m = new Map();
+          for (const el of [...(a.config.feed || []), ...(b.config.feed || [])]) {
+            const vu = m.get(el.id);
+            m.set(el.id, vu ? { ...vu, likes: coupe([...(vu.likes || []), ...(el.likes || [])]) } : el);
+          }
+          return { config: { ...a.config, feed: [...m.values()] } };
+        } }),
+        parArgs: (l) => [...new Set(l)].slice(0, 50),
+        parCle: (l) => [...new Set(l)].sort().slice(0, 50) },
+      { nom: "liste nichée", c: { racine: "gs", steps: [{ k: "dailyClaimed" }, { k: "ids" }], forme: "liste" },
+        faux: (coupe) => ({ mergeGS: (a, b) => ({ ...a, dailyClaimed: { ...(a.dailyClaimed || {}),
+          ids: coupe([...(((a.dailyClaimed || {}).ids) || []), ...(((b.dailyClaimed || {}).ids) || [])]) } }) }),
+        parArgs: (l) => [...new Set(l)].slice(0, 50),
+        parCle: (l) => [...new Set(l)].sort().slice(0, 50) },
+    ];
+    for (const t of trucs) {
+      const z1 = mesureNiche(t.c, 0, true, t.faux(t.parArgs));
+      const p1 = mesureNiche(t.c, 600, true, t.faux(t.parArgs));
+      const m1 = mesureNiche(t.c, 1200, true, t.faux(t.parArgs));
+      if (!m1 || !z1 || !p1 || !estBorne(z1, p1, m1) || m1.taille !== 50)
+        fail(`21e étage — TÉMOIN (${t.nom}) : l'implémentation truquée à plafond 50 n'est pas VUE `
+           + `comme bornée par la mesure. Le gonfleur ou le discriminant est cassé, et le « zéro » `
+           + `de cet étage ne prouverait rien.`);
+      else if (memeEnsemble(m1.s1, m1.s2))
+        fail(`21e étage — TÉMOIN (${t.nom}) : une coupe qui garde la TÊTE de la concaténation rend `
+           + `forcément deux contenus différents selon l'ordre des arguments, et la comparaison ne `
+           + `le voit pas. Son « zéro » ne prouverait rien.`);
+      const m2 = mesureNiche(t.c, 1200, true, t.faux(t.parCle));
+      if (m2 && !memeEnsemble(m2.s1, m2.s2))
+        fail(`21e étage — TÉMOIN (${t.nom}) : un plafond départagé sur la clé converge par `
+           + `construction, et le détecteur crie quand même. Il crierait sur n'importe quoi.`);
+      // Et une FORME FIXE ne doit PAS être prise pour un plafond : c'est ce que la mesure à
+      // n = 0 sépare, et aucune structure nichée réelle ne l'exerce aujourd'hui. Sans ce
+      // troisième témoin, `estBorne` porterait une clause qui ne surveille rien et personne ne
+      // le saurait le jour où elle sauterait (leçon v2.16.96, le compteur qui ne peut pas tomber).
+      const fixe = t.faux(() => (t.c.forme === "liste" ? ["fx1", "fx2"] : { fx1: 1, fx2: 2 }));
+      const zf = mesureNiche(t.c, 0, true, fixe), pf = mesureNiche(t.c, 600, true, fixe);
+      const qf = mesureNiche(t.c, 1200, true, fixe);
+      if (zf && pf && qf && estBorne(zf, pf, qf))
+        fail(`21e étage — TÉMOIN (${t.nom}) : une sortie de taille FIXE (2 entrées qu'on lui en `
+           + `donne 2 ou 2402) est comptée comme BORNÉE. Le discriminant ne sépare plus un `
+           + `plafond d'une forme que la règle reconstruit : l'étage compterait des structures `
+           + `qu'aucun plafond ne touche, et son compteur ne pourrait plus tomber.`);
+    }
+  }
+  // Et le PARCOURS doit vraiment descendre. Les cinq chemins ci-dessous sont les formes que le
+  // recensement doit atteindre : un objet sous un objet, un objet dans un élément, un objet sous
+  // un objet DANS un élément, une liste sous un objet, une liste dans un élément (la forme même
+  // du bug de la v2.16.84). S'il cesse d'en visiter un, son « zéro » est faux (leçon v2.16.90).
+  {
+    const attendus = ["gs.house.placed", "config.announcements[].playerTasks",
+                      "config.weeklyChallenge.challenges[].checkins",
+                      "gs.dailyClaimed.ids", "config.feed[].likes"];
+    const noms = new Set(chemins.map(nomDe));
+    for (const a of attendus)
+      if (!noms.has(a))
+        fail(`21e étage — le parcours ne visite plus « ${a} », une structure nichée que les `
+           + `fixtures portent. Le recensement a cessé de descendre : son « zéro » serait faux.`);
+  }
+  for (const chemin of Object.keys(PLAFOND_ORDRE_APPELANT_NICHE)) {
+    if (!PLAFOND_ORDRE_APPELANT_NICHE[chemin]) fail(`21e étage — fiche « ${chemin} » sans raison écrite.`);
+    if (!vues.has(chemin))
+      fail(`21e étage — fiche PLAFOND_ORDRE_APPELANT_NICHE « ${chemin} », dont la mesure ne trouve `
+         + `PLUS de divergence. Une tolérance qui ne tolère rien est un blanc-seing (v2.16.87).`);
+  }
+  if (process.env.DBG21) console.log(chemins.map((c) => `      ${nomDe(c)} (${c.forme})`).join("\n"));
+  console.log(`    (${chemins.length} structures nichées recensées, ${mesures} mesures (chemins × régimes), `
+    + `${bornes} au plafond, ${vues.size} divergentes)`);
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
