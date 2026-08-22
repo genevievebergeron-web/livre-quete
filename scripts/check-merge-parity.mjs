@@ -3366,9 +3366,13 @@ console.log("· objets bornés — forcer le plafond, puis exiger les MÊMES cl�
 // la moitié des structures — et la moitié muette est justement celle où le bug de la v2.16.84
 // s'était logé.
 //
-// Quand le chemin traverse une LISTE, l'élément des deux côtés reçoit la MÊME identité : sans ça
-// l'union par id garde les deux éléments côte à côte, rien n'est arbitré, et l'étage sortirait
+// Quand le chemin traverse une LISTE, les deux éléments posés portent la MÊME identité des deux
+// côtés : sans ça l'union par id les garde côte à côte, rien n'est arbitré, et l'étage sortirait
 // vert sans avoir touché à quoi que ce soit (« la fixture qui ne collisionne jamais », v2.16.91).
+// Mais ils sont posés dans un ordre CROISÉ (`[n21a, n21b]` d'un côté, `[n21b, n21a]` de l'autre),
+// et chaque rang porte ses propres clés neuves : sans ça, une règle qui apparie les éléments par
+// leur POSITION rend exactement ce que rend la bonne règle — elle tombe par accident et reste
+// invisible (piste laissée par la v2.16.98).
 const PLAFOND_ORDRE_APPELANT_NICHE = {
 };
 
@@ -3477,19 +3481,33 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
     }
     const arr = [...(((noeud || {})[st.liste]) || [])];
     if (!arr.length) return noeud;
-    // DEUX éléments en collision, aux rangs 0 et 1, avec chacun la MÊME identité des deux côtés :
-    // la fusion doit arbitrer les deux. Avec un seul élément posé, une règle qui traite le 2e
-    // autrement du 1er (un `find` qui s'arrête, un `[0]` codé en dur, un tri qui ne départage que
-    // la tête) reste invisible — et c'est la forme du bug de la v2.16.80.
+    // DEUX éléments en collision, aux rangs 0 et 1 : la fusion doit arbitrer les deux. Avec un
+    // seul élément posé, une règle qui traite le 2e autrement du 1er (un `find` qui s'arrête, un
+    // `[0]` codé en dur, un tri qui ne départage que la tête) reste invisible — c'est la forme du
+    // bug de la v2.16.80.
+    // Et ils sont posés dans un ordre CROISÉ entre les côtés : `[n21a, n21b]` ici, `[n21b, n21a]`
+    // là. Dans le MÊME ordre des deux côtés, une règle qui apparie les éléments par leur POSITION
+    // plutôt que par leur `id` rend exactement ce que rend la bonne règle — elle tombe juste par
+    // accident, et reste invisible elle aussi.
+    // Croiser ne suffit pas seul : il faut que chaque rang porte ses PROPRES clés neuves
+    // (`A0…` / `A1…`), sinon les deux éléments d'un même côté sont indiscernables et apparier par
+    // la position rend encore la même chose qu'apparier par l'id. Ce tag par rang avait été écrit
+    // puis retiré en v2.16.98, faute de falsification qui l'exerce ; le TÉMOIN DE POSITION
+    // ci-dessous est cette falsification, et il tombe si l'un OU l'autre saute.
+    // Le croisement ne vaut que pour une liste dont les éléments portent une identité : sans clé
+    // d'id, `lit` relit par le rang et il n'y a rien à apparier.
+    const ordre = st.idk && tag.startsWith("B") ? [1, 0] : [0, 1];
+    // Les deux éléments sont taillés dans l'état d'ORIGINE de la liste, figé avant la boucle. Une
+    // liste d'un seul élément — le cas de toutes les fixtures — n'a rien à l'indice 1 : reprendre
+    // `arr[0]` à ce moment-là revenait à recopier l'élément du rang 0 DÉJÀ GONFLÉ, et le rang 1
+    // repartait donc avec les clés neuves du rang 0 par-dessus les siennes. Tant que les deux
+    // rangs portaient le même tag, les clés étaient les mêmes et le doublon se dédupliquait sans
+    // rien changer ; dès que chaque rang porte les siennes, le rang 1 mesure les DEUX.
+    const orig = [...arr];
     for (let r = 0; r < 2; r++) {
-      const el = clone(arr[r] !== undefined ? arr[r] : arr[0]) || {};
-      if (st.idk) el[st.idk] = ID_NICHE[r];
-      // Même tag pour les deux rangs : un tag distinct par rang a été essayé, et AUCUNE
-      // falsification ne le distingue du tag commun — ce que cet étage mesure est la divergence
-      // entre les deux ORDRES D'ARGUMENTS, et elle ne dépend pas des clés neuves d'un rang
-      // voisin. Une clause qu'aucun témoin n'exerce peut sauter sans que personne le voie
-      // (v2.16.96) : elle n'est donc pas écrite.
-      arr[r] = pose(el, c, i + 1, tag, n, ex);
+      const el = clone(orig[r] !== undefined ? orig[r] : orig[0]) || {};
+      if (st.idk) el[st.idk] = ID_NICHE[ordre[r]];
+      arr[r] = pose(el, c, i + 1, `${tag}${ordre[r]}`, n, ex);
     }
     return { ...(noeud || {}), [st.liste]: arr };
   };
@@ -3661,9 +3679,13 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
     const fauxRang = {
       mergeFamily: (a, b) => {
         const bi = new Map((b.config.feed || []).map((el) => [el.id, el]));
-        const feed = (a.config.feed || []).map((el, i) => {
+        // Départagé sur la clé pour l'élément de rang 0 SEULEMENT, désigné par son `id` et non
+        // par son index : les deux côtés ne posent plus leurs éléments dans le même ordre, et un
+        // `i === 0` désignerait `n21a` d'un côté, `n21b` de l'autre — le témoin mesurerait alors
+        // le croisement au lieu de mesurer le rang.
+        const feed = (a.config.feed || []).map((el) => {
           const u = [...new Set([...(el.likes || []), ...(((bi.get(el.id) || {}).likes) || [])])];
-          return { ...el, likes: (i === 0 ? [...u].sort() : u).slice(0, 50) };
+          return { ...el, likes: (el.id === ID_NICHE[0] ? [...u].sort() : u).slice(0, 50) };
         });
         return { config: { ...a.config, feed } };
       },
@@ -3687,6 +3709,53 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
       fail("21e étage — TÉMOIN DE RANG : le 1er élément, dont le plafond EST départagé sur la clé, "
          + "est vu divergent. Le détecteur crierait sur n'importe quel rang, et son cri au rang 1 "
          + "ne dirait rien du 2e élément.");
+  }
+  // ── Le témoin de POSITION : les deux rangs sont CROISÉS entre les côtés ──────────
+  // Les quatre truqués ci-dessus apparient tous leurs éléments par `id`, comme le vrai code :
+  // ils resteraient verts même si les deux côtés posaient leurs deux éléments dans le MÊME ordre.
+  // Celui-ci apparie par la POSITION — et il départage sa coupe sur la CLÉ, donc l'ordre des
+  // arguments ne peut pas être la cause de ce qu'il rend : sa divergence ne vient QUE du mauvais
+  // appariement. Il tombe si le croisement saute, et il tombe aussi si les deux rangs cessent de
+  // porter des clés neuves distinctes.
+  {
+    const c = { racine: "config", steps: [{ liste: "feed", idk: "id" }, { k: "likes" }], forme: "liste" };
+    const coupeTriee = (l) => [...new Set(l)].sort().slice(0, 50);
+    const parPosition = { mergeFamily: (a, b) => {
+      const fb = b.config.feed || [];
+      const feed = (a.config.feed || []).map((el, i) => ({
+        ...el, likes: coupeTriee([...(el.likes || []), ...(((fb[i] || {}).likes) || [])]),
+      }));
+      return { config: { ...a.config, feed } };
+    } };
+    // Le même truqué à l'appariement près : par `id`. C'est l'ANCRE — si lui aussi diverge, le
+    // cri de son voisin ne dirait rien de l'appariement, il dirait que la coupe est fautive.
+    const parId = { mergeFamily: (a, b) => {
+      const bi = new Map((b.config.feed || []).map((el) => [el.id, el]));
+      const feed = (a.config.feed || []).map((el) => ({
+        ...el, likes: coupeTriee([...(el.likes || []), ...(((bi.get(el.id) || {}).likes) || [])]),
+      }));
+      return { config: { ...a.config, feed } };
+    } };
+    for (const rang of [0, 1]) {
+      const z = mesureNiche(c, 0, true, parPosition, rang);
+      const p = mesureNiche(c, 600, true, parPosition, rang);
+      const q = mesureNiche(c, 1200, true, parPosition, rang);
+      if (!z || !p || !q || !estBorne(z, p, q) || q.taille !== 50)
+        fail(`21e étage — TÉMOIN DE POSITION (rang ${rang}) : l'implémentation truquée à plafond `
+           + `50 n'est pas vue comme bornée. Le gonfleur ne descend plus dans cet élément-là.`);
+      else if (memeEnsemble(q.s1, q.s2))
+        fail(`21e étage — TÉMOIN DE POSITION (rang ${rang}) : une règle qui apparie les éléments `
+           + `d'une liste par leur POSITION au lieu de leur \`id\` rend deux contenus DIFFÉRENTS, `
+           + `et le détecteur ne le voit pas. Soit les deux côtés reposent leurs éléments dans le `
+           + `MÊME ordre, soit les deux rangs portent les mêmes clés neuves : dans les deux cas, `
+           + `apparier par la position rend la même chose qu'apparier par l'id, et le « zéro » de `
+           + `l'étage ne dirait rien de l'appariement.`);
+      const anc = mesureNiche(c, 1200, true, parId, rang);
+      if (anc && !memeEnsemble(anc.s1, anc.s2))
+        fail(`21e étage — TÉMOIN DE POSITION (rang ${rang}) : le même truqué apparié par \`id\`, `
+           + `avec la MÊME coupe triée, est vu divergent. Le cri de celui apparié par position ne `
+           + `dirait alors rien de l'appariement.`);
+    }
   }
   // Le témoin de rang ci-dessus appelle `mesureNiche(..., 1)` DIRECTEMENT : il prouve que la
   // machinerie sait mesurer le 2e élément, pas que la boucle le lui demande. Si `rangsDe`
