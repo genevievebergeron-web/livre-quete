@@ -3796,6 +3796,233 @@ console.log("· structures bornées nichées — parcourir SOUS le premier nivea
     + `(chemins × rangs × régimes), ${bornes} au plafond, ${vues.size} divergentes)`);
 }
 
+// ── 22e ÉTAGE : LES RÈGLES À CHARNIÈRE ─────────────────────────────────────
+// v2.17.0 — la piste laissée par la v2.16.99, mot pour mot : « le parcours ne force qu'UNE clé
+// d'identité par élément […] Sur les 18 listes traversées, une en porte deux —
+// `config.removalRequests[]` (`id` ET `instanceId`) […] `instanceId` EST porteur dans la vraie
+// règle (src/merge.js:537) […] Forcer les DEUX clés, à valeurs distinctes par rang, dirait s'il
+// y en a une. »
+//
+// MESURÉE, et au 21e étage la réponse est INERTE. `config.removalRequests` est bien la seule des
+// 18 listes traversées à porter deux clés d'identité — mais ses éléments ne portent AUCUNE
+// structure nichée, donc le recensement du 21e étage ne pousse aucun chemin sous elle (0 sur 23)
+// et le parcours n'y pose jamais d'élément. Y forcer les deux clés n'aurait exercé rien du tout :
+// un garde-fou qui ne peut pas tomber, exactement ce que la v2.16.96 a appris à ne plus écrire.
+//
+// La vraie question est un cran à côté, et elle se mesure : à QUOI sert cette seconde clé ? À
+// consulter une AUTRE liste. Trois règles du projet le font, et les trois sont VIVANTES :
+//   • `!_rmSet.has(r.instanceId)` (merge.js:537) — une demande de retrait s'efface quand
+//     l'assignation qu'elle vise a été supprimée. `_rmSet` est le tombstone d'`assignments`, pas
+//     celui de `removalRequests`.
+//   • `referencedTaskIds.has(t.id)` (merge.js:520) — une tâche perso SURVIT à son propre
+//     tombstone tant qu'une assignation survivante la référence (les ~125 orphelines de la
+//     v2.5.0).
+//   • `pending.filter(k => !completed.includes(k) && !_refusedSet.has(k))` (merge.js:262) — une
+//     quête en attente de validation sort de la file dès qu'elle est validée ou refusée (v1.64.0).
+// Effacer n'importe laquelle des trois de src/merge.js laissait ce fichier ENTIÈREMENT VERT : une
+// règle présente dans une copie et absente de l'autre, que la parité ne voyait pas. Les étages
+// des listes posent chaque liste SEULE — `frais`/`perime` se contredisent sur le contenu,
+// `supprime` sur le tombstone de la liste elle-même — et pas un seul n'a jamais fait dépendre le
+// sort d'un élément d'une AUTRE liste. La fiche CHAINES de `pending` NOMMAIT pourtant sa
+// charnière depuis toujours (« le retrait passe par `completed`/`refusedKeys`, filtrés dans la
+// règle elle-même ») : une raison écrite à côté d'un contrôle n'est pas un contrôle (v2.16.94).
+const CHARNIERES = [
+  {
+    nom: "une demande de retrait meurt avec l'assignation qu'elle vise",
+    genre: "objets", champ: "removalRequests",
+    sens: "rejet", // l'élément VISÉ est celui que la charnière fait disparaître
+    regle: "src/merge.js:537 — `!_rmSet.has(r.instanceId)` (tombstone d'`assignments`)",
+    vise:   { id: "hg_vise", instanceId: "as_charniere", note: "vise une assignation SUPPRIMÉE" },
+    temoins: [{ id: "hg_temoin", instanceId: "as_vivante", note: "vise une assignation vivante" }],
+    cfgPlus: { removedAssignments: ["as_charniere"] },
+  },
+  {
+    nom: "une tâche perso survit à son tombstone tant qu'une assignation VIVANTE la référence",
+    genre: "objets", champ: "customTasks",
+    sens: "sauvetage", // l'élément VISÉ est celui que la charnière fait survivre
+    regle: "src/merge.js:520 — `referencedTaskIds.has(t.id) || !_rmCT.has(t.id)`",
+    vise:   { id: "ct_referencee", label: "référencée par une assignation vivante" },
+    // Deux témoins, et le second n'est pas un doublon du premier : la charnière ne lit pas les
+    // assignations BRUTES, elle lit `assignMap` — celles qui ont SURVÉCU à leur propre tombstone.
+    // Une tâche référencée par une assignation elle-même supprimée ne doit donc PAS être sauvée,
+    // sinon le ménage des orphelines (v2.5.0) ne finit jamais.
+    temoins: [
+      { id: "ct_orpheline", label: "référencée par personne" },
+      { id: "ct_ref_morte", label: "référencée par une assignation SUPPRIMÉE" },
+    ],
+    cfgPlus: {
+      removedCustomTasks: ["ct_referencee", "ct_orpheline", "ct_ref_morte"],
+      assignments: [
+        { instanceId: "as_sauveuse", taskId: "ct_referencee", playerIds: ["p1"], days: [0] },
+        { instanceId: "as_morte", taskId: "ct_ref_morte", playerIds: ["p1"], days: [0] },
+      ],
+      removedAssignments: ["as_morte"],
+    },
+  },
+  {
+    nom: "une quête VALIDÉE sort de la file d'attente",
+    genre: "chaines", champ: "pending", dans: "gameStates",
+    sens: "rejet",
+    regle: "src/merge.js:262 — `pending.filter((k) => !completed.includes(k) …)`",
+    vise: "tv#2026-08-14",
+    temoins: ["tw#2026-08-14"],
+    gsPlus: { completed: ["tv#2026-08-14"] },
+  },
+  {
+    nom: "une quête REFUSÉE sort de la file d'attente",
+    genre: "chaines", champ: "pending", dans: "gameStates",
+    sens: "rejet",
+    regle: "src/merge.js:262 — `pending.filter((k) => … && !_refusedSet.has(k))`",
+    vise: "tx#2026-08-14",
+    temoins: ["tw#2026-08-14"],
+    gsPlus: { refusedKeys: ["tx#2026-08-14"] },
+  },
+];
+
+console.log("· charnières — le sort d'un élément décidé par une AUTRE liste");
+for (const h of CHARNIERES) {
+  const l = h.genre === "objets"
+    ? LISTES.find((x) => x.champ === h.champ && (h.conteneur || null) === (x.conteneur ? x.conteneur.cle : null))
+    : CHAINES.find((x) => x.champ === h.champ && x.dans === h.dans);
+  if (!l) { fail(`22e étage — charnière « ${h.nom} » : « ${h.champ} » n'est plus déclarée dans ${h.genre === "objets" ? "LISTES" : "CHAINES"}.`); continue; }
+  const chemin = `${l.dans}.${l.conteneur ? l.conteneur.cle + "." : ""}${l.champ}`;
+  const nomEl = (e) => (h.genre === "chaines" ? e : e[l.cle]);
+  const elems = [h.vise, ...h.temoins];
+  const monte = (savedAt, gsBase, cfgBase, pl, plus) => mkFam(savedAt,
+    { ...gsBase, ...(l.dans === "gameStates" ? { [l.champ]: elems } : {}), ...(plus.gs || {}) },
+    { ...cfgBase, ...(l.dans === "config" ? bloc(l, elems) : {}), ...(plus.cfg || {}) }, pl);
+  const litH = (fam) => {
+    const racine = l.dans === "config" ? fam.config : fam.gameStates[0];
+    const c = l.conteneur ? racine[l.conteneur.cle] : racine;
+    return (c && c[l.champ]) || [];
+  };
+  const fA = monte("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, { cfg: h.cfgPlus, gs: h.gsPlus });
+  const fB = monte("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, {});
+  const surviVise = h.sens === "sauvetage";
+  for (const [sens, base, inc] of [["charnière en base", fA, fB], ["charnière en incoming", fB, fA]]) {
+    const rc = litH(client.mergeFamily(base, inc)), rs = litH(server.mergeFamily(base, inc));
+    if (!same(rc, rs))
+      fail(`mergeFamily (${sens}) — ${chemin} : client ≠ serveur sur la charnière « ${h.nom} ». `
+         + `La règle (${h.regle}) n'est pas écrite pareil dans les deux copies.`);
+    for (const [nom, out] of [["client", rc], ["serveur", rs]]) {
+      const la = (e) => (h.genre === "chaines"
+        ? out.includes(e) : out.some((x) => x && x[l.cle] === e[l.cle]));
+      if (la(h.vise) !== surviVise)
+        fail(`${nom} mergeFamily (${sens}) — ${chemin}[${nomEl(h.vise)}] : la charnière « ${h.nom} » `
+           + `ne mord pas. L'élément visé ${surviVise ? "devait SURVIVRE et il a disparu"
+              : "devait DISPARAÎTRE et il est là"}. Règle : ${h.regle} — dans src/merge.js ET `
+           + `server-merge.cjs.`);
+      for (const t of h.temoins)
+        if (la(t) === surviVise)
+          fail(`${nom} mergeFamily (${sens}) — ${chemin}[${nomEl(t)}] : le TÉMOIN de la charnière `
+             + `« ${h.nom} » a le même sort que l'élément visé. La charnière ne départage donc rien `
+             + `— elle emporte (ou épargne) toute la liste, et le contrôle sur l'élément visé ne `
+             + `prouverait rien (v2.16.89, la fixture qui ne contredit pas est un contrôle inerte).`);
+    }
+  }
+}
+
+// ── Recensement des charnières PAR LA MESURE ────────────────────────────────
+// Déclarer deux charnières ne dit rien de la TROISIÈME que quelqu'un écrira demain. Et un
+// recensement par le source (`grep` sur `X.has(el.champ)`) serait à la fois fragile et faux : il
+// ne dit pas quelle liste alimente `X`, et un octet illisible suffit à lui faire sauter un
+// fichier en silence (v2.16.93). Celui-ci ne lit pas le code : il le MESURE.
+//
+// Le principe : poser un élément-SONDE dans la liste L, tous ses champs saturés d'une même
+// sentinelle, et regarder s'il survit. Puis poser cette même sentinelle dans une autre liste M et
+// remesurer. Si le sort de la sonde CHANGE, c'est que la règle de L a lu M — une charnière. Peu
+// importe par quel champ ou quel `Set` intermédiaire : la mesure ne dépend d'aucune forme écrite.
+// Deux régimes, parce qu'une charnière peut mordre dans les deux sens : sonde libre (M peut la
+// faire DISPARAÎTRE, un rejet) et sonde déjà tombstonée par sa propre liste (M peut la faire
+// REVENIR, un sauvetage).
+console.log("· charnières — recensement par la MESURE : aucune dépendance inter-listes non déclarée");
+{
+  const SENT = "SONDE_CHARNIERE";
+  const nomL = (l) => `${l.dans}.${l.conteneur ? l.conteneur.cle + "." : ""}${l.champ}`;
+  const cibles = [...LISTES.map((l) => ({ ...l, genre: "objets" })),
+                  ...CHAINES.map((l) => ({ ...l, genre: "chaines" }))];
+  // Saturer TOUS les champs de la même sentinelle : la mesure n'a pas à deviner par quel champ la
+  // charnière passe. Les nombres restent tels quels (une date ou un compteur ne sert jamais de
+  // clé de rapprochement entre deux listes).
+  const sature = (modele, cle) => {
+    const out = {};
+    for (const [k, v] of Object.entries(modele || {}))
+      out[k] = typeof v === "string" ? SENT : Array.isArray(v) ? [SENT] : v;
+    out[cle] = SENT;
+    return out;
+  };
+  const sonde = (l) => (l.genre === "chaines" ? [SENT] : [sature(l.frais, l.cle)]);
+  const present = (l, out) => (l.genre === "chaines"
+    ? (out || []).includes(SENT)
+    : (out || []).some((e) => e && e[l.cle] === SENT));
+  const litL = (fam, l) => {
+    const racine = l.dans === "config" ? fam.config : fam.gameStates[0];
+    const c = l.conteneur ? racine[l.conteneur.cle] : racine;
+    return (c && c[l.champ]) || [];
+  };
+  const monte = (savedAt, gsBase, cfgBase, pl, l, elems, plus) => mkFam(savedAt,
+    { ...gsBase, ...(l.dans === "gameStates" ? bloc(l, elems) : {}), ...plus.gs },
+    { ...cfgBase, ...(l.dans === "config" ? bloc(l, elems) : {}), ...plus.cfg }, pl);
+  const mesure = (l, plus, impl) => {
+    const fA = monte("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, sonde(l), plus);
+    const fB = monte("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, sonde(l), plus);
+    try { return present(l, litL(impl.mergeFamily(fA, fB), l)); } catch { return null; }
+  };
+  const plusDe = (m, elems) => (m.dans === "config"
+    ? { cfg: bloc(m, elems), gs: {} } : { cfg: {}, gs: bloc(m, elems) });
+  const fusionne = (p, q) => ({ cfg: { ...p.cfg, ...q.cfg }, gs: { ...p.gs, ...q.gs } });
+
+  // Les paires déjà tranchées ailleurs. Une charnière déclarée dans CHARNIERES, ou le tombstone
+  // de la liste elle-même (5e étage), ne sont pas des trouvailles.
+  const paireDeclaree = (l, m) => CHARNIERES.some((h) => h.champ === l.champ
+    && [...Object.keys(h.cfgPlus || {}), ...Object.keys(h.gsPlus || {})].includes(m.champ));
+  let trouvees = 0, paires = 0;
+  const rapport = [];
+  for (const l of cibles) {
+    const regimes = [{ nom: "rejet", plus: { cfg: {}, gs: {} } }];
+    if (l.genre === "objets" && l.tombstone)
+      regimes.push({ nom: "sauvetage", plus: plusDe({ champ: l.tombstone, dans: l.dans }, [SENT]) });
+    for (const r of regimes) {
+      const base = { client: mesure(l, r.plus, client), serveur: mesure(l, r.plus, server) };
+      if (base.client === null) continue;
+      // Un régime « sauvetage » n'a de sens que si la sonde est bel et bien morte au départ.
+      if (r.nom === "sauvetage" && base.client !== false) continue;
+      for (const m of cibles) {
+        if (nomL(m) === nomL(l)) continue;
+        if (m.champ === l.tombstone) continue;          // tombstone de L : 5e étage
+        if (l.conteneur && m.champ === l.conteneur.cle) continue;
+        paires++;
+        const plus = fusionne(r.plus, plusDe(m, sonde(m)));
+        const vc = mesure(l, plus, client), vs = mesure(l, plus, server);
+        if (vc === null) continue;
+        if (vc !== vs)
+          fail(`22e étage — ${nomL(l)} × ${nomL(m)} (régime ${r.nom}) : la sonde survit côté `
+             + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une `
+             + `règle qui fait dépendre ${nomL(l)} de ${nomL(m)} n'est écrite que dans une des `
+             + `deux copies.`);
+        if (vc === base.client) continue;
+        trouvees++;
+        rapport.push(`${nomL(l)} × ${nomL(m)} (${r.nom})`);
+        if (!paireDeclaree(l, m))
+          fail(`22e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'un élément de ${nomL(l)} dépend du `
+             + `contenu de ${nomL(m)} (régime ${r.nom} : la sonde ${vc ? "REVIENT" : "DISPARAÎT"} `
+             + `quand ${nomL(m)} porte la même valeur). Les étages des listes posent chaque liste `
+             + `SEULE et ne peuvent pas voir cette dépendance : effacer la règle les laisserait `
+             + `tous verts. Ajoute la paire à CHARNIERES, avec un TÉMOIN qui prouve qu'elle `
+             + `départage au lieu d'emporter toute la liste.`);
+      }
+    }
+  }
+  if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
+  console.log(`    (${cibles.length} listes × ${cibles.length - 1} × régimes = ${paires} paires `
+    + `mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
+  // Ce que ce recensement NE couvre PAS, écrit noir sur blanc : une charnière dont la valeur de
+  // rapprochement n'est pas la valeur BRUTE d'un champ (les marques composées `id#estampille`
+  // d'`owned`/`deCompleted`, par exemple) ne peut pas être trouvée par une sentinelle unique. Le
+  // régime « sauvetage » ne tourne donc que sur les listes d'objets, qui ont toutes un tombstone
+  // à marque simple.
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
