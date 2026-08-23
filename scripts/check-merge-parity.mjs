@@ -3946,6 +3946,36 @@ const CHARNIERES = [
     temoins: ["tw#2026-08-14"],
     gsPlus: { refusedKeys: ["tx#2026-08-14"] },
   },
+  // v2.17.4 — 26e étage. La SEULE charnière à DEUX sources que le projet porte en plus de celle de
+  // `customTasks` (déjà couverte par le témoin `ct_ref_morte` de sa fiche), et la seule que le
+  // recensement à une source ne pouvait pas atteindre : `pending` est filtrée par `completed`, et
+  // `completed` est elle-même filtrée par `deCompleted`. Poser `deCompleted` SEULE ne déplace rien
+  // (sans complétion, il n'y a rien à annuler) et poser `completed` seule est déjà la fiche
+  // ci-dessus — il faut les DEUX pour que la quête ressorte de la file d'attente.
+  // Vivant : `handleDeComplete` (App.jsx ~2929) retire la clé de `completed` et écrit son
+  // tombstone daté, mais ne touche PAS à `pending` — or `pending` est une UNION, donc la copie
+  // d'en face rapporte la clé et le filtre est la seule chose qui la retenait. Annuler une
+  // validation remet donc la quête « ⏳ en attente », ce qui est cohérent (le parent peut
+  // re-trancher) mais n'a jamais été écrit nulle part.
+  {
+    nom: "une validation ANNULÉE par le portail parent remet la quête dans la file d'attente",
+    genre: "chaines", champ: "pending", dans: "gameStates",
+    sens: "sauvetage", // l'élément VISÉ est celui que la charnière fait survivre
+    regle: "src/merge.js:273 — `pending.filter((k) => !completed.includes(k) …)`, où `completed` "
+         + "est elle-même filtrée par `_annulee` (merge.js:145) : DEUX structures à la fois",
+    vise: "tqa#2026-08-14",
+    // Le témoin est la même quête SANS l'annulation : validée, elle doit rester HORS de la file.
+    // Sans lui, un `pending` qui ignorerait `completed` en entier passerait au vert.
+    temoins: ["tqv#2026-08-14"],
+    gsPlus: {
+      completed: ["tqa#2026-08-14", "tqv#2026-08-14"],
+      completedAt: {
+        "tqa#2026-08-14": "2026-08-14T10:00:00.000Z",
+        "tqv#2026-08-14": "2026-08-14T10:00:00.000Z",
+      },
+      deCompleted: { "tqa#2026-08-14": 1786780000000 }, // > la complétion → `completed` la lâche
+    },
+  },
   // v2.17.1 — 23e étage. La SEULE charnière neuve du recensement étendu aux objets, et la seule
   // du projet dont la valeur de rapprochement est une DATE : le tombstone ne mord que s'il est
   // plus récent que la complétion qu'il annule (v2.16.82, parce qu'une quête peut être REFAITE le
@@ -4129,6 +4159,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     && [...Object.keys(h.cfgPlus || {}), ...Object.keys(h.gsPlus || {})].includes(m.champ));
   let trouvees = 0, paires = 0;
   const rapport = [];
+  // v2.17.4 — 26e étage : les paires qui DÉPLACENT la sonde sont les seules à pouvoir servir
+  // de premier étage à une règle qui en exige deux. On les garde au passage.
+  const candidats = [];
   for (const l of cibles) {
     const regimes = [{ nom: "rejet", plus: { cfg: {}, gs: {} } }];
     if (l.genre === "objets" && l.tombstone)
@@ -4154,6 +4187,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
         if (vc === base.client) continue;
         trouvees++;
         rapport.push(`${nomL(l)} × ${m.nom} (${r.nom})`);
+        candidats.push({ kind: "L", l, r, m, vc });
         if (!paireDeclaree(l, m))
           fail(`22e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'un élément de ${nomL(l)} dépend du `
              + `contenu de ${m.nom} (régime ${r.nom} : la sonde ${vc ? "REVIENT" : "DISPARAÎT"} `
@@ -4236,6 +4270,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
         if (vc === ref) continue;
         trouvees++;
         rapport.push(`${nomO(o)}{clé→${forme}} × ${m.nom} (clé)`);
+        candidats.push({ kind: "O", o, forme, val, m, vc });
         fail(`24e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'une CLÉ de ${nomO(o)}{clé→${forme}} dépend du contenu `
            + `de ${m.nom} (la clé-sonde ${vc ? "REVIENT" : "DISPARAÎT"} quand ${m.nom} porte la même `
            + `valeur). Le 6e étage pose chaque objet SEUL et ne peut pas voir cette dépendance : `
@@ -4254,8 +4289,90 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //   • aucun régime « sauvetage » côté objet : il demande une sonde déjà morte au départ, et
   //     aucun des 21 objets n'a de tombstone à lui (6e étage). Une règle qui RESSUSCITERAIT une
   //     clé d'objet à cause d'une autre structure ne serait donc pas nommée.
-  //   • une charnière qui exige DEUX autres structures à la fois reste invisible : la mesure ne
-  //     pose qu'une M à la fois, côté liste comme côté objet.
+  //   • (FERMÉ en v2.17.4) une charnière qui exige DEUX autres structures à la fois était
+  //     invisible : la mesure ne posait qu'une M à la fois, côté liste comme côté objet. Le 26e
+  //     étage prolonge les charnières qui ont DÉJÀ déplacé la sonde avec une seconde source, et il
+  //     en a nommé une vivante que personne ne surveillait (`pending` × `completed` × `deCompleted`).
+  //     Ce qui reste ouvert et se dit en chiffres : il ne prolonge QUE les 5 paires qui bougent, donc
+  //     une règle dont le PREMIER étage ne déplace rien à lui seul reste hors d'atteinte.
+
+  // ── 26e ÉTAGE : LES CHARNIÈRES À DEUX SOURCES ──────────────────────────────
+  // v2.17.4 — la piste de la v2.17.3, mot pour mot : « une charnière qui exige DEUX autres
+  // structures à la fois reste invisible, la mesure ne pose qu'une M à la fois — `completed` ×
+  // `completedAt` en est l'exemple vivant […] Il ne se mesure pas en ajoutant une forme mais en
+  // posant DEUX sources M à la fois — le produit passerait de `L × M` à `L × M × M'`, soit ~107²
+  // combinaisons par sonde, hors d'atteinte en force brute. La version tenable : ne croiser DEUX M
+  // que lorsque la première a laissé une trace (la sonde a bougé, mais pas assez pour être
+  // nommée), ce qui ramène le second facteur à une poignée de candidats. »
+  //
+  // « Bougé sans être nommée » se lit dans le code du premier passage, il n'y a rien à deviner :
+  // une paire qui déplace la sonde est soit une trouvaille NON déclarée — et alors le fichier
+  // tombe déjà, il n'y a pas de second étage à prolonger — soit une charnière DÉCLARÉE, qui a bel
+  // et bien bougé et que personne ne signale. Ces cinq-là sont les seuls M₁ qui ouvrent une porte :
+  // une M qui ne déplace rien ne peut pas être le premier étage d'une règle à deux étages, puisque
+  // le second n'aurait rien à annuler ni à confirmer. Le produit tombe de ~107² à 5 × 107.
+  //
+  // Ce que l'étage ajoute au premier passage : celui-ci demandait « la sonde bouge-t-elle quand M
+  // porte la marque ? ». Le 26e demande « et quand une SECONDE structure la porte AUSSI, bouge-
+  // t-elle encore ? ». C'est exactement la forme du seul sauvetage vivant du projet :
+  // `deCompleted[k]` condamne une clé de `completed`, `_completedAt[k]` la sauve — mais seulement
+  // si le tombstone l'a condamnée d'abord. Aucun passage à une seule M ne peut l'atteindre : sans
+  // tombstone la clé survit déjà, donc la date de complétion n'a rien à changer.
+  //
+  // Le point de comparaison porte le MÊME échafaudage que la mesure, sentinelle exceptée (la
+  // leçon du 24e étage, v2.17.2), et il porte AUSSI M₁ : ce qu'on mesure ici n'est pas « M₂
+  // change-t-elle quelque chose » — le premier passage l'a déjà demandé — mais « M₂ change-t-elle
+  // quelque chose UNE FOIS QUE M₁ a mordu ».
+  const clesTouchees = (p) => [...Object.keys(p.cfg || {}).map((k) => `config.${k}`),
+                               ...Object.keys(p.gs || {}).map((k) => `gameStates.${k}`)];
+  const mesureDe = (c, plus, impl) => (c.kind === "L"
+    ? mesure(c.l, plus, impl) : mesureO(c.o, c.val, plus, impl));
+  let triples = 0, paires3 = 0, collisions = 0;
+  for (const c of candidats) {
+    const nomSonde = c.kind === "L" ? nomL(c.l) : `${nomO(c.o)}{clé→${c.forme}}`;
+    const premier = c.kind === "L" ? fusionne(c.r.plus, c.m.plus) : c.m.plus;
+    // Les clés de premier niveau déjà écrites : celles de M₁ (et du régime), plus celle de la
+    // sonde elle-même côté liste.
+    const prises = new Set([...clesTouchees(premier),
+      ...(c.kind === "L" ? clesTouchees(plusDe(c.l, [])) : [`${c.o.dans}.${c.o.champ}`])]);
+    for (const m2 of sourcesM) {
+      if (m2.id === c.m.id) continue;                  // les trois formes d'un même objet
+      if (c.kind === "L") {
+        if (m2.id === nomL(c.l)) continue;
+        if (m2.champ === c.l.tombstone) continue;      // tombstone de L : 5e étage
+        if (c.l.conteneur && m2.champ === c.l.conteneur.cle) continue;
+      } else if (m2.id === nomO(c.o)) continue;
+      // Deux injections qui écrivent la MÊME clé de premier niveau : `fusionne` est un spread, la
+      // seconde effacerait la première et la mesure retomberait sur « L × M₂ » en le taisant. On
+      // saute, et on le COMPTE (une couverture qu'on borne se dit, v2.16.96).
+      if (clesTouchees(m2.plus).some((k) => prises.has(k))) { collisions++; continue; }
+      paires3++;
+      const ref = mesureDe(c, fusionne(premier, m2.plusTemoin), client);
+      const vc = mesureDe(c, fusionne(premier, m2.plus), client);
+      const vs = mesureDe(c, fusionne(premier, m2.plus), server);
+      if (vc === null || ref === null) continue;
+      if (vc !== vs)
+        fail(`26e étage — ${nomSonde} × ${c.m.nom} × ${m2.nom} : la sonde survit côté `
+           + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une règle `
+           + `qui fait dépendre ${nomSonde} de ${c.m.nom} ET de ${m2.nom} n'est écrite que dans `
+           + `une des deux copies.`);
+      if (vc === ref) continue;
+      triples++;
+      rapport.push(`${nomSonde} × ${c.m.nom} × ${m2.nom} (${c.kind === "L" ? c.r.nom : "clé"})`);
+      if (c.kind !== "L" || !paireDeclaree(c.l, m2))
+        fail(`26e étage — CHARNIÈRE À DEUX SOURCES NON DÉCLARÉE : une fois que ${c.m.nom} a mordu, `
+           + `le sort de ${nomSonde} dépend ENCORE du contenu de ${m2.nom} (la sonde `
+           + `${vc ? "REVIENT" : "DISPARAÎT"} quand ${m2.nom} porte la même valeur). Le premier `
+           + `passage ne pose qu'une source à la fois et ne peut pas voir ce second étage : `
+           + `effacer la règle le laisserait vert. Ajoute ${m2.champ} à la fiche CHARNIERES de `
+           + `${c.kind === "L" ? c.l.champ : "cet objet"}, avec un TÉMOIN qui prouve que la seconde `
+           + `source départage au lieu d'emporter toute la liste.`);
+    }
+  }
+  console.log(`    (${candidats.length} charnières prolongées × ${sourcesM.length} secondes sources `
+    + `= ${paires3} triplets mesurés, ${collisions} sautés (même clé de premier niveau que la `
+    + `première source), ${triples} charnières à deux sources)`);
+
   if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
   console.log(`    (${cibles.length} listes + ${sondes} objets sondés (${OBJETS.length} × ${FORMES.length} formes) × `
     + `${sourcesM.length} sources (dont ${OBJETS.length} objets × ${FORMES.length} formes : `
@@ -4272,10 +4389,11 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //     des unions par clé qui ne filtrent pas » n'est plus une lecture du code mais une mesure.
   //     Une raison écrite à côté de ce qu'elle décrit envoie le lecteur suivant refaire un travail
   //     déjà fait (v2.16.83) : les limites RÉELLES du côté objet sont écrites au 24e étage, pas ici.
-  //   • une charnière qui exige DEUX autres structures à la fois est invisible : la mesure pose
-  //     une seule M à la fois. `completed` × `completedAt` en est l'exemple vivant — `_completedAt`
-  //     ne SAUVE une clé que si `deCompleted` la condamne d'abord, donc le régime « sauvetage »,
-  //     qui ne pose que le tombstone de L, ne peut pas l'atteindre.
+  //   • (FERMÉ en v2.17.4) ce bloc affirmait qu'une charnière à DEUX sources est invisible, et
+  //     citait `completed` × `completedAt` comme son exemple vivant. C'est FAUX depuis le 26e
+  //     étage, qui nomme ce triplet-là par la mesure — avec deux autres. Ce qu'il ne couvre
+  //     toujours pas est écrit à sa place, pas ici (v2.16.83 : une raison écrite à côté de ce
+  //     qu'elle décrit envoie le lecteur suivant refaire un travail déjà fait).
 }
 
 if (failures) {
