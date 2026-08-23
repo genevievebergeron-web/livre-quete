@@ -4101,10 +4101,18 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   const monte = (savedAt, gsBase, cfgBase, pl, l, elems, plus) => mkFam(savedAt,
     { ...gsBase, ...(l.dans === "gameStates" ? bloc(l, elems) : {}), ...plus.gs },
     { ...cfgBase, ...(l.dans === "config" ? bloc(l, elems) : {}), ...plus.cfg }, pl);
+  // v2.17.5 — 27e étage. La SORTIE COMPLÈTE, normalisée sur la sentinelle. Les deux mesures
+  // qu'on compare portent le même échafaudage à la sentinelle près (SENT d'un côté, TEM de
+  // l'autre) : renommer l'une en l'autre rend les deux sorties TEXTUELLEMENT identiques dès que
+  // la fusion les a traitées pareil. Toute différence qui SURVIT à ce renommage est donc un
+  // endroit où la source injectée a changé quelque chose — et la sonde n'est qu'un de ces
+  // endroits.
+  const norm27 = (out) => JSON.stringify(out).split(SENT).join(TEM);
   const mesure = (l, plus, impl) => {
     const fA = monte("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, sonde(l), plus);
     const fB = monte("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, sonde(l), plus);
-    try { return present(l, litL(impl.mergeFamily(fA, fB), l)); } catch { return null; }
+    try { const out = impl.mergeFamily(fA, fB);
+          return { p: present(l, litL(out, l)), s: norm27(out), o: out }; } catch { return null; }
   };
   const plusDe = (m, elems) => (m.dans === "config"
     ? { cfg: bloc(m, elems), gs: {} } : { cfg: {}, gs: bloc(m, elems) });
@@ -4159,6 +4167,106 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     && [...Object.keys(h.cfgPlus || {}), ...Object.keys(h.gsPlus || {})].includes(m.champ));
   let trouvees = 0, paires = 0;
   const rapport = [];
+
+  // ── 27e ÉTAGE : LA TRACE, MESURÉE SUR TOUTE LA SORTIE ──────────────────────
+  // v2.17.5 — la piste de la v2.17.4, mot pour mot : « la conjonction pure ne se mesure pas en
+  // élargissant le produit […] mais en changeant ce qu'on appelle une "trace". Aujourd'hui la
+  // trace, c'est la sonde qui bouge. Une M₁ peut très bien ne pas déplacer la sonde ET changer la
+  // SORTIE ailleurs […] Comparer la fusion complète "M₁ avec sentinelle" à "M₁ avec témoin"
+  // (normalisée sur la sentinelle) donnerait la liste des M₁ qui laissent une trace SANS être
+  // nommées, et c'est elle qu'il faudrait prolonger. »
+  //
+  // La piste, prise AU PIED DE LA LETTRE, est INERTE — mesuré, pas supposé : sur une fusion NUE
+  // (sans sonde), les 107 sources rendent une sortie strictement identique avec la sentinelle et
+  // avec le témoin. **0 traceur sur 107**, et ce n'est pas un hasard de fixture, c'est structurel :
+  // une règle ne peut voir une sentinelle que si elle la RAPPROCHE d'une valeur présente ailleurs,
+  // et une sentinelle injectée dans un seul champ n'existe, par construction, qu'à un seul
+  // endroit. Sans un second porteur, il n'y a rien à rapprocher. Un garde-fou qui ne peut pas
+  // tomber, exactement ce que la v2.16.96 a appris à ne plus écrire.
+  //
+  // La question est un cran à côté, et elle se mesure : le second porteur, c'est LA SONDE. La
+  // mesure la pose déjà à chacune des 12 246 paires — ce qui manquait, ce n'est pas une injection
+  // de plus, c'est de REGARDER AILLEURS QUE LA SONDE. Jusqu'ici le recensement lisait UN booléen
+  // (`present(l, litL(out, l))`) : la sonde est-elle là ? Toute autre conséquence de la même
+  // injection — un élément VOISIN qui meurt, un champ que la sonde ne touche pas, un scalaire —
+  // sortait du champ de vision de tous les étages, puisque les autres posent leurs fixtures SANS
+  // sentinelle et ne peuvent pas déclencher une règle qui la cherche.
+  //
+  // Ce que l'étage ne coûte presque rien : les fusions sont DÉJÀ faites, seul le côté L demande
+  // un témoin de plus (le côté objet et le 26e étage en calculent un depuis la v2.17.2).
+  //
+  // Chaque trace doit être CLASSÉE. Trois familles, et aucune n'est une exemption en prose : le
+  // classement se calcule sur les fiches elles-mêmes, donc il périme tout seul si une fiche bouge.
+  //   • `tombstone`      — L (ou le tombstone que son régime « sauvetage » injecte) EST le
+  //                        tombstone déclaré de M. Le 5e étage tient la règle, vue du côté de M.
+  //   • `tombstone daté` — même chose pour les deux tombstones qui sont des OBJETS datés et non
+  //                        des listes de marques (`deCompleted`→`completed`, v2.16.82 ;
+  //                        `refundedRewards`→`owned`, v2.16.92). Ils ne peuvent pas porter de
+  //                        champ `tombstone` dans les fiches de listes, faute d'y être.
+  //   • `miroir`         — une fiche CHARNIERES écrite SUR M nomme déjà L comme sa condition.
+  //                        C'est la charnière déclarée, vue par l'autre bout.
+  // Tout le reste tombe.
+  const TOMBSTONES_DATES = { deCompleted: "completed", refundedRewards: "owned" };
+  const parNomL = new Map(cibles.map((t) => [nomL(t), t]));
+  const famille = (sources, m) => {
+    const t = parNomL.get(m.id);
+    for (const src of sources) {
+      if (!src) continue;
+      if (t && t.tombstone === src) return "tombstone";
+      if (TOMBSTONES_DATES[src] === m.champ) return "tombstone daté";
+    }
+    // `miroir` se lit dans les DEUX sens, et le second n'est pas un luxe : dans un triplet, la
+    // fiche qui explique la trace est écrite sur la PREMIÈRE source (`customTasks` sauvée par
+    // `assignments`, `completed` sauvée par `completedAt`), pas sur la seconde. Ne lire que le
+    // premier sens laissait ces deux-là NON CLASSÉES alors qu'elles sont déclarées depuis
+    // v2.17.0 et v2.17.4 — un faux positif se corrige dans la QUESTION (v2.16.96).
+    for (const h of CHARNIERES) {
+      const noms = [...Object.keys(h.cfgPlus || {}), ...Object.keys(h.gsPlus || {})];
+      if (h.champ === m.champ && sources.some((src) => src && noms.includes(src))) return "miroir";
+      if (sources.includes(h.champ) && noms.includes(m.champ)) return "miroir";
+    }
+    return null;
+  };
+  let traces = 0, tracesNonClassees = 0; const rapportTrace = [];
+  const traceVue = (nom, sources, m, a, b) => {
+    if (a.s === b.s) return false;
+    traces++;
+    const f = famille(sources, m);
+    rapportTrace.push(`[${f || "NON CLASSÉE"}] ${nom}`);
+    if (!f) tracesNonClassees++;
+    if (!f)
+      fail(`27e étage — TRACE NON CLASSÉE : ${nom}. La sonde ne bouge pas, mais la SORTIE de la `
+         + `fusion change quand ${m.nom} porte la sentinelle plutôt que le témoin. Une règle lit `
+         + `donc l'une de ces structures (${sources.filter(Boolean).join(", ")}) pour décider du `
+         + `sort de quelque chose que PERSONNE ne sonde : les autres étages posent leurs fixtures `
+         + `sans sentinelle et ne peuvent pas la déclencher. Déclare-la — comme tombstone dans la `
+         + `fiche de la liste visée, ou comme charnière dans CHARNIERES — ou ajoute-la à `
+         + `TOMBSTONES_DATES si c'est un tombstone daté de plus.`);
+    return true;
+  };
+  // La parité, elle aussi, ne portait que sur la sonde. La sortie complète est le contrôle
+  // strictement plus fort, et il est GRATUIT : les deux fusions sont déjà faites. Le chemin lent
+  // (re-sérialiser en triant les clés) ne sert qu'à ne PAS crier sur un simple écart d'ordre de
+  // clés entre les deux fichiers — ce qui n'a aucune conséquence pour l'app.
+  const stable = (v) => (v === null || typeof v !== "object" ? JSON.stringify(v)
+    : Array.isArray(v) ? `[${v.map(stable).join(",")}]`
+    : `{${Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + stable(v[k])).join(",")}}`);
+  let paritesSortie = 0, sortiesDivergentes = 0;
+  // v2.17.5 — prolonger une TRACE (et non plus seulement une morsure) ouvre une porte que le 26e
+  // étage n'avait pas : si la seconde source déplace la sonde À ELLE SEULE, le triplet n'est pas
+  // une règle à deux étages, c'est la règle à une source du premier passage vue une deuxième fois.
+  // Le premier passage a déjà la réponse pour chaque (sonde, régime, source) — on la garde.
+  const bougeSeule = new Map();
+  const pariteSortie = (nom, vc, vs) => {
+    paritesSortie++;
+    if (vc.s === vs.s || stable(vc.o) === stable(vs.o)) return;
+    sortiesDivergentes++;
+    fail(`27e étage — ${nom} : client et serveur rendent des SORTIES DIFFÉRENTES sous cette `
+       + `injection, alors que la sonde a le même sort des deux côtés. La divergence est donc `
+       + `ailleurs que là où le recensement regarde — une règle écrite dans une seule des deux `
+       + `copies, qu'aucun contrôle sur la sonde ne peut voir.`);
+  };
+
   // v2.17.4 — 26e étage : les paires qui DÉPLACENT la sonde sont les seules à pouvoir servir
   // de premier étage à une règle qui en exige deux. On les garde au passage.
   const candidats = [];
@@ -4170,7 +4278,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       const base = { client: mesure(l, r.plus, client), serveur: mesure(l, r.plus, server) };
       if (base.client === null) continue;
       // Un régime « sauvetage » n'a de sens que si la sonde est bel et bien morte au départ.
-      if (r.nom === "sauvetage" && base.client !== false) continue;
+      if (r.nom === "sauvetage" && base.client.p !== false) continue;
       for (const m of sourcesM) {
         if (m.id === nomL(l)) continue;
         if (m.champ === l.tombstone) continue;          // tombstone de L : 5e étage
@@ -4179,18 +4287,25 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
         const plus = fusionne(r.plus, m.plus);
         const vc = mesure(l, plus, client), vs = mesure(l, plus, server);
         if (vc === null) continue;
-        if (vc !== vs)
+        if (vc.p !== vs.p)
           fail(`22e étage — ${nomL(l)} × ${m.nom} (régime ${r.nom}) : la sonde survit côté `
-             + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une `
+             + `${vc.p ? "client" : "serveur"} et disparaît côté ${vc.p ? "serveur" : "client"}. Une `
              + `règle qui fait dépendre ${nomL(l)} de ${m.nom} n'est écrite que dans une des `
              + `deux copies.`);
-        if (vc === base.client) continue;
+        pariteSortie(`${nomL(l)} × ${m.nom} (régime ${r.nom})`, vc, vs);
+        const refT = mesure(l, fusionne(r.plus, m.plusTemoin), client);
+        if (refT !== null && vc.p === refT.p
+            && traceVue(`${nomL(l)} × ${m.nom} (${r.nom})`,
+                        [l.champ, ...(r.nom === "sauvetage" ? [l.tombstone] : [])], m, vc, refT))
+          candidats.push({ kind: "L", l, r, m, via: "trace" });
+        bougeSeule.set(`${nomL(l)}|${r.nom}|${m.nom}`, vc.p !== base.client.p);
+        if (vc.p === base.client.p) continue;
         trouvees++;
         rapport.push(`${nomL(l)} × ${m.nom} (${r.nom})`);
-        candidats.push({ kind: "L", l, r, m, vc });
+        candidats.push({ kind: "L", l, r, m, vc, via: "morsure" });
         if (!paireDeclaree(l, m))
           fail(`22e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'un élément de ${nomL(l)} dépend du `
-             + `contenu de ${m.nom} (régime ${r.nom} : la sonde ${vc ? "REVIENT" : "DISPARAÎT"} `
+             + `contenu de ${m.nom} (régime ${r.nom} : la sonde ${vc.p ? "REVIENT" : "DISPARAÎT"} `
              + `quand ${m.nom} porte la même valeur). Les étages des listes posent chaque liste `
              + `SEULE et ne peuvent pas voir cette dépendance : effacer la règle les laisserait `
              + `tous verts. Ajoute la paire à CHARNIERES, avec un TÉMOIN qui prouve qu'elle `
@@ -4243,7 +4358,8 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   const mesureO = (o, val, plus, impl) => {
     const fA = monteO("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, val, plus);
     const fB = monteO("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, val, plus);
-    try { return presentO(litO(impl.mergeFamily(fA, fB), o)); } catch { return null; }
+    try { const out = impl.mergeFamily(fA, fB);
+          return { p: presentO(litO(out, o)), s: norm27(out), o: out }; } catch { return null; }
   };
   let sondes = 0;
   for (const o of OBJETS) {
@@ -4251,9 +4367,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       const vide = { cfg: {}, gs: {} };
       const base = { client: mesureO(o, val, vide, client), serveur: mesureO(o, val, vide, server) };
       if (base.client === null) continue;
-      if (base.client !== base.serveur)
+      if (base.client.p !== base.serveur.p)
         fail(`24e étage — ${nomO(o)}{clé→${forme}} : la clé-sonde survit côté `
-           + `${base.client ? "client" : "serveur"} et disparaît côté ${base.client ? "serveur" : "client"}, `
+           + `${base.client.p ? "client" : "serveur"} et disparaît côté ${base.client.p ? "serveur" : "client"}, `
            + `SANS qu'aucune autre structure ne la vise. Les deux copies n'arbitrent pas cet objet pareil.`);
       sondes++;
       for (const m of sourcesM) {
@@ -4263,16 +4379,22 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
         const ref = mesureO(o, val, m.plusTemoin, client);
         const vc = mesureO(o, val, m.plus, client), vs = mesureO(o, val, m.plus, server);
         if (vc === null || ref === null) continue;
-        if (vc !== vs)
+        if (vc.p !== vs.p)
           fail(`24e étage — ${nomO(o)}{clé→${forme}} × ${m.nom} : la clé-sonde survit côté `
-             + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une règle qui `
+             + `${vc.p ? "client" : "serveur"} et disparaît côté ${vc.p ? "serveur" : "client"}. Une règle qui `
              + `fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies.`);
-        if (vc === ref) continue;
+        pariteSortie(`${nomO(o)}{clé→${forme}} × ${m.nom}`, vc, vs);
+        bougeSeule.set(`${nomO(o)}|${forme}|${m.nom}`, vc.p !== ref.p);
+        if (vc.p === ref.p) {
+          if (traceVue(`${nomO(o)}{clé→${forme}} × ${m.nom}`, [o.champ], m, vc, ref))
+            candidats.push({ kind: "O", o, forme, val, m, via: "trace" });
+          continue;
+        }
         trouvees++;
         rapport.push(`${nomO(o)}{clé→${forme}} × ${m.nom} (clé)`);
-        candidats.push({ kind: "O", o, forme, val, m, vc });
+        candidats.push({ kind: "O", o, forme, val, m, vc, via: "morsure" });
         fail(`24e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'une CLÉ de ${nomO(o)}{clé→${forme}} dépend du contenu `
-           + `de ${m.nom} (la clé-sonde ${vc ? "REVIENT" : "DISPARAÎT"} quand ${m.nom} porte la même `
+           + `de ${m.nom} (la clé-sonde ${vc.p ? "REVIENT" : "DISPARAÎT"} quand ${m.nom} porte la même `
            + `valeur). Le 6e étage pose chaque objet SEUL et ne peut pas voir cette dépendance : `
            + `effacer la règle le laisserait vert. Déclare la paire, avec un TÉMOIN qui prouve `
            + `qu'elle départage au lieu d'emporter tout l'objet.`);
@@ -4327,7 +4449,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
                                ...Object.keys(p.gs || {}).map((k) => `gameStates.${k}`)];
   const mesureDe = (c, plus, impl) => (c.kind === "L"
     ? mesure(c.l, plus, impl) : mesureO(c.o, c.val, plus, impl));
-  let triples = 0, paires3 = 0, collisions = 0;
+  let triples = 0, paires3 = 0, collisions = 0, seules = 0;
   for (const c of candidats) {
     const nomSonde = c.kind === "L" ? nomL(c.l) : `${nomO(c.o)}{clé→${c.forme}}`;
     const premier = c.kind === "L" ? fusionne(c.r.plus, c.m.plus) : c.m.plus;
@@ -4346,33 +4468,51 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       // seconde effacerait la première et la mesure retomberait sur « L × M₂ » en le taisant. On
       // saute, et on le COMPTE (une couverture qu'on borne se dit, v2.16.96).
       if (clesTouchees(m2.plus).some((k) => prises.has(k))) { collisions++; continue; }
+      if (bougeSeule.get(c.kind === "L" ? `${nomL(c.l)}|${c.r.nom}|${m2.nom}`
+                                        : `${nomO(c.o)}|${c.forme}|${m2.nom}`)) { seules++; continue; }
       paires3++;
       const ref = mesureDe(c, fusionne(premier, m2.plusTemoin), client);
       const vc = mesureDe(c, fusionne(premier, m2.plus), client);
       const vs = mesureDe(c, fusionne(premier, m2.plus), server);
       if (vc === null || ref === null) continue;
-      if (vc !== vs)
+      if (vc.p !== vs.p)
         fail(`26e étage — ${nomSonde} × ${c.m.nom} × ${m2.nom} : la sonde survit côté `
-           + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une règle `
+           + `${vc.p ? "client" : "serveur"} et disparaît côté ${vc.p ? "serveur" : "client"}. Une règle `
            + `qui fait dépendre ${nomSonde} de ${c.m.nom} ET de ${m2.nom} n'est écrite que dans `
            + `une des deux copies.`);
-      if (vc === ref) continue;
+      pariteSortie(`${nomSonde} × ${c.m.nom} × ${m2.nom}`, vc, vs);
+      if (vc.p === ref.p) {
+        traceVue(`${nomSonde} × ${c.m.nom} × ${m2.nom}`,
+                 [c.kind === "L" ? c.l.champ : c.o.champ,
+                  ...(c.kind === "L" && c.r.nom === "sauvetage" ? [c.l.tombstone] : []),
+                  c.m.champ], m2, vc, ref);
+        continue;
+      }
       triples++;
       rapport.push(`${nomSonde} × ${c.m.nom} × ${m2.nom} (${c.kind === "L" ? c.r.nom : "clé"})`);
       if (c.kind !== "L" || !paireDeclaree(c.l, m2))
-        fail(`26e étage — CHARNIÈRE À DEUX SOURCES NON DÉCLARÉE : une fois que ${c.m.nom} a mordu, `
+        fail(`26e étage — CHARNIÈRE À DEUX SOURCES NON DÉCLARÉE : une fois que ${c.m.nom} a `
+           + `${c.via === "trace" ? "laissé une TRACE hors sonde" : "mordu"}, `
            + `le sort de ${nomSonde} dépend ENCORE du contenu de ${m2.nom} (la sonde `
-           + `${vc ? "REVIENT" : "DISPARAÎT"} quand ${m2.nom} porte la même valeur). Le premier `
+           + `${vc.p ? "REVIENT" : "DISPARAÎT"} quand ${m2.nom} porte la même valeur). Le premier `
            + `passage ne pose qu'une source à la fois et ne peut pas voir ce second étage : `
            + `effacer la règle le laisserait vert. Ajoute ${m2.champ} à la fiche CHARNIERES de `
            + `${c.kind === "L" ? c.l.champ : "cet objet"}, avec un TÉMOIN qui prouve que la seconde `
            + `source départage au lieu d'emporter toute la liste.`);
     }
   }
-  console.log(`    (${candidats.length} charnières prolongées × ${sourcesM.length} secondes sources `
+  const parMorsure = candidats.filter((c) => c.via === "morsure").length;
+  console.log(`    (${parMorsure} charnières + ${candidats.length - parMorsure} traces hors sonde `
+    + `prolongées × ${sourcesM.length} secondes sources `
     + `= ${paires3} triplets mesurés, ${collisions} sautés (même clé de premier niveau que la `
-    + `première source), ${triples} charnières à deux sources)`);
+    + `première source), ${seules} sautés (la seconde source mord déjà SEULE), `
+    + `${triples} charnières à deux sources)`);
 
+  console.log(`    (${paritesSortie} sorties complètes comparées client/serveur, `
+    + `${sortiesDivergentes} divergente(s) ; ${traces} traces hors sonde dont `
+    + `${tracesNonClassees} non classée(s) — familles : `
+    + `${[...new Set(rapportTrace.map((r) => r.slice(1, r.indexOf("]"))))].sort().join(", ")})`);
+  if (process.env.DBG27) console.log("      " + rapportTrace.join("\n      "));
   if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
   console.log(`    (${cibles.length} listes + ${sondes} objets sondés (${OBJETS.length} × ${FORMES.length} formes) × `
     + `${sourcesM.length} sources (dont ${OBJETS.length} objets × ${FORMES.length} formes : `
@@ -4389,6 +4529,24 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //     des unions par clé qui ne filtrent pas » n'est plus une lecture du code mais une mesure.
   //     Une raison écrite à côté de ce qu'elle décrit envoie le lecteur suivant refaire un travail
   //     déjà fait (v2.16.83) : les limites RÉELLES du côté objet sont écrites au 24e étage, pas ici.
+  // Ce que le 27e étage NE couvre PAS, écrit noir sur blanc :
+  //   • **une seule DIRECTION.** Les 12 246 paires (et les 2 390 triplets) sont toutes mesurées
+  //     avec la copie FRAÎCHE en base et la périmée en incoming, dans cet ordre. Une règle écrite
+  //     dans un seul sens — le patron exact des quatre quadrants de `mergeGS` (18e étage) —
+  //     laisserait tout ce recensement vert. Le coût est connu et se dit : refaire le produit dans
+  //     l'autre sens le DOUBLE (~60 s de plus). Le mesurer seulement sur les 23 paires qui bougent
+  //     déjà ne serait PAS la même question : une règle qui ne mord que dans le sens non mesuré
+  //     n'a, par définition, laissé aucune trace dans le sens mesuré.
+  //   • **le classement se fait par NOM de champ, pas par EFFET.** `famille` accepte une trace dès
+  //     qu'une fiche déclarée relie les deux structures ; elle ne vérifie pas que la trace relevée
+  //     est bien CELLE de la règle déclarée. Une SECONDE règle entre les deux mêmes champs serait
+  //     avalée en silence. La fermer demanderait de comparer les CHEMINS que la trace déplace à
+  //     ceux que la fiche produit — mesurable, mais c'est un autre étage.
+  //   • la conjonction PURE reste hors d'atteinte, et la borne se chiffre : la prolongation est
+  //     désormais nourrie par les morsures ET par les traces (5 + 18), mais une première source qui
+  //     ne change RIEN — ni la sonde, ni la sortie — n'ouvre toujours aucune porte. Sur une fusion
+  //     NUE, les 107 sources sont dans ce cas (0 traceur, mesuré) ; avec la sonde posée, 18 en
+  //     sortent. Une conjonction dont la première marche est en dehors de ces 18 reste muette.
   //   • (FERMÉ en v2.17.4) ce bloc affirmait qu'une charnière à DEUX sources est invisible, et
   //     citait `completed` × `completedAt` comme son exemple vivant. C'est FAUX depuis le 26e
   //     étage, qui nomme ce triplet-là par la mesure — avec deux autres. Ce qu'il ne couvre
