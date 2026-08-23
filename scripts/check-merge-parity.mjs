@@ -3877,6 +3877,36 @@ const CHARNIERES = [
     temoins: ["tw#2026-08-14"],
     gsPlus: { refusedKeys: ["tx#2026-08-14"] },
   },
+  // v2.17.1 — 23e étage. La SEULE charnière neuve du recensement étendu aux objets, et la seule
+  // du projet dont la valeur de rapprochement est une DATE : le tombstone ne mord que s'il est
+  // plus récent que la complétion qu'il annule (v2.16.82, parce qu'une quête peut être REFAITE le
+  // même jour sous la même `doneKey`).
+  {
+    nom: "une quête ANNULÉE par le portail parent sort de la liste des complétées",
+    genre: "chaines", champ: "completed", dans: "gameStates",
+    sens: "rejet",
+    regle: "src/merge.js:145 — `completed.filter((k) => !_annulee(k))`, où `_annulee` croise "
+         + "`deCompleted[k]` (l'annulation) avec `_completedAt[k]` (la complétion)",
+    vise: "tan#2026-08-14",
+    // Deux témoins, et le second n'est pas un doublon du premier. Le premier prouve que la règle
+    // départage au lieu d'emporter toute la liste. Le SECOND est le discriminant DATÉ, celui que
+    // la v2.16.82 a écrit exprès : une quête annulée puis REFAITE le même jour porte bel et bien
+    // un tombstone, mais une complétion plus récente — elle doit rester. Sans lui, remplacer la
+    // comparaison de dates par un simple `if (deCompleted[k]) return true` passerait au vert, et
+    // la quête refaite disparaîtrait pour de bon.
+    temoins: ["tsn#2026-08-14", "tre#2026-08-14"],
+    gsPlus: {
+      completedAt: {
+        "tan#2026-08-14": "2026-08-14T10:00:00.000Z", // annulée APRÈS avoir été faite
+        "tsn#2026-08-14": "2026-08-14T10:00:00.000Z", // jamais annulée
+        "tre#2026-08-14": "2026-08-15T10:00:00.000Z", // REFAITE après l'annulation
+      },
+      deCompleted: {
+        "tan#2026-08-14": 1786780000000, // > la complétion du 14 → mord
+        "tre#2026-08-14": 1786700000000, // < la complétion du 15 → ne mord plus
+      },
+    },
+  },
 ];
 
 console.log("· charnières — le sort d'un élément décidé par une AUTRE liste");
@@ -3972,6 +4002,32 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     ? { cfg: bloc(m, elems), gs: {} } : { cfg: {}, gs: bloc(m, elems) });
   const fusionne = (p, q) => ({ cfg: { ...p.cfg, ...q.cfg }, gs: { ...p.gs, ...q.gs } });
 
+  // v2.17.1 — 23e étage, la piste de la v2.17.0 mot pour mot : « le recensement mesure L × M
+  // **liste contre liste**. Les charnières vers un OBJET (`completedAt`, `deCompleted`,
+  // `rewardBuyTs`, `hiddenRewards`/`hiddenWeek`, `equipped`…) ne sont pas dans le produit — or
+  // `deCompleted` EST une charnière datée de `completed` (v2.16.82) […] Étendre le côté M aux
+  // OBJETS (une clé portant la sentinelle) dirait s'il y en a d'autres. »
+  //
+  // Dans une LISTE, poser la sentinelle c'est y poser un ÉLÉMENT. Dans un OBJET, c'est y poser une
+  // CLÉ — c'est exactement ainsi que les règles du projet consultent un objet : `deCompleted[k]`,
+  // `_completedAt[k]`, `rewardBuyTs[id]`. La clé est posée EN PLUS du contenu de la fixture, pas à
+  // la place : remplacer l'objet en bloc effacerait le `day`/`week` des seaux datés et ferait
+  // mesurer une forme qui n'existe nulle part (leçon de la v2.16.86).
+  //
+  // DEUX valeurs, parce que le projet rapproche par un objet de deux façons et qu'une clé n'en
+  // porte qu'une à la fois : un TEXTE (`equipped[slot] === itemId`) et une DATE
+  // (`Number(deCompleted[k]) > Date.parse(completedAt[k])`, où un texte vaut 0 et ne mord jamais).
+  // La date est volontairement lointaine : un tombstone daté ne mord que s'il est plus récent que
+  // ce qu'il annule. Une seule des deux formes aurait laissé l'autre moitié muette.
+  const modeleObjet = (o) => ((o.dans === "config" ? famA.config : gsA)[o.champ]) || {};
+  const sourcesM = [
+    ...cibles.map((m) => ({ id: nomL(m), nom: nomL(m), champ: m.champ, plus: plusDe(m, sonde(m)) })),
+    ...OBJETS.flatMap((o) => [["texte", SENT], ["date", 9e12]].map(([forme, val]) => ({
+      id: `${o.dans}.${o.champ}`, nom: `${o.dans}.${o.champ}{clé→${forme}}`, champ: o.champ,
+      plus: plusDe(o, { ...modeleObjet(o), [SENT]: val }),
+    }))),
+  ];
+
   // Les paires déjà tranchées ailleurs. Une charnière déclarée dans CHARNIERES, ou le tombstone
   // de la liste elle-même (5e étage), ne sont pas des trouvailles.
   const paireDeclaree = (l, m) => CHARNIERES.some((h) => h.champ === l.champ
@@ -3987,26 +4043,26 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       if (base.client === null) continue;
       // Un régime « sauvetage » n'a de sens que si la sonde est bel et bien morte au départ.
       if (r.nom === "sauvetage" && base.client !== false) continue;
-      for (const m of cibles) {
-        if (nomL(m) === nomL(l)) continue;
+      for (const m of sourcesM) {
+        if (m.id === nomL(l)) continue;
         if (m.champ === l.tombstone) continue;          // tombstone de L : 5e étage
         if (l.conteneur && m.champ === l.conteneur.cle) continue;
         paires++;
-        const plus = fusionne(r.plus, plusDe(m, sonde(m)));
+        const plus = fusionne(r.plus, m.plus);
         const vc = mesure(l, plus, client), vs = mesure(l, plus, server);
         if (vc === null) continue;
         if (vc !== vs)
-          fail(`22e étage — ${nomL(l)} × ${nomL(m)} (régime ${r.nom}) : la sonde survit côté `
+          fail(`22e étage — ${nomL(l)} × ${m.nom} (régime ${r.nom}) : la sonde survit côté `
              + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une `
-             + `règle qui fait dépendre ${nomL(l)} de ${nomL(m)} n'est écrite que dans une des `
+             + `règle qui fait dépendre ${nomL(l)} de ${m.nom} n'est écrite que dans une des `
              + `deux copies.`);
         if (vc === base.client) continue;
         trouvees++;
-        rapport.push(`${nomL(l)} × ${nomL(m)} (${r.nom})`);
+        rapport.push(`${nomL(l)} × ${m.nom} (${r.nom})`);
         if (!paireDeclaree(l, m))
           fail(`22e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'un élément de ${nomL(l)} dépend du `
-             + `contenu de ${nomL(m)} (régime ${r.nom} : la sonde ${vc ? "REVIENT" : "DISPARAÎT"} `
-             + `quand ${nomL(m)} porte la même valeur). Les étages des listes posent chaque liste `
+             + `contenu de ${m.nom} (régime ${r.nom} : la sonde ${vc ? "REVIENT" : "DISPARAÎT"} `
+             + `quand ${m.nom} porte la même valeur). Les étages des listes posent chaque liste `
              + `SEULE et ne peuvent pas voir cette dépendance : effacer la règle les laisserait `
              + `tous verts. Ajoute la paire à CHARNIERES, avec un TÉMOIN qui prouve qu'elle `
              + `départage au lieu d'emporter toute la liste.`);
@@ -4014,13 +4070,21 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     }
   }
   if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
-  console.log(`    (${cibles.length} listes × ${cibles.length - 1} × régimes = ${paires} paires `
-    + `mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
-  // Ce que ce recensement NE couvre PAS, écrit noir sur blanc : une charnière dont la valeur de
-  // rapprochement n'est pas la valeur BRUTE d'un champ (les marques composées `id#estampille`
-  // d'`owned`/`deCompleted`, par exemple) ne peut pas être trouvée par une sentinelle unique. Le
-  // régime « sauvetage » ne tourne donc que sur les listes d'objets, qui ont toutes un tombstone
-  // à marque simple.
+  console.log(`    (${cibles.length} listes × ${sourcesM.length} sources (dont ${OBJETS.length} objets × 2 formes) `
+    + `× régimes = ${paires} paires mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
+  // Ce que ce recensement NE couvre PAS, écrit noir sur blanc :
+  //   • une charnière dont la valeur de rapprochement n'est pas la valeur BRUTE d'un champ (les
+  //     marques composées `id#estampille` d'`owned`/`deCompleted`, par exemple) ne peut pas être
+  //     trouvée par une sentinelle unique. Le régime « sauvetage » ne tourne donc que sur les
+  //     listes d'objets, qui ont toutes un tombstone à marque simple.
+  //   • le côté L reste les LISTES. Un objet n'est jamais SONDÉ : on ne mesure pas si le sort
+  //     d'une CLÉ de `deCompleted` dépend d'une autre structure. Les 21 objets du projet sont
+  //     tous des unions par clé (max, ou dernière-écriture-gagne) et aucun ne filtre — mais c'est
+  //     une lecture du code, pas une mesure, donc ça reste un angle mort.
+  //   • une charnière qui exige DEUX autres structures à la fois est invisible : la mesure pose
+  //     une seule M à la fois. `completed` × `completedAt` en est l'exemple vivant — `_completedAt`
+  //     ne SAUVE une clé que si `deCompleted` la condamne d'abord, donc le régime « sauvetage »,
+  //     qui ne pose que le tombstone de L, ne peut pas l'atteindre.
 }
 
 if (failures) {
