@@ -2560,6 +2560,75 @@ for (const c of CLE_DIFFERENTE) {
   }
 }
 
+// ── Clé ÉGALE : ce que la règle ne NOMME PAS suit quand même son seau ───────
+// v2.17.2 — l'angle mort SYMÉTRIQUE de la table ci-dessus, et il vit dans la MÊME table. Le
+// contrôle « clé DIFFÉRENTE » exige que le seau frais soit rendu SEUL ; le 13e étage mesure, à clé
+// ÉGALE, que la SOUS-CLÉ fraîche gagne. Aucun des deux ne demande ce que devient un champ que la
+// règle ne nomme pas — et à clé égale, sept des dix seaux RECONSTRUISAIENT leur objet à partir de
+// leurs seuls champs nommés (`return {day:A.day, ids:…}`), jetant tout le reste en silence. La
+// branche « clés différentes », elle, rend le seau ENTIER : deux politiques pour le même objet,
+// et c'est la plus fréquente qui perdait — la clé d'arbitrage est égale 7 jours sur 7.
+//
+// Personne ne pouvait le voir : les fixtures de ce fichier ne mettaient une clé d'arbitrage à
+// égalité que dans les deux contrôles qui lisent une sous-clé NOMMÉE (13e étage, OBJETS_ARBITRES).
+// C'est mot pour mot la leçon de la v2.16.80, appliquée un cran à côté. Trouvé de biais, par
+// l'échafaudage du 24e étage : injecter une liste nichée réécrit la clé de son conteneur, ce qui
+// mettait `weeklyChallenge`/`weeklyQuests` à égalité par accident et faisait crier le recensement
+// des charnières. Le faux positif a été corrigé dans la question (témoin par paire) ; ce qu'il
+// montrait est ici, avec un contrôle à lui.
+//
+// Rien de perdu en prod aujourd'hui — les dix seaux n'y portent que leurs champs nommés — donc
+// aucune donnée à réparer. Ce que ça coûtait : le prochain champ ajouté à un seau disparaissait à
+// la première synchro, sans erreur, sans trace, et le garde-fou restait vert.
+//
+// La mesure exige DEUX choses, et la seconde n'est pas un doublon de la première : le champ doit
+// SURVIVRE, et il doit porter la valeur du côté FRAIS. Rendre `{...recent, ...perime, …}` (ou
+// laisser l'ordre des arguments trancher) le ferait survivre en emportant la valeur périmée —
+// exactement le défaut que la v2.16.87 a réparé sur `_mergePlayer` et sur les ÉLÉMENTS de
+// `weeklyChallenge.challenges`, un cran plus bas dans la même fonction.
+console.log("· seaux datés — clé ÉGALE : un champ que la règle ne NOMME PAS suit quand même le seau");
+{
+  const NN = "champNonNomme";
+  for (const c of CLE_DIFFERENTE) {
+    if (c.frais[NN] !== undefined || c.perime[NN] !== undefined)
+      { fail(`« ${c.chemin} » — la fixture porte déjà « ${NN} » : choisis un autre nom de témoin.`); continue; }
+    if (c.frais[c.cle] === undefined)
+      { fail(`« ${c.chemin} » — la fixture fraîche n'a pas de clé « ${c.cle} » à mettre à égalité.`); continue; }
+    // Clé d'arbitrage forcée à ÉGALITÉ (le cas normal, 7 jours sur 7), et un champ que AUCUNE règle
+    // ne nomme, contradictoire entre les deux copies — sans contradiction, le contrôle serait inerte.
+    const frais  = { ...c.frais,  [NN]: "valeur_fraiche" };
+    const perime = { ...c.perime, [c.cle]: c.frais[c.cle], [NN]: "valeur_perimee" };
+    const gsF = c.dans === "gameStates" ? { ...gsA, [c.champ]: frais } : gsA;
+    const gsP = c.dans === "gameStates" ? { ...gsB, [c.champ]: perime } : gsB;
+    const cfgF = c.dans === "config" ? { ...famA.config, [c.champ]: frais } : famA.config;
+    const cfgP = c.dans === "config" ? { ...famB.config, [c.champ]: perime } : famB.config;
+    const fA = mkFam("2026-08-15T12:00:00.000Z", gsF, cfgF, plA);
+    const fB = mkFam("2026-08-14T12:00:00.000Z", gsP, cfgP, plB);
+    for (const [sens, base, inc] of [["frais en base", fA, fB], ["frais en incoming", fB, fA]]) {
+      const lit = (fn) => { const o = fn(base, inc); return (c.dans === "config" ? o.config : o.gameStates[0])[c.champ] || {}; };
+      const rc = lit(client.mergeFamily), rs = lit(server.mergeFamily);
+      if (rc[NN] !== rs[NN])
+        fail(`« ${c.chemin} » (${sens}) — client rend « ${NN} » = ${JSON.stringify(rc[NN])} et le serveur `
+           + `${JSON.stringify(rs[NN])}. La règle du seau n'est pas écrite pareil dans les deux copies.`);
+      for (const [impl, out] of [["client", rc], ["serveur", rs]]) {
+        if (out[NN] === undefined)
+          fail(`${impl} (${sens}) — « ${c.chemin} » : à « ${c.cle} » ÉGAL, le champ « ${NN} » a été JETÉ. `
+             + `La règle RECONSTRUIT son seau à partir des seuls champs qu'elle nomme, alors que la `
+             + `branche « clés différentes » rend le seau entier — et la clé est égale 7 jours sur 7. `
+             + `Le huitième champ ajouté un jour à ce seau disparaîtra à la première synchro, sans `
+             + `erreur et sans trace. Écris « périmé d'abord, frais ensuite, champs nommés par-dessus » `
+             + `(\`_seau\`) dans src/merge.js ET server-merge.cjs.`);
+        else if (out[NN] !== "valeur_fraiche")
+          fail(`${impl} (${sens}) — « ${c.chemin} » : « ${NN} » survit mais porte la valeur PÉRIMÉE `
+             + `(${JSON.stringify(out[NN])}). Ce que la règle ne nomme pas doit suivre la FRAÎCHEUR, `
+             + `pas l'ordre des arguments de l'appelant : le client met son état local en \`a\`, le `
+             + `serveur son état stocké — chaque côté garderait le sien et la divergence ne se `
+             + `refermerait jamais (v2.16.89).`);
+      }
+    }
+  }
+}
+
 // ── 16e ÉTAGE : les chemins que l'ENTRÉE porte et que la SORTIE jette ───────
 // v2.16.92 — piste laissée par la v2.16.91, mot pour mot : « le recensement du 15e étage est pris
 // sur UNE SEULE fusion, `mergeFamily(famA, famB)`. Or tout le reste du fichier mesure en QUATRE
@@ -3974,14 +4043,23 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // Saturer TOUS les champs de la même sentinelle : la mesure n'a pas à deviner par quel champ la
   // charnière passe. Les nombres restent tels quels (une date ou un compteur ne sert jamais de
   // clé de rapprochement entre deux listes).
-  const sature = (modele, cle) => {
+  const sature = (modele, cle, s = SENT) => {
     const out = {};
     for (const [k, v] of Object.entries(modele || {}))
-      out[k] = typeof v === "string" ? SENT : Array.isArray(v) ? [SENT] : v;
-    out[cle] = SENT;
+      out[k] = typeof v === "string" ? s : Array.isArray(v) ? [s] : v;
+    out[cle] = s;
     return out;
   };
-  const sonde = (l) => (l.genre === "chaines" ? [SENT] : [sature(l.frais, l.cle)]);
+  const sonde = (l, s = SENT) => (l.genre === "chaines" ? [s] : [sature(l.frais, l.cle, s)]);
+  // v2.17.2 — 24e étage. Le TÉMOIN : la même injection, à la sentinelle près. Une source M
+  // n'écrit pas que son contenu — elle écrit aussi l'échafaudage qui l'entoure (le `fixe` du
+  // conteneur d'une liste nichée, par exemple). Comparer « M avec la sentinelle » à une mesure de
+  // base SANS M du tout, c'est laisser cet échafaudage passer pour une charnière : quatre faux
+  // positifs au premier passage, tous `weeklyQuests`/`weeklyChallenge` × leur propre liste
+  // nichée, dont l'injection réécrit la clé d'arbitrage du conteneur et fait changer de branche.
+  // Corrigé dans la QUESTION, pas par une exemption (v2.16.96) : le point de comparaison porte le
+  // MÊME échafaudage, et ne diffère que par la valeur cherchée.
+  const TEM = "TEMOIN_CHARNIERE";
   const present = (l, out) => (l.genre === "chaines"
     ? (out || []).includes(SENT)
     : (out || []).some((e) => e && e[l.cle] === SENT));
@@ -4021,10 +4099,12 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // ce qu'il annule. Une seule des deux formes aurait laissé l'autre moitié muette.
   const modeleObjet = (o) => ((o.dans === "config" ? famA.config : gsA)[o.champ]) || {};
   const sourcesM = [
-    ...cibles.map((m) => ({ id: nomL(m), nom: nomL(m), champ: m.champ, plus: plusDe(m, sonde(m)) })),
+    ...cibles.map((m) => ({ id: nomL(m), nom: nomL(m), champ: m.champ, plus: plusDe(m, sonde(m)),
+                            plusTemoin: plusDe(m, sonde(m, TEM)) })),
     ...OBJETS.flatMap((o) => [["texte", SENT], ["date", 9e12]].map(([forme, val]) => ({
       id: `${o.dans}.${o.champ}`, nom: `${o.dans}.${o.champ}{clé→${forme}}`, champ: o.champ,
       plus: plusDe(o, { ...modeleObjet(o), [SENT]: val }),
+      plusTemoin: plusDe(o, { ...modeleObjet(o), [TEM]: val }),
     }))),
   ];
 
@@ -4069,9 +4149,102 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       }
     }
   }
+
+  // ── 24e ÉTAGE : le côté L ouvert aux OBJETS ────────────────────────────────
+  // v2.17.2 — la piste de la v2.17.1, mot pour mot : « le côté L reste les listes — aucun objet
+  // n'est SONDÉ, donc si le sort d'une CLÉ de `deCompleted` dépendait d'ailleurs, rien ne le
+  // verrait (les 21 objets sont tous des unions par clé qui ne filtrent pas, mais c'est une
+  // LECTURE DU CODE, pas une mesure) ». C'était l'angle mort SYMÉTRIQUE de celui que la v2.17.1
+  // vient de fermer côté M : la mesure savait déjà poser une clé-sentinelle dans un objet, elle
+  // ne savait pas encore en SONDER un.
+  //
+  // Dans une liste, la sonde est un ÉLÉMENT et on demande « survit-il ? ». Dans un objet, la
+  // sonde est une CLÉ et on demande la même chose. Deux différences qui comptent :
+  //   • la clé est posée EN PLUS du contenu que CHAQUE côté porte déjà (`{...gsBase[champ],
+  //     [SENT]: val}`), jamais à la place : remplacer l'objet en bloc effacerait le `day`/`week`
+  //     des seaux datés et ferait mesurer une forme qui n'existe nulle part (v2.16.86). Et le
+  //     contenu vient de la base du côté mesuré, pas de `famA` pour les deux : c'est ce qui fait
+  //     que les seaux datés arbitrent vraiment.
+  //   • « présente » veut dire clé présente ET valeur non nulle. Sur un objet, le projet écrit
+  //     un retrait de DEUX façons (6e étage) : `delete h.placed[ancre]` (`house`) et `null` sur
+  //     la clé (`equipped`, `settings`). Ne regarder que `hasOwnProperty` rendrait la moitié des
+  //     retraits invisibles.
+  //
+  // DEUX formes de valeur, pour la même raison que côté M : une charnière rapproche par TEXTE
+  // (`equipped[slot] === itemId`) ou par DATE (`Number(deCompleted[k]) > …`, où un texte vaut 0
+  // et ne mord jamais). Un seul régime, en revanche : « sauvetage » demande une sonde déjà morte
+  // au départ, or aucun objet du projet n'a de tombstone à lui (les 21 sont classés `sansRetrait`,
+  // `valeurNulle` ou `derniereEcriture` au 6e étage) — il n'y a rien pour tuer la clé d'abord.
+  const nomO = (o) => `${o.dans}.${o.champ}`;
+  const litO = (fam, o) => ((o.dans === "config" ? fam.config : fam.gameStates[0])[o.champ]) || {};
+  const presentO = (obj) => obj[SENT] !== undefined && obj[SENT] !== null;
+  // La clé-sonde est posée EN DERNIER, PAR-DESSUS ce que la source M a écrit — pas avant. Sans
+  // ça, une M qui vit DANS l'objet sondé (`config.weeklyQuests.assignments` est une liste nichée
+  // dont le conteneur EST `weeklyQuests`) réécrit le conteneur en bloc et efface la sonde : la
+  // mesure crie « charnière » sur son propre échafaudage. Quatre faux positifs de cette forme au
+  // premier passage. Corriger dans la QUESTION plutôt qu'exempter la paire (v2.16.96) : la paire
+  // reste MESURÉE, la sonde survit à l'injection, et ce qui la fait disparaître ne peut plus être
+  // que la fusion elle-même.
+  const monteO = (savedAt, gsBase, cfgBase, pl, o, val, plus) => {
+    const gs = { ...gsBase, ...plus.gs }, cfg = { ...cfgBase, ...plus.cfg };
+    const cible = o.dans === "gameStates" ? gs : cfg;
+    cible[o.champ] = { ...(cible[o.champ] || {}), [SENT]: val };
+    return mkFam(savedAt, gs, cfg, pl);
+  };
+  const mesureO = (o, val, plus, impl) => {
+    const fA = monteO("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, val, plus);
+    const fB = monteO("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, val, plus);
+    try { return presentO(litO(impl.mergeFamily(fA, fB), o)); } catch { return null; }
+  };
+  let sondes = 0;
+  for (const o of OBJETS) {
+    for (const [forme, val] of [["texte", SENT], ["date", 9e12]]) {
+      const vide = { cfg: {}, gs: {} };
+      const base = { client: mesureO(o, val, vide, client), serveur: mesureO(o, val, vide, server) };
+      if (base.client === null) continue;
+      if (base.client !== base.serveur)
+        fail(`24e étage — ${nomO(o)}{clé→${forme}} : la clé-sonde survit côté `
+           + `${base.client ? "client" : "serveur"} et disparaît côté ${base.client ? "serveur" : "client"}, `
+           + `SANS qu'aucune autre structure ne la vise. Les deux copies n'arbitrent pas cet objet pareil.`);
+      sondes++;
+      for (const m of sourcesM) {
+        if (m.id === nomO(o)) continue;
+        paires++;
+        // Le point de comparaison porte le MÊME échafaudage que la mesure, sentinelle exceptée.
+        const ref = mesureO(o, val, m.plusTemoin, client);
+        const vc = mesureO(o, val, m.plus, client), vs = mesureO(o, val, m.plus, server);
+        if (vc === null || ref === null) continue;
+        if (vc !== vs)
+          fail(`24e étage — ${nomO(o)}{clé→${forme}} × ${m.nom} : la clé-sonde survit côté `
+             + `${vc ? "client" : "serveur"} et disparaît côté ${vc ? "serveur" : "client"}. Une règle qui `
+             + `fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies.`);
+        if (vc === ref) continue;
+        trouvees++;
+        rapport.push(`${nomO(o)}{clé→${forme}} × ${m.nom} (clé)`);
+        fail(`24e étage — CHARNIÈRE NON DÉCLARÉE : le sort d'une CLÉ de ${nomO(o)}{clé→${forme}} dépend du contenu `
+           + `de ${m.nom} (la clé-sonde ${vc ? "REVIENT" : "DISPARAÎT"} quand ${m.nom} porte la même `
+           + `valeur). Le 6e étage pose chaque objet SEUL et ne peut pas voir cette dépendance : `
+           + `effacer la règle le laisserait vert. Déclare la paire, avec un TÉMOIN qui prouve `
+           + `qu'elle départage au lieu d'emporter tout l'objet.`);
+      }
+    }
+  }
+  // Ce que le 24e étage NE couvre PAS, écrit noir sur blanc :
+  //   • la valeur de la clé-sonde est un TEXTE ou un NOMBRE. Le projet encode ses dates des DEUX
+  //     façons — `deCompleted[k]` en millisecondes, `completedAt[k]` en ISO — et un rapprochement
+  //     daté ne mord que si les deux bouts parlent le même encodage. Une charnière qui lirait
+  //     `Date.parse(L[k])` contre une M en ISO est donc hors d'atteinte, des deux côtés du produit.
+  //     C'est la seule des trois qui se mesure sans réécrire le principe : ajouter une 3e forme
+  //     `{clé→ISO}` aux deux côtés dirait s'il y en a une.
+  //   • aucun régime « sauvetage » côté objet : il demande une sonde déjà morte au départ, et
+  //     aucun des 21 objets n'a de tombstone à lui (6e étage). Une règle qui RESSUSCITERAIT une
+  //     clé d'objet à cause d'une autre structure ne serait donc pas nommée.
+  //   • une charnière qui exige DEUX autres structures à la fois reste invisible : la mesure ne
+  //     pose qu'une M à la fois, côté liste comme côté objet.
   if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
-  console.log(`    (${cibles.length} listes × ${sourcesM.length} sources (dont ${OBJETS.length} objets × 2 formes) `
-    + `× régimes = ${paires} paires mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
+  console.log(`    (${cibles.length} listes + ${sondes} objets sondés (${OBJETS.length} × 2 formes) × `
+    + `${sourcesM.length} sources (dont ${OBJETS.length} objets × 2 formes) × régimes = ${paires} paires `
+    + `mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
   // Ce que ce recensement NE couvre PAS, écrit noir sur blanc :
   //   • une charnière dont la valeur de rapprochement n'est pas la valeur BRUTE d'un champ (les
   //     marques composées `id#estampille` d'`owned`/`deCompleted`, par exemple) ne peut pas être

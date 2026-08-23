@@ -112,10 +112,21 @@ const _mergeCalendar = (a, b, removedIds, preferIncoming) => {
   return [...byId.values(), ...noId];
 };
 const mergePetXp = (a, b) => { const out = { ...(a||{}) }; for (const k in (b||{})) out[k] = Math.max(out[k]||0, b[k]||0); return out; };
-const mergeBossBattle = (a, b) => { a=a||{}; b=b||{};
+// v2.17.2 — 24e étage. À clé d'arbitrage ÉGALE — le cas NORMAL, 7 jours sur 7 — sept seaux datés
+// RECONSTRUISAIENT leur objet à partir des seuls champs que leur règle nomme, et jetaient tout le
+// reste en silence, alors que la branche « clés différentes » rend le seau ENTIER. Deux politiques
+// pour le même objet, et c'est la branche la plus fréquente qui perdait. Même défaut que
+// `_mergePlayer` et que les ÉLÉMENTS de `weeklyChallenge.challenges` (v2.16.87), un cran plus haut
+// et jamais relevé : les fixtures du garde-fou n'avaient jamais mis une clé d'arbitrage à égalité
+// (v2.16.80). Rien de perdu en prod aujourd'hui (les sept seaux n'y portent que leurs champs
+// nommés) — mais le huitième champ ajouté un jour disparaissait à la première synchro.
+// « Périmé d'abord, frais ensuite, champs nommés par-dessus » : ce que la règle ne nomme pas suit
+// quand même son seau, et suit la FRAÎCHEUR, pas l'ordre des arguments de l'appelant (v2.16.89).
+const _seau = (perime, recent, nommes) => ({ ...(perime || {}), ...(recent || {}), ...nommes });
+const mergeBossBattle = (a, b, preferIncoming) => { a=a||{}; b=b||{};
   if (!a.bossId) return b.bossId ? b : { bossId:null, earned:0, spent:0, dmg:0 };
   if (!b.bossId) return a;
-  if (a.bossId === b.bossId) return { bossId:a.bossId, earned:Math.max(a.earned||0,b.earned||0), spent:Math.max(a.spent||0,b.spent||0), dmg:Math.max(a.dmg||0,b.dmg||0) };
+  if (a.bossId === b.bossId) return _seau(preferIncoming ? a : b, preferIncoming ? b : a, { bossId:a.bossId, earned:Math.max(a.earned||0,b.earned||0), spent:Math.max(a.spent||0,b.spent||0), dmg:Math.max(a.dmg||0,b.dmg||0) });
   return (new Date(b.bossId) > new Date(a.bossId)) ? b : a;
 };
 const mergeGS = (a, b, preferIncoming) => {
@@ -272,14 +283,14 @@ const mergeGS = (a, b, preferIncoming) => {
     activeRoutineId: preferIncoming ? (b.activeRoutineId ?? a.activeRoutineId ?? null) : (a.activeRoutineId ?? b.activeRoutineId ?? null), // v2.16.76 — voir `mode` ci-dessus
     hiddenRewards: _hidden.ids,       // v2.16.76 — seau daté, voir `_hidden` plus haut
     hiddenWeek: _hidden.day || null,  // v2.16.76 — indissociable de `hiddenRewards` ci-dessus
-    dailyClaimed: (() => { const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
+    dailyClaimed: (() => { const A=a.dailyClaimed||{}, B=b.dailyClaimed||{}; if (A.day && A.day===B.day) return _seau(preferIncoming ? A : B, preferIncoming ? B : A, { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }); return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // v2.12.2 — miroir du fix client (bug "notification félicitation qui revient sans cesse") :
     // dernière-écriture-gagne laissait une soeur/frère au savedAt plus récent ressusciter en bloc
     // une file jamais vidée. Union + tombstone consumedCelebrationIds, même patron que refundedRewards.
     consumedCelebrationIds: _uniq([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]).slice(-300),
     pendingCelebrations: (() => { const consumed = new Set([...(a.consumedCelebrationIds||[]), ...(b.consumedCelebrationIds||[])]); const seen = new Set(); const out = []; for (const c of [...(a.pendingCelebrations||[]), ...(b.pendingCelebrations||[])]) { if (!c || !c.id || consumed.has(c.id) || seen.has(c.id)) continue; seen.add(c.id); out.push(c); } return out; })(),
     petXp: mergePetXp(a.petXp, b.petXp),
-    petDay: (() => { const A=a.petDay||{}, B=b.petDay||{}; if (A.day && A.day===B.day) return { day:A.day, xp:Math.max(A.xp||0,B.xp||0) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
+    petDay: (() => { const A=a.petDay||{}, B=b.petDay||{}; if (A.day && A.day===B.day) return _seau(preferIncoming ? A : B, preferIncoming ? B : A, { day:A.day, xp:Math.max(A.xp||0,B.xp||0) }); return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // v2.16.88 — voir src/merge.js : `_byKey` aux DEUX niveaux (le côté frais gagne sur un palier en
     // collision, un palier connu d'un seul côté survit). L'ancienne règle gardait toujours `a`.
     petEvo: (() => { const A=a.petEvo||{}, B=b.petEvo||{}, out={};
@@ -319,7 +330,7 @@ const mergeGS = (a, b, preferIncoming) => {
     activeDays: _uniq([...(a.activeDays||[]), ...(b.activeDays||[])]),
     // v2.16.34 — miroir du merge client (App.jsx, mergeGS) : ratchet par rang, jamais de recul.
     leagueTier: (() => { const RANK={bronze:0,argent:1,or:2,diamant:3}; const ra=RANK[a.leagueTier]||0, rb=RANK[b.leagueTier]||0; return rb>=ra ? (b.leagueTier||"bronze") : (a.leagueTier||"bronze"); })(),
-    bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle),
+    bossBattle: mergeBossBattle(a.bossBattle, b.bossBattle, preferIncoming),
     settings: _byKey(a.settings, b.settings), // v2.16.79 — réglages d'accessibilité : une tablette en retard les rallumait un par un
     // v2.16.74 — miroir du merge client (src/merge.js) : compteur à vie par étiquette de tâche,
     // MAX clé par clé, famille `coinsLifetime`/`leagueTier`.
@@ -329,14 +340,14 @@ const mergeGS = (a, b, preferIncoming) => {
     // l'existant en entier. Mesuré par `scripts/check-merge-parity.mjs` (nouveau, lancé au build).
     // « rituel déjà fêté aujourd'hui » (v1.68.0) : sans l'union par jour, la fête d'un rituel
     // revient une 2e fois. Même famille que le bug v2.12.2 (« félicitation qui revient sans cesse »).
-    ritualCelebrated: (() => { const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if (A.day && A.day===B.day) return { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
+    ritualCelebrated: (() => { const A=a.ritualCelebrated||{}, B=b.ritualCelebrated||{}; if (A.day && A.day===B.day) return _seau(preferIncoming ? A : B, preferIncoming ? B : A, { day:A.day, ids:_uniq([...(A.ids||[]),...(B.ids||[])]) }); return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // Surnoms de familiers (v2.4.2) : union par petId, sinon le surnom donné sur une tablette
     // disparaît dès qu'un autre appareil pousse un objet qui ne le contient pas.
     petNickname: _byKey(a.petNickname, b.petNickname), // v2.16.79 — renommer un familier DÉJÀ nommé est une collision sur la même sous-clé
     // Budget-temps quotidien (Backlog #13) : même jour → MAX. Sans ça, un appareil qui a compté
     // moins de minutes REMET le compteur du jour à sa valeur à lui — le plafond posé par le parent
     // (« 30 min ») se retrouve silencieusement repoussé d'autant.
-    sessionMinutes: (() => { const A=a.sessionMinutes||{}, B=b.sessionMinutes||{}; if (A.day && A.day===B.day) return { day:A.day, minutes:Math.max(A.minutes||0,B.minutes||0) }; return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
+    sessionMinutes: (() => { const A=a.sessionMinutes||{}, B=b.sessionMinutes||{}; if (A.day && A.day===B.day) return _seau(preferIncoming ? A : B, preferIncoming ? B : A, { day:A.day, minutes:Math.max(A.minutes||0,B.minutes||0) }); return ((B.day||"")>=(A.day||"")) ? (B.day?B:A) : (A.day?A:B); })(),
     // Annonces archivées par l'enfant (v2.6.0) : union, sinon une annonce balayée revient.
     dismissedAnnouncements: _uniq([...(a.dismissedAnnouncements||[]), ...(b.dismissedAnnouncements||[])]),
     // v2.16.71 — `challengeTiers` n'avait de règle NULLE PART (ni client ni serveur), alors que
@@ -346,7 +357,7 @@ const mergeGS = (a, b, preferIncoming) => {
     // semaine PASSÉE écrase celui de la semaine en cours → l'effet repasse et repaie. Règle : même
     // semaine → union des paliers (monotone, un palier payé ne se dépaie jamais) ; semaine
     // différente → la plus récente gagne. Même patron que `dailyClaimed`/`ritualCelebrated`.
-    challengeTiers: (() => { const A=a.challengeTiers||{}, B=b.challengeTiers||{}; if (A.week && A.week===B.week) return { week:A.week, tiers:_uniq([...(A.tiers||[]),...(B.tiers||[])]) }; return ((B.week||"")>=(A.week||"")) ? (B.week?B:A) : (A.week?A:B); })(),
+    challengeTiers: (() => { const A=a.challengeTiers||{}, B=b.challengeTiers||{}; if (A.week && A.week===B.week) return _seau(preferIncoming ? A : B, preferIncoming ? B : A, { week:A.week, tiers:_uniq([...(A.tiers||[]),...(B.tiers||[])]) }); return ((B.week||"")>=(A.week||"")) ? (B.week?B:A) : (A.week?A:B); })(),
   };
 };
 // v1.66.0 (fix B2) : pseudo / themeId / themeChosenAt en DERNIÈRE-ÉCRITURE-GAGNE (preferIncoming)
@@ -522,7 +533,7 @@ const mergeFamily = (base, incoming) => {
           emoji: preferIncoming ? (c.emoji ?? ex.emoji) : (ex.emoji ?? c.emoji),
           checkins: {...(ex.checkins||{}), ...(c.checkins||{})} });
       });
-      return { weekKey, challenges:[...cm.values()] };
+      return _seau(preferIncoming ? bWC : iWC, preferIncoming ? iWC : bWC, { weekKey, challenges:[...cm.values()] });
     })(),
   };
   // v2.16.52 — même union que le `mergeFamily` du client (src/merge.js) : `seenVersions` (versions
