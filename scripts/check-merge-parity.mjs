@@ -4097,11 +4097,26 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // (`Number(deCompleted[k]) > Date.parse(completedAt[k])`, où un texte vaut 0 et ne mord jamais).
   // La date est volontairement lointaine : un tombstone daté ne mord que s'il est plus récent que
   // ce qu'il annule. Une seule des deux formes aurait laissé l'autre moitié muette.
+  // v2.17.3 — 25e étage, la piste de la v2.17.2 mot pour mot : « la sonde vaut un TEXTE ou un
+  // NOMBRE, or le projet encode ses dates des DEUX façons (`deCompleted` en millisecondes,
+  // `completedAt` en ISO) et un rapprochement daté ne mord que si les deux bouts parlent le même
+  // encodage — une charnière qui lirait `Date.parse(L[k])` contre une M en ISO est hors d'atteinte
+  // des DEUX côtés du produit. Ajouter une 3e forme `{clé→ISO}` aux deux côtés dirait s'il y en a. »
+  //
+  // Les trois formes sont mutuellement AVEUGLES, et c'est exactement ce qui fait qu'aucune n'est le
+  // doublon d'une autre — chacune est le seul encodage que sa famille de règles sait lire :
+  //   • `Number(v) > 1e12` (la forme de `deCompleted`) vaut NaN sur un ISO ET sur la sentinelle
+  //   • `Date.parse(v)`    (la forme de `completedAt`) vaut NaN sur 9e12-le-NOMBRE et sur la sentinelle
+  //   • `v === autreChamp` (la forme d'`equipped`)     ne rapproche que deux TEXTES égaux
+  // La MÊME instante des deux côtés (9e12 ms et son ISO) : une charnière datée ne mord que si les
+  // deux bouts parlent le même encodage, donc la forme est posée côté L **et** côté M. En ajouter
+  // une d'un seul côté ne mesurerait rien de neuf — le produit ne croiserait jamais ISO × ISO.
+  const FORMES = [["texte", SENT], ["date", 9e12], ["ISO", new Date(9e12).toISOString()]];
   const modeleObjet = (o) => ((o.dans === "config" ? famA.config : gsA)[o.champ]) || {};
   const sourcesM = [
     ...cibles.map((m) => ({ id: nomL(m), nom: nomL(m), champ: m.champ, plus: plusDe(m, sonde(m)),
                             plusTemoin: plusDe(m, sonde(m, TEM)) })),
-    ...OBJETS.flatMap((o) => [["texte", SENT], ["date", 9e12]].map(([forme, val]) => ({
+    ...OBJETS.flatMap((o) => FORMES.map(([forme, val]) => ({
       id: `${o.dans}.${o.champ}`, nom: `${o.dans}.${o.champ}{clé→${forme}}`, champ: o.champ,
       plus: plusDe(o, { ...modeleObjet(o), [SENT]: val }),
       plusTemoin: plusDe(o, { ...modeleObjet(o), [TEM]: val }),
@@ -4198,7 +4213,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   };
   let sondes = 0;
   for (const o of OBJETS) {
-    for (const [forme, val] of [["texte", SENT], ["date", 9e12]]) {
+    for (const [forme, val] of FORMES) {
       const vide = { cfg: {}, gs: {} };
       const base = { client: mesureO(o, val, vide, client), serveur: mesureO(o, val, vide, server) };
       if (base.client === null) continue;
@@ -4230,30 +4245,33 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     }
   }
   // Ce que le 24e étage NE couvre PAS, écrit noir sur blanc :
-  //   • la valeur de la clé-sonde est un TEXTE ou un NOMBRE. Le projet encode ses dates des DEUX
-  //     façons — `deCompleted[k]` en millisecondes, `completedAt[k]` en ISO — et un rapprochement
-  //     daté ne mord que si les deux bouts parlent le même encodage. Une charnière qui lirait
-  //     `Date.parse(L[k])` contre une M en ISO est donc hors d'atteinte, des deux côtés du produit.
-  //     C'est la seule des trois qui se mesure sans réécrire le principe : ajouter une 3e forme
-  //     `{clé→ISO}` aux deux côtés dirait s'il y en a une.
+  //   • (FERMÉ en v2.17.3) la valeur de la clé-sonde valait un TEXTE ou un NOMBRE, alors que le
+  //     projet encode ses dates des DEUX façons — `deCompleted[k]` en millisecondes, `completedAt[k]`
+  //     en ISO. La 3e forme `{clé→ISO}` est posée des deux côtés du produit et la réponse est ZÉRO.
+  //     Falsifié : une charnière `petNickname[k]` × `completedAt[k]` par `Date.parse` écrite dans
+  //     LES DEUX copies est nommée par la paire ISO × ISO — et par elle seule. Avec deux formes,
+  //     ou avec la 3e d'un seul côté du produit, l'étage reste VERT sur la même règle.
   //   • aucun régime « sauvetage » côté objet : il demande une sonde déjà morte au départ, et
   //     aucun des 21 objets n'a de tombstone à lui (6e étage). Une règle qui RESSUSCITERAIT une
   //     clé d'objet à cause d'une autre structure ne serait donc pas nommée.
   //   • une charnière qui exige DEUX autres structures à la fois reste invisible : la mesure ne
   //     pose qu'une M à la fois, côté liste comme côté objet.
   if (process.env.DBG22) console.log("      " + rapport.join("\n      "));
-  console.log(`    (${cibles.length} listes + ${sondes} objets sondés (${OBJETS.length} × 2 formes) × `
-    + `${sourcesM.length} sources (dont ${OBJETS.length} objets × 2 formes) × régimes = ${paires} paires `
+  console.log(`    (${cibles.length} listes + ${sondes} objets sondés (${OBJETS.length} × ${FORMES.length} formes) × `
+    + `${sourcesM.length} sources (dont ${OBJETS.length} objets × ${FORMES.length} formes : `
+    + `${FORMES.map(([f]) => f).join("/")}) × régimes = ${paires} paires `
     + `mesurées, ${trouvees} charnières, ${CHARNIERES.length} déclarées)`);
   // Ce que ce recensement NE couvre PAS, écrit noir sur blanc :
   //   • une charnière dont la valeur de rapprochement n'est pas la valeur BRUTE d'un champ (les
   //     marques composées `id#estampille` d'`owned`/`deCompleted`, par exemple) ne peut pas être
   //     trouvée par une sentinelle unique. Le régime « sauvetage » ne tourne donc que sur les
   //     listes d'objets, qui ont toutes un tombstone à marque simple.
-  //   • le côté L reste les LISTES. Un objet n'est jamais SONDÉ : on ne mesure pas si le sort
-  //     d'une CLÉ de `deCompleted` dépend d'une autre structure. Les 21 objets du projet sont
-  //     tous des unions par clé (max, ou dernière-écriture-gagne) et aucun ne filtre — mais c'est
-  //     une lecture du code, pas une mesure, donc ça reste un angle mort.
+  //   • (PÉRIMÉ, réécrit en v2.17.3) ce bloc affirmait encore « le côté L reste les LISTES, un
+  //     objet n'est jamais SONDÉ, ça reste un angle mort ». C'est FAUX depuis le 24e étage
+  //     (v2.17.2), qui sonde les 21 objets par une CLÉ : l'angle mort est fermé, et « les 21 sont
+  //     des unions par clé qui ne filtrent pas » n'est plus une lecture du code mais une mesure.
+  //     Une raison écrite à côté de ce qu'elle décrit envoie le lecteur suivant refaire un travail
+  //     déjà fait (v2.16.83) : les limites RÉELLES du côté objet sont écrites au 24e étage, pas ici.
   //   • une charnière qui exige DEUX autres structures à la fois est invisible : la mesure pose
   //     une seule M à la fois. `completed` × `completedAt` en est l'exemple vivant — `_completedAt`
   //     ne SAUVE une clé que si `deCompleted` la condamne d'abord, donc le régime « sauvetage »,

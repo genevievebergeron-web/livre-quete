@@ -6,6 +6,9 @@
 // ⚠️ À CHAQUE nouvelle version : ajouter l'entrée EN TÊTE de ce tableau (voir APP_VERSION dans App.jsx).
 
 export const CHANGELOG = [
+  { version:"2.17.3", date:"2026-08-23", features:[
+    "\ud83d\udee0\ufe0f Petite fondation technique (rien de visible pour toi).",
+  ]},
   { version:"2.17.2", date:"2026-08-23", features:[
     "\ud83d\udee0\ufe0f Petite fondation technique (rien de visible pour toi).",
   ]},
