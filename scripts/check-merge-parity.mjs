@@ -4729,7 +4729,10 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     const fA = monteO(EQ_ST, gsA, famA.config, plA, o, val, plus);
     const fB = monteO(EQ_ST, gsB, famB.config, plB, o, val, plus);
     try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
-          return { p: presentO(litO(out, o)) }; } catch { return null; }
+          // v2.17.8 — 30e étage : la SIGNATURE manquait de ce côté-ci. `mesureO` (23e étage) la
+          // rend depuis toujours, `mesureOEq` non — et c'est exactement ce qui rendait le côté
+          // objet inconfrontable au régime mesuré. Voir `memeQueAvantO` plus bas.
+          return { p: presentO(litO(out, o)), s: norm27(out) }; } catch { return null; }
   };
   let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
   const rapportEq = [];
@@ -4774,6 +4777,40 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
        + `divergence ici veut dire qu'une règle lit \`savedAt\` autrement — et alors tout le `
        + `recensement des 22e-28e étages, qui ne mesure QU'UN écart d'estampille, a un angle mort `
        + `de plus.`);
+  };
+  // ── 30e ÉTAGE : L'ANGLE MORT SYMÉTRIQUE DU 29e ─────────────────────────────
+  // v2.17.8 — la piste de la v2.17.7, point (b), mot pour mot : « la redondance n'est mesurée que
+  // pour les LISTES — le côté objet (`mesureOEq`) n'a jamais été confronté au régime du 23e étage
+  // de la même façon, et rien ne dit que l'identité y tient : c'est exactement le patron
+  // angle-mort-symétrique, où le contrôle jumeau porte le même trou et où le « zéro » ne parle que
+  // d'une moitié. »
+  //
+  // Le chiffre le disait déjà, et personne ne l'avait lu : l'étage annonçait « 4147 paires » et
+  // « 2803 sorties confrontées au régime mesuré ». Les 1344 manquantes ne sont pas un échantillon,
+  // c'est LA MOITIÉ OBJET EN ENTIER (21 objets × 65 sources − 21 auto-exclusions). `memeQueAvant`
+  // n'est appelée que dans la boucle des listes ; la boucle des objets ne l'a jamais appelée, et
+  // `mesureOEq` ne rendait même pas la signature qu'il aurait fallu lui donner.
+  //
+  // Pourquoi ça compte MAINTENANT plutôt qu'un jour : le point (a) de la même piste propose de
+  // CESSER de mesurer le côté ENDROIT, au motif qu'il est « provablement redondant » avec le 22e.
+  // Cette preuve est celle de `memeQueAvant` — donc elle ne porte QUE sur les listes. Appliquer
+  // (a) aux deux moitiés reviendrait à retirer une mesure de la moitié objet sur la foi d'une
+  // preuve qui ne l'a jamais couverte : le patron « tolérance adossée au mauvais étage », en pire,
+  // parce qu'ici c'est la mesure elle-même qu'on retirerait. (b) est donc le PRÉALABLE de (a),
+  // pas sa suite.
+  const memeQueAvantO = (o, val, plus, fc) => {
+    const fw = mesureO(o, val, plus, client);
+    if (fw === null) return;
+    memeSortie++;
+    if (fw.s === fc.s) return;
+    fail(`30e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ (côté OBJET) : ${nomO(o)}{clé→${FORME_INV}}, à `
+       + `l'ENDROIT, la fusion ne rend pas la même sortie selon que les deux estampilles sont `
+       + `ÉGALES ou que la base est la plus fraîche. Or les deux passent par la même branche : `
+       + `\`isNewer\` est le SEUL lecteur de \`savedAt\` (src/merge.js:508, 573, 867) et il rend `
+       + `\`false\` dans les deux cas. Même conséquence qu'au 29e étage côté liste — le `
+       + `recensement des 22e-29e étages, qui ne mesure QU'UN écart d'estampille, aurait un angle `
+       + `mort de plus — et une raison SUPPLÉMENTAIRE de crier ici : c'est cette identité, et elle `
+       + `seule, qui autoriserait à ne plus mesurer le côté ENDROIT des objets.`);
   };
 
   // (a) la sonde SEULE. Avant toute source : si le sort de l'élément dépend déjà de l'ordre à
@@ -4847,8 +4884,25 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `qui fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies — et `
            + `seule l'égalité des estampilles la fait mordre.`);
       ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`);
+      memeQueAvantO(o, val, m.plus, fc); // v2.17.8 — 30e étage
     }
   }
+  // v2.17.8 — 30e étage, le contrôle qui garde le contrôle. `memeSortie` était jusqu'ici un
+  // compteur d'ambiance : il valait 2803 sur 4147 paires et personne n'a lu l'écart pendant une
+  // nuit entière. Un compteur qu'on IMPRIME sans le confronter à ce qu'il devrait valoir ne
+  // surveille rien (v2.16.96 : un garde-fou qui ne peut pas tomber n'en est pas un). Il est
+  // maintenant ADOSSÉ à `pairesEq` : le jour où une moitié cesse d'être confrontée — parce qu'un
+  // `continue` est ajouté, parce qu'une boucle oublie l'appel, ou parce qu'on applique le point
+  // (a) de la piste sans le mesurer d'abord — ce n'est plus un chiffre qui baisse en silence,
+  // c'est un build rouge. C'est la leçon `temoin-appelle-la-mesure-directement` posée à l'endroit :
+  // le contrôle regarde ce que les BOUCLES ont demandé, pas ce que la machinerie sait faire.
+  if (memeSortie !== pairesEq)
+    fail(`30e étage — COUVERTURE INCOMPLÈTE : ${pairesEq} paires mesurées à \`savedAt\` ÉGAL, mais `
+       + `seulement ${memeSortie} confrontées au régime mesuré (${pairesEq - memeSortie} muettes). `
+       + `Chaque paire posée à égalité doit dire si sa sortie est la MÊME qu'au régime des 22e-29e `
+       + `étages — c'est cette identité qui autorise à transporter leurs conclusions ici. Une `
+       + `moitié non confrontée rend le « 0 arbitrage par l'ordre seul » vrai pour une moitié `
+       + `seulement, et c'est l'angle mort qui a vécu une nuit entière (v2.17.7 : 2803 sur 4147).`);
   console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules (${basesOrdre} tranchée(s) par l'ordre), `
     + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
     + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
