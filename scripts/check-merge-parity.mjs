@@ -4684,6 +4684,192 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //     Et ce cas n'est pas exotique : deux appareils qui poussent dans la même seconde, ou un
   //     serveur qui renvoie l'estampille qu'il vient de recevoir, y tombent.
 
+
+  // ── 29e ÉTAGE : L'ÉGALITÉ ──────────────────────────────────────────────────
+  // v2.17.7 — la piste de la v2.17.6, mot pour mot : « les deux sens mesurés partagent le MÊME
+  // écart de `savedAt`, et c'est le vrai angle mort qui reste. `isNewer` compare avec un `>`
+  // STRICT (src/merge.js:29) : à `savedAt` ÉGAL, `preferIncoming` vaut `false` dans LES DEUX
+  // ordres d'arguments — les deux sens que le 28e étage compare retombent sur la même branche, et
+  // ce qui tranche n'est plus la préférence mais l'ORDRE seul, le patron exact de la v2.16.89.
+  // Le 18e étage ne le voit pas non plus : il compare `(A,B,vrai)`↔`(B,A,faux)` et
+  // `(A,B,faux)`↔`(B,A,vrai)`, jamais `(A,B,faux)`↔`(B,A,faux)`. Le mesurer ne demande pas un
+  // produit de plus, seulement de rejouer la passe réduite du 28e étage avec `savedAt` identique
+  // des deux côtés. »
+  //
+  // Le quadrant `(A,B,faux)`↔`(B,A,faux)` est le SEUL que personne ne pose, et c'est celui que la
+  // vraie vie produit : deux appareils qui poussent dans la même seconde, ou un serveur qui
+  // renvoie l'estampille qu'il vient de recevoir. Les 22e/24e étages mesurent `(A,B,faux)`, le
+  // 28e mesure `(B,A,vrai)`, le 18e apparie les quadrants CROISÉS. À égalité, les deux appelants
+  // — `mergeFamily(local, distant)` sur l'appareil A et `mergeFamily(local, distant)` sur
+  // l'appareil B, qui est le même appel avec les arguments échangés — prennent la MÊME branche de
+  // `preferIncoming`, et rien d'autre que la POSITION ne les départage.
+  //
+  // Ce que la mesure isole, et pourquoi ce n'est pas du bruit : la sonde est posée IDENTIQUE sur
+  // les deux copies (`monte`/`monteO` écrivent le même bloc des deux côtés), et la source M
+  // aussi. Les deux copies sont donc D'ACCORD sur l'élément mesuré. Si son sort change quand on
+  // échange les arguments, ce n'est pas « les deux copies portent des contenus différents » —
+  // c'est que la règle décide du sort d'un élément que les deux copies partagent en regardant
+  // QUI est en `a`. Comparer les SORTIES COMPLÈTES à l'envers, en revanche, serait du bruit pur :
+  // `famA` et `famB` sont bâties pour se contredire partout, et tout champ scalaire arbitré
+  // « le frais gagne, sinon la base » diverge trivialement à égalité. La question est posée sur
+  // la sonde, pas sur la sortie (v2.16.96 : corriger dans la QUESTION).
+  //
+  // Les DEUX copies sont mesurées, pour la raison exacte du 28e étage : une règle écrite dans le
+  // SEUL serveur et qui n'arbitre par l'ordre qu'à égalité ne déplacerait jamais la sonde côté
+  // client, et l'étage resterait muet. On compare donc les quatre `p` : client-endroit,
+  // client-envers, serveur-endroit, serveur-envers.
+  const EQ_ST = "2026-08-15T12:00:00.000Z";
+  const mesureEq = (l, plus, impl, inv) => {
+    const fA = monte(EQ_ST, gsA, famA.config, plA, l, sonde(l), plus);
+    const fB = monte(EQ_ST, gsB, famB.config, plB, l, sonde(l), plus);
+    try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
+          return { p: present(l, litL(out, l)), s: norm27(out) }; } catch { return null; }
+  };
+  const mesureOEq = (o, val, plus, impl, inv) => {
+    const fA = monteO(EQ_ST, gsA, famA.config, plA, o, val, plus);
+    const fB = monteO(EQ_ST, gsB, famB.config, plB, o, val, plus);
+    try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
+          return { p: presentO(litO(out, o)) }; } catch { return null; }
+  };
+  let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
+  const rapportEq = [];
+  const ordreVu = (nom, fe, ie, quoi) => {
+    if (fe.p === ie.p) return;
+    ordreSeul++;
+    rapportEq.push(`${nom} — survit ${fe.p ? "à l'ENDROIT" : "à l'ENVERS"} seulement (savedAt ÉGAL)`);
+    fail(`29e étage — ARBITRAGE PAR L'ORDRE SEUL : ${nom}. À \`savedAt\` ÉGAL — donc avec `
+       + `\`preferIncoming\` FAUX des deux côtés, la même branche — ${quoi} survit quand `
+       + `${fe.p ? "la copie A" : "la copie B"} est en base et disparaît quand les deux copies sont `
+       + `échangées. Les deux copies portent pourtant la MÊME sonde : ce n'est donc pas la fraîcheur `
+       + `qui tranche, c'est la POSITION de l'argument. Les deux appareils qui se synchronisent dans `
+       + `la même seconde gardent chacun un sous-ensemble différent, et rien ne le leur dit `
+       + `(v2.16.89). Départage sur le CONTENU (union, max, id) plutôt que sur \`a\` ?? \`b\`, ou `
+       + `rends \`isNewer\` total sur l'égalité.`);
+  };
+  // Ce que le 29e étage suppose, et qui doit être VÉRIFIÉ, pas supposé : que le régime « savedAt
+  // ÉGAL » ne diffère du régime mesuré depuis le 22e étage que par l'ORDRE des arguments. Le
+  // premier jet posait ici une autre question — « cette charnière ne mord-elle qu'à égalité ? » —
+  // et cette question-là est INERTE PAR CONSTRUCTION : `savedAt` n'est lu nulle part ailleurs que
+  // par les trois `isNewer(incoming.savedAt, base.savedAt)` de `mergeFamily` (src/merge.js:508,
+  // 573, 867), et ce booléen vaut `false` AUSSI BIEN dans le régime mesuré (la base est fraîche,
+  // l'incoming périmé) qu'à égalité (le `>` est strict). Les deux régimes rendent donc la même
+  // fusion, la comparaison comparait une grandeur à elle-même, et son « 0 charnière conditionnée
+  // à la fraîcheur » était un zéro qui ne pouvait pas tomber — mesuré avant de le retirer : 2803
+  // paires, 0 sortie différente (v2.17.7).
+  //
+  // La question est donc RETOURNÉE plutôt qu'exemptée (v2.16.96) : au lieu de chercher une
+  // charnière que la construction interdit, on EXIGE l'identité qui la rend impossible. Ce
+  // contrôle-là peut tomber — le jour où une règle lira `savedAt` autrement que par `isNewer`
+  // (un rapprochement à la minute, une fenêtre de tolérance, un `>=`), le raisonnement de tout
+  // l'étage s'écroule, et c'est ici que ça se verra plutôt que dans un zéro rassurant.
+  const memeQueAvant = (l, plus, fc) => {
+    const fw = mesure(l, plus, client);
+    if (fw === null) return;
+    memeSortie++;
+    if (fw.s === fc.s) return;
+    fail(`29e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ : ${nomL(l)}, à l'ENDROIT, la fusion ne rend pas `
+       + `la même sortie selon que les deux estampilles sont ÉGALES ou que la base est la plus `
+       + `fraîche. Or les deux passent par la même branche : \`isNewer\` est le SEUL lecteur de `
+       + `\`savedAt\` (src/merge.js:508, 573, 867) et il rend \`false\` dans les deux cas. Une `
+       + `divergence ici veut dire qu'une règle lit \`savedAt\` autrement — et alors tout le `
+       + `recensement des 22e-28e étages, qui ne mesure QU'UN écart d'estampille, a un angle mort `
+       + `de plus.`);
+  };
+
+  // (a) la sonde SEULE. Avant toute source : si le sort de l'élément dépend déjà de l'ordre à
+  // égalité, la comparaison paire par paire mesurerait un écart qui n'a rien à voir avec M.
+  const baseEqL = new Map();
+  for (const l of cibles) {
+    const vide = { cfg: {}, gs: {} };
+    const fe = mesureEq(l, vide, client, false), ie = mesureEq(l, vide, client, true);
+    if (fe === null || ie === null) continue;
+    baseEqL.set(nomL(l), fe);
+    basesEq++;
+    if (fe.p === ie.p) continue;
+    basesOrdre++;
+    fail(`29e étage — ${nomL(l)} : à \`savedAt\` ÉGAL, la sonde ${fe.p ? "survit" : "disparaît"} `
+       + `quand la copie A est en base et ${ie.p ? "survit" : "disparaît"} quand les deux copies `
+       + `sont échangées, SANS qu'aucune autre structure ne soit posée. C'est la règle de `
+       + `${nomL(l)} elle-même qui tranche par la POSITION de l'argument dès que la fraîcheur `
+       + `n'arbitre plus.`);
+  }
+  for (const l of cibles) {
+    const r = { cfg: {}, gs: {} };
+    const bq = baseEqL.get(nomL(l));
+    if (!bq) continue;
+    for (const m of sourcesInv) {
+      if (m.id === nomL(l)) continue;
+      if (m.champ === l.tombstone) continue;
+      if (l.conteneur && m.champ === l.conteneur.cle) continue;
+      const plus = fusionne(r, m.plus);
+      const fc = mesureEq(l, plus, client, false), ic = mesureEq(l, plus, client, true);
+      const fs = mesureEq(l, plus, server, false), is = mesureEq(l, plus, server, true);
+      if (fc === null || ic === null || fs === null || is === null) continue;
+      pairesEq++;
+      pariteEq++;
+      if (fc.p !== fs.p || ic.p !== is.p)
+        fail(`29e étage — ${nomL(l)} × ${m.nom} (savedAt ÉGAL) : la sonde survit côté `
+           + `${fc.p !== fs.p ? (fc.p ? "client" : "serveur") : (ic.p ? "client" : "serveur")} et `
+           + `disparaît de l'autre, dans le sens `
+           + `${fc.p !== fs.p ? "ENDROIT" : "ENVERS"}. Une règle qui fait dépendre ${nomL(l)} de `
+           + `${m.nom} n'est écrite que dans une des deux copies — et seule l'égalité des `
+           + `estampilles la fait mordre.`);
+      ordreVu(`${nomL(l)} × ${m.nom}`, fc, ic, `un élément de ${nomL(l)}`);
+      memeQueAvant(l, plus, fc);
+    }
+  }
+  for (const o of OBJETS) {
+    const val = FORMES[0][1];
+    const vide = { cfg: {}, gs: {} };
+    const fe = mesureOEq(o, val, vide, client, false), ie = mesureOEq(o, val, vide, client, true);
+    if (fe !== null && ie !== null) {
+      basesEq++;
+      if (fe.p !== ie.p) {
+        basesOrdre++;
+        fail(`29e étage — ${nomO(o)}{clé→${FORME_INV}} : à \`savedAt\` ÉGAL, la clé-sonde `
+           + `${fe.p ? "survit" : "disparaît"} quand la copie A est en base et `
+           + `${ie.p ? "survit" : "disparaît"} quand les deux copies sont échangées, SANS qu'aucune `
+           + `autre structure ne soit posée. C'est la règle de ${nomO(o)} elle-même qui tranche par `
+           + `la POSITION de l'argument dès que la fraîcheur n'arbitre plus.`);
+      }
+    }
+    for (const m of sourcesInv) {
+      if (m.id === nomO(o)) continue;
+      const fc = mesureOEq(o, val, m.plus, client, false), ic = mesureOEq(o, val, m.plus, client, true);
+      const fs = mesureOEq(o, val, m.plus, server, false), is = mesureOEq(o, val, m.plus, server, true);
+      if (fc === null || ic === null || fs === null || is === null) continue;
+      pairesEq++;
+      pariteEq++;
+      if (fc.p !== fs.p || ic.p !== is.p)
+        fail(`29e étage — ${nomO(o)}{clé→${FORME_INV}} × ${m.nom} (savedAt ÉGAL) : la clé-sonde `
+           + `survit côté ${fc.p !== fs.p ? (fc.p ? "client" : "serveur") : (ic.p ? "client" : "serveur")} `
+           + `et disparaît de l'autre, dans le sens ${fc.p !== fs.p ? "ENDROIT" : "ENVERS"}. Une règle `
+           + `qui fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies — et `
+           + `seule l'égalité des estampilles la fait mordre.`);
+      ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`);
+    }
+  }
+  console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules (${basesOrdre} tranchée(s) par l'ordre), `
+    + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
+    + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
+    + `${pariteEq} parités client/serveur, ${memeSortie} sorties confrontées au régime mesuré)`);
+  if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
+  // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
+  //   • **le produit reste RÉDUIT**, exactement comme au 28e : une seule des trois formes de clé
+  //     (`texte`) et le seul régime `rejet`. Un arbitrage par l'ordre qui ne se manifesterait que
+  //     par un rapprochement DATÉ, ou seulement sur une sonde déjà tombstonée, reste hors
+  //     d'atteinte. Le marché est le même : dire s'il EXISTE, pas en dresser le catalogue.
+  //   • **la question porte sur la SONDE**, pas sur la sortie complète. Une règle qui arbitre par
+  //     l'ordre à égalité sur un champ que la sonde ne touche pas n'est pas nommée ici — et ce
+  //     n'est pas un oubli : à égalité, tout scalaire arbitré « le frais gagne, sinon la base »
+  //     diverge trivialement entre les deux ordres, donc la sortie complète répondrait OUI partout
+  //     et ne désignerait rien (le contraire du 27e étage, où la sortie complète discrimine parce
+  //     que les deux mesures ne diffèrent QUE par la sentinelle).
+  //   • **l'égalité mesurée est EXACTE** (la même chaîne ISO des deux côtés). Deux estampilles
+  //     distinctes que `new Date()` rendrait égales — même milliseconde écrite deux fois avec un
+  //     décalage de fuseau, par exemple — tomberaient dans la même branche sans que l'étage les
+  //     pose. C'est le même `>` qui décide, donc la conclusion se transporte ; la MESURE, elle,
+  //     ne porte que sur la forme exacte.
   const parMorsure = candidats.filter((c) => c.via === "morsure").length;
   console.log(`    (${parMorsure} charnières + ${candidats.length - parMorsure} traces hors sonde `
     + `prolongées × ${sourcesM.length} secondes sources `
