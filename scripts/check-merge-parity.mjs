@@ -4257,11 +4257,13 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // une règle à deux étages, c'est la règle à une source du premier passage vue une deuxième fois.
   // Le premier passage a déjà la réponse pour chaque (sonde, régime, source) — on la garde.
   const bougeSeule = new Map();
-  const pariteSortie = (nom, vc, vs) => {
+  // L'étage est passé en paramètre : la même mesure sert au sens mesuré (27e) et au sens inverse
+  // (28e), et un message qui annonce le mauvais étage envoie le lecteur chercher au mauvais endroit.
+  const pariteSortie = (nom, vc, vs, etage = "27e") => {
     paritesSortie++;
     if (vc.s === vs.s || stable(vc.o) === stable(vs.o)) return;
     sortiesDivergentes++;
-    fail(`27e étage — ${nom} : client et serveur rendent des SORTIES DIFFÉRENTES sous cette `
+    fail(`${etage} étage — ${nom} : client et serveur rendent des SORTIES DIFFÉRENTES sous cette `
        + `injection, alors que la sonde a le même sort des deux côtés. La divergence est donc `
        + `ailleurs que là où le recensement regarde — une règle écrite dans une seule des deux `
        + `copies, qu'aucun contrôle sur la sonde ne peut voir.`);
@@ -4501,6 +4503,187 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `source départage au lieu d'emporter toute la liste.`);
     }
   }
+
+  // ── 28e ÉTAGE : LA DIRECTION ───────────────────────────────────────────────
+  // v2.17.6 — la piste de la v2.17.5, mot pour mot : « les 12 246 paires sont toutes mesurées
+  // copie fraîche en base, périmée en incoming ; une règle écrite dans un seul sens, le patron
+  // exact des quatre quadrants de `mergeGS`, laisserait tout le recensement vert. Le coût est
+  // connu et il est brutal — refaire le produit dans l'autre sens le DOUBLE — et il ne se
+  // contourne PAS en ne mesurant que les 23 paires qui bougent déjà : une règle qui ne mord que
+  // dans le sens non mesuré n'a, par définition, laissé aucune trace dans le sens mesuré. Ce qui
+  // se négocie, en revanche, c'est le PRODUIT : le sens inverse n'a pas besoin des 3 formes ni des
+  // deux régimes pour dire s'il existe une asymétrie, une seule forme et le régime `rejet`
+  // suffisent à répondre OUI ou NON, et c'est seulement si la réponse est OUI qu'il faut payer le
+  // produit complet. »
+  //
+  // « L'autre sens », c'est l'ORDRE DES ARGUMENTS, et rien d'autre : les deux copies portent la
+  // MÊME injection (`monte` pose la sonde et la source des deux côtés), donc inverser revient à
+  // demander `mergeFamily(fB, fA)` au lieu de `mergeFamily(fA, fB)`. Ce que ça change n'est pas
+  // cosmétique : `mergeFamily` calcule `preferIncoming = isNewer(incoming.savedAt, base.savedAt)`,
+  // donc le sens mesuré depuis le 22e étage a TOUJOURS valu `preferIncoming === false`, et les 36
+  // endroits de `mergeGS` qui lisent ce drapeau n'ont jamais été exercés que par leur branche
+  // « base gagne ». Le 18e étage connaît les quatre quadrants — mais il ne leur pose qu'une seule
+  // question, celle des valeurs INVENTÉES. Le sort d'un ÉLÉMENT, lui, n'a jamais été mesuré que
+  // dans un sens.
+  //
+  // Le produit RÉDUIT, et pourquoi chaque coupe est sans conséquence pour la question posée :
+  //   • une seule FORME de clé côté objet (`texte`). Les trois formes existent parce qu'une
+  //     charnière DATÉE ne mord que si les deux bouts parlent le même encodage (v2.17.3) — c'est
+  //     une question d'ENCODAGE, pas de sens. Une règle asymétrique qui ne mordrait que par
+  //     `Date.parse` mordrait dans les deux sens ou dans aucun ; ce que l'étage cherche ici, c'est
+  //     l'existence d'un ÉCART entre les deux sens, pas son catalogue complet.
+  //   • le régime `sauvetage` sauté. Il demande une sonde déjà tombstonée, donc il ne s'applique
+  //     qu'aux 21 listes d'objets, et il pose une source de PLUS (le tombstone) : c'est le produit
+  //     complet, pas le sondage d'existence.
+  // Ce que la réduction coûte est écrit plus bas, en toutes lettres, et se paiera le jour où la
+  // réponse passera à OUI.
+  //
+  // Le point de comparaison est le MÊME des deux côtés, sinon la mesure compare deux questions :
+  // côté liste le premier passage juge la morsure contre la fusion SANS source (`base.client.p`),
+  // côté objet contre le TÉMOIN (`ref.p`, v2.17.2). Le sens inverse reprend exactement le même
+  // point de comparaison sur chaque côté — sinon un écart de MÉTHODE se lirait comme un écart de
+  // SENS (v2.16.88 : le relevé qui partage l'angle mort de ce qu'il surveille ne produit aucun
+  // signal ; ici l'inverse, un relevé qui change de question produit un faux signal).
+  //
+  // Les DEUX copies sont mesurées dans le sens inverse, et ce n'est pas un luxe : l'asymétrie se
+  // lit sur le client, or une règle écrite dans le SEUL serveur et qui ne mord que dans le sens
+  // inverse ne déplacerait jamais la sonde côté client — ni à l'aller ni au retour — et l'étage
+  // resterait muet. La parité du sens inverse ferme ce trou, et elle rend la lecture par le seul
+  // client COMPLÈTE : les deux parités (aller, déjà mesurée au 22e/24e étage, et retour) donnent
+  // `mordFwd(client) === mordFwd(serveur)` et `mordInv(client) === mordInv(serveur)`.
+  const mesureInv = (l, plus, impl) => {
+    const fA = monte("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, l, sonde(l), plus);
+    const fB = monte("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, l, sonde(l), plus);
+    try { const out = impl.mergeFamily(fB, fA);   // ← périmée en BASE, fraîche en INCOMING
+          return { p: present(l, litL(out, l)), s: norm27(out), o: out }; } catch { return null; }
+  };
+  const mesureOInv = (o, val, plus, impl) => {
+    const fA = monteO("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, val, plus);
+    const fB = monteO("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, val, plus);
+    try { const out = impl.mergeFamily(fB, fA);
+          return { p: presentO(litO(out, o)), s: norm27(out), o: out }; } catch { return null; }
+  };
+  const [[FORME_INV]] = FORMES;                        // « texte » — la première des trois
+  const estForme = (m, f) => m.nom.endsWith(`{clé→${f}}`);
+  const sourcesInv = sourcesM.filter((m) => !m.nom.includes("{clé→") || estForme(m, FORME_INV));
+  let pairesInv = 0, asymetries = 0, basesInv = 0, basesAsym = 0;
+  const rapportInv = [];
+  const asymVue = (nom, mordFwd, mordInv, declaree, quoi) => {
+    if (!!mordFwd === !!mordInv) return;
+    asymetries++;
+    rapportInv.push(`${nom} — mord ${mordInv ? "à l'ENVERS seulement" : "à l'ENDROIT seulement"}`);
+    if (declaree) return;
+    fail(`28e étage — CHARNIÈRE ASYMÉTRIQUE : ${nom}. ${quoi} ${mordInv
+        ? "quand la copie PÉRIMÉE est en base (preferIncoming = vrai), et ne bouge pas dans le sens "
+          + "que tout le recensement mesure"
+        : "dans le sens mesuré, et plus du tout quand les deux copies sont échangées"}. Une règle `
+       + `de fusion qui ne vaut que dans un sens est le patron exact des quatre quadrants de `
+       + `mergeGS (18e étage) : selon que la sync tourne côté client (mergeFamily(local, remote)) `
+       + `ou côté serveur (mergeFamily(existant, PUT)), la même donnée n'a pas le même sort. `
+       + `Écris la règle dans les DEUX branches de preferIncoming, ou déclare la paire dans `
+       + `CHARNIERES si l'asymétrie est voulue.`);
+  };
+
+  // (a) la sonde SEULE, dans les deux sens. Avant toute source : si le sort de l'élément dépend
+  // déjà de l'ordre des arguments, la comparaison paire par paire ci-dessous mesurerait un écart
+  // qui n'a rien à voir avec la source posée.
+  for (const l of cibles) {
+    const vide = { cfg: {}, gs: {} };
+    const bf = mesure(l, vide, client), bi = mesureInv(l, vide, client);
+    if (bf === null || bi === null) continue;
+    basesInv++;
+    if (bf.p === bi.p) continue;
+    basesAsym++;
+    fail(`28e étage — ${nomL(l)} : la sonde ${bf.p ? "survit" : "disparaît"} quand la copie fraîche `
+       + `est en base, et ${bi.p ? "survit" : "disparaît"} quand les deux copies sont échangées, `
+       + `SANS qu'aucune autre structure ne soit posée. Les deux copies portent pourtant la MÊME `
+       + `liste : c'est donc la règle de ${nomL(l)} elle-même qui lit preferIncoming pour décider `
+       + `du sort d'un élément.`);
+  }
+  for (const l of cibles) {
+    const r = { nom: "rejet", plus: { cfg: {}, gs: {} } };
+    const bi = mesureInv(l, r.plus, client);
+    if (bi === null) continue;
+    for (const m of sourcesInv) {
+      if (m.id === nomL(l)) continue;
+      if (m.champ === l.tombstone) continue;
+      if (l.conteneur && m.champ === l.conteneur.cle) continue;
+      const plus = fusionne(r.plus, m.plus);
+      const ic = mesureInv(l, plus, client), is = mesureInv(l, plus, server);
+      if (ic === null || is === null) continue;
+      pairesInv++;
+      if (ic.p !== is.p)
+        fail(`28e étage — ${nomL(l)} × ${m.nom} (sens INVERSE) : la sonde survit côté `
+           + `${ic.p ? "client" : "serveur"} et disparaît côté ${ic.p ? "serveur" : "client"}. Une `
+           + `règle qui fait dépendre ${nomL(l)} de ${m.nom} n'est écrite que dans une des deux `
+           + `copies — et seul le sens inverse la fait mordre.`);
+      pariteSortie(`${nomL(l)} × ${m.nom} (sens INVERSE)`, ic, is, "28e");
+      asymVue(`${nomL(l)} × ${m.nom} (rejet)`,
+              bougeSeule.get(`${nomL(l)}|rejet|${m.nom}`), ic.p !== bi.p,
+              paireDeclaree(l, m),
+              `Le sort d'un élément de ${nomL(l)} dépend du contenu de ${m.nom}`);
+    }
+  }
+  for (const o of OBJETS) {
+    const val = FORMES[0][1];
+    const vide = { cfg: {}, gs: {} };
+    const bf = mesureO(o, val, vide, client), bi = mesureOInv(o, val, vide, client);
+    if (bf !== null && bi !== null) {
+      basesInv++;
+      if (bf.p !== bi.p) {
+        basesAsym++;
+        fail(`28e étage — ${nomO(o)}{clé→${FORME_INV}} : la clé-sonde ${bf.p ? "survit" : "disparaît"} `
+           + `quand la copie fraîche est en base, et ${bi.p ? "survit" : "disparaît"} quand les deux `
+           + `copies sont échangées, SANS qu'aucune autre structure ne soit posée. C'est la règle de `
+           + `${nomO(o)} elle-même qui lit preferIncoming pour décider du sort d'une CLÉ.`);
+      }
+    }
+    for (const m of sourcesInv) {
+      if (m.id === nomO(o)) continue;
+      const ic = mesureOInv(o, val, m.plus, client), is = mesureOInv(o, val, m.plus, server);
+      const ir = mesureOInv(o, val, m.plusTemoin, client);   // même point de comparaison qu'à l'aller
+      if (ic === null || is === null || ir === null) continue;
+      pairesInv++;
+      if (ic.p !== is.p)
+        fail(`28e étage — ${nomO(o)}{clé→${FORME_INV}} × ${m.nom} (sens INVERSE) : la clé-sonde `
+           + `survit côté ${ic.p ? "client" : "serveur"} et disparaît côté `
+           + `${ic.p ? "serveur" : "client"}. Une règle qui fait dépendre ${nomO(o)} de ${m.nom} `
+           + `n'est écrite que dans une des deux copies — et seul le sens inverse la fait mordre.`);
+      pariteSortie(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom} (sens INVERSE)`, ic, is, "28e");
+      asymVue(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom} (clé)`,
+              bougeSeule.get(`${nomO(o)}|${FORME_INV}|${m.nom}`), ic.p !== ir.p, false,
+              `Le sort d'une CLÉ de ${nomO(o)} dépend du contenu de ${m.nom}`);
+    }
+  }
+  console.log(`    (sens INVERSE — ${basesInv} sondes seules (${basesAsym} asymétrique(s)), puis `
+    + `${pairesInv} paires (produit réduit : ${sourcesInv.length} sources, 1 forme `
+    + `« ${FORME_INV} », régime rejet) = ${asymetries} charnière(s) asymétrique(s))`);
+  if (process.env.DBG28 && rapportInv.length) console.log("      " + rapportInv.join("\n      "));
+  // Ce que le 28e étage NE couvre PAS, écrit noir sur blanc :
+  //   • **le produit est RÉDUIT, et la réduction se dit en chiffres.** Une seule des trois formes
+  //     de clé (`texte`) des DEUX côtés, et le seul régime `rejet` : une charnière asymétrique qui
+  //     ne mordrait que par un rapprochement DATÉ (`date`/`ISO`, v2.17.3), ou seulement en régime
+  //     `sauvetage`, reste hors d'atteinte. C'est assumé, et c'est le marché que la piste posait :
+  //     le sens inverse n'a pas besoin du produit complet pour dire s'il EXISTE une asymétrie.
+  //     Le coût est MESURÉ, pas estimé : le fichier passe de 89 s à 115 s sur la même machine et
+  //     la même passe, soit **+26 s** pour 4 147 paires. Rendre un facteur (les deux formes datées,
+  //     ou le régime `sauvetage`) coûte du même ordre à chaque fois : le produit complet à
+  //     l'envers vaut donc bien le « ~60 s de plus, le produit DOUBLÉ » que la v2.17.5 annonçait.
+  //     Le marché a tenu — 26 s ont suffi à répondre NON. Le jour où la réponse passe à OUI, on paie.
+  //   • **le sens inverse ne repose que la question de la SONDE** (l'élément survit-il ?) et celle
+  //     de la parité de SORTIE. Il ne repose ni celle du 27e étage (une TRACE ailleurs que sur la
+  //     sonde), ni celle du 26e (une seconde source). Une règle à la fois asymétrique ET sans
+  //     morsure sur la sonde n'est donc pas nommée.
+  //   • **les deux sens mesurés partagent le MÊME écart de `savedAt`**, et c'est le vrai angle mort
+  //     qui reste. `isNewer` compare avec un `>` STRICT (src/merge.js:29) : à `savedAt` ÉGAL,
+  //     `preferIncoming` vaut `false` dans LES DEUX ordres d'arguments. Les deux sens que cet étage
+  //     compare retombent donc sur la même branche, et ce qui tranche n'est plus la préférence mais
+  //     l'ORDRE seul — le patron exact de la v2.16.89 (« chaque côté met SA copie en `a`, la
+  //     divergence ne se referme jamais »). Le 18e étage ne le voit pas non plus : il compare
+  //     `(A,B,vrai)`↔`(B,A,faux)` et `(A,B,faux)`↔`(B,A,vrai)`, jamais `(A,B,faux)`↔`(B,A,faux)`.
+  //     Et ce cas n'est pas exotique : deux appareils qui poussent dans la même seconde, ou un
+  //     serveur qui renvoie l'estampille qu'il vient de recevoir, y tombent.
+
   const parMorsure = candidats.filter((c) => c.via === "morsure").length;
   console.log(`    (${parMorsure} charnières + ${candidats.length - parMorsure} traces hors sonde `
     + `prolongées × ${sourcesM.length} secondes sources `
@@ -4530,13 +4713,13 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //     Une raison écrite à côté de ce qu'elle décrit envoie le lecteur suivant refaire un travail
   //     déjà fait (v2.16.83) : les limites RÉELLES du côté objet sont écrites au 24e étage, pas ici.
   // Ce que le 27e étage NE couvre PAS, écrit noir sur blanc :
-  //   • **une seule DIRECTION.** Les 12 246 paires (et les 2 390 triplets) sont toutes mesurées
-  //     avec la copie FRAÎCHE en base et la périmée en incoming, dans cet ordre. Une règle écrite
-  //     dans un seul sens — le patron exact des quatre quadrants de `mergeGS` (18e étage) —
-  //     laisserait tout ce recensement vert. Le coût est connu et se dit : refaire le produit dans
-  //     l'autre sens le DOUBLE (~60 s de plus). Le mesurer seulement sur les 23 paires qui bougent
-  //     déjà ne serait PAS la même question : une règle qui ne mord que dans le sens non mesuré
-  //     n'a, par définition, laissé aucune trace dans le sens mesuré.
+  //   • (FERMÉ en v2.17.6) ce bloc affirmait que les 12 246 paires sont toutes mesurées dans UN
+  //     seul sens — copie fraîche en base, périmée en incoming — et qu'une règle écrite dans un
+  //     seul sens laisserait tout le recensement vert. C'est le 28e étage, et la réponse est NON :
+  //     4 147 paires remesurées `mergeFamily(fB, fA)`, 65 sondes seules, 0 asymétrie. Le coût
+  //     annoncé (~60 s, le produit DOUBLÉ) n'a pas eu à être payé en entier : le produit RÉDUIT —
+  //     1 forme, régime `rejet` — suffit à répondre OUI ou NON, et il coûte +26 s (89 s → 115 s,
+  //     mesuré). Ce qui reste ouvert est écrit à sa place, au 28e étage, pas ici (v2.16.83).
   //   • **le classement se fait par NOM de champ, pas par EFFET.** `famille` accepte une trace dès
   //     qu'une fiche déclarée relie les deux structures ; elle ne vérifie pas que la trace relevée
   //     est bien CELLE de la règle déclarée. Une SECONDE règle entre les deux mêmes champs serait
