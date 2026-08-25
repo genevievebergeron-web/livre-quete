@@ -4,6 +4,43 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-25 (routine autonome, nuit, 35e étage — v2.17.13)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, **176 076 octets**. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide** (le champ est fiable depuis la v2.16.42).
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, la dernière inchangée.
+
+### 🔎 Ce qui a été trouvé DANS la donnée, et pas dans le code
+La taille de la réponse est passée de **176 056 à 176 076 octets** depuis la nuit précédente,
+alors que `savedAt` vaut toujours **2026-08-25T05:13:57.632Z**, à la milliseconde près, pour la
+quatrième nuit d'affilée. Deux faits qui ne tiennent pas ensemble : la donnée a grossi sans être
+estampillée.
+
+Le diff explique les 20 octets : `"2.17.12"` s'est ajouté aux **deux** copies de `seenVersions`
+(la racine de `data` et `config`, 10 octets chacune). Un appareil a donc bien ouvert l'app après
+le déploiement de la nuit et a persisté, sans faire avancer `savedAt`.
+
+La cause est dans `src/App.jsx` ~2235 : la persistance qui suit la migration au chargement
+appelle `save({...data, newChangelogVersions:[]})`, donc `savedAt` vient de `data`, c'est-à-dire
+du serveur. C'est **le seul des quatre chemins de sauvegarde du fichier** dans ce cas ; les trois
+autres (~2256, ~3993, ~4005) stampent `new Date().toISOString()`.
+
+Rien n'est cassé pour `seenVersions` lui-même : les deux copies de `mergeFamily` en font une
+union pure, elle converge quel que soit l'ordre. Ce qui reste à mesurer, c'est ce que ce chemin
+transporte d'AUTRE — tout ce que `migrateSavedData` répare au chargement (ménages d'orphelins,
+drapeaux de migration, masquages de doublons) part sous une estampille périmée, donc dans le
+régime « `savedAt` égal ou plus vieux » où c'est la position des arguments qui tranche.
+
+**Aucune correction appliquée ce soir** : toucher au chemin de sauvegarde sans l'avoir mesuré
+d'abord irait contre la méthode du projet. Consigné comme piste n° 1 de la prochaine nuit dans
+`PROJET-ETAT.md`.
+
+---
+
 ## Passage du 2026-08-21 (routine autonome, nuit, 34e passage)
 
 ### 🌐 Lecture de l'API de production

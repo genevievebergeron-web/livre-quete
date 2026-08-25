@@ -4098,9 +4098,49 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     const c = l.conteneur ? racine[l.conteneur.cle] : racine;
     return (c && c[l.champ]) || [];
   };
-  const monte = (savedAt, gsBase, cfgBase, pl, l, elems, plus) => mkFam(savedAt,
-    { ...gsBase, ...(l.dans === "gameStates" ? bloc(l, elems) : {}), ...plus.gs },
-    { ...cfgBase, ...(l.dans === "config" ? bloc(l, elems) : {}), ...plus.cfg }, pl);
+  // ── 35e ÉTAGE : LE GARDE `conteneur` DES LISTES, RÉPARÉ PLUTÔT QU'EXEMPTÉ ──
+  // v2.17.13 — la piste de la v2.17.12, point (1). Les boucles de LISTES portaient QUATRE fois
+  // `if (l.conteneur && m.champ === l.conteneur.cle) continue;` (22e, 26e, 28e, 29e étages) :
+  // refus de croiser une liste nichée avec l'objet qui la contient, au motif que la source
+  // ÉCRASERAIT la cible. Le motif était exact — `...plus.cfg` écrit au PREMIER niveau, donc le
+  // bloc de M remplaçait le conteneur en entier — mais l'exemption était la mauvaise réponse,
+  // et la MESURE l'a montrée pire que ce que la piste croyait (sonde jetable, jetée après
+  // lecture, comme au 34e étage) :
+  //   • sous M, les deux copies portaient un `config.weeklyQuests` TEXTUELLEMENT IDENTIQUE
+  //     (`generatedForWeek` « 2026-08-14 » des deux côtés, là où la fixture pose 08-14 contre
+  //     08-07) — `fixture-identique-controle-inerte`, exactement la maladie du 34e étage ;
+  //   • et surtout la sonde N'ÉTAIT PAS DANS LA FIXTURE : `assignments` valait le contenu réel
+  //     de `famA` (`wq1`), pas l'élément-sentinelle. La paire ne mesurait donc pas « une cible
+  //     reconstruite », elle ne mesurait RIEN — deux fois plutôt qu'une.
+  //   • le compte, enfin, n'était pas celui que la piste annonçait : 13 paires exemptées (9 au
+  //     22e — trois formes × deux régimes pour `weeklyQuests`, trois pour `weeklyChallenge` —,
+  //     2 au 28e, 2 au 29e), pas 3. `prolonger-ce-qui-a-deja-bouge` : compter AVANT d'écrire.
+  //
+  // La réparation est le miroir exact de `sousCle` (34e étage) : de la source, ne prendre que
+  // ce que la cible ne définit pas déjà, et rendre au conteneur le bloc que la CIBLE vient de
+  // poser (son `fixe` — la clé d'arbitrage — et sa liste-sonde). Inconditionnel plutôt que
+  // réservé aux paires en collision : quand `plus` n'écrit pas la clé du conteneur, `inj` vaut
+  // déjà `propre` et l'opération est l'identité — 4 145 paires sur 4 147 ne changent pas d'un
+  // octet, et aucun appelant n'a de drapeau à passer (donc aucun appelant ne peut l'oublier,
+  // `garde-fou-teste-la-regle-pas-lappelant`).
+  //
+  // LIMITE, écrite plutôt que tue : une charnière qui ferait dépendre le sort d'un élément de la
+  // valeur du `fixe` du conteneur (`assignments` × `weeklyQuests.generatedForWeek`) reste hors
+  // d'atteinte — la cible impose son `fixe`, égal des deux côtés EXPRÈS (sans quoi le seau daté
+  // prend un bloc en entier et la règle de la liste ne tourne jamais). C'est le jumeau de la
+  // limite structurelle notée au 34e étage, et c'est strictement mieux que l'exemption : avant
+  // ce soir, ces paires ne disaient rien du tout.
+  const monte = (savedAt, gsBase, cfgBase, pl, l, elems, plus) => {
+    const gs = { ...gsBase, ...(l.dans === "gameStates" ? bloc(l, elems) : {}), ...plus.gs };
+    const cfg = { ...cfgBase, ...(l.dans === "config" ? bloc(l, elems) : {}), ...plus.cfg };
+    if (l.conteneur) {
+      const cible = l.dans === "gameStates" ? gs : cfg, k = l.conteneur.cle;
+      const propre = bloc(l, elems)[k], inj = cible[k] || {}, neuf = { ...propre };
+      for (const kk of Object.keys(inj)) if (!(kk in propre)) neuf[kk] = inj[kk];
+      cible[k] = neuf;
+    }
+    return mkFam(savedAt, gs, cfg, pl);
+  };
   // v2.17.5 — 27e étage. La SORTIE COMPLÈTE, normalisée sur la sentinelle. Les deux mesures
   // qu'on compare portent le même échafaudage à la sentinelle près (SENT d'un côté, TEM de
   // l'autre) : renommer l'une en l'autre rend les deux sorties TEXTUELLEMENT identiques dès que
@@ -4161,6 +4201,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
                             dans: m.dans, conteneur: m.conteneur || null })),
     ...OBJETS.flatMap((o) => FORMES.map(([forme, val]) => ({
       id: `${o.dans}.${o.champ}`, nom: `${o.dans}.${o.champ}{clé→${forme}}`, champ: o.champ,
+      // v2.17.13 — 35e étage : sans `dans`, « M est le conteneur de L » se reconnaîtrait au NOM
+      // seul, et une clé homonyme dans l'autre racine passerait pour la même structure.
+      dans: o.dans, conteneur: null,
       plus: plusDe(o, { ...modeleObjet(o), [SENT]: val }),
       plusTemoin: plusDe(o, { ...modeleObjet(o), [TEM]: val }),
     }))),
@@ -4170,7 +4213,10 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // de la liste elle-même (5e étage), ne sont pas des trouvailles.
   const paireDeclaree = (l, m) => CHARNIERES.some((h) => h.champ === l.champ
     && [...Object.keys(h.cfgPlus || {}), ...Object.keys(h.gsPlus || {})].includes(m.champ));
-  let trouvees = 0, paires = 0;
+  // v2.17.13 — 35e étage. « M est l'objet qui CONTIENT la liste-cible », reconnu à la
+  // DÉCLARATION : même racine, et le `champ` de la source est la clé du conteneur de la cible.
+  const collisionL = (l, m) => !!(l.conteneur && m.dans === l.dans && m.champ === l.conteneur.cle);
+  let trouvees = 0, paires = 0, collisionsL = 0;
   const rapport = [];
 
   // ── 27e ÉTAGE : LA TRACE, MESURÉE SUR TOUTE LA SORTIE ──────────────────────
@@ -4290,7 +4336,11 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       for (const m of sourcesM) {
         if (m.id === nomL(l)) continue;
         if (m.champ === l.tombstone) continue;          // tombstone de L : 5e étage
-        if (l.conteneur && m.champ === l.conteneur.cle) continue;
+        // v2.17.13 — 35e étage : la paire « liste-cible ⊂ objet-source » n'est plus SAUTÉE, elle
+        // est mesurée (`monte` rend au conteneur le bloc que la cible vient de poser). Comptée
+        // sur le seul régime « rejet », le seul des deux qui soit posé inconditionnellement —
+        // un attendu qui dépendrait de `base.client.p` viendrait du parcours qu'il surveille.
+        if (collisionL(l, m) && r.nom === "rejet") collisionsL++;
         paires++;
         const plus = fusionne(r.plus, m.plus);
         const vc = mesure(l, plus, client), vs = mesure(l, plus, server);
@@ -4512,7 +4562,10 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       if (c.kind === "L") {
         if (m2.id === nomL(c.l)) continue;
         if (m2.champ === c.l.tombstone) continue;      // tombstone de L : 5e étage
-        if (c.l.conteneur && m2.champ === c.l.conteneur.cle) continue;
+        // v2.17.13 — 35e étage : le garde `conteneur` spécifique est retiré ici aussi. La paire
+        // n'est pas pour autant mesurée : la règle GÉNÉRIQUE deux lignes plus bas la saute déjà
+        // (M₂ écrit la même clé de premier niveau que la sonde), à la différence près qu'elle la
+        // COMPTE dans `collisions` au lieu de la taire. Une couverture qu'on borne se dit.
       } else if (m2.id === nomO(c.o)) continue;
       // Deux injections qui écrivent la MÊME clé de premier niveau : `fusionne` est un spread, la
       // seconde effacerait la première et la mesure retomberait sur « L × M₂ » en le taisant. On
@@ -4655,7 +4708,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     for (const m of sourcesInv) {
       if (m.id === nomL(l)) continue;
       if (m.champ === l.tombstone) continue;
-      if (l.conteneur && m.champ === l.conteneur.cle) continue;
+      if (collisionL(l, m)) collisionsL++;              // v2.17.13 — 35e étage
       const plus = fusionne(r.plus, m.plus);
       const ic = mesureInv(l, plus, client), is = mesureInv(l, plus, server);
       if (ic === null || is === null) continue;
@@ -4770,6 +4823,25 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   const mesureEq = (l, plus, impl, inv) => {
     const fA = monte(EQ_ST, gsA, famA.config, plA, l, sonde(l), plus);
     const fB = monte(EQ_ST, gsB, famB.config, plB, l, sonde(l), plus);
+    // v2.17.13 — 35e étage, le jumeau côté LISTE du garde-fou d'échafaudage du 34e, posé UNE
+    // fois par paire (client, à l'ENDROIT). Le 34e demande « les deux copies portent-elles un
+    // bloc DISTINCT ? » ; celui-ci demande la question d'AVANT, et c'est elle qui manquait : la
+    // sonde est-elle seulement DANS la fixture ? Une source qui écrit la clé du conteneur
+    // effaçait la liste-sentinelle en entier, sur les deux copies — la paire répondait alors
+    // « même sort » quoi qu'il arrive à la fusion, et son silence ne parlait que d'elle.
+    if (impl === client && !inv && l.conteneur) {
+      const dedansA = present(l, litL(fA, l)), dedansB = present(l, litL(fB, l));
+      if (!dedansA || !dedansB) {
+        sondeEffacee++;
+        fail(`35e étage — SONDE EFFACÉE PAR L'ÉCHAFAUDAGE : ${nomL(l)}, sous la source posée, ne `
+           + `porte plus l'élément-sentinelle ${!dedansA && !dedansB ? "sur AUCUNE des deux copies"
+                : `côté ${dedansA ? "B" : "A"}`}. La fixture a remplacé le bloc du conteneur au `
+           + `lieu de le côtoyer : quelle que soit la règle de ${nomL(l)}, la mesure ne peut plus `
+           + `rendre que « la sonde a disparu », et ce que cette paire dit ne vient pas de la `
+           + `fusion. Rends au conteneur le bloc que la CIBLE pose (voir \`monte\`, 35e étage) au `
+           + `lieu de le remplacer.`);
+      }
+    }
     try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
           return { p: present(l, litL(out, l)), s: norm27(out) }; } catch { return null; }
   };
@@ -4805,7 +4877,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
           return { p: presentO(litO(out, o)), s: norm27(out) }; } catch { return null; }
   };
   let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
-  let copiesJumelles = 0, collisionsO = 0;
+  let copiesJumelles = 0, collisionsO = 0, sondeEffacee = 0;
   let basesEqS = 0, basesOrdreS = 0, basesParite = 0;
   let memeSortieBase = 0;
   const rapportEq = [];
@@ -5078,7 +5150,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     for (const m of sourcesInv) {
       if (m.id === nomL(l)) continue;
       if (m.champ === l.tombstone) continue;
-      if (l.conteneur && m.champ === l.conteneur.cle) continue;
+      if (collisionL(l, m)) collisionsL++;              // v2.17.13 — 35e étage
       const plus = fusionne(r, m.plus);
       const fc = mesureEq(l, plus, client, false), ic = mesureEq(l, plus, client, true);
       const fs = mesureEq(l, plus, server, false), is = mesureEq(l, plus, server, true);
@@ -5097,7 +5169,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       memeQueAvant(l, plus, fc, fs);   // v2.17.9 — 31e étage : les DEUX copies
     }
   }
-  // ── PISTE OUVERTE (v2.17.11) : LE GARDE `conteneur` N'EXISTE QUE CÔTÉ LISTE ──
+  // ── LE GARDE `conteneur` : CLOS DES DEUX CÔTÉS (34e puis 35e étage) ────────
   // Trouvé par le FAUX POSITIF de la falsification du 33e étage, pas par une relecture. Les
   // boucles de LISTES portent trois fois `if (l.conteneur && m.champ === l.conteneur.cle)
   // continue;` (22e, 28e, 29e étages) : refus de croiser une liste avec le conteneur qui la
@@ -5110,8 +5182,12 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // `config.weeklyQuests.assignments` et `config.weeklyChallenge` ⊃
   // `config.weeklyChallenge.challenges`, les deux seuls cas du projet. L'enjeu est petit, le
   // patron ne l'est pas : `angle-mort-symetrique`, le garde d'un seul côté, et rien ne
-  // l'exerçait. À TRANCHER : sauter comme le font les listes, ou garder ET écrire ici pourquoi
-  // la mesure vaut quand même sur une cible reconstruite. Ne pas trancher en silence.
+  // l'exerçait. TRANCHÉ au 34e étage (v2.17.12) : ni sauter ni garder tel quel — corriger dans
+  // la QUESTION, `sousCle` juste en dessous. Et TRANCHÉ DANS L'AUTRE SENS au 35e étage
+  // (v2.17.13) : les quatre `continue` du côté liste sont retirés, `monte` rend au conteneur le
+  // bloc que la cible pose. Ce paragraphe se lisait encore « à trancher » une nuit après l'avoir
+  // été — `raison-ecrite-a-cote-est-fausse` : une prose qui survit à sa décision envoie le
+  // lecteur suivant refaire un travail déjà fait.
   for (const o of OBJETS) {
     const val = FORMES[0][1];
     const vide = { cfg: {}, gs: {} };
@@ -5180,6 +5256,28 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   if (copiesJumelles !== 0)
     fail(`34e étage — ${copiesJumelles} paires d'objets mesurées sur deux copies JUMELLES `
        + `(voir les cris ci-dessus). Attendu : 0.`);
+  // v2.17.13 — 35e étage, le jumeau côté LISTE, et il tombe pour la même raison que celui du 34e :
+  // l'attendu vient des DÉCLARATIONS (`cibles` porteuses d'un `conteneur` × les sources dont le
+  // `champ` EST cette clé), jamais du parcours mesuré — un attendu dérivé de la même boucle ne
+  // peut pas voir la boucle rétrécir (`releve-partage-le-plafond-surveille`). Il tombe dans les
+  // deux sens : vers le BAS si une nuit remet l'un des `continue` retirés ce soir, vers le HAUT
+  // si une liste nichée de plus est déclarée sans qu'on ait vu naître ses paires. Le `× 2` du
+  // second terme est le 28e étage ET le 29e, qui partagent `sourcesInv` et le seul régime rejet.
+  const nichees = cibles.filter((l) => l.conteneur);
+  const collisionsLAttendues =
+      nichees.reduce((n, l) => n + sourcesM.filter((m) => collisionL(l, m)).length, 0)
+    + nichees.reduce((n, l) => n + sourcesInv.filter((m) => collisionL(l, m)).length, 0) * 2;
+  if (collisionsL !== collisionsLAttendues)
+    fail(`35e étage — COLLISIONS LISTE ⊂ OBJET NON MESURÉES : ${collisionsLAttendues} paires `
+       + `« liste-cible ⊂ objet-source » sont DÉCLARÉES (une cible avec \`conteneur:\` dont la clé `
+       + `est une source), mais ${collisionsL} ont été traversées. Ce sont les seules paires où la `
+       + `source vit AU-DESSUS de la cible : leur échafaudage passe par le rappel du bloc dans `
+       + `\`monte\` (35e étage), et sans lui la source efface la liste-sonde en entier sur les deux `
+       + `copies. Les sauter, c'est rendre la charnière conteneur × liste-contenue muette du côté `
+       + `liste, alors que le 34e étage vient de l'ouvrir du côté objet.`);
+  if (sondeEffacee !== 0)
+    fail(`35e étage — ${sondeEffacee} paire(s) de listes mesurées SANS la sonde dans la fixture `
+       + `(voir les cris ci-dessus). Attendu : 0.`);
   if (memeSortie !== pairesEq * 2)
     fail(`31e étage — COUVERTURE INCOMPLÈTE : ${pairesEq} paires mesurées à \`savedAt\` ÉGAL, donc `
        + `${pairesEq * 2} confrontations attendues (client ET serveur, les deux côtés ENDROIT), `
@@ -5225,7 +5323,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     + `${pariteEq} parités client/serveur, ${memeSortie}/${pairesEq * 2} sorties confrontées au `
     + `régime mesuré (les DEUX copies), ${memeSortieBase}/${basesEq + basesEqS} pour l'entrée NUE, `
     + `${collisionsO}/${collisionsAttendues} collision(s) conteneur⊃liste posées sur le bloc PROPRE `
-    + `de chaque copie, ${copiesJumelles} paire(s) sur copies jumelles)`);
+    + `de chaque copie, ${copiesJumelles} paire(s) sur copies jumelles, `
+    + `${collisionsL}/${collisionsLAttendues} collision(s) liste⊂conteneur MESURÉES, `
+    + `${sondeEffacee} sonde(s) effacée(s) par l'échafaudage)`);
   if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
   // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
   //   • **`ordreVu` n'est posé que côté CLIENT, et c'est un CHOIX MESURÉ, pas un oubli** — voir
