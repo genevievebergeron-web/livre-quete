@@ -4153,7 +4153,12 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   const modeleObjet = (o) => ((o.dans === "config" ? famA.config : gsA)[o.champ]) || {};
   const sourcesM = [
     ...cibles.map((m) => ({ id: nomL(m), nom: nomL(m), champ: m.champ, plus: plusDe(m, sonde(m)),
-                            plusTemoin: plusDe(m, sonde(m, TEM)) })),
+                            plusTemoin: plusDe(m, sonde(m, TEM)),
+                            // v2.17.12 — 34e étage : de quoi RECONNAÎTRE une source qui vit DANS
+                            // l'objet sondé. Sans ces deux champs, la collision conteneur⊃liste
+                            // n'est pas exprimable côté OBJET, et c'est précisément pour ça
+                            // qu'elle a vécu treize étages sans être vue.
+                            dans: m.dans, conteneur: m.conteneur || null })),
     ...OBJETS.flatMap((o) => FORMES.map(([forme, val]) => ({
       id: `${o.dans}.${o.champ}`, nom: `${o.dans}.${o.champ}{clé→${forme}}`, champ: o.champ,
       plus: plusDe(o, { ...modeleObjet(o), [SENT]: val }),
@@ -4352,15 +4357,54 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // premier passage. Corriger dans la QUESTION plutôt qu'exempter la paire (v2.16.96) : la paire
   // reste MESURÉE, la sonde survit à l'injection, et ce qui la fait disparaître ne peut plus être
   // que la fusion elle-même.
-  const monteO = (savedAt, gsBase, cfgBase, pl, o, val, plus) => {
+  //
+  // ── 34e ÉTAGE : LA DOCTRINE CI-DESSUS N'ÉTAIT PAS TENUE POUR DEUX PAIRES ───
+  // v2.17.12 — la piste de la v2.17.11, point (1). Trois lignes plus haut, la règle de la mesure
+  // est écrite noir sur blanc : « la clé est posée EN PLUS du contenu que CHAQUE côté porte déjà,
+  // jamais à la place […] et le contenu vient de la base du côté mesuré, pas de `famA` pour les
+  // deux : c'est ce qui fait que les seaux datés arbitrent vraiment. » Elle est FAUSSE pour les
+  // deux paires où la source M vit DANS l'objet sondé — `config.weeklyQuests` ⊃
+  // `config.weeklyQuests.assignments`, `config.weeklyChallenge` ⊃
+  // `config.weeklyChallenge.challenges` : le `...plus.cfg` du dessus écrit au PREMIER niveau,
+  // donc il remplace le bloc entier du conteneur, sur les DEUX copies, par le bloc de M.
+  //
+  // MESURÉ avant d'être corrigé (sonde jetable, pas relecture) : sous M, les deux copies portent
+  // un `config.weeklyQuests` TEXTUELLEMENT IDENTIQUE — même `generatedForWeek` (« 2026-08-14 »
+  // des deux côtés, là où la fixture pose 08-14 contre 08-07), mêmes assignations, même
+  // clé-sonde. Idem pour `weeklyChallenge{weekKey}`. Or `generatedForWeek`/`weekKey` EST la clé
+  // d'arbitrage du seau daté (v2.16.78) : la mettre à égalité sur les deux copies, c'est retirer
+  // au bloc la seule chose que sa propre règle pouvait départager. La paire est alors muette sur
+  // l'axe de l'ordre non pas parce que la fusion est saine, mais parce que l'échafaudage a
+  // effacé la question — `fixture-identique-controle-inerte`, et le patron jumeau de
+  // `cle-arbitrage-jamais-mise-a-egalite`.
+  //
+  // Ce n'est donc PAS le choix « sauter comme le font les listes » : sauter aurait fermé le
+  // garde des deux côtés et laissé la charnière conteneur × liste-contenue mesurée par PERSONNE
+  // (`angle-mort-symetrique` à l'envers). Ce n'est pas non plus « garder et écrire pourquoi » :
+  // il n'y a rien à écrire en faveur d'une paire inerte. C'est la troisième voie, celle que la
+  // v2.16.96 avait déjà prise ici même — corriger dans la QUESTION. `sousCle` dit : de M, ne
+  // prends QUE la liste qu'elle vient poser, et laisse à chaque copie le bloc de conteneur
+  // qu'elle porte déjà. Les deux copies restent d'accord sur la structure INJECTÉE (la liste
+  // sentinelle, identique des deux côtés, comme dans toutes les autres paires) et redeviennent
+  // en désaccord sur ce que la fixture leur donne — exactement le régime de toutes les autres.
+  const monteO = (savedAt, gsBase, cfgBase, pl, o, val, plus, sousCle = null) => {
     const gs = { ...gsBase, ...plus.gs }, cfg = { ...cfgBase, ...plus.cfg };
     const cible = o.dans === "gameStates" ? gs : cfg;
+    if (sousCle) {
+      const propre = (o.dans === "gameStates" ? gsBase : cfgBase)[o.champ] || {};
+      cible[o.champ] = { ...propre, [sousCle]: (cible[o.champ] || {})[sousCle] };
+    }
     cible[o.champ] = { ...(cible[o.champ] || {}), [SENT]: val };
     return mkFam(savedAt, gs, cfg, pl);
   };
-  const mesureO = (o, val, plus, impl) => {
-    const fA = monteO("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, val, plus);
-    const fB = monteO("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, val, plus);
+  // La collision, reconnue à la DÉCLARATION plutôt qu'au nom : une source-liste dont le
+  // `conteneur` est l'objet sondé. `null` partout ailleurs — 4 145 paires sur 4 147 ne changent
+  // pas d'un octet.
+  const sousCleDe = (o, m) => (m.conteneur && m.dans === o.dans && m.conteneur.cle === o.champ
+    ? m.champ : null);
+  const mesureO = (o, val, plus, impl, sousCle = null) => {
+    const fA = monteO("2026-08-15T12:00:00.000Z", gsA, famA.config, plA, o, val, plus, sousCle);
+    const fB = monteO("2026-08-14T12:00:00.000Z", gsB, famB.config, plB, o, val, plus, sousCle);
     try { const out = impl.mergeFamily(fA, fB);
           return { p: presentO(litO(out, o)), s: norm27(out), o: out }; } catch { return null; }
   };
@@ -4378,9 +4422,12 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       for (const m of sourcesM) {
         if (m.id === nomO(o)) continue;
         paires++;
-        // Le point de comparaison porte le MÊME échafaudage que la mesure, sentinelle exceptée.
-        const ref = mesureO(o, val, m.plusTemoin, client);
-        const vc = mesureO(o, val, m.plus, client), vs = mesureO(o, val, m.plus, server);
+        // Le point de comparaison porte le MÊME échafaudage que la mesure, sentinelle exceptée —
+        // v2.17.12 : `sousCle` comprise, sinon le témoin et la mesure ne parlent plus du même
+        // objet et l'écart mesuré serait celui des deux échafaudages, pas celui de la sentinelle.
+        const sc = sousCleDe(o, m);
+        const ref = mesureO(o, val, m.plusTemoin, client, sc);
+        const vc = mesureO(o, val, m.plus, client, sc), vs = mesureO(o, val, m.plus, server, sc);
         if (vc === null || ref === null) continue;
         if (vc.p !== vs.p)
           fail(`24e étage — ${nomO(o)}{clé→${forme}} × ${m.nom} : la clé-sonde survit côté `
@@ -4726,9 +4773,31 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
           return { p: present(l, litL(out, l)), s: norm27(out) }; } catch { return null; }
   };
-  const mesureOEq = (o, val, plus, impl, inv) => {
-    const fA = monteO(EQ_ST, gsA, famA.config, plA, o, val, plus);
-    const fB = monteO(EQ_ST, gsB, famB.config, plB, o, val, plus);
+  const mesureOEq = (o, val, plus, impl, inv, sousCle = null) => {
+    const fA = monteO(EQ_ST, gsA, famA.config, plA, o, val, plus, sousCle);
+    const fB = monteO(EQ_ST, gsB, famB.config, plB, o, val, plus, sousCle);
+    // v2.17.12 — 34e étage, le garde-fou de l'échafaudage lui-même, posé UNE fois par paire
+    // (côté client, à l'ENDROIT). La question de l'ordre — « la clé-sonde survit-elle quand A est
+    // en base et disparaît-elle quand on échange ? » — n'a de sens que si les deux copies portent
+    // un bloc-cible DISTINCT : la sonde et la source sont posées identiques des deux côtés
+    // EXPRÈS, et c'est le contenu que chaque copie porte déjà qui donne à la règle du bloc de
+    // quoi trancher. Si l'échafaudage rend les deux blocs textuellement égaux, la paire répond
+    // « même sort » quoi qu'il arrive à la fusion : elle ne surveille plus rien et son zéro ne
+    // parle que d'elle. C'est le trou exact que le 34e étage vient de fermer ; ce contrôle est ce
+    // qui empêchera une prochaine nuit de le rouvrir en silence, en `plus` de la correction.
+    if (impl === client && !inv) {
+      const bA = JSON.stringify((o.dans === "gameStates" ? fA.gameStates[0] : fA.config)[o.champ]);
+      const bB = JSON.stringify((o.dans === "gameStates" ? fB.gameStates[0] : fB.config)[o.champ]);
+      if (bA === bB) {
+        copiesJumelles++;
+        fail(`34e étage — ÉCHAFAUDAGE INERTE : ${nomO(o)}, sous la source posée, porte un bloc `
+           + `TEXTUELLEMENT IDENTIQUE sur les deux copies (${bA.slice(0, 120)}…). La question de `
+           + `l'ordre est alors répondue par la fixture, pas par la fusion : quelle que soit la `
+           + `règle de ${nomO(o)}, échanger deux entrées égales rend la même sortie, et le `
+           + `« 0 arbitrage par l'ordre seul » de cette paire ne mesure rien. Rends au bloc ce que `
+           + `chaque copie porte déjà (voir \`sousCle\` au 34e étage) au lieu de le remplacer.`);
+      }
+    }
     try { const out = inv ? impl.mergeFamily(fB, fA) : impl.mergeFamily(fA, fB);
           // v2.17.8 — 30e étage : la SIGNATURE manquait de ce côté-ci. `mesureO` (23e étage) la
           // rend depuis toujours, `mesureOEq` non — et c'est exactement ce qui rendait le côté
@@ -4736,6 +4805,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
           return { p: presentO(litO(out, o)), s: norm27(out) }; } catch { return null; }
   };
   let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
+  let copiesJumelles = 0, collisionsO = 0;
   let basesEqS = 0, basesOrdreS = 0, basesParite = 0;
   let memeSortieBase = 0;
   const rapportEq = [];
@@ -4895,8 +4965,8 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // pas sa suite.
   const QUEUE_O = ` Et une raison SUPPLÉMENTAIRE de crier ici : c'est cette identité, et elle`
     + ` seule, qui autoriserait à ne plus mesurer le côté ENDROIT des objets.`;
-  const memeQueAvantO = (o, val, plus, fc, fs, nue = false) => {
-    const mc = mesureO(o, val, plus, client), ms = mesureO(o, val, plus, server);
+  const memeQueAvantO = (o, val, plus, fc, fs, nue = false, sousCle = null) => {
+    const mc = mesureO(o, val, plus, client, sousCle), ms = mesureO(o, val, plus, server, sousCle);
     const quoi = `${nomO(o)}{clé→${FORME_INV}}`;
     identite(nue ? 33 : 30, quoi, "client", fc, mc && mc.s, nue ? QUEUE_B : QUEUE_O, nue);
     identite(nue ? 33 : 31, quoi, "serveur", fs, ms && ms.s, nue ? QUEUE_B : QUEUE_O, nue);
@@ -5054,9 +5124,11 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     const bo = baseEqO.get(nomO(o));
     for (const m of sourcesInv) {
       if (m.id === nomO(o)) continue;
-      const fc = mesureOEq(o, val, m.plus, client, false), ic = mesureOEq(o, val, m.plus, client, true);
-      const fs = mesureOEq(o, val, m.plus, server, false), is = mesureOEq(o, val, m.plus, server, true);
+      const sc = sousCleDe(o, m);            // v2.17.12 — 34e étage
+      const fc = mesureOEq(o, val, m.plus, client, false, sc), ic = mesureOEq(o, val, m.plus, client, true, sc);
+      const fs = mesureOEq(o, val, m.plus, server, false, sc), is = mesureOEq(o, val, m.plus, server, true, sc);
       if (fc === null || ic === null || fs === null || is === null) continue;
+      if (sc) collisionsO++;
       pairesEq++;
       pariteEq++;
       if (fc.p !== fs.p || ic.p !== is.p)
@@ -5067,7 +5139,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `seule l'égalité des estampilles la fait mordre.${dejaSonde(bo, nomO(o))}`);
       ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`,
               dejaSonde(bo, nomO(o)));
-      memeQueAvantO(o, val, m.plus, fc, fs); // v2.17.8 — 30e ; v2.17.9 — les DEUX copies
+      memeQueAvantO(o, val, m.plus, fc, fs, false, sc); // v2.17.8 — 30e ; v2.17.9 — les DEUX copies
     }
   }
   // v2.17.8 — 30e étage, le contrôle qui garde le contrôle. `memeSortie` était jusqu'ici un
@@ -5085,6 +5157,29 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // qu'elles rendent la sortie du régime mesuré, sinon l'identité ne vaut que pour la copie
   // confrontée. Le `× 2` est la forme même de la réserve (i) : c'est ce chiffre, et pas une
   // phrase, qui empêchera la prochaine nuit de retirer `fs` en croyant l'identité acquise.
+  // v2.17.12 — 34e étage : les paires en COLLISION ne peuvent plus disparaître en silence.
+  // L'attendu est dérivé des DÉCLARATIONS (`OBJETS` × les cibles porteuses d'un `conteneur`), pas
+  // de ce que la boucle a bien voulu poser : un contrôle dont l'attendu vient du même parcours que
+  // le mesuré ne peut pas voir le parcours se rétrécir (`releve-partage-le-plafond-surveille`).
+  // Il tombe dans les deux sens. Vers le BAS : le jour où une nuit ajoute le `continue` symétrique
+  // des listes — la sortie « facile » que la piste du 33e étage proposait — la charnière
+  // conteneur × liste-contenue cesse d'être mesurée par QUI QUE CE SOIT, des deux côtés du
+  // produit, et c'est un build rouge plutôt qu'un chiffre qui baisse. Vers le HAUT : le jour où
+  // une liste nichée de plus est déclarée (`conteneur:`), la paire naît et le contrôle exige
+  // qu'on l'ait vue naître.
+  const collisionsAttendues = OBJETS.reduce((n, o) => n + cibles.filter((m) =>
+    m.conteneur && m.dans === o.dans && m.conteneur.cle === o.champ).length, 0);
+  if (collisionsO !== collisionsAttendues)
+    fail(`34e étage — COLLISIONS CONTENEUR NON MESURÉES : ${collisionsAttendues} paires `
+       + `« objet-cible ⊃ liste-source » sont DÉCLARÉES (une cible avec \`conteneur:\` dont la clé `
+       + `est un objet d'\`OBJETS\`), mais ${collisionsO} ont été mesurées. Ce sont les seules `
+       + `paires où la source vit DANS la cible : leur échafaudage passe par \`sousCle\`, et sans `
+       + `lui la source remplace le bloc du conteneur sur les DEUX copies — clé d'arbitrage `
+       + `comprise. Les sauter, c'est fermer le garde des deux côtés du produit et laisser la `
+       + `charnière conteneur × liste-contenue mesurée par personne.`);
+  if (copiesJumelles !== 0)
+    fail(`34e étage — ${copiesJumelles} paires d'objets mesurées sur deux copies JUMELLES `
+       + `(voir les cris ci-dessus). Attendu : 0.`);
   if (memeSortie !== pairesEq * 2)
     fail(`31e étage — COUVERTURE INCOMPLÈTE : ${pairesEq} paires mesurées à \`savedAt\` ÉGAL, donc `
        + `${pairesEq * 2} confrontations attendues (client ET serveur, les deux côtés ENDROIT), `
@@ -5128,7 +5223,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
     + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
     + `${pariteEq} parités client/serveur, ${memeSortie}/${pairesEq * 2} sorties confrontées au `
-    + `régime mesuré (les DEUX copies), ${memeSortieBase}/${basesEq + basesEqS} pour l'entrée NUE)`);
+    + `régime mesuré (les DEUX copies), ${memeSortieBase}/${basesEq + basesEqS} pour l'entrée NUE, `
+    + `${collisionsO}/${collisionsAttendues} collision(s) conteneur⊃liste posées sur le bloc PROPRE `
+    + `de chaque copie, ${copiesJumelles} paire(s) sur copies jumelles)`);
   if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
   // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
   //   • **`ordreVu` n'est posé que côté CLIENT, et c'est un CHOIX MESURÉ, pas un oubli** — voir
