@@ -4272,6 +4272,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // v2.17.4 — 26e étage : les paires qui DÉPLACENT la sonde sont les seules à pouvoir servir
   // de premier étage à une règle qui en exige deux. On les garde au passage.
   const candidats = [];
+
   for (const l of cibles) {
     const regimes = [{ nom: "rejet", plus: { cfg: {}, gs: {} } }];
     if (l.genre === "objets" && l.tombstone)
@@ -4765,18 +4766,74 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // contrôle-là peut tomber — le jour où une règle lira `savedAt` autrement que par `isNewer`
   // (un rapprochement à la minute, une fenêtre de tolérance, un `>=`), le raisonnement de tout
   // l'étage s'écroule, et c'est ici que ça se verra plutôt que dans un zéro rassurant.
-  const memeQueAvant = (l, plus, fc) => {
-    const fw = mesure(l, plus, client);
-    if (fw === null) return;
+  // ── 31e ÉTAGE : L'IDENTITÉ N'ÉTAIT PROUVÉE QUE SUR UNE COPIE ────────────────
+  // v2.17.9 — la piste de la v2.17.8 demandait d'instruire DEUX réserves avant d'appliquer son
+  // point (a) (« cesser de poser le côté ENDROIT à égalité »). La réserve (i), mot pour mot :
+  // « `memeQueAvant`/`memeQueAvantO` confrontent justement le `fc` ENDROIT — l'identité qui les
+  // rend redondantes est aussi ce qui les alimente, et il faut décider si le contrôle de
+  // couverture survit tel quel ou change de forme. »
+  //
+  // En l'instruisant, l'identité s'est révélée plus étroite que ce que tout le monde en disait.
+  // Le 29e étage mesure QUATRE fusions par paire — client-endroit, client-envers,
+  // serveur-endroit, serveur-envers — et n'en confrontait qu'UNE au régime mesuré : `fc`, le
+  // CLIENT. `fs` — le côté ENDROIT du SERVEUR — n'a jamais été confronté à rien. « ÉGAL ≡
+  // mesuré » était donc une phrase vraie pour une moitié de ce qu'elle prétend couvrir, et c'est
+  // le même patron `angle-mort-symetrique` que la v2.17.8 a fermé sur l'axe liste/objet, reparu
+  // ici sur l'axe client/serveur. Une nuit qui aurait appliqué (a) sur la foi de cette phrase
+  // aurait retiré `fs` sans qu'aucune mesure ne l'ait jamais couvert.
+  //
+  // Fermer ce trou coûte une fusion de plus par paire, et la piste espérait la financer en
+  // libérant du temps ailleurs. **Les deux façons de la financer ont été MESURÉES, et aucune ne
+  // rapporte.** Le régime mesuré des deux copies (`vc`/`vs`) est déjà calculé par les 22e/23e
+  // étages sur des entrées identiques : le confronter REFAIT la fusion, et un mémo devrait donc
+  // rendre les deux côtés gratuits. Écrit, mesuré, retiré — 24,29 s CPU avec le mémo contre
+  // 23,90 s en fusions fraîches, soit 1,6 % d'écart sur une machine dont le mur d'horloge varie
+  // de 25 % d'une passe à l'autre : les 8 294 fusions évitées coûtent, en `Map` et en chaînes
+  // retenues, à peu près ce qu'elles coûtaient à calculer. Un mémo qui ne rapporte rien mais
+  // couple ce contrôle aux boucles des 22e/23e étages n'est pas un gain, c'est une dépendance de
+  // plus ; la version simple est gardée et l'espoir de la piste est écrit ici comme MESURÉ FAUX,
+  // pour qu'aucune nuit ne le réécrive. Le vrai prix de l'étage est donc net : 21,07 s quand
+  // l'identité ne couvrait qu'une copie, 23,90 s quand elle les couvre toutes les deux (+13,4 %).
+  const identite = (etage, quoi, cote, eq, mes, queue = "") => {
+    if (mes === undefined || mes === null || !eq) return;
     memeSortie++;
-    if (fw.s === fc.s) return;
-    fail(`29e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ : ${nomL(l)}, à l'ENDROIT, la fusion ne rend pas `
-       + `la même sortie selon que les deux estampilles sont ÉGALES ou que la base est la plus `
-       + `fraîche. Or les deux passent par la même branche : \`isNewer\` est le SEUL lecteur de `
-       + `\`savedAt\` (src/merge.js:508, 573, 867) et il rend \`false\` dans les deux cas. Une `
-       + `divergence ici veut dire qu'une règle lit \`savedAt\` autrement — et alors tout le `
-       + `recensement des 22e-28e étages, qui ne mesure QU'UN écart d'estampille, a un angle mort `
-       + `de plus.`);
+    if (mes === eq.s) return;
+    fail(`${etage}e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ : ${quoi}, à l'ENDROIT, côté ${cote}, la `
+       + `fusion ne rend pas la même sortie selon que les deux estampilles sont ÉGALES ou que la `
+       + `base est la plus fraîche. Or les deux passent par la même branche : \`isNewer\` est le `
+       + `SEUL lecteur de \`savedAt\` (src/merge.js:508, 573, 867) et il rend \`false\` dans les `
+       + `deux cas. Une divergence ici veut dire qu'une règle lit \`savedAt\` autrement — et alors `
+       + `tout le recensement des 22e-30e étages, qui ne mesure QU'UN écart d'estampille, a un `
+       + `angle mort de plus.${queue}`);
+  };
+  //
+  // ── LE VERDICT SUR LE POINT (a), ET POURQUOI IL EST ÉCRIT ICI ──────────────
+  // Le point (a) de la piste — « ne mesurer à égalité que l'ENVERS » — est REFUSÉ, et la raison
+  // tient en une ligne de ce fichier plutôt qu'en un paragraphe du journal : l'identité s'écrit
+  // `identite(29, …, fc, mes.c)`. `fc` est le côté ENDROIT ; `mes.c` est le régime mesuré. Les
+  // retirer l'un OU l'autre ne laisse qu'une seule grandeur, et le test devient `mes.c === mes.c`
+  // — vrai pour toujours, quoi qu'il arrive à la fusion. C'est exactement `compteur-de-securite-
+  // qui-ne-peut-pas-tomber` et `fixture-identique-controle-inerte`, et le contrôle de couverture
+  // ci-dessous ne peut PAS le voir : `memeSortie` s'incrémenterait pareil, le compte tomberait
+  // juste, et le build resterait vert en ne surveillant plus rien.
+  //
+  // Le côté ENDROIT à égalité n'est donc pas « payé pour rien » : il est le SEUL opérande non
+  // redondant de la seule mesure qui garde vraie la phrase dont tous les étages 22e-31e
+  // dépendent — « `isNewer` est le seul lecteur de `savedAt` ». Une redondance qui n'existe que
+  // parce qu'on la vérifie ne peut pas servir d'argument pour cesser de la vérifier ; le jour où
+  // on cesse, elle cesse d'être vraie sans que personne ne l'apprenne. `ordreVu` le dit d'une
+  // autre façon : il compare l'ENDROIT à l'ENVERS, et une question sur l'ORDRE ne se pose pas
+  // avec un seul ordre.
+  //
+  // Ce qui RESTE ouvert de la piste, et qui n'est pas tranché ici : la réserve (ii) — les deux
+  // autres formes de clé (`date`, `ISO`) et le régime `sauvetage`, que le produit réduit n'a
+  // jamais posés ni au 28e, ni au 29e, ni au 30e. Elle est maintenant SANS financement : la
+  // réserve (i) montre qu'il n'y avait pas de temps à récupérer ici, ni en coupant (a), ni en
+  // mémorisant. Ces axes devront être payés, ou ne pas être posés — pas espérés gratuits.
+  const memeQueAvant = (l, plus, fc, fs) => {
+    const mc = mesure(l, plus, client), ms = mesure(l, plus, server);
+    identite(29, nomL(l), "client", fc, mc && mc.s);
+    identite(31, nomL(l), "serveur", fs, ms && ms.s);
   };
   // ── 30e ÉTAGE : L'ANGLE MORT SYMÉTRIQUE DU 29e ─────────────────────────────
   // v2.17.8 — la piste de la v2.17.7, point (b), mot pour mot : « la redondance n'est mesurée que
@@ -4798,19 +4855,13 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // preuve qui ne l'a jamais couverte : le patron « tolérance adossée au mauvais étage », en pire,
   // parce qu'ici c'est la mesure elle-même qu'on retirerait. (b) est donc le PRÉALABLE de (a),
   // pas sa suite.
-  const memeQueAvantO = (o, val, plus, fc) => {
-    const fw = mesureO(o, val, plus, client);
-    if (fw === null) return;
-    memeSortie++;
-    if (fw.s === fc.s) return;
-    fail(`30e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ (côté OBJET) : ${nomO(o)}{clé→${FORME_INV}}, à `
-       + `l'ENDROIT, la fusion ne rend pas la même sortie selon que les deux estampilles sont `
-       + `ÉGALES ou que la base est la plus fraîche. Or les deux passent par la même branche : `
-       + `\`isNewer\` est le SEUL lecteur de \`savedAt\` (src/merge.js:508, 573, 867) et il rend `
-       + `\`false\` dans les deux cas. Même conséquence qu'au 29e étage côté liste — le `
-       + `recensement des 22e-29e étages, qui ne mesure QU'UN écart d'estampille, aurait un angle `
-       + `mort de plus — et une raison SUPPLÉMENTAIRE de crier ici : c'est cette identité, et elle `
-       + `seule, qui autoriserait à ne plus mesurer le côté ENDROIT des objets.`);
+  const QUEUE_O = ` Et une raison SUPPLÉMENTAIRE de crier ici : c'est cette identité, et elle`
+    + ` seule, qui autoriserait à ne plus mesurer le côté ENDROIT des objets.`;
+  const memeQueAvantO = (o, val, plus, fc, fs) => {
+    const mc = mesureO(o, val, plus, client), ms = mesureO(o, val, plus, server);
+    const quoi = `${nomO(o)}{clé→${FORME_INV}}`;
+    identite(30, quoi, "client", fc, mc && mc.s, QUEUE_O);
+    identite(31, quoi, "serveur", fs, ms && ms.s, QUEUE_O);
   };
 
   // (a) la sonde SEULE. Avant toute source : si le sort de l'élément dépend déjà de l'ordre à
@@ -4852,7 +4903,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `${m.nom} n'est écrite que dans une des deux copies — et seule l'égalité des `
            + `estampilles la fait mordre.`);
       ordreVu(`${nomL(l)} × ${m.nom}`, fc, ic, `un élément de ${nomL(l)}`);
-      memeQueAvant(l, plus, fc);
+      memeQueAvant(l, plus, fc, fs);   // v2.17.9 — 31e étage : les DEUX copies
     }
   }
   for (const o of OBJETS) {
@@ -4884,7 +4935,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `qui fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies — et `
            + `seule l'égalité des estampilles la fait mordre.`);
       ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`);
-      memeQueAvantO(o, val, m.plus, fc); // v2.17.8 — 30e étage
+      memeQueAvantO(o, val, m.plus, fc, fs); // v2.17.8 — 30e ; v2.17.9 — les DEUX copies
     }
   }
   // v2.17.8 — 30e étage, le contrôle qui garde le contrôle. `memeSortie` était jusqu'ici un
@@ -4896,17 +4947,26 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // (a) de la piste sans le mesurer d'abord — ce n'est plus un chiffre qui baisse en silence,
   // c'est un build rouge. C'est la leçon `temoin-appelle-la-mesure-directement` posée à l'endroit :
   // le contrôle regarde ce que les BOUCLES ont demandé, pas ce que la machinerie sait faire.
-  if (memeSortie !== pairesEq)
-    fail(`30e étage — COUVERTURE INCOMPLÈTE : ${pairesEq} paires mesurées à \`savedAt\` ÉGAL, mais `
-       + `seulement ${memeSortie} confrontées au régime mesuré (${pairesEq - memeSortie} muettes). `
-       + `Chaque paire posée à égalité doit dire si sa sortie est la MÊME qu'au régime des 22e-29e `
-       + `étages — c'est cette identité qui autorise à transporter leurs conclusions ici. Une `
-       + `moitié non confrontée rend le « 0 arbitrage par l'ordre seul » vrai pour une moitié `
-       + `seulement, et c'est l'angle mort qui a vécu une nuit entière (v2.17.7 : 2803 sur 4147).`);
+  //
+  // v2.17.9 — 31e étage : le compte attendu passe à DEUX par paire. Chaque paire pose quatre
+  // fusions à égalité, dont deux à l'ENDROIT (`fc` client, `fs` serveur) ; les deux doivent dire
+  // qu'elles rendent la sortie du régime mesuré, sinon l'identité ne vaut que pour la copie
+  // confrontée. Le `× 2` est la forme même de la réserve (i) : c'est ce chiffre, et pas une
+  // phrase, qui empêchera la prochaine nuit de retirer `fs` en croyant l'identité acquise.
+  if (memeSortie !== pairesEq * 2)
+    fail(`31e étage — COUVERTURE INCOMPLÈTE : ${pairesEq} paires mesurées à \`savedAt\` ÉGAL, donc `
+       + `${pairesEq * 2} confrontations attendues (client ET serveur, les deux côtés ENDROIT), `
+       + `mais seulement ${memeSortie} faites (${pairesEq * 2 - memeSortie} muettes). Chaque paire `
+       + `posée à égalité doit dire, POUR CHAQUE COPIE, si sa sortie est la MÊME qu'au régime des `
+       + `22e-30e étages — c'est cette identité qui autorise à transporter leurs conclusions ici. `
+       + `Une moitié non confrontée rend le « 0 arbitrage par l'ordre seul » vrai pour une moitié `
+       + `seulement : c'est l'angle mort qui a vécu une nuit entière côté OBJET (v2.17.7 : 2803 `
+       + `sur 4147) et qui vivait depuis toujours côté SERVEUR (v2.17.8 : 4147 sur 8294).`);
   console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules (${basesOrdre} tranchée(s) par l'ordre), `
     + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
     + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
-    + `${pariteEq} parités client/serveur, ${memeSortie} sorties confrontées au régime mesuré)`);
+    + `${pariteEq} parités client/serveur, ${memeSortie}/${pairesEq * 2} sorties confrontées au `
+    + `régime mesuré (les DEUX copies))`);
   if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
   // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
   //   • **le produit reste RÉDUIT**, exactement comme au 28e : une seule des trois formes de clé
