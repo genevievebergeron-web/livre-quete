@@ -4736,8 +4736,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
           return { p: presentO(litO(out, o)), s: norm27(out) }; } catch { return null; }
   };
   let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
+  let basesEqS = 0, basesOrdreS = 0, basesParite = 0;
   const rapportEq = [];
-  const ordreVu = (nom, fe, ie, quoi) => {
+  const ordreVu = (nom, fe, ie, quoi, deja = "") => {
     if (fe.p === ie.p) return;
     ordreSeul++;
     rapportEq.push(`${nom} — survit ${fe.p ? "à l'ENDROIT" : "à l'ENVERS"} seulement (savedAt ÉGAL)`);
@@ -4748,7 +4749,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
        + `qui tranche, c'est la POSITION de l'argument. Les deux appareils qui se synchronisent dans `
        + `la même seconde gardent chacun un sous-ensemble différent, et rien ne le leur dit `
        + `(v2.16.89). Départage sur le CONTENU (union, max, id) plutôt que sur \`a\` ?? \`b\`, ou `
-       + `rends \`isNewer\` total sur l'égalité.`);
+       + `rends \`isNewer\` total sur l'égalité.${deja}`);
   };
   // Ce que le 29e étage suppose, et qui doit être VÉRIFIÉ, pas supposé : que le régime « savedAt
   // ÉGAL » ne diffère du régime mesuré depuis le 22e étage que par l'ORDRE des arguments. Le
@@ -4866,20 +4867,101 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
 
   // (a) la sonde SEULE. Avant toute source : si le sort de l'élément dépend déjà de l'ordre à
   // égalité, la comparaison paire par paire mesurerait un écart qui n'a rien à voir avec M.
-  const baseEqL = new Map();
+  //
+  // ── 32e ÉTAGE : L'AXE CLIENT/SERVEUR POSÉ SUR LE RESTE DU 29e ──────────────
+  // v2.17.10 — la question laissée ouverte par la v2.17.9, mot pour mot : « l'axe qui vient de
+  // livrer, client/serveur, n'a été posé que sur `identite`. Les autres contrôles du 29e étage —
+  // `ordreVu` et les sondes seules (`baseEqL`) — ne sont posés que côté CLIENT ; `ordreVu(fc, ic)`
+  // n'est jamais rejoué en `ordreVu(fs, is)`. Rien ne dit que « 0 arbitrage par l'ordre seul »
+  // vaut pour le serveur. »
+  //
+  // Elle a DEUX jambes, et elles ne se ressemblent pas.
+  //
+  // ── JAMBE 1 : `ordreVu` côté serveur dans les boucles de PAIRES — REFUSÉE ──
+  // La conclusion s'y transporte DÉJÀ, et la preuve tient sur le treillis booléen des quatre
+  // `p` que chaque paire calcule (`fc`/`ic` client, `fs`/`is` serveur, tous les quatre
+  // mesurés depuis la v2.17.9 pour le contrôle de parité) :
+  //
+  //     supposons `fs.p ≠ is.p`         — le SERVEUR arbitre par l'ordre ;
+  //     si la parité est muette, alors  `fc.p = fs.p` et `ic.p = is.p` ;
+  //     donc                            `fc.p ≠ ic.p` — et `ordreVu` CLIENT crie.
+  //
+  // Autrement dit : `fs.p ≠ is.p` ⟹ (la parité crie) ∨ (`ordreVu` client crie). Il n'existe
+  // aucune assignation des quatre booléens où le serveur arbitre par l'ordre sans qu'un crieur
+  // déjà écrit ne parle. Ajouter `ordreVu(fs, is)` serait donc poser un crieur qui ne peut
+  // JAMAIS crier seul — la forme même de `compteur-de-securite-qui-ne-peut-pas-tomber`, et
+  // l'inverse exact de ce que la v2.17.9 a dû défendre pour `fc` (là, retirer l'opérande rendait
+  // le test tautologique ; ici, ajouter l'opérande rend le crieur redondant). La preuve n'est pas
+  // restée sur le papier : une règle serveur-seule qui arbitre par la POSITION à égalité, injectée
+  // dans les paires, rend le build ROUGE **aujourd'hui**, sans une ligne de plus (v2.17.10).
+  //
+  // ── JAMBE 2 : les sondes SEULES — VIVANTE, et pas pour la raison annoncée ──
+  // Ici le treillis ne s'applique pas : la boucle des bases ne calcule QUE le client, et **aucun
+  // contrôle de parité n'y existe**. Les 4147 parités du 29e étage ont TOUJOURS une source M au
+  // tableau ; la sonde toute seule n'a jamais été confrontée entre les deux copies.
+  //
+  // Et en allant écrire cette moitié, on trouve que l'ATTRIBUTION que ce bloc promet depuis le
+  // 29e étage n'a jamais été écrite non plus. Sa raison d'être, deux lignes plus haut : « si le
+  // sort de l'élément dépend déjà de l'ordre à égalité, la comparaison paire par paire mesurerait
+  // un écart qui n'a rien à voir avec M ». `baseEqL` était bien rempli — et `bq` n'était lu que
+  // comme un GARDE de présence (`if (!bq) continue`), son `.p` jamais comparé à quoi que ce
+  // soit. Le jour où une sonde tranche par l'ordre toute seule, l'étage crie 65 fois « `l` × M »
+  // en accusant chaque source, et la phrase censée l'empêcher est de la prose (patron
+  // `raison-ecrite-a-cote-est-fausse`). Côté OBJET c'était pire : le résultat de la base n'était
+  // même pas retenu. Les deux sont écrits maintenant, pour les DEUX copies.
+  const baseEqL = new Map(), baseEqO = new Map();
+  const sondeSeule = (nom, quoi, fe, ie, fes, ies) => {
+    basesEq++;
+    if (fe.p !== ie.p) {
+      basesOrdre++;
+      fail(`29e étage — ${nom} : à \`savedAt\` ÉGAL, côté CLIENT, ${quoi} `
+         + `${fe.p ? "survit" : "disparaît"} quand la copie A est en base et `
+         + `${ie.p ? "survit" : "disparaît"} quand les deux copies sont échangées, SANS qu'aucune `
+         + `autre structure ne soit posée. C'est la règle de ${nom} elle-même qui tranche par la `
+         + `POSITION de l'argument dès que la fraîcheur n'arbitre plus.`);
+    }
+    if (fes === null || ies === null) return { c: fe, ci: ie, s: null, si: null };
+    basesEqS++;
+    if (fes.p !== ies.p) {
+      basesOrdreS++;
+      fail(`32e étage — ${nom} : à \`savedAt\` ÉGAL, côté SERVEUR, ${quoi} `
+         + `${fes.p ? "survit" : "disparaît"} quand la copie A est en base et `
+         + `${ies.p ? "survit" : "disparaît"} quand les deux copies sont échangées, SANS qu'aucune `
+         + `autre structure ne soit posée. La sonde seule n'était mesurée QUE côté client depuis le `
+         + `29e étage : une règle de ${nom} écrite dans le SEUL serveur et qui tranche par la `
+         + `POSITION dès que la fraîcheur n'arbitre plus passait ici sans être nommée.`);
+    }
+    if (fe.p !== fes.p || ie.p !== ies.p) {
+      basesParite++;
+      fail(`32e étage — ${nom} (sonde SEULE, savedAt ÉGAL) : ${quoi} survit côté `
+         + `${fe.p !== fes.p ? (fe.p ? "client" : "serveur") : (ie.p ? "client" : "serveur")} et `
+         + `disparaît de l'autre, dans le sens ${fe.p !== fes.p ? "ENDROIT" : "ENVERS"}, SANS `
+         + `qu'aucune source ne soit posée. Les 4147 parités du 29e étage ont toutes une source M `
+         + `au tableau : un écart client/serveur que la structure porte TOUTE SEULE y est imputé à `
+         + `M, une fois par source.`);
+    }
+    return { c: fe, ci: ie, s: fes, si: ies };
+  };
+  // Ce que la sonde SEULE disait déjà, rendu au cri de la paire (voir jambe 2 ci-dessus).
+  const dejaSonde = (bq, quoi) => {
+    if (!bq) return "";
+    const cotes = [];
+    if (bq.c.p !== bq.ci.p) cotes.push("client");
+    if (bq.s && bq.si && bq.s.p !== bq.si.p) cotes.push("serveur");
+    const div = !!(bq.s && bq.si && (bq.c.p !== bq.s.p || bq.ci.p !== bq.si.p));
+    if (!cotes.length && !div) return "";
+    return ` ⚠️ ATTRIBUTION (32e étage) : la sonde SEULE de ${quoi} — aucune source posée —`
+       + (cotes.length ? ` tranche DÉJÀ par l'ordre côté ${cotes.join(" et ")}` : "")
+       + (div ? `${cotes.length ? ", et" : ""} diverge DÉJÀ entre les deux copies` : "")
+       + `. Ce cri n'accuse donc pas la source : il répète un écart que la structure porte seule. `
+       + `Répare d'abord sa propre règle, puis relis ce cri.`;
+  };
   for (const l of cibles) {
     const vide = { cfg: {}, gs: {} };
     const fe = mesureEq(l, vide, client, false), ie = mesureEq(l, vide, client, true);
     if (fe === null || ie === null) continue;
-    baseEqL.set(nomL(l), fe);
-    basesEq++;
-    if (fe.p === ie.p) continue;
-    basesOrdre++;
-    fail(`29e étage — ${nomL(l)} : à \`savedAt\` ÉGAL, la sonde ${fe.p ? "survit" : "disparaît"} `
-       + `quand la copie A est en base et ${ie.p ? "survit" : "disparaît"} quand les deux copies `
-       + `sont échangées, SANS qu'aucune autre structure ne soit posée. C'est la règle de `
-       + `${nomL(l)} elle-même qui tranche par la POSITION de l'argument dès que la fraîcheur `
-       + `n'arbitre plus.`);
+    const fes = mesureEq(l, vide, server, false), ies = mesureEq(l, vide, server, true);
+    baseEqL.set(nomL(l), sondeSeule(nomL(l), "la sonde", fe, ie, fes, ies));
   }
   for (const l of cibles) {
     const r = { cfg: {}, gs: {} };
@@ -4901,8 +4983,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `disparaît de l'autre, dans le sens `
            + `${fc.p !== fs.p ? "ENDROIT" : "ENVERS"}. Une règle qui fait dépendre ${nomL(l)} de `
            + `${m.nom} n'est écrite que dans une des deux copies — et seule l'égalité des `
-           + `estampilles la fait mordre.`);
-      ordreVu(`${nomL(l)} × ${m.nom}`, fc, ic, `un élément de ${nomL(l)}`);
+           + `estampilles la fait mordre.${dejaSonde(bq, nomL(l))}`);
+      ordreVu(`${nomL(l)} × ${m.nom}`, fc, ic, `un élément de ${nomL(l)}`,
+              dejaSonde(bq, nomL(l)));
       memeQueAvant(l, plus, fc, fs);   // v2.17.9 — 31e étage : les DEUX copies
     }
   }
@@ -4911,16 +4994,10 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     const vide = { cfg: {}, gs: {} };
     const fe = mesureOEq(o, val, vide, client, false), ie = mesureOEq(o, val, vide, client, true);
     if (fe !== null && ie !== null) {
-      basesEq++;
-      if (fe.p !== ie.p) {
-        basesOrdre++;
-        fail(`29e étage — ${nomO(o)}{clé→${FORME_INV}} : à \`savedAt\` ÉGAL, la clé-sonde `
-           + `${fe.p ? "survit" : "disparaît"} quand la copie A est en base et `
-           + `${ie.p ? "survit" : "disparaît"} quand les deux copies sont échangées, SANS qu'aucune `
-           + `autre structure ne soit posée. C'est la règle de ${nomO(o)} elle-même qui tranche par `
-           + `la POSITION de l'argument dès que la fraîcheur n'arbitre plus.`);
-      }
+      const fes = mesureOEq(o, val, vide, server, false), ies = mesureOEq(o, val, vide, server, true);
+      baseEqO.set(nomO(o), sondeSeule(`${nomO(o)}{clé→${FORME_INV}}`, "la clé-sonde", fe, ie, fes, ies));
     }
+    const bo = baseEqO.get(nomO(o));
     for (const m of sourcesInv) {
       if (m.id === nomO(o)) continue;
       const fc = mesureOEq(o, val, m.plus, client, false), ic = mesureOEq(o, val, m.plus, client, true);
@@ -4933,8 +5010,9 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
            + `survit côté ${fc.p !== fs.p ? (fc.p ? "client" : "serveur") : (ic.p ? "client" : "serveur")} `
            + `et disparaît de l'autre, dans le sens ${fc.p !== fs.p ? "ENDROIT" : "ENVERS"}. Une règle `
            + `qui fait dépendre ${nomO(o)} de ${m.nom} n'est écrite que dans une des deux copies — et `
-           + `seule l'égalité des estampilles la fait mordre.`);
-      ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`);
+           + `seule l'égalité des estampilles la fait mordre.${dejaSonde(bo, nomO(o))}`);
+      ordreVu(`${nomO(o)}{clé→${FORME_INV}} × ${m.nom}`, fc, ic, `une CLÉ de ${nomO(o)}`,
+              dejaSonde(bo, nomO(o)));
       memeQueAvantO(o, val, m.plus, fc, fs); // v2.17.8 — 30e ; v2.17.9 — les DEUX copies
     }
   }
@@ -4962,13 +5040,32 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
        + `Une moitié non confrontée rend le « 0 arbitrage par l'ordre seul » vrai pour une moitié `
        + `seulement : c'est l'angle mort qui a vécu une nuit entière côté OBJET (v2.17.7 : 2803 `
        + `sur 4147) et qui vivait depuis toujours côté SERVEUR (v2.17.8 : 4147 sur 8294).`);
-  console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules (${basesOrdre} tranchée(s) par l'ordre), `
+  // v2.17.10 — 32e étage : la même discipline que le `memeSortie` du 30e, appliquée aux sondes
+  // seules. `basesEqS` est ADOSSÉ à `basesEq` : si une nuit retire la mesure serveur des bases —
+  // ou si une copie se met à jeter là où l'autre passe — ce n'est pas un chiffre qui baisse en
+  // silence dans une ligne de relevé, c'est un build rouge. Sans cet adossement, le « 0 tranchée
+  // par l'ordre côté serveur » ci-dessous serait un zéro qui ne parle que de ce qu'on a bien voulu
+  // mesurer (`releve-partage-le-plafond-surveille`).
+  if (basesEqS !== basesEq)
+    fail(`32e étage — COUVERTURE INCOMPLÈTE DES SONDES SEULES : ${basesEq} sondes mesurées côté `
+       + `client, mais seulement ${basesEqS} côté serveur (${basesEq - basesEqS} muette(s)). Une `
+       + `sonde que le client sait fusionner et que le serveur jette est déjà une divergence — et `
+       + `tant qu'elle n'est pas mesurée, le « 0 arbitrage par l'ordre » des bases ne vaut que pour `
+       + `la copie qu'on a regardée.`);
+  console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules × 2 copies (${basesOrdre} tranchée(s) `
+    + `par l'ordre côté client, ${basesOrdreS} côté serveur, ${basesParite} divergente(s) entre `
+    + `copies), `
     + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
     + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
     + `${pariteEq} parités client/serveur, ${memeSortie}/${pairesEq * 2} sorties confrontées au `
     + `régime mesuré (les DEUX copies))`);
   if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
   // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
+  //   • **`ordreVu` n'est posé que côté CLIENT, et c'est un CHOIX MESURÉ, pas un oubli** — voir
+  //     la jambe 1 du 32e étage plus haut : `fs.p ≠ is.p` implique qu'un crieur déjà écrit parle,
+  //     donc le côté serveur y serait redondant par construction. Ce qui NE se transporte pas de
+  //     cette façon, ce sont les sondes seules, et elles sont mesurées des deux côtés depuis la
+  //     v2.17.10.
   //   • **le produit reste RÉDUIT**, exactement comme au 28e : une seule des trois formes de clé
   //     (`texte`) et le seul régime `rejet`. Un arbitrage par l'ordre qui ne se manifesterait que
   //     par un rapprochement DATÉ, ou seulement sur une sonde déjà tombstonée, reste hors
