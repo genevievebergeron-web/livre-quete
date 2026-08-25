@@ -4737,6 +4737,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   };
   let pairesEq = 0, ordreSeul = 0, basesEq = 0, basesOrdre = 0, memeSortie = 0, pariteEq = 0;
   let basesEqS = 0, basesOrdreS = 0, basesParite = 0;
+  let memeSortieBase = 0;
   const rapportEq = [];
   const ordreVu = (nom, fe, ie, quoi, deja = "") => {
     if (fe.p === ie.p) return;
@@ -4795,9 +4796,13 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // plus ; la version simple est gardée et l'espoir de la piste est écrit ici comme MESURÉ FAUX,
   // pour qu'aucune nuit ne le réécrive. Le vrai prix de l'étage est donc net : 21,07 s quand
   // l'identité ne couvrait qu'une copie, 23,90 s quand elle les couvre toutes les deux (+13,4 %).
-  const identite = (etage, quoi, cote, eq, mes, queue = "") => {
+  const identite = (etage, quoi, cote, eq, mes, queue = "", nue = false) => {
     if (mes === undefined || mes === null || !eq) return;
-    memeSortie++;
+    // v2.17.11 — 33e étage : les sondes SEULES ont leur PROPRE compteur. Le mettre en commun
+    // avec `memeSortie` aurait fait partager au relevé le plafond de ce qu'il surveille
+    // (`releve-partage-le-plafond-surveille`) : le contrôle du 31e attend `pairesEq × 2`, un
+    // appel de plus l'aurait rendu ROUGE, et le rendre tolérant aurait éteint sa question.
+    if (nue) memeSortieBase++; else memeSortie++;
     if (mes === eq.s) return;
     fail(`${etage}e étage — RÉGIME ÉGAL ≠ RÉGIME MESURÉ : ${quoi}, à l'ENDROIT, côté ${cote}, la `
        + `fusion ne rend pas la même sortie selon que les deux estampilles sont ÉGALES ou que la `
@@ -4831,10 +4836,42 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // jamais posés ni au 28e, ni au 29e, ni au 30e. Elle est maintenant SANS financement : la
   // réserve (i) montre qu'il n'y avait pas de temps à récupérer ici, ni en coupant (a), ni en
   // mémorisant. Ces axes devront être payés, ou ne pas être posés — pas espérés gratuits.
-  const memeQueAvant = (l, plus, fc, fs) => {
+  // ── 33e ÉTAGE : L'IDENTITÉ N'A JAMAIS ÉTÉ POSÉE SUR L'ENTRÉE NUE ───────────
+  // v2.17.11 — la piste de la v2.17.10, point (1), mot pour mot : « `memeQueAvant`/
+  // `memeQueAvantO` ne sont appelées que dans les boucles de PAIRES — la sonde SEULE, elle,
+  // n'est jamais confrontée au régime mesuré, ni côté client ni côté serveur. […] l'identité
+  // « ÉGAL ≡ mesuré » vaut pour 8 294 paires et pour ZÉRO base, alors que les bases viennent de
+  // recevoir leurs propres crieurs et que rien ne dit que leurs conclusions se transportent. »
+  //
+  // Ce n'est PAS le même trou que la jambe 1 du 32e étage, et la différence tient à l'ENTRÉE.
+  // Là-bas, ajouter `ordreVu(fs, is)` posait un crieur redondant parce que le treillis des
+  // quatre `p` de la MÊME paire le rendait muet par construction. Ici, la grandeur confrontée
+  // n'est pas un quatrième booléen de la même fusion : c'est une fusion sur une entrée que les
+  // boucles de paires ne posent JAMAIS. Leur `plus` vaut toujours `fusionne(vide, m.plus)`
+  // avec `m.plus` non vide — 65 sources, aucune vide. L'entrée NUE (`{cfg:{},gs:{}}`, la seule
+  // structure posée étant la sonde elle-même) n'apparaît nulle part dans les 8 294 paires, et
+  // une règle qui lirait `savedAt` autrement que par `isNewer` sur un chemin que seule
+  // l'entrée nue emprunte serait invisible à tous les étages précédents. L'identité des 29e-31e
+  // dit « pour toute entrée PORTANT une source M » ; elle ne dit rien de l'entrée sans M.
+  //
+  // Pourquoi ça compte maintenant plutôt qu'un jour : depuis le 32e étage, la sonde seule n'est
+  // plus un intermédiaire de calcul, elle CRIE (arbitrage par l'ordre client, arbitrage par
+  // l'ordre serveur, parité entre copies) et elle ANNOTE (⚠️ ATTRIBUTION, qui redirige 750 cris
+  // de paire vers la structure). Toutes ces conclusions sont tirées dans le régime « savedAt
+  // ÉGAL », et elles ne valent pour l'app que si ce régime rend, sur l'entrée nue, la même
+  // fusion que le régime mesuré des 22e-30e étages. Personne ne l'avait vérifié : c'est le
+  // patron `tolerance-adossee-au-mauvais-etage` — la phrase citée existe, mais elle a été
+  // prouvée sur d'autres entrées que celles dont on se sert.
+  const QUEUE_B = ` Et ici AUCUNE source n'est posée : le \`plus\` est l'entrée NUE, que les`
+    + ` boucles de PAIRES ne posent jamais (leur \`plus\` porte toujours une source M). Ce cri`
+    + ` dit donc que l'identité des 29e-31e étages ne se transporte PAS à l'entrée nue — et`
+    + ` avec elle tombe tout ce que la sonde SEULE conclut depuis le 32e étage : ses deux`
+    + ` arbitrages par l'ordre, sa parité client/serveur, et l'annotation ⚠️ ATTRIBUTION qui`
+    + ` réoriente les cris des paires.`;
+  const memeQueAvant = (l, plus, fc, fs, nue = false) => {
     const mc = mesure(l, plus, client), ms = mesure(l, plus, server);
-    identite(29, nomL(l), "client", fc, mc && mc.s);
-    identite(31, nomL(l), "serveur", fs, ms && ms.s);
+    identite(nue ? 33 : 29, nomL(l), "client", fc, mc && mc.s, nue ? QUEUE_B : "", nue);
+    identite(nue ? 33 : 31, nomL(l), "serveur", fs, ms && ms.s, nue ? QUEUE_B : "", nue);
   };
   // ── 30e ÉTAGE : L'ANGLE MORT SYMÉTRIQUE DU 29e ─────────────────────────────
   // v2.17.8 — la piste de la v2.17.7, point (b), mot pour mot : « la redondance n'est mesurée que
@@ -4858,11 +4895,11 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   // pas sa suite.
   const QUEUE_O = ` Et une raison SUPPLÉMENTAIRE de crier ici : c'est cette identité, et elle`
     + ` seule, qui autoriserait à ne plus mesurer le côté ENDROIT des objets.`;
-  const memeQueAvantO = (o, val, plus, fc, fs) => {
+  const memeQueAvantO = (o, val, plus, fc, fs, nue = false) => {
     const mc = mesureO(o, val, plus, client), ms = mesureO(o, val, plus, server);
     const quoi = `${nomO(o)}{clé→${FORME_INV}}`;
-    identite(30, quoi, "client", fc, mc && mc.s, QUEUE_O);
-    identite(31, quoi, "serveur", fs, ms && ms.s, QUEUE_O);
+    identite(nue ? 33 : 30, quoi, "client", fc, mc && mc.s, nue ? QUEUE_B : QUEUE_O, nue);
+    identite(nue ? 33 : 31, quoi, "serveur", fs, ms && ms.s, nue ? QUEUE_B : QUEUE_O, nue);
   };
 
   // (a) la sonde SEULE. Avant toute source : si le sort de l'élément dépend déjà de l'ordre à
@@ -4962,6 +4999,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     if (fe === null || ie === null) continue;
     const fes = mesureEq(l, vide, server, false), ies = mesureEq(l, vide, server, true);
     baseEqL.set(nomL(l), sondeSeule(nomL(l), "la sonde", fe, ie, fes, ies));
+    memeQueAvant(l, vide, fe, fes, true); // v2.17.11 — 33e étage : l'entrée NUE, les DEUX copies
   }
   for (const l of cibles) {
     const r = { cfg: {}, gs: {} };
@@ -4989,6 +5027,21 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
       memeQueAvant(l, plus, fc, fs);   // v2.17.9 — 31e étage : les DEUX copies
     }
   }
+  // ── PISTE OUVERTE (v2.17.11) : LE GARDE `conteneur` N'EXISTE QUE CÔTÉ LISTE ──
+  // Trouvé par le FAUX POSITIF de la falsification du 33e étage, pas par une relecture. Les
+  // boucles de LISTES portent trois fois `if (l.conteneur && m.champ === l.conteneur.cle)
+  // continue;` (22e, 28e, 29e étages) : refus de croiser une liste avec le conteneur qui la
+  // contient, parce que la source ÉCRASERAIT la cible au lieu de la côtoyer. Les boucles
+  // d'OBJETS n'ont AUCUN garde symétrique — seulement `m.id === nomO(o)`. Quand l'objet-cible
+  // EST le conteneur d'une liste-source, `plusDe(m, …)` remplace le bloc de premier niveau en
+  // entier et `monteO` repose la clé-sonde PAR-DESSUS le bloc de M : le `modeleObjet` de la
+  // fixture est effacé, et la paire mesurée n'est pas « la clé de O × la liste M » mais « O
+  // reconstruit à partir du bloc de M ». Deux paires sur 8294 — `config.weeklyQuests` ⊃
+  // `config.weeklyQuests.assignments` et `config.weeklyChallenge` ⊃
+  // `config.weeklyChallenge.challenges`, les deux seuls cas du projet. L'enjeu est petit, le
+  // patron ne l'est pas : `angle-mort-symetrique`, le garde d'un seul côté, et rien ne
+  // l'exerçait. À TRANCHER : sauter comme le font les listes, ou garder ET écrire ici pourquoi
+  // la mesure vaut quand même sur une cible reconstruite. Ne pas trancher en silence.
   for (const o of OBJETS) {
     const val = FORMES[0][1];
     const vide = { cfg: {}, gs: {} };
@@ -4996,6 +5049,7 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
     if (fe !== null && ie !== null) {
       const fes = mesureOEq(o, val, vide, server, false), ies = mesureOEq(o, val, vide, server, true);
       baseEqO.set(nomO(o), sondeSeule(`${nomO(o)}{clé→${FORME_INV}}`, "la clé-sonde", fe, ie, fes, ies));
+      memeQueAvantO(o, val, vide, fe, fes, true); // v2.17.11 — 33e étage : l'entrée NUE
     }
     const bo = baseEqO.get(nomO(o));
     for (const m of sourcesInv) {
@@ -5052,13 +5106,29 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
        + `sonde que le client sait fusionner et que le serveur jette est déjà une divergence — et `
        + `tant qu'elle n'est pas mesurée, le « 0 arbitrage par l'ordre » des bases ne vaut que pour `
        + `la copie qu'on a regardée.`);
+  // v2.17.11 — 33e étage : le même adossement que les 30e/31e/32e, posé sur les BASES. Le compte
+  // attendu n'est PAS `basesEq × 2` mais `basesEq + basesEqS` : la moitié serveur d'une base
+  // n'existe que si `mesureEq(…, server, …)` a rendu quelque chose, et c'est `basesEqS` qui le
+  // compte. Écrire `× 2` aurait fait de ce contrôle un doublon de celui du 32e étage — il serait
+  // devenu rouge pour la même raison, et muet sur la sienne (`angle-mort-symetrique`). Adossé
+  // aux deux compteurs séparément, il ne parle que de ce qu'il surveille : chaque sonde MESURÉE,
+  // sur chaque copie où elle l'a été, doit dire si le régime « savedAt ÉGAL » lui rend la même
+  // sortie que le régime des 22e-30e étages.
+  if (memeSortieBase !== basesEq + basesEqS)
+    fail(`33e étage — COUVERTURE INCOMPLÈTE DE L'ENTRÉE NUE : ${basesEq} sondes seules mesurées `
+       + `côté client et ${basesEqS} côté serveur, donc ${basesEq + basesEqS} confrontations au `
+       + `régime mesuré attendues, mais seulement ${memeSortieBase} faites `
+       + `(${basesEq + basesEqS - memeSortieBase} muette(s)). Une sonde seule dont on ne sait pas `
+       + `si sa fusion à égalité rend la sortie du régime mesuré ne peut RIEN transporter : ni son `
+       + `« 0 arbitrage par l'ordre », ni sa parité client/serveur, ni l'annotation ⚠️ ATTRIBUTION `
+       + `dont dépendent les cris des paires depuis le 32e étage.`);
   console.log(`    (savedAt ÉGAL — ${basesEq} sondes seules × 2 copies (${basesOrdre} tranchée(s) `
     + `par l'ordre côté client, ${basesOrdreS} côté serveur, ${basesParite} divergente(s) entre `
     + `copies), `
     + `puis ${pairesEq} paires × 2 ordres × 2 copies (produit réduit : ${sourcesInv.length} sources, `
     + `1 forme « ${FORME_INV} », régime rejet) = ${ordreSeul} arbitrage(s) par l'ordre seul, `
     + `${pariteEq} parités client/serveur, ${memeSortie}/${pairesEq * 2} sorties confrontées au `
-    + `régime mesuré (les DEUX copies))`);
+    + `régime mesuré (les DEUX copies), ${memeSortieBase}/${basesEq + basesEqS} pour l'entrée NUE)`);
   if (process.env.DBG29 && rapportEq.length) console.log("      " + rapportEq.join("\n      "));
   // Ce que le 29e étage NE couvre PAS, écrit noir sur blanc :
   //   • **`ordreVu` n'est posé que côté CLIENT, et c'est un CHOIX MESURÉ, pas un oubli** — voir
