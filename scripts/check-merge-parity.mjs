@@ -381,7 +381,25 @@ const SOUS_CLES_TOLEREES = new Set(); // v2.16.89 — `gameStates.coinsWeek`, `c
     for (const gs of fam.gameStates) releve(gs, "gameStates");
   }
 
-  console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}) — aucun angle mort`);
+  // v2.17.16 — L’ÂGE du relevé, pas seulement sa date. Cette ligne imprimait « relevé du 2026-08-21 »
+  // cinq nuits d’affilée sans que personne n’en tire quoi que ce soit, pendant que la prod prenait
+  // TROIS formes que le relevé ignorait (`config.feed[].likeTs`, `gameStates.catCounts.*`,
+  // `gameStates.xpLog[].id`). Deux d’entre elles étaient tolérées par ce contrôle SANS fiche du 13e
+  // étage : le contrôle passait au vert parce que sa SOURCE était en retard, pas parce que rien ne
+  // manquait. Une date qu’on lit sans la soustraire n’est pas une mesure. Le plafond est donc posé :
+  // la session nocturne fait un `GET` chaque nuit, 14 jours est un ordre de grandeur au-delà
+  // duquel le relevé ne décrit plus la prod qu’il prétend figer.
+  const AGE_MAX_J = 14;
+  const ageJ = Math.floor((Date.now() - Date.parse(`${schemaProd.releveLe}T00:00:00Z`)) / 86400000);
+  console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}, il y a ${ageJ} jour(s)) — aucun angle mort`);
+  if (!Number.isFinite(ageJ))
+    fail(`relevé de prod — « releveLe » vaut « ${schemaProd.releveLe} », qui n’est pas une date lisible. `
+       + `Régénère : node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);
+  else if (ageJ > AGE_MAX_J)
+    fail(`relevé de prod — figé depuis ${ageJ} jours (plafond ${AGE_MAX_J}). Ce contrôle compare les `
+       + `fixtures à une photo de la prod : périmée, il passe au vert sur les formes qu’elle ne `
+       + `connaissait pas encore, et le 13e étage ne réclame pas leur fiche. Régénère après un `
+       + `GET : node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);
   let toleres = 0;
   // v2.16.88 — SOUS LE PLAFOND. Jusqu'ici, le relevé de prod s'arrêtait exactement là où s'arrêtent
   // les recensements qu'il surveille : un niveau sous une racine, plus les éléments de liste. Une
@@ -1976,6 +1994,10 @@ const SOUS_CLES = [
   { chemin: "gameStates.petXp", dans: "gameStates", champ: "petXp",
     valeurFraiche: { dragon: 40 }, valeurPerimee: { dragon: 10, chat: 5 },
     convergent: { dragon: 40, chat: 5 }, pourquoi: "max par familier (monotone)" },
+  { chemin: "gameStates.catCounts", dans: "gameStates", champ: "catCounts",
+    valeurFraiche: { menage: 12 }, valeurPerimee: { menage: 3, lecture: 7 },
+    convergent: { menage: 12, lecture: 7 },
+    pourquoi: "compteur \u00c0 VIE par cat\u00e9gorie (catalog.js ~406), fusionn\u00e9 par `Math.max` cl\u00e9 par cl\u00e9 (merge.js:441) : monotone, exactement comme `petXp` juste au-dessus." },
   { chemin: "gameStates.completedAt", dans: "gameStates", champ: "completedAt",
     valeurFraiche: { "t13#2026-08-14": "2026-08-15T10:00:00.000Z" },
     valeurPerimee: { "t13#2026-08-14": "2026-08-14T10:00:00.000Z", "t14#2026-08-01": "2026-08-01T10:00:00.000Z" },
@@ -2000,6 +2022,12 @@ const SOUS_CLES = [
     valeurFraiche: { bossId: "2026-08-01", earned: 5, spent: 2, dmg: 30 },
     valeurPerimee: { bossId: "2026-08-01", earned: 9, spent: 1, dmg: 10 },
     convergent: { bossId: "2026-08-01", earned: 9, spent: 2, dmg: 30 }, pourquoi: "bossId ÉGAL → max sur chaque compteur monotone" },
+  { chemin: "config.feed[].likeTs", dans: "config", champ: "feed",
+    poser: (v) => ({ feed: [{ id: "f13", ts: 2, type: "quete", playerId: "p1", text: "Fil", likes: ["p1", "p2"], likeTs: v, unlikes: {} }] }),
+    lire: (cfg) => (cfg.feed || []).find((f) => f && f.id === "f13")?.likeTs,
+    valeurFraiche: { p1: 20 }, valeurPerimee: { p1: 5, p2: 7 },
+    convergent: { p1: 20, p2: 7 },
+    pourquoi: "registre dat\u00e9 du \u2764\ufe0f pos\u00e9 (v2.16.84), fusionn\u00e9 par `maxPar` cl\u00e9 par cl\u00e9 (merge.js ~622). Le 9e \u00e9tage dit qu\u2019aucune cl\u00e9 ne DISPARA\u00ceT ; ici on mesure qu\u2019aucune ne RECULE \u2014 un `likeTs` qui recule laisserait le tombstone `unlikes` reprendre un c\u0153ur reprononc\u00e9." },
   { chemin: "config.weeklyChallenge.challenges[].checkins", dans: "config", champ: "weeklyChallenge",
     poser: (v) => ({ weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "Défi", emoji: "⭐", checkins: v }] } }),
     lire: (cfg) => cfg.weeklyChallenge?.challenges?.[0]?.checkins,

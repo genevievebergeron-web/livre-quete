@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Structure de la prod, sans aucune donnée de famille. `*` = une clé d'objet sous la surface recensée, jamais écrite. Régénérer avec scripts/releve-schema-prod.mjs.",
-  "releveLe": "2026-08-21",
+  "releveLe": "2026-08-26",
   "champs": {
     "config.announcements": "listeObjets",
     "config.announcements[].countdownDoneText": "scalaire",
@@ -59,6 +59,8 @@
     "config.feed": "listeObjets",
     "config.feed[].emoji": "scalaire",
     "config.feed[].id": "scalaire",
+    "config.feed[].likeTs": "objet",
+    "config.feed[].likeTs.*": "scalaire",
     "config.feed[].likes": "liste",
     "config.feed[].playerId": "scalaire",
     "config.feed[].text": "scalaire",
@@ -134,6 +136,7 @@
     "gameStates.calendar[].time": "scalaire",
     "gameStates.calendar[].type": "scalaire",
     "gameStates.catCounts": "objet",
+    "gameStates.catCounts.*": "scalaire",
     "gameStates.challengeTiers": "objetDeListes",
     "gameStates.challengeTiers.*": "scalaire",
     "gameStates.challengeTiers.tiers": "liste",
@@ -209,6 +212,7 @@
     "gameStates.xpLog": "listeObjets",
     "gameStates.xpLog[].amount": "scalaire",
     "gameStates.xpLog[].date": "scalaire",
+    "gameStates.xpLog[].id": "scalaire",
     "gameStates.xpLog[].source": "scalaire"
   }
 }
