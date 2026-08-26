@@ -389,14 +389,36 @@ const SOUS_CLES_TOLEREES = new Set(); // v2.16.89 — `gameStates.coinsWeek`, `c
   // manquait. Une date qu’on lit sans la soustraire n’est pas une mesure. Le plafond est donc posé :
   // la session nocturne fait un `GET` chaque nuit, 14 jours est un ordre de grandeur au-delà
   // duquel le relevé ne décrit plus la prod qu’il prétend figer.
+  // v2.17.17 — cette mesure était juste dans sa forme et fausse dans son HORLOGE. `releveLe` valait
+  // `d.savedAt` de la prod, or `savedAt` est la date du GAGNANT de l'arbitrage de fusion, pas celle
+  // de ce fichier : elle s'arrête pendant que la prod bouge (le 26 août, +20 octets de charge à
+  // `savedAt` identique au dixième de milliseconde) et elle avance sans qu'on ait rien régénéré.
+  // Les deux sens ont été falsifiés : régénérer sur la charge du soir rendait un fichier identique
+  // à l'octet, `releveLe` compris — indiscernable de ne rien faire ; et un `savedAt` reculé de
+  // 20 jours faisait échouer le build sur un relevé fabriqué à la seconde, en conseillant une
+  // régénération sans effet. `releveLe` est maintenant la date de GÉNÉRATION, la seule horloge que
+  // ce dépôt contrôle, et le plafond mord sur elle.
+  //
+  // `prodSavedAt` est imprimé mais VOLONTAIREMENT pas arbitré : une prod peut légitimement ne pas
+  // bouger (personne ne joue), et son horloge peut se figer par arbitrage. Un plafond dur dessus
+  // casserait le build sur un fait qu'on ne contrôle pas. Son ABSENCE, elle, est arbitrée : un
+  // relevé sans ce champ vient de l'ancien script, donc sa `releveLe` est une date de prod et
+  // l'âge calculé plus bas ne mesure pas ce qu'il prétend.
   const AGE_MAX_J = 14;
   const ageJ = Math.floor((Date.now() - Date.parse(`${schemaProd.releveLe}T00:00:00Z`)) / 86400000);
-  console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}, il y a ${ageJ} jour(s)) — aucun angle mort`);
+  const charge = schemaProd.prodSavedAt ? String(schemaProd.prodSavedAt).slice(0, 10) : null;
+  console.log(`· fixtures vs schéma de prod (relevé du ${schemaProd.releveLe}, il y a ${ageJ} jour(s)`
+            + `${charge ? `, sur une charge de prod datée du ${charge}` : ""}) — aucun angle mort`);
+  if (!("prodSavedAt" in schemaProd))
+    fail(`relevé de prod — « prodSavedAt » absent : ce fichier vient de l’ancien script, où « releveLe » `
+       + `portait le « savedAt » de la PROD et non la date de génération. L’âge affiché ci-dessus ne `
+       + `mesure donc pas l’âge du relevé. Régénère : node scripts/releve-schema-prod.mjs <prod.json> `
+       + `> scripts/schema-prod.json`);
   if (!Number.isFinite(ageJ))
     fail(`relevé de prod — « releveLe » vaut « ${schemaProd.releveLe} », qui n’est pas une date lisible. `
        + `Régénère : node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);
   else if (ageJ > AGE_MAX_J)
-    fail(`relevé de prod — figé depuis ${ageJ} jours (plafond ${AGE_MAX_J}). Ce contrôle compare les `
+    fail(`relevé de prod — pas régénéré depuis ${ageJ} jours (plafond ${AGE_MAX_J}). Ce contrôle compare les `
        + `fixtures à une photo de la prod : périmée, il passe au vert sur les formes qu’elle ne `
        + `connaissait pas encore, et le 13e étage ne réclame pas leur fiche. Régénère après un `
        + `GET : node scripts/releve-schema-prod.mjs <prod.json> > scripts/schema-prod.json`);

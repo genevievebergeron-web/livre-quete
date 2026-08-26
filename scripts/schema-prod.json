@@ -1,6 +1,7 @@
 {
   "_lisezMoi": "Structure de la prod, sans aucune donnée de famille. `*` = une clé d'objet sous la surface recensée, jamais écrite. Régénérer avec scripts/releve-schema-prod.mjs.",
   "releveLe": "2026-08-26",
+  "prodSavedAt": "2026-08-26T04:44:58.593Z",
   "champs": {
     "config.announcements": "listeObjets",
     "config.announcements[].countdownDoneText": "scalaire",

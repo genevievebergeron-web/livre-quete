@@ -92,9 +92,22 @@ const releve = (racine, dans) => {
 releve(d.config, "config");
 for (const gs of d.gameStates || []) releve(gs, "gameStates");
 
+// v2.17.17 — `releveLe` est la date de GÉNÉRATION, plus celle de la prod. Elle valait
+// `d.savedAt.slice(0,10)`, et la v2.17.16 s'est appuyée dessus pour mesurer l'âge du relevé et
+// casser le build au-delà de 14 jours. Mais `savedAt` n'est pas l'horloge de ce fichier : c'est
+// celle du GAGNANT de l'arbitrage de fusion, et elle peut s'arrêter pendant que la prod bouge.
+// Mesuré le 26 août : la charge a gagné 20 octets (`seenVersions` 298 → 299, `"2.17.16"` ajouté
+// dans les DEUX copies) avec un `savedAt` identique au dixième de milliseconde près. Régénérer
+// ce soir-là produisait un fichier identique à l'octet — `releveLe` compris : la régénération
+// était indiscernable de son absence. Et dans l'autre sens, un `savedAt` figé (six nuits
+// observées en v2.17.16) fait monter l'âge d'un relevé refait chaque nuit, jusqu'à casser le
+// build de tout le monde en conseillant une régénération qui n'y changerait rien.
+// La date de la prod reste écrite à côté, sous son vrai nom — c'est une information de
+// diagnostic, pas la mesure.
 const sortie = {
   _lisezMoi: "Structure de la prod, sans aucune donnée de famille. `*` = une clé d'objet sous la surface recensée, jamais écrite. Régénérer avec scripts/releve-schema-prod.mjs.",
-  releveLe: (d.savedAt || "").slice(0, 10),
+  releveLe: new Date().toISOString().slice(0, 10),
+  prodSavedAt: d.savedAt || null,
   champs: Object.fromEntries(Object.keys(schema).sort().map((k) => [k, schema[k]])),
 };
 process.stdout.write(JSON.stringify(sortie, null, 2) + "\n");
