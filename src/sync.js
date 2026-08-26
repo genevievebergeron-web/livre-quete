@@ -178,3 +178,61 @@ export const load = async () => {
 export const getLastSavedAt = () => LAST_SAVED_AT;
 export const setLastSavedAt = (v) => { LAST_SAVED_AT = v; };
 export const wasLastLoadSynced = () => LAST_LOAD_SYNCED;
+
+// ─── v2.17.14 — RESTAMPE APRÈS MIGRATION ─────────────────────────────────────
+// Le chargement (`App.jsx`) persiste TOUJOURS les données migrées : `save({...data, …})`.
+// Ce `data` vient de `load()`, donc son `savedAt` est celui du SERVEUR. Or `remotePush`
+// refusionne avant d'écrire (`mergeFamily(cloud, data)`) et `preferIncoming` vaut
+// `isNewer(incoming.savedAt, base.savedAt)` — à horodatage ÉGAL, c'est `false` : la base
+// gagne. Tout ce que la migration vient de réparer dans un champ « dernière-écriture-gagne »
+// (`pin`, `mode`, `coins`, `house`, `theme`, `players[].name`…) est donc réécrit par le cloud
+// avant même d'y arriver. Mesuré le 2026-08-25 sur la donnée de prod : 5 cibles sur 5 perdues
+// sans restampe, 5 sur 5 qui survivent avec. Rien ne criait : la migration se réapplique à
+// chaque chargement, l'écran de l'appareil qui vient de charger a l'air juste, et la valeur
+// d'avant revient à la fusion suivante. `savedAt` figé à la milliseconde depuis quatre nuits
+// (2026-08-25T05:13:57.632Z) alors que la donnée grossissait est le symptôme qui l'a nommé.
+//
+// Deux conditions, et les deux comptent :
+//   • le contenu a VRAIMENT changé (`_famSig` ignore `savedAt`) — sinon chaque ouverture
+//     d'app ferait gagner cet appareil sur tous les champs « dernière-écriture-gagne », ce
+//     qui est le cas NORMAL, 7 jours sur 7 ;
+//   • le chargement était SYNCHRONISÉ — même garde que le ménage des orphelines (v2.15.8) :
+//     sur un `load()` retombé sur la copie locale seule (serveur Canner qui se réveille), cette
+//     copie peut être périmée, et la restamper la ferait écraser ce qui est plus frais ailleurs.
+//     Sans synchro, on ne restampe pas : la migration repassera au prochain chargement synchronisé.
+//
+// La QUESTION a dû être corrigée avant qu'une ligne ne parte en prod. Premier jet : « le contenu
+// a-t-il changé ? » (`_famSig`, qui compare `JSON.stringify`). Mesuré sur la prod : il répond OUI
+// tous les jours, et pour RIEN — le seul écart entre le cloud et la sortie de `migrateSavedData`,
+// sur les quatre joueurs, est que `activeDays` en ressort TRIÉE (`activeDaysFromCompleted`) alors
+// que le cloud la porte en désordre. Même ensemble (mesuré), et aucun consommateur ne lit l'ordre :
+// `streakOf`, `activeDaysThisWeek` et `computeLeagueTier` construisent tous un `Set`, la fusion en
+// fait une union `_uniq`. Écarts HORS `activeDays` : ZÉRO. Ce premier jet aurait donc restampé à
+// chaque ouverture, faisant gagner l'appareil qui vient de charger sur tous les champs
+// « dernière-écriture-gagne » — précisément le danger que la condition existait pour écarter.
+//
+// La question juste n'est pas « est-ce que ça a changé ? » mais « est-ce que la fusion à venir va
+// JETER quelque chose ? ». On la pose telle quelle : on rejoue `mergeFamily` et on regarde si elle
+// rend `apres` intact. À l'ordre des listes de scalaires près — celles-là sont fusionnées en union,
+// leur ordre n'est un comportement pour personne, et c'est exactement le bruit d'`activeDays`.
+const _triScalaires = (o) => {
+  if (o === null || typeof o !== "object") return o;
+  if (Array.isArray(o)) {
+    const n = o.map(_triScalaires);
+    return n.every((v) => v === null || typeof v !== "object")
+      ? [...n].sort((x, y) => (String(x) < String(y) ? -1 : 1))
+      : n;
+  }
+  const out = {};
+  for (const k of Object.keys(o).sort()) out[k] = _triScalaires(o[k]);
+  return out;
+};
+const _sigOrdreLibre = (d) => {
+  try { return JSON.stringify(_triScalaires({ c: d?.config, g: d?.gameStates })); }
+  catch { return Math.random() + ""; }
+};
+export const doitRestamper = (avant, apres, synced) => {
+  if (!synced || !avant?.config) return false;
+  try { return _sigOrdreLibre(mergeFamily(avant, apres)) !== _sigOrdreLibre(apres); }
+  catch { return false; }
+};

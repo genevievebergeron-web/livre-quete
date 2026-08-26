@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-merge-parity.mjs && node scripts/check-sources-lisibles.mjs && vite build",
+    "build": "node scripts/check-merge-parity.mjs && node scripts/check-restampe-migration.mjs && node scripts/check-sources-lisibles.mjs && vite build",
     "preview": "vite preview",
     "start": "node server.cjs"
   },
