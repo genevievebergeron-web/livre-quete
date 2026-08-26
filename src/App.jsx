@@ -30,6 +30,7 @@ import { ENERGY_MAX, currentEnergy, minsToEnergy } from "./energy.js";
 import { isMorningLocked, isTimeLocked, rotatingDoneToday, isShopLocked, rotatingRemaining, rotatingNeed, sessionFlushPlan, SESSION_TICK_MS } from "./gating.js";
 import { isNewer, mergeGS, mergeFamily } from "./merge.js";
 import { STORE_KEY, PULL_FAILED, remotePush, remotePull, save, load, _famSig, doitRestamper, getLastSavedAt, setLastSavedAt, wasLastLoadSynced } from "./sync.js";
+import { nettoyerApresMigration } from "./post-migration-cleanup.js";
 import { CHANGELOG } from "./changelog.js";
 import { migrateSavedData, dedupeUpdateFeed } from "./migrations.js";
 import { queueError, peekErrorQueue, dropQueuedErrors } from "./errorlog.js";
@@ -93,7 +94,7 @@ function usePrefetchLazyScreens(ready){
 
 // ⚠️ v2.16.42 — exporté : `main.jsx` le passe à l'`ErrorBoundary` pour horodater un
 // plantage de rendu avec la bonne version. Le tableau CHANGELOG vit dans changelog.js.
-export const APP_VERSION = "2.17.17";
+export const APP_VERSION = "2.17.18";
 const BUG_EMAIL = "sturnus.vulgaris.linnaeus@proton.me";
 // `weeklyRewards` (rotation quotidienne de la boutique) est dans `src/catalog.js` depuis le
 // 2026-08-09 (Lot 5/#24), avec le `REWARD_CATALOG` qu'elle tire au sort.
@@ -2197,38 +2198,13 @@ export default function App() {
   // Load + migration automatique des données
   useEffect(()=>{
     load().then(raw=>{
-      const data = migrateSavedData(raw);
+      let data = migrateSavedData(raw);
       if(data?.config&&data?.gameStates){
-        // 🧹 Nettoyage des tâches « à usage unique » d'un jour passé (anti-accumulation)
-        const today=todayStamp();
-        const expired=(data.config.assignments||[]).filter(a=>a.oneDay && a.oneDay!==today).map(a=>a.instanceId);
-        if(expired.length){
-          const rm=new Set(expired);
-          data.config={...data.config,
-            assignments:(data.config.assignments||[]).filter(a=>!rm.has(a.instanceId)),
-            removedAssignments:_uniq([...(data.config.removedAssignments||[]), ...expired]).slice(-800)};
-        }
-        // 🧹 v1.55.0 — ménage des tâches perso ORPHELINES (plus aucune assignation) → tombstone durable
-        // v2.15.8 (CAUSE RACINE de la casse généralisée des tâches perso de toute la famille, trouvée
-        // le 2026-07-28 en reconstruisant les rituels Matin/École/Camp/Soir) : ce ménage tournait à
-        // CHAQUE chargement, sur CHAQUE appareil, sans aucune protection, avec deux failles combinées :
-        // (1) ne regardait QUE config.assignments, jamais config.weeklyQuests.assignments (Lot 7) ;
-        // (2) tournait même quand load() retombait sur la copie LOCALE seule après un échec réseau
-        // (LAST_LOAD_SYNCED=false — serveur Canner qui se réveille, ~1-4s, ou simple délai wifi,
-        // documenté dans SYNC.md) — une copie locale peut alors être périmée (n'a pas encore vu les
-        // assignations créées ailleurs depuis sa dernière vraie synchro), faisant passer des tâches
-        // BIEN VIVANTES pour orphelines, tombstonées pour toujours et repoussées au cloud aussitôt
-        // (save() plus bas). Fix : n'agir QUE sur une synchro cloud confirmée, et inclure weeklyQuests.
-        if (wasLastLoadSynced()) {
-          const usedTaskIds=new Set([...(data.config.assignments||[]).map(a=>a.taskId), ...((data.config.weeklyQuests||{}).assignments||[]).map(a=>a.taskId)]);
-          const orphans=(data.config.customTasks||[]).filter(t=>t&&t.id&&!usedTaskIds.has(t.id)).map(t=>t.id);
-          if(orphans.length){
-            const orphSet=new Set(orphans);
-            data.config={...data.config,
-              customTasks:(data.config.customTasks||[]).filter(t=>!orphSet.has(t.id)),
-              removedCustomTasks:_uniq([...(data.config.removedCustomTasks||[]), ...orphans]).slice(-1000)};
-          }
-        }
+        // 🧹 Les deux ménages du chargement (tâches « un jour » périmées, tâches perso
+        // orphelines) vivent dans `post-migration-cleanup.js` depuis la v2.17.18 : ils y sont
+        // importables depuis Node, donc mesurés par `check-migration-sans-mutation.mjs` au même
+        // titre que `migrateSavedData` (couverture + intégrité de l'argument). Ici, un `useEffect`.
+        data = nettoyerApresMigration(data, { today: todayStamp(), synced: wasLastLoadSynced() });
         setConfig(data.config);
         setGameStates(data.gameStates);
         // Toujours persister les données migrées (pin par défaut, seenVersions, etc.)

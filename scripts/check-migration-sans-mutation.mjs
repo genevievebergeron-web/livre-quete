@@ -32,12 +32,17 @@
 // UNIQUE ne tournent que sur une donnée qui ne les porte pas, et `rotativeCleanupV1` VIDE
 // `assignments` — il masque donc les ménages d'orphelines qui viennent après lui. Les mesurer
 // dans la même fixture, ce serait n'en mesurer aucun.
-// CE QU'IL NE COUVRE PAS, et il faut le savoir : le bloc de ménage d'`App.jsx` (~2200-2233,
-// tâches « un jour » périmées, tâches perso orphelines) tourne APRÈS `migrateSavedData` et AVANT
-// `doitRestamper`, sur le même `data`. Il réassigne `data.config` (`{...data.config, …}`) plutôt
-// que d'écrire dedans, donc il est sain aujourd'hui — vérifié à la main le 2026-08-26, pas mesuré
-// ici : `App.jsx` n'est pas importable depuis un script Node (JSX + React). Une mutation en place
-// ajoutée LÀ retomberait donc dans l'angle mort, et ce fichier resterait muet.
+// v2.17.18 — le bloc de ménage qui tourne APRÈS `migrateSavedData` et AVANT `doitRestamper`
+// (tâches « un jour » périmées, tâches perso orphelines) était nommé ici comme angle mort assumé :
+// il vivait dans `App.jsx`, que Node ne peut pas importer (JSX + React), donc « vérifié à la main,
+// pas mesuré ». Il vit maintenant dans `src/post-migration-cleanup.js` et il est mesuré plus bas,
+// aux mêmes deux promesses, plus deux qui n'appartiennent qu'à lui (le garde `synced` de la
+// v2.15.8, et l'ORDRE des deux ménages).
+//
+// CE QU'IL NE COUVRE TOUJOURS PAS : ce qui reste dans le `useEffect` d'`App.jsx` autour de ces
+// appels (`setConfig`/`setGameStates`, la persistance, l'injection du changelog dans le fil).
+// Aucune de ces lignes ne transforme `data` avant `doitRestamper` aujourd'hui — mais c'est du
+// raisonnement, pas une mesure : la frontière du mesurable est la frontière du module.
 //
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -45,6 +50,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { migrateSavedData } = await import(path.join(ROOT, "src/migrations.js"));
 const { TASK_CATALOG } = await import(path.join(ROOT, "src/catalog.js"));
 const { COLOR_DESATURATE_MAP } = await import(path.join(ROOT, "src/shared.js"));
+const { nettoyerApresMigration } = await import(path.join(ROOT, "src/post-migration-cleanup.js"));
 
 let failures = 0;
 const fail = (m) => { failures++; console.error("  ✗ " + m); };
@@ -164,5 +170,156 @@ for (const [nom, fabrique] of [["A (déjà migrée)", familleMigree], ["B (neuve
        + `(mesuré : 0/5 réparations arrivent au cloud dans ce régime). Reconstruire au lieu de muter.`);
 }
 
-if (failures) { console.error(`✗ migrateSavedData (couverture des ménages + intégrité de l'argument) : ${failures} problème(s)`); process.exit(1); }
+// ═══════════════════════════════════════════════════════════════════════════
+// `nettoyerApresMigration` — les deux ménages du chargement (v2.17.18)
+// ═══════════════════════════════════════════════════════════════════════════
+// Mêmes deux promesses que ci-dessus (COUVERTURE + INTÉGRITÉ), plus deux qui n'appartiennent
+// qu'à ce module et qu'aucune des deux ne peut voir :
+//   • le GARDE `synced` — la cause racine de la v2.15.8. Le ménage des orphelines ne doit PAS
+//     agir sur une lecture qui n'a pas été confirmée par le cloud, sinon une copie locale périmée
+//     fait passer des tâches vivantes pour orphelines et les tombstone pour toujours. « Il agit »
+//     et « il s'abstient » sont deux faits distincts : les deux sont mesurés.
+//   • l'ORDRE — le ménage des orphelines lit `assignments` APRÈS le filtrage des « un jour ».
+//     Les inverser laisse en vie une tâche perso dont la dernière assignation vient de partir.
+//     Mesuré par une DIFFÉRENCE entre deux jours, pas par un état final.
+//
+// La fixture porte de la saleté des DEUX sortes. Sans elle, le contrôle serait inerte : sur la
+// prod du 2026-08-26, les deux ménages sont des no-op (317→317 assignations, 83→83 tâches perso),
+// et comparer deux no-op ne prouve rien.
+const HIER = "2026-08-25", AUJD = "2026-08-26";
+const familleAuChargement = () => ({
+  savedAt: "2026-08-26T00:00:00.000Z",
+  config: {
+    assignments: [
+      { instanceId: "i_perenne", taskId: "cust_perenne" },            // sans `oneDay` → survit
+      { instanceId: "i_hier",    taskId: "cust_a", oneDay: HIER },    // périmé → part
+      { instanceId: "i_hier2",   taskId: "cust_c", oneDay: HIER },    // périmé, tombstone NON pré-semé
+      { instanceId: "i_aujd",    taskId: "cust_b", oneDay: AUJD },    // du jour → survit AUJD
+    ],
+    weeklyQuests: { assignments: [{ instanceId: "wq1", taskId: "cust_wq" }] },
+    customTasks: [
+      { id: "cust_perenne", label: "vivante" },   // assignée → survit
+      { id: "cust_wq",      label: "hebdo" },     // tenue en vie par weeklyQuests SEUL
+      { id: "cust_a",       label: "orpheline" }, // sa seule assignation part avec `i_hier`
+      { id: "cust_b",       label: "du jour" },   // orpheline seulement APRÈS AUJD
+      { id: "cust_c",       label: "orpheline 2" }, // part avec `i_hier2`
+    ],
+    removedAssignments: ["i_hier"],      // déjà là → le tombstone ne doit pas doubler
+    removedCustomTasks: [],
+  },
+  gameStates: [{ pin: "1234", xp: 0, completed: [], completedAt: {} }],
+});
+const ids = (arr, k) => (arr || []).map((x) => (k ? x[k] : x));
+
+// ── COUVERTURE : chaque ménage a-t-il RETIRÉ quelque chose ? ──────────────
+// Écrit en DIFFÉRENCE entrée→sortie, jamais en état final : une fixture qu'on viderait de sa
+// saleté satisferait « il reste les vivantes » tout aussi bien, et le contrôle passerait au vert
+// sur du code qu'il ne visite plus.
+{
+  const couvertures = [
+    // Le tombstone est mesuré sur `i_hier2`, PAS sur `i_hier` : celui-ci est pré-semé dans
+    // `removedAssignments` (c'est son rôle, tester le non-doublon), donc un `includes` sur lui
+    // est satisfait par la fixture même si le ménage cessait complètement d'écrire le tombstone
+    // (mesuré le 2026-08-26 : écriture retirée → zéro crieur). Deux assertions étaient aveugles
+    // au même élément de fixture, pour la même raison.
+    ["ménage « un jour » — l'assignation périmée est RETIRÉE",
+      (e, o) => ids(e.config.assignments, "instanceId").includes("i_hier")
+             && !ids(o.config.assignments, "instanceId").includes("i_hier")],
+    ["ménage « un jour » — le tombstone est ÉCRIT (mesuré là où la fixture ne le pré-sème pas)",
+      (e, o) => !e.config.removedAssignments.includes("i_hier2")
+             && o.config.removedAssignments.includes("i_hier2")],
+    ["ménage « un jour » — celle du JOUR et la pérenne survivent",
+      (e, o) => ids(o.config.assignments, "instanceId").join() === "i_perenne,i_aujd"],
+    // Écrit en DIFFÉRENCE, et pas « il y en a exactement 1 » : une fixture SANS le tombstone
+    // préexistant satisfait « exactement 1 » grâce à celui que le ménage vient d'ajouter, donc
+    // l'assertion cesserait de tester quoi que ce soit sans que rien ne crie (mesuré le
+    // 2026-08-26 : fixture lavée là → zéro crieur sur les quatre garde-fous du build).
+    ["ménage « un jour » — le tombstone déjà présent ne DOUBLE pas",
+      (e, o) => e.config.removedAssignments.includes("i_hier")
+             && o.config.removedAssignments.filter((x) => x === "i_hier").length === 1],
+    ["ménage des orphelines — la tâche perso dont l'assignation vient de partir est RETIRÉE",
+      (e, o) => ids(e.config.customTasks, "id").includes("cust_a")
+             && !ids(o.config.customTasks, "id").includes("cust_a")
+             && o.config.removedCustomTasks.includes("cust_a")],
+    ["ménage des orphelines — `weeklyQuests` tient sa tâche en vie (le trou de la v2.15.8)",
+      (e, o) => ids(e.config.customTasks, "id").includes("cust_wq")
+             && ids(o.config.customTasks, "id").includes("cust_wq")],
+    // Sans cette ligne, un ménage qui retirerait TOUTES les tâches perso passait au vert : les
+    // autres assertions ne parlent que de ce qui doit PARTIR (mesuré le 2026-08-26, zéro crieur).
+    ["ménage des orphelines — une tâche perso ASSIGNÉE survit",
+      (e, o) => ids(e.config.customTasks, "id").includes("cust_perenne")
+             && ids(o.config.customTasks, "id").includes("cust_perenne")
+             && ids(o.config.customTasks, "id").includes("cust_b")],
+  ];
+  const raw = familleAuChargement();
+  const entree = JSON.parse(JSON.stringify(raw));
+  const sortie = nettoyerApresMigration(raw, { today: AUJD, synced: true });
+  for (const [quoi, ok] of couvertures) {
+    let vert = false;
+    try { vert = !!ok(entree, sortie); } catch { vert = false; }
+    if (!vert) fail(`couverture chargement — « ${quoi} » : la fixture ne porte plus la saleté que ce ménage existe pour nettoyer, ou le ménage ne l'atteint plus`);
+  }
+}
+
+// ── Le GARDE `synced` (cause racine v2.15.8) ──────────────────────────────
+// Deux faits distincts, deux mesures : sans synchro confirmée, le ménage des orphelines
+// S'ABSTIENT — et celui des « un jour », lui, tourne quand même (il ne dépend d'aucun réseau).
+{
+  const raw = familleAuChargement();
+  const entree = JSON.parse(JSON.stringify(raw));
+  const o = nettoyerApresMigration(raw, { today: AUJD, synced: false });
+  // En DIFFÉRENCE contre l'entrée, jamais contre une longueur codée en dur : un « === 4 » se
+  // périme dès que la fixture gagne ou perd une tâche, et le fait mesuré est « rien n'a été retiré ».
+  if (ids(o.config.customTasks, "id").join() !== ids(entree.config.customTasks, "id").join()
+      || o.config.removedCustomTasks.length !== entree.config.removedCustomTasks.length)
+    fail("garde `synced` : le ménage des orphelines a AGI sur une lecture non confirmée par le cloud. "
+       + "C'est la cause racine de la v2.15.8 — une copie locale périmée fait passer des tâches vivantes "
+       + "pour orphelines, les tombstone pour toujours et repousse le tombstone au cloud aussitôt.");
+  if (ids(o.config.assignments, "instanceId").includes("i_hier"))
+    fail("garde `synced` : le ménage « un jour » s'est abstenu lui aussi. Il ne dépend d'aucune "
+       + "lecture réseau (une date périmée l'est sur n'importe quelle copie) — le garde est posé trop haut.");
+}
+
+// ── L'ORDRE des deux ménages ──────────────────────────────────────────────
+// `cust_b` n'est orpheline QUE lorsque `i_aujd` a été filtrée. La différence entre les deux jours
+// est donc la signature de l'ordre : l'inversion rendrait les deux sorties identiques.
+{
+  const leJour  = nettoyerApresMigration(familleAuChargement(), { today: AUJD, synced: true });
+  const lendemain = nettoyerApresMigration(familleAuChargement(), { today: "2026-08-27", synced: true });
+  const vivantLeJour = ids(leJour.config.customTasks, "id").includes("cust_b");
+  const mortLendemain = !ids(lendemain.config.customTasks, "id").includes("cust_b");
+  if (!vivantLeJour || !mortLendemain)
+    fail("ordre des ménages : le ménage des orphelines ne lit pas `assignments` APRÈS le filtrage des "
+       + `« un jour » (cust_b vivante le jour même : ${vivantLeJour}, morte le lendemain : ${mortLendemain}). `
+       + "Inversés, une tâche perso survit un chargement de plus à sa dernière assignation.");
+}
+
+// ── INTÉGRITÉ : l'argument survit-il intact ? ─────────────────────────────
+// Même raison qu'au-dessus, et elle vaut ici AUSSI : ce module tourne entre `migrateSavedData` et
+// `doitRestamper`, sur le `data` que ce dernier compare. Une écriture en place ferait porter la
+// réparation aux deux côtés de la comparaison, et le cloud la jetterait en silence.
+// Le troisième cas est le chemin `return data` (rien à nettoyer) : il ne reconstruit RIEN, donc
+// c'est le seul où une écriture en place serait la seule trace de passage. La fixture y est lavée
+// de sa saleté — c'est le seul endroit où ça se justifie, et l'assertion ne porte que sur l'argument.
+const familleSansSaleté = () => {
+  const f = familleAuChargement();
+  f.config.assignments = [{ instanceId: "i_perenne", taskId: "cust_perenne" }];
+  f.config.customTasks = [{ id: "cust_perenne", label: "vivante" }, { id: "cust_wq", label: "hebdo" }];
+  return f;
+};
+for (const [quoi, fabrique, args] of [["synchro confirmée", familleAuChargement, { today: AUJD, synced: true }],
+                                      ["sans synchro",      familleAuChargement, { today: AUJD, synced: false }],
+                                      ["rien à nettoyer",   familleSansSaleté,   { today: AUJD, synced: true }]]) {
+  const raw = fabrique();
+  const avant = JSON.stringify(raw);
+  nettoyerApresMigration(raw, args);
+  if (JSON.stringify(raw) !== avant)
+    fail(`intégrité chargement (${quoi}) : \`nettoyerApresMigration\` a MODIFIÉ son argument. `
+       + "Il tourne entre `migrateSavedData` et `doitRestamper` (sync.js) : l'état « avant » que "
+       + "`doitRestamper` compare porterait alors la réparation lui aussi, donc le cloud la jette. "
+       + "Reconstruire au lieu de muter.");
+}
+
+if (failures) { console.error(`✗ ménages du chargement (couverture + intégrité de l'argument) : ${failures} problème(s)`); process.exit(1); }
 console.log("✓ migrateSavedData : argument intact, et les 12 ménages surveillés agissent bien sur les fixtures");
+console.log("✓ nettoyerApresMigration : argument intact, les 2 ménages du chargement agissent, garde `synced` et ordre tenus");
