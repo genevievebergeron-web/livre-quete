@@ -4,6 +4,38 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-08-26 (routine autonome, nuit, 39e étage — v2.17.17)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, **175 833 octets**. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide** (le champ est fiable depuis la v2.16.42).
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, aucun message neuf.
+- Rien à corriger, pas de Phase 2.
+
+### 🔎 Le fait consigné le 25 août s'est reproduit, et il a servi
+La charge est passée de **175 813 à 175 833 octets** pendant que `savedAt` reste à
+**`2026-08-26T04:44:58.593Z`**, au dixième de milliseconde près. Même signature qu'au passage du
+25 : `"2.17.16"` s'ajoute aux **deux** copies de `seenVersions` (298 → 299 entrées, 10 octets
+chacune), donc un appareil a ouvert l'app après le déploiement et a persisté sans estampiller. La
+cause est déjà écrite plus bas : `src/App.jsx` ~2235, `save({...data, newChangelogVersions:[]})`,
+le seul des quatre chemins de sauvegarde qui ne restampe pas.
+
+Ce qui est neuf cette nuit, c'est **une deuxième victime de ce chemin**, hors production : la
+v2.17.16 avait branché le plafond d'âge du relevé de prod sur ce même `savedAt`. Une horloge qui
+s'arrête rendait la régénération indiscernable de son absence, et un `savedAt` figé assez
+longtemps aurait cassé `npm run build` sur un relevé fait à la seconde. Corrigé en v2.17.17 :
+`releveLe` est la date de génération, `prodSavedAt` est gardé à côté, imprimé mais pas arbitré.
+
+**La piste principale du 25 août reste entière et prioritaire** : ce que `migrateSavedData`
+répare au chargement (ménages d'orphelins, drapeaux de migration, masquages de doublons) part par
+ce chemin sous une estampille périmée, donc dans le régime où c'est la position des arguments qui
+tranche. Ça, c'est en production, et ce n'est toujours pas mesuré.
+
+---
+
 ## Passage du 2026-08-25 (routine autonome, nuit, 35e étage — v2.17.13)
 
 ### 🌐 Lecture de l'API de production
