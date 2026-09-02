@@ -89,6 +89,24 @@ const releve = (racine, dans) => {
   }
 };
 
+// v2.17.21 — LE PREMIER NIVEAU DE LA CHARGE, qu'aucun relevé n'avait jamais écrit. Ce fichier
+// commençait à `d.config` et `d.gameStates` — exactement comme les quinze recensements de
+// `check-merge-parity.mjs`, qui partent tous de `fam.config` / `fam.gameStates`. La racine de la
+// charge elle-même (`savedAt`, `seenVersions`, et tout ce que le `...newer` des deux `mergeFamily`
+// traîne) n'était donc lue par PERSONNE : ni ici, ni dans aucun étage. C'est la même faute que le
+// plafond de la v2.16.88, montée d'un cran — un recensement borné au premier niveau ne peut rien
+// dire de l'étage au-dessus de lui.
+// `config` et `gameStates` sont posés pour leur NATURE seulement : leur contenu est relevé sous
+// son propre préfixe juste en dessous, et redescendre ici écrirait tout l'arbre une seconde fois.
+const releveRacine = (charge) => {
+  for (const [k, v] of Object.entries(charge || {})) {
+    pose(`charge.${k}`, nature(v));
+    if (k === "config" || k === "gameStates") continue;
+    sousLePlafond(v, `charge.${k}`);
+  }
+};
+
+releveRacine(d);
 releve(d.config, "config");
 for (const gs of d.gameStates || []) releve(gs, "gameStates");
 

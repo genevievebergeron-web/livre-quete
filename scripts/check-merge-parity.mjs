@@ -203,8 +203,15 @@ const plB = {
 const EXEMPT_PL = { id: "clé de rapprochement de mergeFamily" };
 memeValeur(plA, plB, "players[0]", EXEMPT_PL);
 
-const mkFam = (savedAt, gs, cfgExtra, pl) => ({
+// v2.17.21 — `racineExtra` : la charge a un PREMIER NIVEAU, et les fixtures n'en portaient que
+// `savedAt`/`gameStates`/`config`. La prod, elle, porte aussi une copie de racine de
+// `seenVersions`, que les deux `mergeFamily` lisent (`base.seenVersions`, `incoming.seenVersions`)
+// et réécrivent. Une fixture qui ne la porte pas rend cette moitié de l'union INERTE : les quatre
+// sources se réduisent aux deux copies de `config`, et une règle écrite sur les deux autres
+// pourrait disparaître sans qu'un seul étage bronche.
+const mkFam = (savedAt, gs, cfgExtra, pl, racineExtra) => ({
   savedAt,
+  ...racineExtra,
   gameStates: [gs],
   config: {
     players: [pl],
@@ -249,7 +256,7 @@ const famA = mkFam("2026-08-15T12:00:00.000Z", gsA, {
   boss: { startedAt: "2026-08-01", hp: 100, lastHitTs: "2026-08-14T10:00:00.000Z", defeatedAt: "2026-08-14T20:00:00.000Z" },
   weeklyQuests: { generatedForWeek: "2026-08-14", assignments: [{ instanceId: "wq1", taskId: "tk1", playerIds: ["p1"], days: [0] }] },
   weeklyChallenge: { weekKey: "2026-08-14", challenges: [{ playerId: "p1", text: "A", checkins: { "2026-08-14": true } }] },
-}, plA);
+}, plA, { seenVersions: ["2.17.0"] });
 const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   ...DRAPEAUX_B,
   announcements: [{ id: "an2", createdAt: "2026-08-13", text: "B", targetPlayerIds: ["p1"], sharedTasks: ["ranger"],
@@ -267,7 +274,7 @@ const famB = mkFam("2026-08-14T12:00:00.000Z", gsB, {
   boss: { startedAt: "2026-08-01", hp: 60, lastHitTs: "2026-08-15T10:00:00.000Z" },
   weeklyQuests: { generatedForWeek: "2026-08-07", assignments: [{ instanceId: "wq2", taskId: "tk1", playerIds: ["p1"], days: [1] }] },
   weeklyChallenge: { weekKey: "2026-08-07", challenges: [{ playerId: "p1", text: "B", checkins: { "2026-08-07": true } }] },
-}, plB);
+}, plB, { seenVersions: ["2.16.99"] });
 
 const EXEMPT_CFG = {
   // Structurels, volontairement identiques : ce sont les supports sur lesquels les
@@ -376,7 +383,17 @@ const SOUS_CLES_TOLEREES = new Set(); // v2.16.89 — `gameStates.coinsWeek`, `c
   // faute que « le relevé au même plafond que le surveillé » (v2.16.88), déplacée d'un cran : un
   // contrôle ne peut rien reprocher à une donnée qu'il lit APRÈS la transformation surveillée.
   // Il lit donc les deux ENTRÉES, et rien d'autre.
+  // v2.17.21 — LE PREMIER NIVEAU DE LA CHARGE. Ces deux lignes partaient de `fam.config` et
+  // `fam.gameStates`, et les quinze autres recensements de ce fichier font pareil : la RACINE de la
+  // charge n'était lue par personne. Or les deux `mergeFamily` rendent `{...newer, config,
+  // gameStates, seenVersions, savedAt}` — tout champ de racine que le gagnant traîne passe donc la
+  // fusion sans règle écrite, sans fixture, et sans qu'aucun étage puisse le voir. `seenVersions`
+  // en est l'exemple vivant : la prod en porte une copie de racine (2 792 octets), les DEUX copies
+  // de la fusion la LISENT (`base.seenVersions`, `incoming.seenVersions`) et l'écrivent, et aucune
+  // fixture ne l'avait. Même parcours que `releveRacine` de `scripts/releve-schema-prod.mjs` :
+  // nature seule pour `config`/`gameStates`, qui sont relevés sous leur propre préfixe.
   for (const fam of [famA, famB]) {
+    for (const [k, v] of Object.entries(fam)) pose(`charge.${k}`, natureDe(v));
     releve(fam.config, "config");
     for (const gs of fam.gameStates) releve(gs, "gameStates");
   }
@@ -2849,7 +2866,19 @@ console.log("· chemins d'ENTRÉE que la fusion jette — complétude, aux quatr
 // la même valeur — le même blanchiment que celui que la v2.16.93 vient de retirer au contrôle
 // « fixtures vs schéma de prod », une couche plus bas.
 const VALEURS_RECALCULEES = [
-  // { chemin: "…", pourquoi: "…" } — vide aujourd'hui, et le compte imprimé le dit.
+  // { chemin: "…", pourquoi: "…" }
+  // v2.17.21 — la PREMIÈRE fiche de ce 17e étage, et elle n'est apparue qu'en donnant aux fixtures
+  // une racine (elles n'en avaient pas). `seenVersions` vit à DEUX endroits depuis la v2.16.52 : à
+  // la racine de la charge et dans `config`. Les deux copies de la fusion en font une seule union
+  // de QUATRE sources (`bC`, `iC`, `base`, `incoming`) qu'elles réécrivent aux deux endroits. Vue
+  // chemin par chemin, une version qui n'existait qu'à la racine « apparaît » donc dans
+  // `config.seenVersions` sans qu'aucune des deux `config` ne la porte. Ce n'est pas une invention :
+  // c'est un CROISEMENT voulu entre deux emplacements du même champ, et il est mesuré juste en
+  // dessous (43e étage), dans les deux sens et pour les deux emplacements.
+  { chemin: "config.seenVersions[]", pourquoi: "croisement racine↔config voulu (v2.16.52) : un même "
+    + "champ à deux emplacements, une seule union de quatre sources. Mesuré au 43e étage." },
+  { chemin: "charge.seenVersions[]", pourquoi: "le croisement dans l'autre sens : une version qui "
+    + "n'existait que dans `config` ressort à la racine. Même union, mêmes quatre sources." },
 ];
 
 const _clesJointure = ["id", "instanceId", "playerId", "version"];
@@ -2871,8 +2900,14 @@ const _cheminsValues = (v, chemin, acc) => {
   acc.get(chemin).add(JSON.stringify(v));
   return acc;
 };
+// v2.17.21 — la RACINE de la charge, que ce relevé de valeurs sautait comme tous les autres. Sans
+// elle, une valeur portée à la racine par une entrée et rendue à la racine par la fusion passait
+// pour une INVENTION — le détecteur aurait crié sur une donnée que quelqu'un a bel et bien écrite.
+// `config` et `gameStates` sont sautés ici : ils ont leur propre préfixe juste en dessous.
 const _valeursDe = (fam) => {
   const acc = new Map();
+  for (const [k, v] of Object.entries(fam || {}))
+    if (k !== "config" && k !== "gameStates") _cheminsValues(v, `charge.${k}`, acc);
   _cheminsValues(fam.config, "config", acc);
   for (const gs of fam.gameStates || []) _cheminsValues(gs, "gameStates", acc);
   return acc;
@@ -5449,6 +5484,196 @@ console.log("· charnières — recensement par la MESURE : aucune dépendance i
   //     étage, qui nomme ce triplet-là par la mesure — avec deux autres. Ce qu'il ne couvre
   //     toujours pas est écrit à sa place, pas ici (v2.16.83 : une raison écrite à côté de ce
   //     qu'elle décrit envoie le lecteur suivant refaire un travail déjà fait).
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 43e étage — LE PREMIER NIVEAU DE LA CHARGE (v2.17.21)
+// ═══════════════════════════════════════════════════════════════════════════
+// Les quarante-deux étages au-dessus partent tous de `fam.config` et `fam.gameStates`. Le relevé de
+// prod partait des deux mêmes racines. Le détecteur d'inventions aussi. Le recensement des chemins
+// jetés aussi. Personne, dans ce fichier, ne regardait la charge ELLE-MÊME — alors que les deux
+// copies rendent `{ ...newer, config, gameStates, seenVersions, savedAt }` : tout champ posé à la
+// racine traverse la fusion, et son sort est décidé par un spread que rien ne mesurait. C'est le
+// plafond de la v2.16.88 monté d'un cran, et il était plus haut que je ne le croyais — un
+// recensement borné au premier niveau ne peut rien dire de l'étage AU-DESSUS de lui.
+//
+// La mise en CONSTATS est une fonction pure, `constatsRacine(m)`, partagée par le réel et par les
+// témoins (leçon de la v2.17.20 : un témoin qui appelle la mesure directement ne prouve rien de la
+// boucle qui la promène). Les témoins lui passent des fusions VOLONTAIREMENT fausses et exigent que
+// chaque axe crie — falsifier une des quatre mesures fait donc échouer l'étage.
+console.log("· premier niveau de la CHARGE — chaque champ de racine doit dire qui l'arbitre");
+{
+  const schemaProd = require(path.join(ROOT, "scripts/schema-prod.json"));
+  const REGLES_RACINE = {
+    config: "recomposé champ par champ par les étages ci-dessus (`config` est reconstruit, jamais "
+      + "pris en bloc) — sa complétude est le contrôle « fixtures vs schéma de prod ».",
+    gameStates: "recomposé par `mergeGS` joueur par joueur (server-merge.cjs ~384) — sa complétude "
+      + "est celle des étages `mergeGS`.",
+    savedAt: "clé d'ARBITRAGE de toute la charge : le plus récent des deux gagne (`isNewer`). "
+      + "Mesuré ici, axe [savedAt].",
+    seenVersions: "UNION de QUATRE sources — les deux copies de `config` et les deux de racine "
+      + "(v2.16.52 : le champ vit aux deux endroits). Axe [union] ici, et le croisement entre les "
+      + "deux emplacements est fiché au 17e étage.",
+  };
+
+  // ── Complétude, dans les deux sens ───────────────────────────────────────────────────────────
+  const enProd = Object.keys(schemaProd.champs)
+    .filter((c) => c.startsWith("charge.") && c.split(".").length === 2)
+    .map((c) => c.slice("charge.".length));
+  for (const cle of enProd)
+    if (!(cle in REGLES_RACINE))
+      fail(`« ${cle} » est un champ de PREMIER NIVEAU de la charge que la prod porte et qu'aucune `
+         + `règle ne nomme. Les deux \`mergeFamily\` rendent \`{...newer, …}\` : il traverse donc la `
+         + `fusion en bloc, du seul côté gagnant, et disparaît si le gagnant ne le porte pas. `
+         + `Ajoute-lui une fiche dans REGLES_RACINE — soit une règle qui l'arbitre, soit le constat `
+         + `qu'il suit le gagnant, écrit noir sur blanc.`);
+  for (const cle of Object.keys(REGLES_RACINE))
+    if (!enProd.includes(cle))
+      fail(`REGLES_RACINE fiche « ${cle} », que le relevé de prod ne porte plus à la racine. Fiche `
+         + `périmée : retire-la, sinon elle couvrira un jour un champ homonyme sans relecture.`);
+  for (const [cle, pourquoi] of Object.entries(REGLES_RACINE))
+    if (!pourquoi) fail(`REGLES_RACINE — fiche « ${cle} » sans raison écrite.`);
+
+  // ── La fixture doit se CONTREDIRE à la racine ────────────────────────────────────────────────
+  // Sans ça l'axe [union] se satisfait tout seul : `attendu` est calculé à partir des fixtures, donc
+  // deux racines identiques (ou recopiées de `config`) le vérifient sans rien mesurer. Mesuré :
+  // deux racines portant la MÊME liste ne faisaient crier personne.
+  {
+    const rA = famA.seenVersions, rB = famB.seenVersions;
+    const cA = famA.config.seenVersions, cB = famB.config.seenVersions;
+    if (!Array.isArray(rA) || !Array.isArray(rB) || !rA.length || !rB.length)
+      fail(`43e étage — les fixtures doivent porter une liste \`seenVersions\` à la RACINE (la prod `
+         + `en porte une, et les deux copies de la fusion la lisent). Sans elle, la moitié racine de `
+         + `l'union à quatre sources est inerte.`);
+    else {
+      if (!rA.some((v) => !rB.includes(v)) || !rB.some((v) => !rA.includes(v)))
+        fail(`43e étage — les deux racines \`seenVersions\` ne se contredisent pas dans les deux sens `
+           + `(A=${JSON.stringify(rA)}, B=${JSON.stringify(rB)}). L'axe [union] serait vérifié par sa `
+           + `propre fixture : chaque côté doit porter une version que l'autre n'a pas.`);
+      const melange = [...rA, ...rB].filter((v) => [...cA, ...cB].includes(v));
+      if (melange.length)
+        fail(`43e étage — la racine et \`config\` partagent ${JSON.stringify(melange)}. Le CROISEMENT `
+           + `entre les deux emplacements (17e étage) devient alors indiscernable d'une recopie : `
+           + `garde les deux jeux de versions disjoints.`);
+    }
+  }
+
+  // ── La mise en CONSTATS, pure, partagée par le réel et par les témoins ───────────────────────
+  // famA est daté du 15 août, famB du 14 : A est le côté FRAIS, dans les deux ordres.
+  const avecTemoin = (fam, v) => ({ ...fam, temoinRacine: v });
+  const unionAttendue = [...new Set([...(famA.seenVersions || []), ...(famB.seenVersions || []),
+    ...famA.config.seenVersions, ...famB.config.seenVersions])].sort();
+  const constatsRacine = (m) => {
+    const out = [];
+    // [savedAt] — la clé qui décide de TOUTE la charge.
+    for (const [sens, x, y] of [["AB", famA, famB], ["BA", famB, famA]]) {
+      const got = m(x, y).savedAt;
+      if (got !== famA.savedAt)
+        out.push(`[savedAt] ${sens} : \`savedAt\` rendu « ${got} », attendu « ${famA.savedAt} » (le `
+               + `plus récent des deux). Si cette clé sort du mauvais côté, chaque arbitrage des `
+               + `étages au-dessus est mesuré à l'envers.`);
+    }
+    // [union] — quatre sources, et les DEUX emplacements doivent recevoir la même union.
+    for (const [sens, x, y] of [["AB", famA, famB], ["BA", famB, famA]]) {
+      const o = m(x, y);
+      for (const [ou, liste] of [["racine", o.seenVersions], ["config", o.config.seenVersions]]) {
+        const got = [...new Set(liste || [])].sort();
+        if (JSON.stringify(got) !== JSON.stringify(unionAttendue))
+          out.push(`[union] ${sens} : \`seenVersions\` (${ou}) vaut ${JSON.stringify(got)}, attendu `
+                 + `l'union des QUATRE sources ${JSON.stringify(unionAttendue)}. Une version annoncée `
+                 + `à un enfant et perdue à la synchro lui sera réannoncée.`);
+      }
+    }
+    // [bloc] — la règle par DÉFAUT de la racine : un champ porté des deux côtés suit le gagnant.
+    for (const [sens, x, y] of [["AB", avecTemoin(famA, "frais"), avecTemoin(famB, "perime")],
+                                ["BA", avecTemoin(famB, "perime"), avecTemoin(famA, "frais")]]) {
+      const got = m(x, y).temoinRacine;
+      if (got !== "frais")
+        out.push(`[bloc] ${sens} : un champ de racine porté des DEUX côtés rend « ${got} », attendu `
+               + `« frais ». La racine suit le gagnant de \`savedAt\` (\`...newer\`) ; si ce n'est `
+               + `plus vrai, la fiche REGLES_RACINE de ce champ est fausse.`);
+    }
+    // [perdu] — et porté par le SEUL côté périmé, il tombe. Comportement MESURÉ, pas approuvé.
+    for (const [sens, x, y] of [["AB", famA, avecTemoin(famB, "seul")],
+                                ["BA", avecTemoin(famB, "seul"), famA]]) {
+      const got = m(x, y).temoinRacine;
+      if (got !== undefined)
+        out.push(`[perdu] ${sens} : un champ de racine porté par le seul côté PÉRIMÉ rend « ${got} », `
+               + `alors que \`...newer\` le laisse tomber. Si la règle a changé (tant mieux), réécris `
+               + `cette mesure ET la fiche REGLES_RACINE qui la décrit.`);
+    }
+    return out;
+  };
+
+  // ── Le réel ──────────────────────────────────────────────────────────────────────────────────
+  for (const [nom, m] of [["client", client.mergeFamily], ["serveur", server.mergeFamily]])
+    for (const msg of constatsRacine(m)) fail(`43e étage — ${nom} ${msg}`);
+
+  // ── Les témoins : quatre fusions volontairement fausses, un axe chacune ──────────────────────
+  // Ils passent par `constatsRacine`, pas à côté : falsifier une des quatre mesures rend le témoin
+  // de cet axe muet, et l'étage échoue en le disant.
+  // Les axes sont DÉCLARÉS : sans cette liste, vider la table des témoins ne fait crier personne
+  // (mesuré — c'est le second tas de la v2.17.20, « rien ne déclarait combien de témoins doivent
+  // tourner »). Un axe ajouté à `constatsRacine` sans son témoin fait donc échouer l'étage.
+  const AXES = ["savedAt", "union", "bloc", "perdu"];
+  const vrai = client.mergeFamily;
+  const TEMOINS = [
+    ["savedAt", "le mauvais côté gagne l'arbitrage", (x, y) => ({ ...vrai(x, y), savedAt: famB.savedAt })],
+    ["union", "l'union rend une liste vide", (x, y) => { const o = vrai(x, y);
+      return { ...o, seenVersions: [], config: { ...o.config, seenVersions: [] } }; }],
+    ["bloc", "la racine du gagnant est jetée", (x, y) => { const o = { ...vrai(x, y) };
+      delete o.temoinRacine; return o; }],
+    ["perdu", "la racine du périmé survit", (x, y) => ({ ...vrai(x, y), temoinRacine: "seul" })],
+  ];
+  // La boucle ne juge RIEN : elle collecte. Le verdict est pris une seule fois, sur le COMPTE — une
+  // table de témoins vidée, un axe ajouté sans le sien et un témoin devenu muet passent tous les
+  // trois par là. Un `fail` dans la boucle EN PLUS de celui-ci serait redondant, et sa falsification
+  // passerait inaperçue : une seule ligne de verdict, nommée, plutôt que deux dont l'une ment.
+  // L'ANCRE : un axe que `constatsRacine` n'émet JAMAIS, promené par la même collecte. Il doit
+  // rester non prouvé. Sans lui, une collecte qui cesse de lire les cris (`axesProuves.add(axe)`
+  // sans condition) déclare les quatre axes prouvés et ne fait crier personne — mesuré.
+  const AXE_INERTE = "axeQuAucuneMesureNEmet";
+  const axesProuves = new Set();
+  const pourquoiMuet = new Map(TEMOINS.map(([axe, quoi]) => [axe, quoi]));
+  for (const [axe, , faux] of [...TEMOINS, [AXE_INERTE, "", vrai]])
+    if (constatsRacine(faux).some((c) => c.startsWith(`[${axe}]`))) axesProuves.add(axe);
+  if (axesProuves.has(AXE_INERTE))
+    fail(`43e étage — ANCRE : la collecte des témoins déclare prouvé « ${AXE_INERTE} », un axe`
+       + ` qu'aucune mesure n'émet. Elle ne lit donc plus les cris qu'elle est censée compter, et`
+       + ` le « 4/4 prouvés » imprimé plus bas ne veut plus rien dire.`);
+  for (const axe of AXES)
+    if (!axesProuves.has(axe))
+      fail(`43e étage — l'axe [${axe}] est déclaré et aucun témoin ne prouve qu'il sait crier`
+         + `${pourquoiMuet.has(axe) ? ` (le sien — une fusion où ${pourquoiMuet.get(axe)} — reste muet)` : ` (aucun témoin ne le vise)`}. `
+         + `La mesure de cet axe ne mesure peut-être plus rien, et son « zéro » sur la vraie fusion `
+         + `ne prouverait alors rien du tout. Répare la mesure, ou ajoute-lui un témoin.`);
+  for (const [axe] of TEMOINS)
+    if (!AXES.includes(axe))
+      fail(`43e étage — le témoin « ${axe} » ne correspond à aucun axe déclaré. Ajoute l'axe à AXES `
+         + `(et sa mesure à \`constatsRacine\`), ou retire le témoin.`);
+  console.log(`    (${enProd.length} champs de racine, ${Object.keys(REGLES_RACINE).length} fichés ; `
+    + `${AXES.length} axes × 2 copies mesurés, ${axesProuves.size}/${AXES.length} prouvés par un `
+    + `témoin de fusion fausse)`);
+  // Ce que le 43e étage NE couvre PAS, écrit noir sur blanc :
+  //   • qu'un champ de racine porté par le seul côté périmé DOIVE survivre. Il ne survit pas, dans
+  //     les deux copies, et l'axe [perdu] grave ce comportement tel quel plutôt que de l'approuver.
+  //     Le jour où la racine portera autre chose que les quatre champs d'aujourd'hui, c'est cette
+  //     ligne-là qu'il faudra rouvrir — un champ de racine neuf serait perdu à la première synchro
+  //     venue du mauvais côté, sans qu'aucun autre étage ne le voie.
+  //   • la PROFONDEUR sous un champ de racine inconnu : `releve-schema-prod.mjs` descend sous lui en
+  //     `*`, mais aucun étage ne mesurerait l'arbitrage de ce qu'il y trouverait. Il n'y a rien à y
+  //     trouver aujourd'hui (les quatre champs sont fichés) ; ce sera à mesurer au cinquième.
+  //   • les témoins prouvent que chaque axe SAIT crier ; ils ne prouvent pas que la liste des axes
+  //     est complète. Un cinquième comportement de racine, non nommé, resterait muet — c'est la
+  //     limite de tout recensement par table, et elle est ici bornée à quatre champs connus.
+  //   • DEUX muettes mesurées, nommées plutôt que passées sous silence (22 variantes rejouées) :
+  //     (a) la ligne de verdict `if (!axesProuves.has(axe))` est le dernier maillon non mesuré —
+  //         tout ce qui est en amont l'est, l'ancre `AXE_INERTE` comprise. Une ligne, nommée.
+  //     (b) désarmer la contradiction de racine des fixtures ne fait crier personne, et c'est
+  //         STRUCTUREL : c'est une assertion désarmée sur un sujet sain. Ce qu'elle surveille est
+  //         mesuré par le lavage, pas par la falsification — deux racines rendues identiques, ou
+  //         recopiées de `config`, sont bien attrapées (v2.17.20 : les deux mesures ne voient pas
+  //         la même chose, il faut les deux).
 }
 
 if (failures) {
