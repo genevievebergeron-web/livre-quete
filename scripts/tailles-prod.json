@@ -1,0 +1,2103 @@
+{
+  "_lisezMoi": "Tailles de la prod par sous-arbre, sans aucune donnée de famille : des noms de champs de l'app, des `*` pour les clés dynamiques, et des octets. Régénérer avec scripts/releve-tailles-prod.mjs ; soustraire avec --contre.",
+  "releveLe": "2026-09-02",
+  "prodSavedAt": "2026-09-02T09:14:36.518Z",
+  "chemins": {
+    "charge": {
+      "octets": 174923,
+      "n": 1,
+      "cles": 0,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config": {
+      "octets": 111311,
+      "n": 1,
+      "cles": 9,
+      "enfants": 38,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.announcements": {
+      "octets": 9092,
+      "n": 1,
+      "cles": 16,
+      "enfants": 9,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.announcements[]": {
+      "octets": 9082,
+      "n": 9,
+      "cles": 0,
+      "enfants": 124,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.announcements[].countdownDoneText": {
+      "octets": 201,
+      "n": 6,
+      "cles": 120,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].countdownLabel": {
+      "octets": 144,
+      "n": 6,
+      "cles": 102,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].countdownTo": {
+      "octets": 144,
+      "n": 8,
+      "cles": 112,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].createdAt": {
+      "octets": 108,
+      "n": 9,
+      "cles": 108,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].dismissLabel": {
+      "octets": 210,
+      "n": 6,
+      "cles": 90,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].emoji": {
+      "octets": 53,
+      "n": 9,
+      "cles": 72,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].expiresAt": {
+      "octets": 108,
+      "n": 9,
+      "cles": 108,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].id": {
+      "octets": 134,
+      "n": 9,
+      "cles": 45,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].playerTasks": {
+      "octets": 3382,
+      "n": 8,
+      "cles": 112,
+      "enfants": 32,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.announcements[].playerTasks.*": {
+      "octets": 3022,
+      "n": 32,
+      "cles": 320,
+      "enfants": 120,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.announcements[].playerTasks.*[]": {
+      "octets": 2870,
+      "n": 120,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].playerTasksLabel": {
+      "octets": 156,
+      "n": 6,
+      "cles": 114,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].secret": {
+      "octets": 42,
+      "n": 9,
+      "cles": 81,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].sharedTasks": {
+      "octets": 280,
+      "n": 3,
+      "cles": 42,
+      "enfants": 6,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.announcements[].sharedTasks[]": {
+      "octets": 271,
+      "n": 6,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].targetAll": {
+      "octets": 42,
+      "n": 9,
+      "cles": 108,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].targetPlayerIds": {
+      "octets": 122,
+      "n": 9,
+      "cles": 162,
+      "enfants": 11,
+      "vides": 3,
+      "forme": "liste"
+    },
+    "charge.config.announcements[].targetPlayerIds[]": {
+      "octets": 99,
+      "n": 11,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].text": {
+      "octets": 2096,
+      "n": 9,
+      "cles": 63,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.announcements[].title": {
+      "octets": 216,
+      "n": 9,
+      "cles": 72,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments": {
+      "octets": 32530,
+      "n": 1,
+      "cles": 14,
+      "enfants": 317,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.assignments[]": {
+      "octets": 32212,
+      "n": 317,
+      "cles": 0,
+      "enfants": 1661,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.assignments[].createdAt": {
+      "octets": 704,
+      "n": 76,
+      "cles": 912,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments[].days": {
+      "octets": 1395,
+      "n": 317,
+      "cles": 2219,
+      "enfants": 420,
+      "vides": 238,
+      "forme": "liste"
+    },
+    "charge.config.assignments[].days[]": {
+      "octets": 420,
+      "n": 420,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments[].instanceId": {
+      "octets": 3825,
+      "n": 317,
+      "cles": 4121,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments[].playerIds": {
+      "octets": 4007,
+      "n": 317,
+      "cles": 3804,
+      "enfants": 369,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.assignments[].playerIds[]": {
+      "octets": 3321,
+      "n": 369,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments[].taskId": {
+      "octets": 3536,
+      "n": 317,
+      "cles": 2853,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.assignments[].time": {
+      "octets": 639,
+      "n": 317,
+      "cles": 2219,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.boss": {
+      "octets": 226,
+      "n": 1,
+      "cles": 7,
+      "enfants": 9,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.boss.*": {
+      "octets": 130,
+      "n": 9,
+      "cles": 86,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.bugs": {
+      "octets": 1908,
+      "n": 1,
+      "cles": 7,
+      "enfants": 14,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.bugs[]": {
+      "octets": 1893,
+      "n": 14,
+      "cles": 0,
+      "enfants": 56,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.bugs[].id": {
+      "octets": 182,
+      "n": 14,
+      "cles": 70,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.bugs[].text": {
+      "octets": 914,
+      "n": 14,
+      "cles": 98,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.bugs[].ts": {
+      "octets": 182,
+      "n": 14,
+      "cles": 70,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.bugs[].who": {
+      "octets": 223,
+      "n": 14,
+      "cles": 84,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.childTaskProposals": {
+      "octets": 2,
+      "n": 1,
+      "cles": 21,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.coinOffers": {
+      "octets": 2,
+      "n": 1,
+      "cles": 13,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.colorToneDownV1": {
+      "octets": 4,
+      "n": 1,
+      "cles": 18,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.createdAt": {
+      "octets": 26,
+      "n": 1,
+      "cles": 12,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards": {
+      "octets": 645,
+      "n": 1,
+      "cles": 16,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.customRewards[]": {
+      "octets": 640,
+      "n": 4,
+      "cles": 0,
+      "enfants": 24,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.customRewards[].coins": {
+      "octets": 4,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards[].cost": {
+      "octets": 4,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards[].desc": {
+      "octets": 216,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards[].emoji": {
+      "octets": 24,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards[].id": {
+      "octets": 76,
+      "n": 4,
+      "cles": 20,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customRewards[].label": {
+      "octets": 116,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks": {
+      "octets": 10853,
+      "n": 1,
+      "cles": 14,
+      "enfants": 83,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.customTasks[]": {
+      "octets": 10769,
+      "n": 83,
+      "cles": 0,
+      "enfants": 592,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.customTasks[].cat": {
+      "octets": 684,
+      "n": 83,
+      "cles": 498,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].child": {
+      "octets": 40,
+      "n": 10,
+      "cles": 80,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].coins": {
+      "octets": 119,
+      "n": 83,
+      "cles": 664,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].diff": {
+      "octets": 586,
+      "n": 83,
+      "cles": 581,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].emoji": {
+      "octets": 502,
+      "n": 83,
+      "cles": 664,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].id": {
+      "octets": 1248,
+      "n": 83,
+      "cles": 415,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].label": {
+      "octets": 2755,
+      "n": 83,
+      "cles": 664,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].ownerId": {
+      "octets": 9,
+      "n": 1,
+      "cles": 10,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.customTasks[].xp": {
+      "octets": 160,
+      "n": 83,
+      "cles": 415,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.errorLogs": {
+      "octets": 2,
+      "n": 1,
+      "cles": 12,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.feed": {
+      "octets": 10875,
+      "n": 1,
+      "cles": 7,
+      "enfants": 60,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.feed[]": {
+      "octets": 10814,
+      "n": 60,
+      "cles": 0,
+      "enfants": 425,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.feed[].emoji": {
+      "octets": 378,
+      "n": 60,
+      "cles": 480,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].id": {
+      "octets": 660,
+      "n": 60,
+      "cles": 300,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].likeTs": {
+      "octets": 125,
+      "n": 5,
+      "cles": 45,
+      "enfants": 5,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.feed[].likeTs.*": {
+      "octets": 65,
+      "n": 5,
+      "cles": 50,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].likes": {
+      "octets": 595,
+      "n": 60,
+      "cles": 480,
+      "enfants": 54,
+      "vides": 25,
+      "forme": "liste"
+    },
+    "charge.config.feed[].likes[]": {
+      "octets": 456,
+      "n": 54,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].playerId": {
+      "octets": 538,
+      "n": 60,
+      "cles": 660,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].text": {
+      "octets": 3777,
+      "n": 60,
+      "cles": 420,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].ts": {
+      "octets": 780,
+      "n": 60,
+      "cles": 300,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.feed[].type": {
+      "octets": 371,
+      "n": 60,
+      "cles": 420,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.mode": {
+      "octets": 9,
+      "n": 1,
+      "cles": 7,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.momentRequests": {
+      "octets": 2,
+      "n": 1,
+      "cles": 17,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.orphanAssignCleanupV1": {
+      "octets": 4,
+      "n": 1,
+      "cles": 24,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.orphanAssignCleanupV2": {
+      "octets": 4,
+      "n": 1,
+      "cles": 24,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.pin": {
+      "octets": 6,
+      "n": 1,
+      "cles": 6,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players": {
+      "octets": 751,
+      "n": 1,
+      "cles": 10,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.players[]": {
+      "octets": 746,
+      "n": 4,
+      "cles": 0,
+      "enfants": 28,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.players[].color": {
+      "octets": 36,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].id": {
+      "octets": 36,
+      "n": 4,
+      "cles": 20,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].name": {
+      "octets": 67,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].pseudo": {
+      "octets": 54,
+      "n": 4,
+      "cles": 36,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].starterThemes": {
+      "octets": 99,
+      "n": 4,
+      "cles": 64,
+      "enfants": 8,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.players[].starterThemes[]": {
+      "octets": 87,
+      "n": 8,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].themeChosenAt": {
+      "octets": 104,
+      "n": 4,
+      "cles": 64,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.players[].themeId": {
+      "octets": 34,
+      "n": 4,
+      "cles": 40,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.removalRequests": {
+      "octets": 2,
+      "n": 1,
+      "cles": 18,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.removedAnnouncements": {
+      "octets": 2,
+      "n": 1,
+      "cles": 23,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.removedAssignments": {
+      "octets": 4951,
+      "n": 1,
+      "cles": 21,
+      "enfants": 339,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.removedAssignments[]": {
+      "octets": 4611,
+      "n": 339,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.removedCustomTasks": {
+      "octets": 2322,
+      "n": 1,
+      "cles": 21,
+      "enfants": 149,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.removedCustomTasks[]": {
+      "octets": 2172,
+      "n": 149,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.removedMomentRequests": {
+      "octets": 2,
+      "n": 1,
+      "cles": 24,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.removedProposals": {
+      "octets": 2,
+      "n": 1,
+      "cles": 19,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.removedRemovalRequests": {
+      "octets": 2,
+      "n": 1,
+      "cles": 25,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.repairEvents": {
+      "octets": 2,
+      "n": 1,
+      "cles": 15,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.rotativeCleanupV1": {
+      "octets": 4,
+      "n": 1,
+      "cles": 20,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.routineEnd": {
+      "octets": 7,
+      "n": 1,
+      "cles": 13,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.routineOrphanCleanupV1": {
+      "octets": 4,
+      "n": 1,
+      "cles": 25,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.seenVersions": {
+      "octets": 2802,
+      "n": 1,
+      "cles": 15,
+      "enfants": 304,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.seenVersions[]": {
+      "octets": 2497,
+      "n": 304,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.selectedRewards": {
+      "octets": 247,
+      "n": 1,
+      "cles": 18,
+      "enfants": 20,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.selectedRewards[]": {
+      "octets": 226,
+      "n": 20,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.teamInvites": {
+      "octets": 2,
+      "n": 1,
+      "cles": 14,
+      "enfants": 0,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.config.theme": {
+      "octets": 11,
+      "n": 1,
+      "cles": 8,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.updateFeedEntries": {
+      "octets": 14986,
+      "n": 1,
+      "cles": 20,
+      "enfants": 30,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.updateFeedEntries[]": {
+      "octets": 14955,
+      "n": 30,
+      "cles": 0,
+      "enfants": 120,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.updateFeedEntries[].features": {
+      "octets": 12526,
+      "n": 30,
+      "cles": 330,
+      "enfants": 53,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.updateFeedEntries[].features[]": {
+      "octets": 12443,
+      "n": 53,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.updateFeedEntries[].ts": {
+      "octets": 780,
+      "n": 30,
+      "cles": 150,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.updateFeedEntries[].type": {
+      "octets": 240,
+      "n": 30,
+      "cles": 210,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.updateFeedEntries[].version": {
+      "octets": 269,
+      "n": 30,
+      "cles": 300,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.updateFeedRebuildV1": {
+      "octets": 4,
+      "n": 1,
+      "cles": 22,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weekPersist": {
+      "octets": 4,
+      "n": 1,
+      "cles": 14,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge": {
+      "octets": 651,
+      "n": 1,
+      "cles": 18,
+      "enfants": 2,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.weeklyChallenge.*": {
+      "octets": 12,
+      "n": 1,
+      "cles": 10,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge.challenges": {
+      "octets": 613,
+      "n": 1,
+      "cles": 13,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.weeklyChallenge.challenges[]": {
+      "octets": 608,
+      "n": 4,
+      "cles": 0,
+      "enfants": 20,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.weeklyChallenge.challenges[].checkins": {
+      "octets": 113,
+      "n": 4,
+      "cles": 44,
+      "enfants": 6,
+      "vides": 1,
+      "forme": "objet"
+    },
+    "charge.config.weeklyChallenge.challenges[].checkins.*": {
+      "octets": 24,
+      "n": 6,
+      "cles": 78,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge.challenges[].emoji": {
+      "octets": 24,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge.challenges[].playerId": {
+      "octets": 36,
+      "n": 4,
+      "cles": 44,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge.challenges[].playerName": {
+      "octets": 54,
+      "n": 4,
+      "cles": 52,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyChallenge.challenges[].text": {
+      "octets": 157,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests": {
+      "octets": 17711,
+      "n": 1,
+      "cles": 15,
+      "enfants": 2,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.weeklyQuests.*": {
+      "octets": 12,
+      "n": 1,
+      "cles": 19,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments": {
+      "octets": 17663,
+      "n": 1,
+      "cles": 14,
+      "enfants": 155,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.weeklyQuests.assignments[]": {
+      "octets": 17507,
+      "n": 155,
+      "cles": 0,
+      "enfants": 930,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.config.weeklyQuests.assignments[].days": {
+      "octets": 475,
+      "n": 155,
+      "cles": 1085,
+      "enfants": 160,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.weeklyQuests.assignments[].days[]": {
+      "octets": 160,
+      "n": 160,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments[].instanceId": {
+      "octets": 1777,
+      "n": 155,
+      "cles": 2015,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments[].isRecurring": {
+      "octets": 620,
+      "n": 155,
+      "cles": 2170,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments[].playerIds": {
+      "octets": 1725,
+      "n": 155,
+      "cles": 1860,
+      "enfants": 157,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.config.weeklyQuests.assignments[].playerIds[]": {
+      "octets": 1413,
+      "n": 157,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments[].taskId": {
+      "octets": 1085,
+      "n": 155,
+      "cles": 1395,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.config.weeklyQuests.assignments[].time": {
+      "octets": 1130,
+      "n": 155,
+      "cles": 1085,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates": {
+      "octets": 60732,
+      "n": 1,
+      "cles": 13,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[]": {
+      "octets": 60727,
+      "n": 4,
+      "cles": 0,
+      "enfants": 204,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].activeDays": {
+      "octets": 901,
+      "n": 4,
+      "cles": 52,
+      "enfants": 69,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].activeDays[]": {
+      "octets": 828,
+      "n": 69,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].activeRoutineId": {
+      "octets": 76,
+      "n": 4,
+      "cles": 72,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].avatar": {
+      "octets": 521,
+      "n": 4,
+      "cles": 36,
+      "enfants": 36,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].avatar.*": {
+      "octets": 189,
+      "n": 36,
+      "cles": 292,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].badges": {
+      "octets": 916,
+      "n": 4,
+      "cles": 36,
+      "enfants": 81,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].badges[]": {
+      "octets": 831,
+      "n": 81,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].bossBattle": {
+      "octets": 275,
+      "n": 4,
+      "cles": 52,
+      "enfants": 16,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].bossBattle.*": {
+      "octets": 127,
+      "n": 16,
+      "cles": 128,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].boughtRewards": {
+      "octets": 52,
+      "n": 4,
+      "cles": 64,
+      "enfants": 4,
+      "vides": 3,
+      "forme": "liste"
+    },
+    "charge.gameStates[].boughtRewards[]": {
+      "octets": 41,
+      "n": 4,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar": {
+      "octets": 7427,
+      "n": 4,
+      "cles": 44,
+      "enfants": 61,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].calendar[]": {
+      "octets": 7362,
+      "n": 61,
+      "cles": 0,
+      "enfants": 299,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].calendar[].date": {
+      "octets": 724,
+      "n": 61,
+      "cles": 427,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar[].id": {
+      "octets": 1213,
+      "n": 61,
+      "cles": 305,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar[].label": {
+      "octets": 2222,
+      "n": 61,
+      "cles": 488,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar[].recur": {
+      "octets": 237,
+      "n": 54,
+      "cles": 432,
+      "enfants": 2,
+      "vides": 0,
+      "forme": "objet+scalaire"
+    },
+    "charge.gameStates[].calendar[].recur.*": {
+      "octets": 9,
+      "n": 2,
+      "cles": 13,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar[].time": {
+      "octets": 7,
+      "n": 1,
+      "cles": 7,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].calendar[].type": {
+      "octets": 513,
+      "n": 61,
+      "cles": 427,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].catCounts": {
+      "octets": 77,
+      "n": 4,
+      "cles": 48,
+      "enfants": 6,
+      "vides": 3,
+      "forme": "objet"
+    },
+    "charge.gameStates[].catCounts.*": {
+      "octets": 9,
+      "n": 6,
+      "cles": 55,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].challengeTiers": {
+      "octets": 39,
+      "n": 4,
+      "cles": 68,
+      "enfants": 2,
+      "vides": 3,
+      "forme": "objet"
+    },
+    "charge.gameStates[].challengeTiers.*": {
+      "octets": 12,
+      "n": 1,
+      "cles": 7,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].challengeTiers.tiers": {
+      "octets": 3,
+      "n": 1,
+      "cles": 8,
+      "enfants": 1,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].challengeTiers.tiers[]": {
+      "octets": 1,
+      "n": 1,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].coins": {
+      "octets": 9,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].coinsLifetime": {
+      "octets": 13,
+      "n": 4,
+      "cles": 64,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].coinsWeek": {
+      "octets": 84,
+      "n": 4,
+      "cles": 48,
+      "enfants": 4,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].coinsWeek.*": {
+      "octets": 48,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].completed": {
+      "octets": 14030,
+      "n": 4,
+      "cles": 48,
+      "enfants": 457,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].completedAt": {
+      "octets": 20174,
+      "n": 4,
+      "cles": 56,
+      "enfants": 345,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].completedAt.*": {
+      "octets": 8970,
+      "n": 345,
+      "cles": 10855,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].completed[]": {
+      "octets": 13569,
+      "n": 457,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].consumedCelebrationIds": {
+      "octets": 1132,
+      "n": 4,
+      "cles": 100,
+      "enfants": 94,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].consumedCelebrationIds[]": {
+      "octets": 1034,
+      "n": 94,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].dailyClaimed": {
+      "octets": 166,
+      "n": 4,
+      "cles": 60,
+      "enfants": 8,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].dailyClaimed.*": {
+      "octets": 48,
+      "n": 4,
+      "cles": 24,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].dailyClaimed.ids": {
+      "octets": 58,
+      "n": 4,
+      "cles": 24,
+      "enfants": 10,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].dailyClaimed.ids[]": {
+      "octets": 44,
+      "n": 10,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].deCompleted": {
+      "octets": 8,
+      "n": 4,
+      "cles": 56,
+      "enfants": 0,
+      "vides": 4,
+      "forme": "objet"
+    },
+    "charge.gameStates[].dismissedAnnouncements": {
+      "octets": 152,
+      "n": 4,
+      "cles": 100,
+      "enfants": 8,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.gameStates[].dismissedAnnouncements[]": {
+      "octets": 139,
+      "n": 8,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].energy": {
+      "octets": 8,
+      "n": 4,
+      "cles": 36,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].energyTs": {
+      "octets": 104,
+      "n": 4,
+      "cles": 44,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].equipped": {
+      "octets": 283,
+      "n": 4,
+      "cles": 44,
+      "enfants": 21,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].equipped.*": {
+      "octets": 107,
+      "n": 21,
+      "cles": 151,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].hiddenRewards": {
+      "octets": 71,
+      "n": 4,
+      "cles": 64,
+      "enfants": 4,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.gameStates[].hiddenRewards[]": {
+      "octets": 62,
+      "n": 4,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].hiddenWeek": {
+      "octets": 40,
+      "n": 4,
+      "cles": 52,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].house": {
+      "octets": 255,
+      "n": 4,
+      "cles": 32,
+      "enfants": 12,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].house.*": {
+      "octets": 123,
+      "n": 12,
+      "cles": 116,
+      "enfants": 6,
+      "vides": 2,
+      "forme": "objet+scalaire"
+    },
+    "charge.gameStates[].house.*.*": {
+      "octets": 30,
+      "n": 6,
+      "cles": 48,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].lastFedDay": {
+      "octets": 48,
+      "n": 4,
+      "cles": 52,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].lastSeenDay": {
+      "octets": 48,
+      "n": 4,
+      "cles": 56,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].leagueTier": {
+      "octets": 32,
+      "n": 4,
+      "cles": 52,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].mode": {
+      "octets": 27,
+      "n": 4,
+      "cles": 28,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].noCoinsResetV1": {
+      "octets": 16,
+      "n": 4,
+      "cles": 68,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].owned": {
+      "octets": 754,
+      "n": 4,
+      "cles": 32,
+      "enfants": 117,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].owned[]": {
+      "octets": 633,
+      "n": 117,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pending": {
+      "octets": 8,
+      "n": 4,
+      "cles": 40,
+      "enfants": 0,
+      "vides": 4,
+      "forme": "liste"
+    },
+    "charge.gameStates[].pendingCelebrations": {
+      "octets": 1823,
+      "n": 4,
+      "cles": 88,
+      "enfants": 13,
+      "vides": 1,
+      "forme": "liste"
+    },
+    "charge.gameStates[].pendingCelebrations[]": {
+      "octets": 1805,
+      "n": 13,
+      "cles": 0,
+      "enfants": 104,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].pendingCelebrations[].badges": {
+      "octets": 26,
+      "n": 13,
+      "cles": 117,
+      "enfants": 0,
+      "vides": 13,
+      "forme": "liste"
+    },
+    "charge.gameStates[].pendingCelebrations[].coins": {
+      "octets": 14,
+      "n": 13,
+      "cles": 104,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].id": {
+      "octets": 143,
+      "n": 13,
+      "cles": 65,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].level": {
+      "octets": 52,
+      "n": 13,
+      "cles": 104,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].taskEmoji": {
+      "octets": 86,
+      "n": 13,
+      "cles": 156,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].taskLabel": {
+      "octets": 314,
+      "n": 13,
+      "cles": 156,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].themeId": {
+      "octets": 131,
+      "n": 13,
+      "cles": 130,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pendingCelebrations[].xp": {
+      "octets": 25,
+      "n": 13,
+      "cles": 65,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].petDay": {
+      "octets": 112,
+      "n": 4,
+      "cles": 36,
+      "enfants": 8,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].petDay.*": {
+      "octets": 56,
+      "n": 8,
+      "cles": 44,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].petEvo": {
+      "octets": 259,
+      "n": 4,
+      "cles": 36,
+      "enfants": 9,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].petEvo.*": {
+      "octets": 183,
+      "n": 9,
+      "cles": 63,
+      "enfants": 15,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].petEvo.*.*": {
+      "octets": 99,
+      "n": 15,
+      "cles": 60,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].petMigV2": {
+      "octets": 16,
+      "n": 4,
+      "cles": 44,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].petNickname": {
+      "octets": 71,
+      "n": 4,
+      "cles": 56,
+      "enfants": 4,
+      "vides": 2,
+      "forme": "objet"
+    },
+    "charge.gameStates[].petNickname.*": {
+      "octets": 29,
+      "n": 4,
+      "cles": 32,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].petXp": {
+      "octets": 131,
+      "n": 4,
+      "cles": 32,
+      "enfants": 11,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].petXp.*": {
+      "octets": 35,
+      "n": 11,
+      "cles": 81,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].pin": {
+      "octets": 24,
+      "n": 4,
+      "cles": 24,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].refundedRewards": {
+      "octets": 81,
+      "n": 4,
+      "cles": 72,
+      "enfants": 3,
+      "vides": 2,
+      "forme": "liste"
+    },
+    "charge.gameStates[].refundedRewards[]": {
+      "octets": 72,
+      "n": 3,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].refusals": {
+      "octets": 8,
+      "n": 4,
+      "cles": 44,
+      "enfants": 0,
+      "vides": 4,
+      "forme": "liste"
+    },
+    "charge.gameStates[].refusedKeys": {
+      "octets": 2422,
+      "n": 4,
+      "cles": 56,
+      "enfants": 83,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].refusedKeys[]": {
+      "octets": 2335,
+      "n": 83,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].removedCalendarIds": {
+      "octets": 8,
+      "n": 4,
+      "cles": 84,
+      "enfants": 0,
+      "vides": 4,
+      "forme": "liste"
+    },
+    "charge.gameStates[].removedRoutineIds": {
+      "octets": 876,
+      "n": 4,
+      "cles": 80,
+      "enfants": 48,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].removedRoutineIds[]": {
+      "octets": 824,
+      "n": 48,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].rewardBuyTs": {
+      "octets": 8,
+      "n": 4,
+      "cles": 56,
+      "enfants": 0,
+      "vides": 4,
+      "forme": "objet"
+    },
+    "charge.gameStates[].ritualCelebrated": {
+      "octets": 100,
+      "n": 4,
+      "cles": 76,
+      "enfants": 4,
+      "vides": 2,
+      "forme": "objet"
+    },
+    "charge.gameStates[].ritualCelebrated.*": {
+      "octets": 24,
+      "n": 2,
+      "cles": 12,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].ritualCelebrated.ids": {
+      "octets": 42,
+      "n": 2,
+      "cles": 12,
+      "enfants": 2,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].ritualCelebrated.ids[]": {
+      "octets": 38,
+      "n": 2,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].rotativeCleanupV1": {
+      "octets": 16,
+      "n": 4,
+      "cles": 80,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].routines": {
+      "octets": 2158,
+      "n": 4,
+      "cles": 44,
+      "enfants": 16,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].routines[]": {
+      "octets": 2138,
+      "n": 16,
+      "cles": 0,
+      "enfants": 64,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].routines[].emoji": {
+      "octets": 116,
+      "n": 16,
+      "cles": 128,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].routines[].id": {
+      "octets": 296,
+      "n": 16,
+      "cles": 80,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].routines[].name": {
+      "octets": 240,
+      "n": 16,
+      "cles": 112,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].routines[].taskIds": {
+      "octets": 926,
+      "n": 16,
+      "cles": 160,
+      "enfants": 91,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.gameStates[].routines[].taskIds[]": {
+      "octets": 819,
+      "n": 91,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].sessionMinutes": {
+      "octets": 131,
+      "n": 4,
+      "cles": 68,
+      "enfants": 8,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].sessionMinutes.*": {
+      "octets": 55,
+      "n": 8,
+      "cles": 64,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].settings": {
+      "octets": 667,
+      "n": 4,
+      "cles": 44,
+      "enfants": 40,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].settings.*": {
+      "octets": 175,
+      "n": 40,
+      "cles": 448,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].xp": {
+      "octets": 16,
+      "n": 4,
+      "cles": 20,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].xpLog": {
+      "octets": 1138,
+      "n": 4,
+      "cles": 32,
+      "enfants": 17,
+      "vides": 2,
+      "forme": "liste"
+    },
+    "charge.gameStates[].xpLog[]": {
+      "octets": 1115,
+      "n": 17,
+      "cles": 0,
+      "enfants": 66,
+      "vides": 0,
+      "forme": "objet"
+    },
+    "charge.gameStates[].xpLog[].amount": {
+      "octets": 29,
+      "n": 17,
+      "cles": 153,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].xpLog[].date": {
+      "octets": 204,
+      "n": 17,
+      "cles": 119,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].xpLog[].id": {
+      "octets": 180,
+      "n": 15,
+      "cles": 75,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.gameStates[].xpLog[].source": {
+      "octets": 119,
+      "n": 17,
+      "cles": 153,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.savedAt": {
+      "octets": 26,
+      "n": 1,
+      "cles": 10,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    },
+    "charge.seenVersions": {
+      "octets": 2802,
+      "n": 1,
+      "cles": 15,
+      "enfants": 304,
+      "vides": 0,
+      "forme": "liste"
+    },
+    "charge.seenVersions[]": {
+      "octets": 2497,
+      "n": 304,
+      "cles": 0,
+      "enfants": 0,
+      "vides": 0,
+      "forme": "scalaire"
+    }
+  }
+}

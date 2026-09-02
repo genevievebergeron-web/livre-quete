@@ -5676,6 +5676,141 @@ console.log("· premier niveau de la CHARGE — chaque champ de racine doit dire
   //         la même chose, il faut les deux).
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 44e étage — LE RELEVÉ DE TAILLES DE LA PROD (v2.17.22)
+// ═══════════════════════════════════════════════════════════════════════════
+// Pourquoi cet étage existe. Deux nuits d'affilée, la charge de prod a bougé sans qu'on puisse dire
+// OÙ : −242 octets le 1er septembre, et le 2, `config` qui grossit de 1 300 pendant que « le reste »
+// maigrit de 1 730. Les deux constats ont été laissés OUVERTS dans `PROJET-ETAT`, et les deux fois
+// pour la même raison : la référence de la veille avait été prise À LA MAIN, par une commande écrite
+// nulle part. Une référence qu'on ne peut pas rejouer ne peut ni confirmer ni infirmer.
+// `scripts/releve-tailles-prod.mjs` la rend rejouable et `scripts/tailles-prod.json` la fige, comme
+// `releve-schema-prod.mjs` l'avait fait pour la FORME. Cet étage est ce qui empêche ce fichier de
+// devenir un champ écrit et jamais lu : il en mesure la fraîcheur ET la complétude.
+//
+// Ce qu'il mesure, et c'est plus fort qu'un simple « le fichier est là » : JSON impose une identité
+// à l'octet près entre un conteneur et ses enfants (accolades + virgules + Σ ( "clé": + valeur )).
+// Le relevé enregistre les deux côtés par des chemins INDÉPENDANTS — le nombre d'enfants est compté
+// à la source (`Object.keys(v).length`), jamais dérivé de la somme de ce qui a été relevé — donc un
+// sous-arbre oublié par le parcours casse l'identité. Le fichier porte ainsi la preuve que son
+// propre recensement est complet, et il suffit ici de la rejouer. C'est la leçon des v2.17.20/21
+// (« mesurer le RECENSEMENT, pas le détecteur ») appliquée à la génération plutôt qu'après coup.
+//
+// La mise en constats est une FONCTION PURE partagée par la génération, par cet étage et par ses
+// témoins — jamais réécrite ici. Les témoins passent à `constats` des relevés VOLONTAIREMENT faux :
+// falsifier une mesure rend son témoin muet, et l'étage le dit.
+{
+  const { constats: constatsTailles } = await import(path.join(ROOT, "scripts/releve-tailles-prod.mjs"));
+  const tailles = require(path.join(ROOT, "scripts/tailles-prod.json"));
+
+  // L'ÂGE, avec l'horloge que ce dépôt contrôle (v2.17.17) : `releveLe` est la date de GÉNÉRATION.
+  // `prodSavedAt` est imprimé et volontairement pas arbitré — une prod peut légitimement ne pas
+  // bouger — mais son ABSENCE dirait que le fichier vient d'un autre script.
+  const AGE_MAX_J = 14;
+  const ageJ = Math.floor((Date.now() - Date.parse(`${tailles.releveLe}T00:00:00Z`)) / 86400000);
+  const dateCharge = tailles.prodSavedAt ? String(tailles.prodSavedAt).slice(0, 10) : null;
+  console.log(`· relevé de tailles de prod (du ${tailles.releveLe}, il y a ${ageJ} jour(s)`
+            + `${dateCharge ? `, sur une charge datée du ${dateCharge}` : ""}) — attribution complète à l'octet`);
+  if (!("prodSavedAt" in tailles))
+    fail(`44e étage — « prodSavedAt » absent de scripts/tailles-prod.json : ce fichier ne vient pas de `
+       + `scripts/releve-tailles-prod.mjs. Régénère après un GET : node scripts/releve-tailles-prod.mjs `
+       + `<prod.json> > scripts/tailles-prod.json`);
+  if (!Number.isFinite(ageJ))
+    fail(`44e étage — « releveLe » vaut « ${tailles.releveLe} », qui n'est pas une date lisible.`);
+  else if (ageJ > AGE_MAX_J)
+    fail(`44e étage — relevé de tailles pas régénéré depuis ${ageJ} jours (plafond ${AGE_MAX_J}). Il sert `
+       + `de RÉFÉRENCE à la soustraction de la nuit (« --contre ») : périmé, il attribue un écart de `
+       + `deux semaines à un seul chemin et la mesure ne veut plus rien dire. Régénère après un GET : `
+       + `node scripts/releve-tailles-prod.mjs <prod.json> > scripts/tailles-prod.json`);
+
+  // LE RÉEL.
+  for (const m of constatsTailles(tailles.chemins)) fail(`44e étage — ${m}`);
+
+  // LES TÉMOINS. Chaque axe déclaré doit être prouvé par un relevé faux qui le fait crier — sinon
+  // son « zéro » sur le fichier committé ne prouve rien. Même fonction, mêmes entrées de forme.
+  const AXES = ["orphelin", "compte", "octets", "donnée"];
+  const clone = () => JSON.parse(JSON.stringify(tailles.chemins));
+  const unConteneur = Object.keys(tailles.chemins).find((c) => c.startsWith("charge.config.") && tailles.chemins[c].forme === "liste");
+  // Un enfant SCALAIRE de `config` : sa propre identité n'est pas posée (un scalaire n'a pas de
+  // ponctuation), donc lui retirer une occurrence ne fait crier que le [compte] de son parent. Un
+  // témoin qui déclencherait deux axes à la fois prouverait les deux et masquerait qu'un des deux
+  // ne sait plus crier tout seul.
+  const unScalaire = Object.keys(tailles.chemins).find((c) => /^charge\.config\.[A-Za-z0-9_]+$/.test(c) && tailles.chemins[c].forme === "scalaire");
+  const TEMOINS = [
+    ["orphelin", `un chemin intermédiaire (« ${unConteneur} ») retiré du relevé`,
+      () => { const c = clone(); delete c[unConteneur]; return c; }],
+    ["compte", `un enfant (« ${unScalaire} ») relevé une fois de moins que la prod n'en porte`,
+      () => { const c = clone(); c[unScalaire].n -= 1; return c; }],
+    ["octets", "un sous-arbre dont le poids n'explique plus celui de son parent",
+      () => { const c = clone(); c["charge.config"].octets += 1; return c; }],
+    ["donnée", "un chemin qui porte une clé choisie par la famille (une date)",
+      () => { const c = clone(); c["charge.config.fuite-2026-08-14"] = { octets: 0, n: 1, cles: 0, enfants: 0, vides: 0, forme: "scalaire" }; return c; }],
+  ];
+  // La boucle ne juge RIEN : elle collecte, et le verdict est pris une seule fois sur le COMPTE.
+  // L'ANCRE est un axe qu'aucune mesure n'émet, promené par la même collecte : il doit rester non
+  // prouvé. Sans lui, une collecte qui cesse de lire les cris déclarerait les quatre axes prouvés.
+  const AXE_INERTE = "axeQuAucuneMesureNEmet";
+  const prouves = new Set();
+  const pourquoi = new Map(TEMOINS.map(([a, q]) => [a, q]));
+  // L'ancre est une DÉCLARATION tant que rien ne compte les passages : la retirer de la boucle
+  // laissait tout au vert (mesuré). Le compte de visites en fait une mesure — c'est la même faute
+  // que « une liste est une déclaration, pas une mesure » (v2.17.20), et elle se solde pareil.
+  let visites = 0;
+  for (const [axe, , faux] of [...TEMOINS, [AXE_INERTE, "", clone]]) {
+    visites++;
+    if (constatsTailles(faux()).some((m) => m.startsWith(`[${axe}]`))) prouves.add(axe);
+  }
+  if (visites !== TEMOINS.length + 1)
+    fail(`44e étage — la collecte a visité ${visites} témoin(s) pour ${TEMOINS.length} déclaré(s) plus `
+       + `l'ancre. Si c'est l'ancre qui manque, plus rien ne surveille une collecte qui cesserait de `
+       + `lire les cris, et le « ${AXES.length}/${AXES.length} prouvés » deviendrait automatique.`);
+  if (prouves.has(AXE_INERTE))
+    fail(`44e étage — ANCRE : la collecte déclare prouvé « ${AXE_INERTE} », un axe qu'aucune mesure `
+       + `n'émet. Elle ne lit donc plus les cris qu'elle compte, et le « ${AXES.length}/${AXES.length} prouvés » ne veut plus rien dire.`);
+  for (const axe of AXES)
+    if (!prouves.has(axe))
+      fail(`44e étage — l'axe [${axe}] est déclaré et aucun témoin ne prouve qu'il sait crier`
+         + `${pourquoi.has(axe) ? ` (le sien — ${pourquoi.get(axe)} — reste muet)` : ` (aucun témoin ne le vise)`}. `
+         + `Sa mesure ne mesure peut-être plus rien, et son zéro sur le fichier committé ne prouverait `
+         + `alors rien. Répare la mesure, ou ajoute-lui un témoin.`);
+  for (const [axe] of TEMOINS)
+    if (!AXES.includes(axe))
+      fail(`44e étage — le témoin « ${axe} » ne correspond à aucun axe déclaré.`);
+  console.log(`    (${Object.keys(tailles.chemins).length} chemins, ${tailles.chemins["charge"] ? tailles.chemins["charge"].octets : 0} octets `
+    + `attribués depuis la racine ; ${AXES.length} axes, ${prouves.size}/${AXES.length} prouvés par un relevé faux)`);
+  // Ce que le 44e étage NE couvre PAS, écrit noir sur blanc :
+  //   • l'axe [unité]. L'identité JSON est invariante d'échelle : tout compter en unités de chaîne
+  //     JS au lieu d'octets UTF-8 la laisse vraie à l'octet près (mesuré — c'est la seule
+  //     falsification du parcours que les autres axes ne voient pas). Elle se tranche en confrontant
+  //     le total à un encodeur INDÉPENDANT, ce qui exige la charge de prod. Cet étage lit un fichier
+  //     committé sans la prod sous la main : `constats` accepte la charge en second argument et
+  //     l'axe est mesuré à la GÉNÉRATION, jamais ici. C'est une frontière, pas un oubli.
+  //   • que le relevé décrive la prod d'AUJOURD'HUI. Seul son âge est arbitré (14 jours), comme
+  //     pour `schema-prod.json` : une charge qui change de forme sans que personne régénère reste
+  //     invisible jusqu'au plafond.
+  //   • la SOUSTRACTION elle-même (`--contre`) n'est pas rejouée ici : elle n'a d'entrée qu'avec
+  //     deux relevés, et le dépôt n'en fige qu'un. Ce qu'elle a de mesurable — que rien ne reste
+  //     hors attribution — est exactement l'identité que cet étage vérifie sur chacun des deux.
+  //   • les chemins ne sont pas croisés avec `scripts/schema-prod.json`. C'est délibéré : l'identité
+  //     à l'octet mesure déjà la complétude du parcours à CHAQUE niveau, ce qu'une comparaison de
+  //     listes de chemins ne ferait que deviner, et les deux relevés se régénèrent séparément.
+  //   • CINQ muettes mesurées (18 variantes rejouées dans un arbre miroir : 11 falsifications de
+  //     l'étage, 7 lavages du fichier committé — 13 attrapées). Elles sont TOUTES de la même
+  //     famille : une assertion désarmée sur un sujet SAIN ne peut pas crier, parce qu'il n'y a
+  //     rien à trouver. Chacune est appariée à la variante qui prouve que sa ligne est vivante :
+  //       (a) `for (const m of constatsTailles(...)) fail(...)` retirée — le dernier maillon. Les
+  //           SEPT lavages crient à travers cette ligne, donc elle vit.
+  //       (b) le plafond d'âge à l'infini — le lavage « relevé vieux de 8 mois » crie à travers lui.
+  //       (c) l'arbitrage de `prodSavedAt` absent — le lavage « prodSavedAt absent » crie à travers.
+  //       (d) le contrôle témoin→axe retiré — les falsifications « AXES vidé » et « un axe retiré »
+  //           crient à travers lui.
+  //       (e) le compte de visites retiré — la falsification « l'ANCRE n'est plus promenée » crie à
+  //           travers lui (c'est LUI qui l'attrape : sans ce compte, elle était muette, mesuré).
+  //     C'est la leçon de la v2.17.20 : falsification et lavage ne voient pas la même chose, il
+  //     faut les deux, et une muette appariée n'est pas un angle mort.
+}
+
 if (failures) {
   console.error(`\n✗ Couche de fusion : ${failures} problème(s).`);
   console.error("  Toute règle de fusion doit être écrite dans LES DEUX fichiers.\n");
