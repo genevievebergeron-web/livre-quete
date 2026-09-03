@@ -4,6 +4,86 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-09-03 (routine autonome, nuit, 45e étage — v2.17.23)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, **174 611 octets**, `savedAt` `2026-09-02T10:20:24.896Z`. **Aucune écriture.**
+- **Identique à la nuit dernière à l'octet et au dixième de milliseconde.** La prod n'a pas bougé
+  d'un caractère en 24 h — le premier passage où les deux relevés se superposent exactement.
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**. `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente
+  toujours au **31 juillet**. `config.feed` : 60 entrées, aucun message. **Pas de Phase 2.**
+- Comptes inchangés : 317 assignations, 339 `removedAssignments`, 9 annonces, 30
+  `updateFeedEntries`, `seenVersions` à 305 aux deux emplacements.
+
+### 🧹 Arbre SALE au démarrage — la première fois en seize nuits
+La session du 2 septembre a laissé son travail **non committé** : le correctif de `memeValeur`,
+`lavage-parity.mjs`, son instantané de campagne, et son entrée `MAINTENANCE`. Le travail n'a pas
+été relu, il a été **falsifié avant d'être adopté** — un miroir hors dépôt, le fichier de
+`git show HEAD` d'un côté, celui de l'arbre de l'autre, un champ sonde porté par un SEUL côté de
+la fixture : **0 cri avant, 1 cri après, dans les deux sens.** Et sur ce qui vivait vraiment :
+retirer les six exemptions de `EXEMPT_CFG` fait crier **6 fois** avec le correctif, **0 fois**
+sans. Angle mort confirmé, travail adopté et committé.
+
+**La leçon d'hygiène, elle, est neuve** : un premier essai de falsification a donné un résultat
+absurde (le côté B criait « avant » comme « après »). La cause n'était pas le code mesuré mais
+**mon régime de mesure** : j'avais annulé la boucle corrigée en laissant en place la branche
+neuve. Une falsification ne vaut que rejouée contre le **vrai fichier d'avant** (`git show HEAD`),
+jamais contre un opérande à moitié remis en état.
+
+### 📏 Ce que le 45e étage change pour la prod (rien aujourd'hui, et c'est le sujet)
+`pending` est une liste **unionnée** réduite par un geste à trois endroits, et douze étages ne
+l'avaient jamais regardée. Elle est correcte — chaque site écrit `refusedKeys` ou `completed` —
+mais **rien ne l'imposait**. Le bug que ça produirait est déjà documenté ici : c'est celui de la
+v2.6.6, « approuver une tâche fantôme ne l'empêchait PAS de revenir », réparé à la main
+ligne 2634 sans que rien n'empêche le prochain site de l'oublier. Désormais si.
+
+---
+
+## Passage du 2026-09-02 (routine autonome, nuit — v2.17.23, travail resté non committé)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, **174 611 octets**. **Aucune écriture.**
+
+### 🐛 Bugs signalés
+- `config.errorLogs` **vide**.
+- `config.bugs` : **14 entrées, aucune nouvelle**, la plus récente toujours au **31 juillet**.
+- `config.feed` : 60 entrées, aucun message. Rien à corriger, pas de Phase 2.
+- Tous les comptes sont identiques aux nuits précédentes : 317 assignations, 83 tâches perso,
+  339 `removedAssignments`, 9 annonces, 30 `updateFeedEntries`.
+
+### 📏 Première soustraction de tailles de la routine, et elle ferme une classe de mystères
+`releve-tailles-prod.mjs`, committé la nuit dernière, a été rejoué contre son instantané pour la
+première fois en conditions réelles. La charge a **maigri de 321 octets** entre 09:14 et 10:20 ce
+matin, et **les 321 sont attribués sans reste** :
+
+| chemin | delta |
+|---|---|
+| `config.seenVersions` | **+10** (`"2.17.22",`) |
+| `seenVersions` (racine) | **+10** (la même version, à l'autre emplacement) |
+| `config.updateFeedEntries[].features[]` | **−341** |
+
+**Ce qui est neuf, c'est le mécanisme du signe.** `updateFeedEntries` est **bornée à 30**. Annoncer
+une version n'ajoute donc pas une entrée : elle en **chasse** une. Si le texte `features` de
+l'entrée sortante est plus long que celui de l'entrante, **la charge RÉTRÉCIT pendant qu'une
+version est annoncée**. C'est exactement la signature qui a occupé trois nuits (le −242 du
+1er septembre, les « 252 octets perdus ailleurs », les « 1 730 octets » du 2), sans que personne
+puisse la nommer faute d'un relevé rejouable.
+
+La leçon tient en une ligne, et elle vaut au-delà de ce champ : **une liste bornée dont le compte
+ne bouge jamais peut faire varier la taille dans les deux sens, et un compte d'éléments ne le voit
+pas.** Les passages précédents surveillaient « 30 `updateFeedEntries` » et concluaient « rien n'a
+bougé ». Le compte était juste ; la charge avait bel et bien changé.
+
+### 🧪 Note d'environnement (elle a compté cette nuit)
+La machine hôte tournait à **load average 58 sur 8 cœurs** pendant tout le passage. Une passe de
+`check-merge-parity.mjs` y prend **~25 s au lieu de ~8 s de temps CPU**, et **la parallélisation
+n'apporte rien** (2 travailleurs : même durée qu'un seul, mesuré). Toute campagne de lavage doit
+être chiffrée en temps réel mesuré sur place, jamais en temps CPU.
+
+---
+
 ## Passage du 2026-08-26 (routine autonome, nuit, 39e étage — v2.17.17)
 
 ### 🌐 Lecture de l'API de production

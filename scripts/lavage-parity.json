@@ -1,0 +1,385 @@
+{
+  "laveLe": "2026-09-02",
+  "cible": "scripts/check-merge-parity.mjs",
+  "catalogues": 66,
+  "entrees": 464,
+  "sousEntreesNonVisitees": 935,
+  "ecartesNonVisites": [
+    "cas:1455",
+    "trucs:3799",
+    "fauxRang:3867",
+    "sourcesM:4313"
+  ],
+  "exhaustif": true,
+  "cris": 373,
+  "muettes": 61,
+  "plantages": 30,
+  "muettesDetail": [
+    {
+      "catalogue": "RICHESSE",
+      "entree": "scalaire: 0"
+    },
+    {
+      "catalogue": "RICHESSE",
+      "entree": "listeVide: 1"
+    },
+    {
+      "catalogue": "RICHESSE",
+      "entree": "liste: 2"
+    },
+    {
+      "catalogue": "RICHESSE",
+      "entree": "objet: 2"
+    },
+    {
+      "catalogue": "RICHESSE",
+      "entree": "objetDeListes: 3"
+    },
+    {
+      "catalogue": "RICHESSE",
+      "entree": "listeObjets: 3 "
+    },
+    {
+      "catalogue": "NAIF_ASSUME",
+      "entree": "__drapeaux: \"true-seulement, le spread ne peut pas les perdre\""
+    },
+    {
+      "catalogue": "NAIF_ASSUME_PL",
+      "entree": "starterThemes: \"union bornée, le résultat contient déjà la valeur fraîch"
+    },
+    {
+      "catalogue": "LISTES",
+      "entree": "{ champ: \"momentRequests\", cle: \"id\", dans: \"config\", temoinHorsBloc: 0,"
+    },
+    {
+      "catalogue": "LISTES",
+      "entree": "{ champ: \"teamInvites\", cle: \"id\", dans: \"config\", temoinHorsBloc: 0, fr"
+    },
+    {
+      "catalogue": "LISTES",
+      "entree": "{ champ: \"coinOffers\", cle: \"id\", dans: \"config\", temoinHorsBloc: 0, fra"
+    },
+    {
+      "catalogue": "CHAINES",
+      "entree": "{ champ: \"removedAssignments\", dans: \"config\", sansRetrait: \"tombstone ("
+    },
+    {
+      "catalogue": "CHAINES",
+      "entree": "{ champ: \"removedCustomTasks\", dans: \"config\", sansRetrait: \"tombstone ("
+    },
+    {
+      "catalogue": "CHAINES",
+      "entree": "{ champ: \"starterThemes\", dans: \"config\", sansRetrait: \"posé à la créati"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "xp: 0"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "coins: 0"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "coinsLifetime: 0"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "completed: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "pending: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "owned: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "equipped: {}"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "boughtRewards: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "badges: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "activeDays: []"
+    },
+    {
+      "catalogue": "vide",
+      "entree": "refusedKeys: [] "
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "completed: \"deCompleted\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "owned: \"refundedRewards\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "announcements: \"removedAnnouncements\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "assignments: \"removedAssignments\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "customTasks: \"removedCustomTasks\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "removalRequests: \"removedRemovalRequests\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "momentRequests: \"removedMomentRequests\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "childTaskProposals: \"removedProposals\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "routines: \"removedRoutineIds\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "calendar: \"removedCalendarIds\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "pendingCelebrations: \"consumedCelebrationIds\""
+    },
+    {
+      "catalogue": "GESTES",
+      "entree": "likes: \"unlikes\""
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": "ts: 5"
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": "...poses"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": "ts: 5"
+    },
+    {
+      "catalogue": "el",
+      "entree": "ts: 5"
+    },
+    {
+      "catalogue": "el",
+      "entree": "updatedAt: 5"
+    },
+    {
+      "catalogue": "el",
+      "entree": "createdAt: \"2026-08-14\""
+    },
+    {
+      "catalogue": "jeux",
+      "entree": "[\"client AB\", client.mergeFamily(famA, famB)]"
+    },
+    {
+      "catalogue": "jeux",
+      "entree": "[\"client BA\", client.mergeFamily(famB, famA)]"
+    },
+    {
+      "catalogue": "jeux",
+      "entree": "[\"serveur AB\", server.mergeFamily(famA, famB)]"
+    },
+    {
+      "catalogue": "jeux",
+      "entree": "[\"serveur BA\", server.mergeFamily(famB, famA)]"
+    },
+    {
+      "catalogue": "gsRachat",
+      "entree": "boughtRewards: [\"rw_bonbon\"]"
+    },
+    {
+      "catalogue": "gsRachat",
+      "entree": "refundedRewards: [\"rw_bonbon#\" + VIEUX] "
+    },
+    {
+      "catalogue": "NIVEAUX",
+      "entree": "{ prefixe: \"players[]\", cles: [...new Set([...Object.keys(plA), ...Objec"
+    },
+    {
+      "catalogue": "NIVEAUX_OBJ",
+      "entree": "{ prefixe: \"config\", cles: [...new Set([...Object.keys(famA.config), ..."
+    },
+    {
+      "catalogue": "NIVEAUX_OBJ",
+      "entree": "{ prefixe: \"players[]\", cles: [...new Set([...Object.keys(plA), ...Objec"
+    },
+    {
+      "catalogue": "parId",
+      "entree": "mergeFamily: (a, b) => { const bi = new Map((b.config.feed || []).map((e"
+    },
+    {
+      "catalogue": "CHARNIERES",
+      "entree": "{ nom: \"une quête VALIDÉE sort de la file d'attente\", genre: \"chaines\", "
+    },
+    {
+      "catalogue": "cibles",
+      "entree": "...LISTES.map((l) => ({ ...l, genre: \"objets\" }))"
+    },
+    {
+      "catalogue": "cibles",
+      "entree": "...CHAINES.map((l) => ({ ...l, genre: \"chaines\" }))"
+    },
+    {
+      "catalogue": "FORMES",
+      "entree": "[\"texte\", SENT]"
+    },
+    {
+      "catalogue": "FORMES",
+      "entree": "[\"date\", 9e12]"
+    },
+    {
+      "catalogue": "FORMES",
+      "entree": "[\"ISO\", new Date(9e12).toISOString()]"
+    },
+    {
+      "catalogue": "TOMBSTONES_DATES",
+      "entree": "deCompleted: \"completed\""
+    },
+    {
+      "catalogue": "TOMBSTONES_DATES",
+      "entree": "refundedRewards: \"owned\" "
+    }
+  ],
+  "plantagesDetail": [
+    {
+      "catalogue": "SOUS_LE_PLAFOND",
+      "entree": ": \"10e étage, forme B — la liste de tâches par joueur est recensée en `p"
+    },
+    {
+      "catalogue": "SOUS_LE_PLAFOND",
+      "entree": ": \"arbitré EN BLOC (dernière-écriture-gagne, src/merge.js ~243) : `place"
+    },
+    {
+      "catalogue": "SOUS_LE_PLAFOND",
+      "entree": ": \"12e étage — les DEUX niveaux sont mesurés : sur un palier en collisio"
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": "[l.cle]"
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": ": ID"
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": "[l.champ]"
+    },
+    {
+      "catalogue": "elemFrais",
+      "entree": ": [VOISIN]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": "[l.cle]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": ": ID"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": "[l.champ]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": ": [VOISIN, RETIRE]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": "[l.tombstoneDate.retrait]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": ": { [RETIRE]: T2 }"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": "[l.tombstoneDate.pose]"
+    },
+    {
+      "catalogue": "elemRepose",
+      "entree": ": { [VOISIN]: T1, [RETIRE]: T3 } "
+    },
+    {
+      "catalogue": "el",
+      "entree": "[l.cle]"
+    },
+    {
+      "catalogue": "el",
+      "entree": ": ID"
+    },
+    {
+      "catalogue": "el",
+      "entree": "[l.objet]"
+    },
+    {
+      "catalogue": "el",
+      "entree": ": { [l.cleDyn]: elems } "
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"400 — tombstone des demandes refusées, lu par appartenance\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"200 — tombstone `id#estampille` du remboursement, lu par appartenance"
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"400 — tombstone des événements calendrier, lu par appartenance\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"200 — tombstone des rituels supprimés, lu par appartenance\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"300 — tombstone des célébrations déjà jouées, lu par appartenance\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"800 — tombstone d'assignation ; 335/800 en prod le 21 août, le plus r"
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"1000 — tombstone de tâche maison ; 145/1000 en prod\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"800 — tombstone des propositions d'enfant ; 0 en prod\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"200 — tombstone des annonces ; 0 en prod\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"200 — tombstone des demandes de moment ; 0 en prod\""
+    },
+    {
+      "catalogue": "PLAFOND_ORDRE_APPELANT",
+      "entree": ": \"400 — tombstone des demandes de retrait ; 0 en prod\""
+    }
+  ]
+}

@@ -28,7 +28,15 @@ const client = await import(path.join(ROOT, "src/merge.js"));
 const server = require(path.join(ROOT, "server-merge.cjs"));
 
 let failures = 0;
-const fail = (msg) => { failures++; console.error("  ✗ " + msg); };
+// v2.17.23 — `LAVAGE_ARRET_AU_1ER_CRI=1` fait sortir au PREMIER cri au lieu de dérouler les 45
+// étages. C'est une commodité du lavage automatisé (`scripts/lavage-parity.mjs`), pas un mode de
+// build : le VERDICT est rigoureusement le même (sortie ≠ 0 dès qu'un cri existe, sortie 0 sinon),
+// seule la longueur du rapport change. Une passe complète coûte ~25 s sur cette machine et la
+// campagne en compte 464 ; s'arrêter au premier cri la ramène de trois heures à une poignée de
+// minutes. L'ancre du harnais tourne sous le MÊME drapeau que les variantes — mesurer sous deux
+// régimes différents est précisément la faute que la v2.17.11 a payée.
+const ARRET_1ER_CRI = process.env.LAVAGE_ARRET_AU_1ER_CRI === "1";
+const fail = (msg) => { failures++; console.error("  ✗ " + msg); if (ARRET_1ER_CRI) process.exit(1); };
 
 // Comparaison profonde tolérante à l'ORDRE des clés d'objet (les deux copies
 // construisent leurs littéraux dans un ordre différent, ce n'est pas une dérive)
@@ -141,10 +149,26 @@ const gsB = {
 // ne l'est pas. C'est arrivé en écrivant ce fichier : `lastSeenDay` s'est retrouvé
 // à "2026-08-15" des deux côtés, et la preuve de sensibilité (retirer sa règle des
 // deux copies) ne déclenchait rien. Un champ non surveillé doit crier, pas se taire.
+// v2.17.23 — cette fonction ne parcourait que `Object.keys(b)`, et le lavage automatisé l'a
+// prise en défaut dans les DEUX sens. Un champ porté par le seul côté A n'était jamais visité ;
+// un champ porté par le seul côté B satisfaisait l'exigence de contradiction parce que
+// `same(undefined, valeur)` est faux — « absent » passait pour « contradictoire ». Le contrôle
+// dont le métier est d'empêcher les fixtures inertes avait donc sa propre exemption, non
+// déclarée : l'ABSENCE. Six drapeaux de `config` en vivaient (ils ne sont pas dans `DRAPEAUX_B`),
+// alors que le commentaire d'`EXEMPT_GS` juste en dessous affirme que leur exemption « reste un
+// fait vérifié et pas une promesse » — c'était vrai de `gameStates`, faux de `config`.
+// Le reste du fichier emploie déjà l'union (`new Set([...Object.keys(a), ...Object.keys(b)])`)
+// aux lignes 175, 520, 534 et 660 : c'est ici qui était l'exception.
 const memeValeur = (a, b, quoi, exempt = {}) => {
-  for (const k of Object.keys(b)) {
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
     if (exempt[k]) continue;
-    if (same(a[k], b[k]))
+    const dansA = k in a, dansB = k in b;
+    if (!dansA || !dansB)
+      fail(`fixture ${quoi} — « ${k} » n'est porté que par le côté ${dansA ? "A" : "B"} : `
+         + `aucune COLLISION n'est jouée sur ce champ, donc sa règle de fusion n'est mesurée `
+         + `par personne. Porte-le des deux côtés avec deux valeurs contradictoires, ou exempte-le `
+         + `ici avec la raison (et une section qui mesure vraiment son arbitrage).`);
+    else if (same(a[k], b[k]))
       fail(`fixture ${quoi} — « ${k} » porte la MÊME valeur des deux côtés : aucun contrôle `
          + `ne peut le voir (tous écartent « rien à départager »). Donne-lui deux valeurs `
          + `contradictoires, la plus fraîche du côté A.`);
@@ -286,6 +310,16 @@ const EXEMPT_CFG = {
   // Volontairement vides des deux côtés : rien à départager par construction, la
   // parité champ par champ ci-dessus reste leur contrôle.
   coinOffers: 1, teamInvites: 1, momentRequests: 1,
+  // v2.17.23 — les six drapeaux de migration de `config`, jumeaux exacts des trois d'`EXEMPT_GS`
+  // et pour la même raison de FORME : `migrations.js` ne les écrit qu'à `true`, jamais à `false`,
+  // donc ils n'ont pas de seconde valeur avec laquelle se contredire. Leur vraie collision est
+  // `true` contre ABSENT, mesurée par la section « drapeaux de migration » juste en dessous, qui
+  // les nomme un par un dans `DRAPEAUX_CFG`. Jusqu'ici cette exemption n'était écrite NULLE PART :
+  // ils passaient parce que `memeValeur` ne visitait que les clés du côté B, et `DRAPEAUX_B` ne
+  // les porte pas. Une exemption qui tient par un angle mort n'est pas relisable — le lavage
+  // automatisé de la v2.17.23 l'a nommée, elle est maintenant déclarée.
+  colorToneDownV1: 1, rotativeCleanupV1: 1, orphanAssignCleanupV1: 1,
+  orphanAssignCleanupV2: 1, routineOrphanCleanupV1: 1, updateFeedRebuildV1: 1,
 };
 memeValeur(famA.config, famB.config, "config", EXEMPT_CFG);
 
@@ -1507,34 +1541,281 @@ console.log("· époque de reset — le côté qui a vu le reset le plus récent
 // est absent d'`owned` chez les 4 enfants en prod, le ménage permanent tient tout seul).
 console.log("· gestes — tout retrait d'une liste à tombstone doit écrire ce tombstone");
 {
+  // v2.17.23 — cet étage était une LISTE BLANCHE, et le lavage automatisé l'a pris en défaut :
+  // retirer n'importe laquelle des 12 paires de `GESTES` ne faisait crier PERSONNE (12 muettes sur
+  // 12, le plus gros paquet de la campagne). La raison est celle de la v2.17.20, une couche plus
+  // haut : l'étage mesurait son DÉTECTEUR (« ce champ-là écrit-il son tombstone ? ») et jamais son
+  // RECENSEMENT (« quels champs faut-il regarder ? »). Un champ absent de la table n'était pas
+  // « exempté », il était INVISIBLE — et une exemption par omission ne se relit pas.
+  //
+  // Le sens est inversé : la SOURCE dicte les champs à classer, chacun doit tomber dans une des
+  // quatre tables ci-dessous, et toute fiche doit avoir un sujet. Trois trouvailles en naissant :
+  //
+  //   1. `pending` n'était classée NULLE PART. C'est une liste UNIONNÉE (`merge.js:273`), réduite
+  //      par un geste à TROIS endroits (App.jsx 2639/2658/2783), et douze étages ne l'avaient
+  //      jamais regardée. Elle est correcte aujourd'hui — chaque site écrit `refusedKeys` ou
+  //      `completed`, que la fusion soustrait de l'union — mais rien ne l'imposait. Un quatrième
+  //      site qui l'oublierait ferait revenir la demande au portail parent : très exactement le
+  //      bug que la v2.6.6 a réparé À LA MAIN à la ligne 2634.
+  //   2. `pendingCelebrations` avait une fiche que le détecteur ne pouvait PAS exercer : la file
+  //      est vidée EN BLOC (`pendingCelebrations:[]`, ~2830), une forme que la sonde `.filter(`
+  //      ne voit pas. Fiche vivante, zéro visite, depuis la v2.16.83.
+  //   3. `customTasks` n'a AUCUN geste dans App.jsx — sa fiche nommait un retrait qui n'existe
+  //      pas. Le tombstone est bien écrit, mais par `post-migration-cleanup.js`, hors de la
+  //      portée de cet étage.
+  //
+  // Une fiche sans sujet n'est pas inoffensive : elle donne l'illusion d'une surveillance.
+
+  // ── (1) le geste RÉDUIT la liste (`X: (…).filter(`) et doit écrire son tombstone ──
   const GESTES = {
     completed: "deCompleted", owned: "refundedRewards",
     announcements: "removedAnnouncements", assignments: "removedAssignments",
-    customTasks: "removedCustomTasks", removalRequests: "removedRemovalRequests",
+    removalRequests: "removedRemovalRequests",
     momentRequests: "removedMomentRequests", childTaskProposals: "removedProposals",
     routines: "removedRoutineIds", calendar: "removedCalendarIds",
-    pendingCelebrations: "consumedCelebrationIds",
     likes: "unlikes", // v2.16.84 — sous-liste (feed[].likes), même exigence : le geste écrit son tombstone
+    // v2.17.23 — DEUX tombstones acceptés, et c'est une propriété de la fusion, pas une facilité :
+    // `merge.js:273` unionne `pending` puis SOUSTRAIT `completed` et `refusedKeys`. Le retrait
+    // s'exprime donc par l'AJOUT à l'une ou l'autre, selon que la demande est approuvée ou refusée.
+    pending: ["refusedKeys", "completed"],
   };
+  // ── (2) le geste VIDE la liste entière (`X: []`) — même exigence de tombstone ──
+  // Forme déclarée fiche par fiche, jamais devinée : `X: []` est AUSSI la façon d'initialiser une
+  // liste (`likes:[]` à chaque entrée de fil, ~2686), donc la piloter par la forme seule
+  // inventerait des accusations. C'est l'opt-in qui rend la fiche exerçable.
+  const VIDE_EN_BLOC = {
+    pendingCelebrations: "consumedCelebrationIds", // App.jsx ~2830 — la file entière est consommée d'un coup
+  };
+  // ── (3) réduite dans App.jsx, mais ne traverse PAS la fusion (raison écrite) ──
+  const HORS_FUSION = {
+    items: "vue locale : `rest.filter(a=>a.time===…)` groupe les assignations du jour par moment "
+         + "pour l'affichage (~1265). Rien n'est retiré, l'objet est construit à l'écran et n'est "
+         + "jamais persisté — absent de la charge de prod, vérifié au passage du 3 septembre.",
+    taskIds: "brouillon local : `setRoutineBuilder` coche/décoche une quête dans l'assistant de "
+           + "rituel (~995), sur un état de composant qui ne part au nuage qu'à la sauvegarde, en "
+           + "BLOC. Le `taskIds` PERSISTÉ (`gameStates[].routines[].taskIds`) est classé "
+           + "`elementEnBloc` au 8e étage : l'élément entier vient du côté frais.",
+    myCalTargets: "`.filter(Boolean)` sur un tableau construit à l'instant (~4154), pour écarter "
+                + "un id absent. Aucune liste existante n'est réduite ; absent de la prod.",
+    badges: "`.filter(Boolean)` sur `newBadgeIds.map(...)` (~2700) : c'est la CONSTRUCTION des "
+          + "badges d'une célébration différée, pas un retrait. Le `badges` persisté est unionné "
+          + "sans tombstone (`merge.js:294`) à dessein — aucune UI ne décoche un badge, et l'union "
+          + "est increvable tant que c'est vrai (même raison qu'`owned`, merge.js ~819).",
+    refusals: "remplacée EN BLOC par le côté frais (`merge.js:275`, dernière-écriture-gagne, elle "
+            + "voyage avec l'état du joueur) : un retrait tient par construction, sans tombstone. "
+            + "Les trois sites (2716/2785/3386) dédupliquent par `key` avant de réinsérer.",
+    boughtRewards: "même règle en bloc que `refusals` (`merge.js:288`, dernière-écriture-gagne, "
+                 + "voyage avec `coins`). C'est d'ailleurs la moitié qui TENAIT dans le bug "
+                 + "v2.16.81 : « j'ai changé d'idée » retire l'id de `boughtRewards` ET d'`owned`, "
+                 + "et seul `owned` — unionné — avait besoin d'un tombstone (`refundedRewards`).",
+  };
+  // ── (4) tombstone de fusion vivant, mais AUCUN geste dans App.jsx ──
+  // Une fiche ici est une affirmation d'ABSENCE, et le recensement la vérifie : si un geste
+  // apparaît un jour, l'étage crie au lieu de le laisser passer sous couvert d'être « classé ».
+  const SANS_GESTE = {
+    customTasks: { tombstone: "removedCustomTasks", pourquoi:
+      "aucun retrait dans App.jsx — une quête personnalisée est créée (3026/3310/3351/"
+               + "3365/3431) et jamais supprimée. `removedCustomTasks` existe et est bien écrit, "
+               + "mais par `post-migration-cleanup.js:55`, hors de la portée de cet étage (au même "
+               + "titre que `migrations.js`, exclu à dessein plus haut)." },
+  };
+
   const lignes = require("node:fs").readFileSync(path.join(ROOT, "src/App.jsx"), "utf8").split("\n");
-  // Bornes de bloc : les déclarations de premier niveau du composant (`  const handleX`, `  function X`).
-  const bornes = lignes.reduce((acc, l, i) => (/^  (?:const|function) \w+/.test(l) ? [...acc, i] : acc), []);
-  const blocDe = (i) => {
-    let debut = 0, fin = lignes.length;
+  const RE_REDUIT = (c) => new RegExp("\\b" + c + "\\s*:\\s*[^,]*\\.filter\\(");
+  const RE_VIDE   = (c) => new RegExp("\\b" + c + "\\s*:\\s*\\[\\s*\\]");
+
+  // ── le RECENSEMENT et le DÉTECTEUR, deux fonctions PURES ────────────────
+  // Partagées telles quelles par la mesure réelle et par les témoins — leçon v2.17.20, où trois
+  // témoins appelaient le détecteur directement et ne prouvaient rien de la boucle qui le promène.
+  // `blocDe` prend sa source en ARGUMENT : la version précédente la lisait par fermeture, donc un
+  // témoin nourri d'une source fausse faisait quand même relire le vrai App.jsx.
+  const blocDe = (src, i) => {
+    const bornes = src.reduce((acc, l, k) => (/^  (?:const|function) \w+/.test(l) ? [...acc, k] : acc), []);
+    let debut = 0, fin = src.length;
     for (const b of bornes) { if (b <= i && b > debut) debut = b; if (b > i && b < fin) fin = b; }
-    return { corps: lignes.slice(debut, fin).join("\n"), nom: (lignes[debut].match(/^  (?:const|function) (\w+)/) || [])[1] || "?" };
+    return { corps: src.slice(debut, fin).join("\n"), nom: (src[debut].match(/^  (?:const|function) (\w+)/) || [])[1] || "?" };
   };
-  for (let i = 0; i < lignes.length; i++) {
-    for (const [champ, tombstone] of Object.entries(GESTES)) {
-      if (!new RegExp("\\b" + champ + "\\s*:\\s*[^,]*\\.filter\\(").test(lignes[i])) continue;
-      const { corps, nom } = blocDe(i);
-      if (!corps.includes(tombstone))
-        fail(`App.jsx:${i + 1} (${nom}) — retire un élément de « ${champ} » sans jamais écrire `
-           + `\`${tombstone}\`. Une liste unionnée ne sait pas exprimer un retrait : la copie d'en `
-           + `face ramènera l'élément à la synchro suivante. Écris le tombstone ICI aussi — la règle `
-           + `de fusion existe déjà, c'est l'appelant qui manque (c'était « handleUndo », v2.16.83).`);
-    }
+  // Le recensement de DÉCOUVERTE ne connaît qu'une forme, `X: (…).filter(` : c'est la seule assez
+  // spécifique pour nommer un champ que personne n'a classé. La forme `X: []` sert à exercer une
+  // fiche existante (voir `VIDE_EN_BLOC`), jamais à en inventer une.
+  const recenser = (src) => {
+    const vus = new Map();
+    for (let i = 0; i < src.length; i++)
+      for (const m of src[i].matchAll(/\b(\w+)\s*:\s*[^,]*\.filter\(/g))
+        vus.set(m[1], [...(vus.get(m[1]) || []), i + 1]);
+    return vus;
+  };
+  const sansTombstone = (src, table, forme) => {
+    const manques = [];
+    for (let i = 0; i < src.length; i++)
+      for (const [champ, t] of Object.entries(table)) {
+        if (!forme(champ).test(src[i])) continue;
+        const attendus = Array.isArray(t) ? t : [t];
+        const { corps, nom } = blocDe(src, i);
+        if (!attendus.some((x) => corps.includes(x))) manques.push({ ligne: i + 1, nom, champ, attendus });
+      }
+    return manques;
+  };
+  const sitesDe = (src, champ, forme) => src.reduce((acc, l, i) => (forme(champ).test(l) ? [...acc, i + 1] : acc), []);
+
+  // v2.17.23 — la forme `X: []` ne peut pas piloter la découverte à elle seule (`likes:[]` ouvre
+  // chaque entrée de fil), mais elle le peut BORNÉE aux champs que la fusion traite vraiment. La
+  // borne est mesurée sur `src/merge.js`, pas déclarée ici : sans elle, retirer la seule fiche de
+  // `VIDE_EN_BLOC` ne faisait crier personne — la fiche était son propre garant.
+  const srcMerge = require("node:fs").readFileSync(path.join(ROOT, "src/merge.js"), "utf8");
+  const champDeFusion = (c) => new RegExp("\\.\\s*" + c + "\\b").test(srcMerge);
+
+  const recensés = recenser(lignes);
+  // Un `X: []` n'est un RETRAIT que dans un littéral qui ÉTALE un état existant (`{...p, X: []}`).
+  // Sans cette condition la sonde est une fabrique de faux positifs, et c'est mesuré, pas craint :
+  // elle nommait `ids` (dans un TERNAIRE, `? …dailyClaimed.ids : []`), `days` (le marqueur « ceci
+  // est un rituel » d'une assignation NEUVE, ~3430) et `challenges` (un seau hebdo neuf quand la
+  // semaine change, ~3448/3468) — quatre constructions, zéro retrait. La borne de ligne ne suffit
+  // pas non plus : `{day:wk,ids:[]}` vit sur une ligne qui porte `[...gs]` ailleurs. C'est le
+  // littéral qu'il faut délimiter, à la accolade.
+  const vidages = (src) => {
+    const out = [];
+    for (let i = 0; i < src.length; i++)
+      for (const m of src[i].matchAll(/\b(\w+)\s*:\s*\[\s*\]/g)) {
+        let prof = 0, j = m.index - 1;
+        for (; j >= 0; j--) { const c = src[i][j]; if (c === "}") prof++; else if (c === "{") { if (prof === 0) break; prof--; } }
+        if (j >= 0 && /\.\.\./.test(src[i].slice(j, m.index))) out.push({ champ: m[1], ligne: i + 1 });
+      }
+    return out;
+  };
+  for (const { champ, ligne } of vidages(lignes))
+    if (champDeFusion(champ) && !(champ in VIDE_EN_BLOC) && !(champ in GESTES)
+        && !(champ in HORS_FUSION) && !(champ in SANS_GESTE))
+      fail(`App.jsx:${ligne} — « ${champ} » est VIDÉE en bloc dans un littéral qui étale l'état `
+         + `existant, et c'est un champ que la fusion traite (\`merge.js\` le lit). Un vidage est un `
+         + `retrait : classe-le dans \`VIDE_EN_BLOC\` avec son tombstone, ou dis dans \`HORS_FUSION\` `
+         + `pourquoi ce vidage n'a pas besoin d'en écrire un.`);
+  let visites = 0;
+
+  // Sens 1 — la SOURCE vers les tables : aucun champ réduit ne reste non classé.
+  for (const [champ, où] of recensés) {
+    visites++;
+    if (champ in GESTES || champ in HORS_FUSION) continue;
+    if (champ in SANS_GESTE)
+      fail(`App.jsx:${où[0]} — « ${champ} » est fiché dans \`SANS_GESTE\` (« aucun retrait dans `
+         + `App.jsx »), or en voici un. L'affirmation d'absence est PÉRIMÉE : donne à ce champ son `
+         + `tombstone dans \`GESTES\`, ou dis pourquoi ce site-là ne traverse pas la fusion.`);
+    else
+      fail(`App.jsx:${où[0]} — « ${champ} » est réduit par un \`.filter(\` et n'est classé NULLE `
+         + `PART. Si la liste traverse la fusion, donne-lui son tombstone dans \`GESTES\` ; sinon, `
+         + `écris dans \`HORS_FUSION\` POURQUOI elle ne le traverse pas. Une table qui ne connaît `
+         + `pas un champ ne l'exempte pas, elle ne le voit pas — c'est ainsi que \`pending\` a `
+         + `traversé douze étages sans être regardée (v2.17.23).`);
   }
+  // Sens 2 — les tables vers la SOURCE : une fiche sans sujet donne l'illusion d'une surveillance.
+  for (const [champ, forme, table] of [
+    ...Object.keys(GESTES).map((c) => [c, RE_REDUIT, "GESTES"]),
+    ...Object.keys(VIDE_EN_BLOC).map((c) => [c, RE_VIDE, "VIDE_EN_BLOC"]),
+    ...Object.keys(HORS_FUSION).map((c) => [c, RE_REDUIT, "HORS_FUSION"]),
+  ]) {
+    const sites = sitesDe(lignes, champ, forme);
+    if (sites.length === 0)
+      fail(`la fiche « ${champ} » de \`${table}\` ne correspond à AUCUN site d'App.jsx : soit le `
+         + `geste a été renommé (et son retrait n'est plus mesuré), soit la forme du retrait a `
+         + `changé, soit la fiche est périmée. C'était le cas de \`pendingCelebrations\` depuis la `
+         + `v2.16.83 — fiche vivante, zéro visite, parce que la file se vide EN BLOC.`);
+    else visites += sites.length;
+  }
+  for (const champ of Object.keys(SANS_GESTE))
+    if (!(champ in GESTES) && !(champ in VIDE_EN_BLOC) && sitesDe(lignes, champ, RE_REDUIT).length === 0
+        && sitesDe(lignes, champ, RE_VIDE).length === 0) visites++;
+    else fail(`la fiche « ${champ} » de \`SANS_GESTE\` affirme qu'aucun geste ne réduit ce champ, `
+            + `or il est soit fiché ailleurs, soit réduit dans App.jsx. Tranche.`);
+  // Sens 3 — la FUSION vers les tables. Les deux premiers sens partent d'App.jsx, donc un champ
+  // qu'aucun geste ne réduit AUJOURD'HUI leur est invisible : c'est ce qui laissait la fiche
+  // `SANS_GESTE` sans garant (la retirer ne faisait crier personne, elle s'auto-justifiait).
+  // Ce sens-ci part de l'autre bout : chaque tombstone PERSISTÉ de `merge.js` protège une liste,
+  // et cette liste doit être classée quelque part. Le tri « persisté » vs « local » est mesuré —
+  // un tombstone est lu comme propriété (`.removedX`) ; `removedIds`, simple paramètre de
+  // `_mergeCalendar`, ne l'est pas et sort tout seul.
+  const reclamés = new Set([
+    ...Object.values(GESTES).flatMap((t) => (Array.isArray(t) ? t : [t])),
+    ...Object.values(VIDE_EN_BLOC),
+    ...Object.values(SANS_GESTE).map((f) => f.tombstone),
+  ]);
+  let tombstones = 0;
+  for (const m of new Set([...srcMerge.matchAll(/\b(removed[A-Z]\w*|consumed[A-Z]\w*|refunded[A-Z]\w*|de[A-Z]\w*|unlikes|refusedKeys)\b/g)].map((x) => x[1]))) {
+    if (!champDeFusion(m)) continue; // local, pas un champ de la charge
+    tombstones++;
+    if (!reclamés.has(m))
+      fail(`\`merge.js\` porte le tombstone « ${m} », et AUCUNE fiche de cet étage ne le réclame. `
+         + `Un tombstone existe pour qu'un retrait survive à la fusion : dis quelle liste il `
+         + `protège (\`GESTES\`/\`VIDE_EN_BLOC\`), ou pourquoi aucun geste ne s'en sert `
+         + `(\`SANS_GESTE\`). C'est le seul sens qui parte de la FUSION, donc le seul qui voie `
+         + `une liste qu'aucun geste ne réduit aujourd'hui.`);
+  }
+  if (tombstones < 10)
+    fail(`le recensement par la fusion n'a trouvé que ${tombstones} tombstone(s) persisté(s) dans `
+       + `\`merge.js\` (13 au 3 septembre 2026) : la sonde ne mord plus, et ce sens passerait au `
+       + `vert à vide.`);
+
+  // v2.17.23 — l'ancre « visites === 0 » a été RETIRÉE, pas oubliée : elle ne pouvait pas crier
+  // seule. Le 2e sens crie dès qu'UNE fiche n'a plus de site ; si le recensement ne visitait rien,
+  // aucune fiche n'aurait de site et il crierait pour toutes. Il n'existe donc aucune assignation
+  // où « visites === 0 » serait le seul crieur — un axe prouvé redondant sur le treillis, gardé
+  // seulement s'il pouvait crier seul quelque part. Le compte reste imprimé, comme relevé.
+
+  // ── le DÉTECTEUR, sur les deux formes ───────────────────────────────────
+  // Le détecteur COMPTE les sites qu'il a vraiment examinés. Sans ça, désarmer sa boucle passait
+  // en silence : sur une source SAINE il n'y a rien à trouver, donc « ne rien trouver » et « ne
+  // rien regarder » rendent le même vert. Même faute que la v2.17.20, une couche plus bas.
+  let sitesVus = 0;
+  for (const [table, forme] of [[GESTES, RE_REDUIT], [VIDE_EN_BLOC, RE_VIDE]]) {
+    for (const champ of Object.keys(table)) sitesVus += sitesDe(lignes, champ, forme).length;
+    for (const { ligne, nom, champ, attendus } of sansTombstone(lignes, table, forme))
+      fail(`App.jsx:${ligne} (${nom}) — retire un élément de « ${champ} » sans jamais écrire `
+         + `${attendus.map((x) => "`" + x + "`").join(" ni ")}. Une liste unionnée ne sait pas `
+         + `exprimer un retrait : la copie d'en face ramènera l'élément à la synchro suivante. `
+         + `Écris le tombstone ICI aussi — la règle de fusion existe déjà, c'est l'appelant qui `
+         + `manque (c'était « handleUndo », v2.16.83).`);
+  }
+  if (sitesVus < 15)
+    fail(`le détecteur n'a examiné que ${sitesVus} site(s) de retrait (23 au 3 septembre 2026) : `
+       + `sa boucle ne promène plus les fiches sur App.jsx. Une source saine ne peut PAS distinguer `
+       + `« rien trouvé » de « rien regardé » — c'est ce compte qui les sépare.`);
+  console.log(`    (${recensés.size} champ(s) réduit(s) recensé(s), ${sitesVus} site(s) examiné(s), `
+            + `${tombstones} tombstone(s) de fusion réclamé(s), ${visites} fiche(s) promenée(s))`);
+
+  // ── TÉMOINS : chaque moitié doit savoir crier SEULE, par les mêmes fonctions ──
+  const faux = ["  const handleFaux = () => {",
+                "    setX(p=>({...p, completed:(p.completed||[]).filter(k=>k!==x), pendingCelebrations:[] }));",
+                "  };"];
+  if (sansTombstone(faux, { completed: "deCompleted" }, RE_REDUIT).length !== 1)
+    fail(`témoin [détecteur/réduit] — un retrait de « completed » SANS \`deCompleted\` dans le bloc `
+       + `n'est plus repéré : la question du 7e étage ne sait plus se poser.`);
+  if (sansTombstone(faux, { pendingCelebrations: "consumedCelebrationIds" }, RE_VIDE).length !== 1)
+    fail(`témoin [détecteur/vidé] — une file vidée EN BLOC sans son tombstone n'est plus repérée : `
+       + `la forme \`X: []\` retomberait dans l'angle mort d'où \`pendingCelebrations\` sort.`);
+  if (sansTombstone(faux, { completed: ["deCompleted", "setX"] }, RE_REDUIT).length !== 0)
+    fail(`témoin [détecteur/tombstones multiples] — le bloc porte « setX », l'un des deux tombstones `
+       + `acceptés, et l'étage crie quand même : \`pending\` serait faussement accusée.`);
+  if (blocDe(faux, 1).corps.includes("useMemo"))
+    fail(`témoin [pureté] — \`blocDe\` relit le vrai App.jsx au lieu de la source qu'on lui passe : `
+       + `tous les témoins ci-dessus mesureraient le fichier réel, pas leur propre cas.`);
+  if (sitesDe(faux, "completedZZ", RE_REDUIT).length !== 0 || sitesDe(faux, "completed", RE_REDUIT).length !== 1)
+    fail(`témoin [recensement/sens 2] — \`sitesDe\` ne sait plus distinguer une fiche qui a un `
+       + `sujet d'une fiche qui n'en a pas : le 2e sens ne peut plus nommer une fiche périmée, et `
+       + `\`pendingCelebrations\` retomberait dans l'angle mort d'où elle sort.`);
+  if (recenser(faux).get("completed")?.length !== 1)
+    fail(`témoin [recensement] — la sonde de source ne voit plus « completed » dans un bloc qui la `
+       + `réduit pourtant : le sens « source vers tables » ne peut plus rien nommer, et un champ `
+       + `neuf entrerait dans App.jsx sans que personne le classe.`);
+  if (recenser(faux).has("pendingCelebrations"))
+    fail(`témoin [recensement/frontière] — la sonde de DÉCOUVERTE par \`.filter(\` s'est mise à lire `
+       + `la forme \`X: []\`, qui est aussi celle d'une initialisation (\`likes:[]\` à chaque entrée `
+       + `de fil) : elle va inventer des champs non classés.`);
+  if (vidages(faux).length !== 1 || vidages(faux)[0].champ !== "pendingCelebrations")
+    fail(`témoin [vidage] — la sonde de vidage ne voit plus \`X: []\` dans un littéral ÉTALÉ : `
+       + `\`pendingCelebrations\` redeviendrait invisible, et retirer sa fiche ne crierait plus.`);
+  if (vidages(["    const frais = { weekKey: k, challenges: [] }; const n = [...gs];"]).length !== 0)
+    fail(`témoin [vidage/frontière] — la sonde compte un littéral NEUF comme un retrait, alors que `
+       + `la ligne ne porte un \`...\` qu'AILLEURS. Elle va accuser \`days\`, \`ids\` et `
+       + `\`challenges\`, qui ne retirent rien (mesuré le 3 septembre 2026).`);
 }
 
 // ── 8e ÉTAGE : LES SOUS-LISTES DE CHAÎNES, DANS LES ÉLÉMENTS ───────────────
