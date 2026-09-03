@@ -1620,7 +1620,7 @@ _Avant: 2026-08-11 — v2.16.52 (**Phase 2, vrai bug trouvé dans les données d
   - Pas de build local nécessaire — Canner s'en charge
   - Repo GitHub : `genevievebergeron-web/livre-quete`
 - **Dossier canonique (GitHub Desktop) : `~/Projects/livre-de-quetes/livre-quete/`** ← travailler ICI
-  - Le dossier parent `~/Projects/livre-de-quetes/` est un second clone du même repo — ne pas committer dedans (risque de divergence)
+  - Le dossier parent `~/Projects/livre-de-quetes/` n'est pas un dépôt git : il ne contient que des fichiers de travail à côté du repo
 - **Push :** GitHub Desktop (bouton « Push origin ») ou `cd ~/Projects/livre-de-quetes/livre-quete && git push`
 
 > ⚠️ **Lock files git dans le sandbox** — si erreur de push, supprimer manuellement :
