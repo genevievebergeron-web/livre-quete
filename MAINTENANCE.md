@@ -4,6 +4,41 @@ Ce fichier trace les passages de vérification (bugs signalés + suggestions des
 
 ---
 
+## Passage du 2026-09-04 (routine autonome, nuit, 46e étage — v2.17.24)
+
+### 🌐 Lecture de l'API de production
+- `GET` OK, HTTP 200, **174 176 octets**, `savedAt` `2026-09-04T00:43:26.616Z`. **Aucune écriture.**
+- `errorLogs` **vide**, **14 `bugs`** inchangés depuis le 25 juillet, `feed` à 60 entrées sans
+  message, `seenVersions` à **306** aux deux emplacements, 30 `updateFeedEntries`.
+- **Aucun signalement à corriger.**
+
+### 📉 La charge a MAIGRI de 756 octets, et pour la première fois l'écart est attribué sans enquête
+`node scripts/releve-tailles-prod.mjs <prod.json> --contre scripts/tailles-prod.json` rend la
+réponse en une commande, ligne par ligne, sans reste :
+
+```
+Total : 174923 → 174167 (-756 octets)
+-756  charge
+  -776  charge.config
+    +20   charge.config.seenVersions
+    -796  charge.config.updateFeedEntries[].features
+  +20   charge.seenVersions
+```
+
+**C'est le plafond de 30 annonces qui tourne, et rien d'autre.** `updateFeedEntries` garde 30
+entrées, mais ses `features` passent de **53 à 51** : deux versions neuves sont entrées par la tête
+avec une ligne de 58 caractères (« 🛠️ Petite fondation technique »), et deux vieilles entrées de
+2026-08 sont sorties par la queue avec deux lignes détaillées chacune. Les +40 octets restants sont
+`seenVersions` (301 → 306), compté aux **deux** emplacements de la charge.
+
+**Ce qui compte ici, c'est le coût de la réponse.** Les 1er et 2 septembre, deux écarts du même
+ordre ont coûté chacun une nuit d'enquête et sont restés écrits comme OUVERTS, faute d'une
+référence rejouable (v2.17.22). Le même genre d'écart se referme maintenant en une commande, et la
+réponse n'est pas une hypothèse : l'attribution est exacte à l'octet, la ligne `(ponctuation)`
+comprise. Rien ne reste « ailleurs ».
+
+---
+
 ## Passage du 2026-09-03 (routine autonome, nuit, 45e étage — v2.17.23)
 
 ### 🌐 Lecture de l'API de production

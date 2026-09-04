@@ -1492,27 +1492,177 @@ console.log("· « ↩️ Annuler » — l'annulation tient, et une quête refai
 // revenaient du nuage, et côté serveur le reset ne pouvait même pas être accepté. `resetAt` en fait
 // une époque. Ce contrôle est aussi la contrepartie de son exemption dans `memeValeur` : le champ y
 // porte la même valeur des deux côtés, il doit donc être mis en contradiction ICI.
+//
+// ── v2.17.24 — CET ÉTAGE ÉTAIT SATISFAIT PAR SA PROPRE FIXTURE ────────────────────────────────
+// Le lavage automatisé a lavé les DOUZE entrées de `vide` une par une : ONZE ne faisaient crier
+// personne, seul `resetAt` était ancré. La cause tient en une ligne de `merge.js` — l'époque
+// COURT-CIRCUITE la fusion (`return { ...b, resetAt: _resetAt }`, merge.js:98), donc le résultat
+// est le côté reset TEL QUEL. Un champ retiré de la fixture est absent du résultat, et le test
+// `Array.isArray(v) ? v.length : (v || 0)` lit une ABSENCE exactement comme un vide : l'assertion
+// « ce champ est vide après le reset » restait vraie parce que la fixture ne le posait plus. Même
+// famille que la v2.17.18 (« trois assertions sur sept satisfaites par leur propre fixture »),
+// mais poussée à son terme : ici la fixture ÉTAIT le résultat.
+//
+// Et la même passe a nommé un trou que le lavage ne pouvait pas voir. La liste `champs` était une
+// LISTE BLANCHE de sept noms écrits à la main, sur une fixture qui en posait onze : `coins`,
+// `pending`, `equipped` et `boughtRewards` étaient posés dans l'état de reset et vérifiés par
+// PERSONNE. Un reset qui aurait laissé les pièces, les demandes en attente ou l'équipement porté
+// passait au vert. C'est la troisième fois que la même forme mord (v2.17.20 sur les extensions,
+// v2.17.23 sur les gestes) : une liste blanche n'exempte pas ce qu'elle omet, elle le rend
+// INVISIBLE, et une exemption par omission ne se relit pas.
+//
+// LE SENS PART MAINTENANT DE LA SOURCE. Le littéral que « Reset complet » écrit dans `App.jsx`
+// (~3783) dicte les champs, et chacun doit tomber dans `VIDES` (remis à zéro, vérifié après
+// fusion) ou `PORTES` (écrit non-vide à dessein, raison écrite). La fixture n'est plus une liste
+// de souhaits : c'est le miroir de ce que l'app produit, et l'étage le vérifie dans les deux sens.
 console.log("· époque de reset — le côté qui a vu le reset le plus récent gagne ENTIÈREMENT");
 {
-  const vide = { resetAt: 1755999999999, xp: 0, coins: 0, coinsLifetime: 0, completed: [], pending: [],
-                 owned: [], equipped: {}, boughtRewards: [], badges: [], activeDays: [], refusedKeys: [] };
+  // ── (1) ce que le reset REMET À ZÉRO — vérifié champ par champ après la fusion ──
+  const VIDES = {
+    xp: "progression", coins: "bourse courante", coinsLifetime: "bourse cumulée",
+    completed: "quêtes accomplies", pending: "demandes en attente au portail parent",
+    owned: "inventaire", equipped: "équipement porté",
+    boughtRewards: "récompenses achetées", badges: "badges",
+  };
+  // ── (2) ce que le reset écrit NON-VIDE à dessein — chaque fiche est une raison, pas une exemption ──
+  const PORTES = {
+    resetAt: "l'époque elle-même : c'est ELLE qui exprime le retrait, elle ne peut pas être vide",
+    coinsWeek: "seau hebdo NEUF (`{ week: custodyWeekKey() }`) : une semaine qui repart de zéro, "
+             + "pas une valeur conservée du côté périmé",
+    noCoinsResetV1: "drapeau de migration remis à `true` pour que le ménage v1 ne rejoue pas sur "
+                  + "un état déjà neuf (`migrations.js`)",
+    avatar: "PRÉSERVÉ à dessein (`avatar: n[playerIdx].avatar`) : le reset efface la progression, "
+          + "pas le personnage que l'enfant s'est fabriqué",
+  };
+
+  // La fixture est le MIROIR du littéral d'App.jsx, plus rien de moins : les axes ci-dessous
+  // vérifient l'un par l'autre, donc laver un champ ici fait crier `[posé]`.
+  const vide = { xp: 0, coins: 0, coinsLifetime: 0, coinsWeek: { week: "2026-08-21" },
+                 noCoinsResetV1: true, resetAt: 1755999999999, completed: [], pending: [],
+                 owned: [], equipped: {}, boughtRewards: [], badges: [],
+                 avatar: { configured: true, skin: "z" } };
   const plein = { ...gsA, resetAt: 1755000000000 }; // a vu un reset PLUS ANCIEN
-  const champs = ["xp", "coinsLifetime", "completed", "owned", "badges", "activeDays", "refusedKeys"];
+
+  // ── les fonctions sont PURES et prennent leur source en ARGUMENT ─────────
+  // Leçon v2.17.20/23 : un témoin qui appelle la mesure par fermeture fait relire le vrai fichier
+  // et ne prouve rien de son propre cas. Le réel et les témoins passent ici par les MÊMES trois
+  // fonctions, avec des entrées différentes.
+  const estVide = (v) => Array.isArray(v) ? v.length === 0
+                       : (v && typeof v === "object") ? Object.keys(v).length === 0
+                       : !v;
+  // Le littéral de reset se repère par `resetAt: Date.now()` — la seule écriture d'époque de
+  // l'app — puis se délimite à l'accolade, jamais à la ligne (leçon v2.17.23 : `{day:wk,ids:[]}`
+  // vit sur une ligne qui porte autre chose).
+  const clesDuReset = (src) => {
+    const m = /resetAt\s*:\s*Date\.now\(\)/.exec(src);
+    if (!m) return [];
+    let prof = 0, i = m.index;
+    for (; i >= 0; i--) { const c = src[i]; if (c === "}") prof++; else if (c === "{") { if (!prof) break; prof--; } }
+    if (i < 0) return [];
+    let p2 = 0, j = i;
+    for (; j < src.length; j++) { const c = src[j]; if (c === "{") p2++; else if (c === "}") { p2--; if (!p2) break; } }
+    const corps = src.slice(i + 1, j);
+    const cles = []; let d = 0, dernier = 0;
+    for (let k = 0; k <= corps.length; k++) {
+      const c = corps[k];
+      if (k === corps.length || (c === "," && d === 0)) {
+        const mm = /^\s*([A-Za-z_$][\w$]*)\s*:/.exec(corps.slice(dernier, k));
+        if (mm) cles.push(mm[1]);
+        dernier = k + 1;
+      } else if (c === "{" || c === "[" || c === "(") d++;
+      else if (c === "}" || c === "]" || c === ")") d--;
+    }
+    return cles;
+  };
+  // Trois axes sur la FIXTURE, avant même de fusionner quoi que ce soit.
+  const constatsFixture = (cles, fVide, fPlein) => {
+    const out = []; let visites = 0;
+    for (const c of cles)                                     // [classement] source → tables
+      if (!(c in VIDES) && !(c in PORTES))
+        out.push({ axe: "classement", msg: `« ${c} » est écrit par « Reset complet » (App.jsx) et n'est classé `
+          + `NULLE PART. Dis dans \`VIDES\` que le reset le remet à zéro (l'étage le vérifiera après `
+          + `fusion), ou dans \`PORTES\` POURQUOI il est écrit non-vide. Une table qui ne connaît pas `
+          + `un champ ne l'exempte pas, elle ne le voit pas.` });
+    for (const c of Object.keys(VIDES)) {
+      if (!cles.includes(c))                                  // [classement] tables → source
+        out.push({ axe: "classement", msg: `la fiche « ${c} » de \`VIDES\` ne correspond à AUCUNE clé du `
+          + `littéral de reset d'App.jsx : le champ a été renommé, ou il a cessé d'être remis à zéro. `
+          + `Une fiche sans sujet donne l'illusion d'une surveillance.` });
+      if (!(c in fVide) || !estVide(fVide[c]))                // [miroir] la fixture pose le champ, VIDE
+        out.push({ axe: "miroir", msg: `« ${c} » est remis à zéro par le reset et la fixture \`vide\` ne le pose `
+          + `pas (ou le pose non-vide). L'époque court-circuite la fusion : le résultat EST cette `
+          + `fixture, donc un champ qu'elle omet paraît vide sans que rien ne l'ait vidé. C'est ce qui `
+          + `rendait onze lavages muets avant la v2.17.24.` });
+      if (estVide(fPlein[c]))                                 // [contradiction] les deux côtés se contredisent
+        out.push({ axe: "contradiction", msg: `« ${c} » est VIDE des deux côtés de la fixture : la paire ne met `
+          + `rien en contradiction, et l'assertion « vide après le reset » se vérifie toute seule. Le côté `
+          + `périmé doit porter une valeur que le reset a le devoir d'effacer.` });
+    }
+    for (const c of Object.keys(PORTES)) {
+      if (!cles.includes(c))
+        out.push({ axe: "classement", msg: `la fiche « ${c} » de \`PORTES\` ne correspond à AUCUNE clé du `
+          + `littéral de reset d'App.jsx : la raison écrite ne protège plus rien.` });
+      if (!(c in fVide) || estVide(fVide[c]))                  // [miroir] posé NON-VIDE, c'est ce qui en fait une « portée »
+        out.push({ axe: "miroir", msg: `« ${c} » est écrit NON-VIDE par le reset (\`PORTES\`) et la fixture `
+          + `\`vide\` ne le porte pas. Sans lui, l'axe [fuite] n'a plus rien à quoi comparer pour ce `
+          + `champ-là, et la fiche de \`PORTES\` devient sa propre garante.` });
+    }
+    // Le miroir se lit dans les DEUX sens : une clé que la fixture pose SEULE fait de l'état de
+    // reset une invention, et l'axe [fuite] la prendrait pour une clé légitime (leçon v2.16.86,
+    // `house.deco` — un champ que ni la prod ni le code ne portaient).
+    for (const c of Object.keys(fVide))
+      if (!cles.includes(c))
+        out.push({ axe: "miroir", msg: `la fixture \`vide\` pose « ${c} », que le littéral de reset d'App.jsx `
+          + `n'écrit PAS. L'état de reset de cet étage n'est plus le miroir de celui que l'app produit : `
+          + `ce qu'il vérifie là-dessus ne parle de rien.` });
+    visites = cles.length + Object.keys(VIDES).length + Object.keys(PORTES).length + Object.keys(fVide).length;
+    return { constats: out, visites };
+  };
+  // Deux axes sur le RÉSULTAT de la fusion.
+  const constatsFusion = (rc, attendues) => {
+    const out = [];
+    for (const c of Object.keys(VIDES))
+      if (!estVide(rc[c]))
+        out.push({ axe: "vidé", msg: `« ${c} » vaut encore ${JSON.stringify(rc[c])} après un reset plus récent. `
+          + `Un état vide n'exprime aucun retrait face à un max()/une union : c'est \`resetAt\` qui doit `
+          + `trancher, en tête de mergeGS, dans les deux copies.` });
+    for (const c of Object.keys(rc))
+      if (!attendues.has(c))
+        out.push({ axe: "fuite", msg: `« ${c} » survit à un reset plus récent alors qu'il ne vient QUE du côté `
+          + `périmé. L'époque doit rendre le côté reset ENTIER : un champ qui repasse est une progression `
+          + `que l'enfant croyait effacée et qui revient du nuage.` });
+    return { constats: out, visites: Object.keys(VIDES).length + Object.keys(rc).length };
+  };
+
+  const appSrc = require("node:fs").readFileSync(path.join(ROOT, "src/App.jsx"), "utf8");
+  const cles = clesDuReset(appSrc);
+  // ANCRE — sans ce compte, une source dont la forme change (ou un `clesDuReset` désarmé) rendrait
+  // zéro clé, et les trois axes de fixture passeraient au vert À VIDE : « rien trouvé » et « rien
+  // regardé » rendent le même résultat sur une source saine (leçon v2.17.20).
+  if (cles.length < 10)
+    fail(`le recensement du littéral de reset n'a trouvé que ${cles.length} clé(s) dans App.jsx (13 au `
+       + `4 septembre 2026) : la sonde \`resetAt: Date.now()\` ne mord plus, et les axes [classement], `
+       + `[posé] et [contradiction] se vérifieraient à vide.`);
+  // Le compte des VISITES est ce qui sépare « rien trouvé » de « rien regardé » : sur une fixture
+  // SAINE, retirer l'appel réel ci-dessous ne peut faire crier personne — les témoins, eux,
+  // resteraient verts en appelant les fonctions pures directement (leçon v2.17.20).
+  let examinés = 0;
+  { const { constats, visites } = constatsFixture(cles, vide, plein);
+    examinés += visites;
+    for (const { axe, msg } of constats) fail(`époque de reset [${axe}] — ${msg}`); }
+
+  const attendues = new Set([...Object.keys(vide), "resetAt"]);
   for (const [sens, x, y] of [["reset en a", vide, plein], ["reset en b", plein, vide]]) {
     for (const pref of [true, false]) {
       const rc = client.mergeGS(x, y, pref), rs = server.mergeGS(x, y, pref);
       if (!same(rc, rs)) fail(`époque de reset (${sens}, preferIncoming=${pref}) — client ≠ serveur.`);
-      for (const f of champs) {
-        const v = rc[f];
-        const reste = Array.isArray(v) ? v.length : (v || 0);
-        if (reste)
-          fail(`mergeGS (${sens}, preferIncoming=${pref}) — « ${f} » vaut encore ${JSON.stringify(v)} après un `
-             + `reset plus récent. Un état vide n'exprime aucun retrait face à un max()/une union : c'est `
-             + `\`resetAt\` qui doit trancher, en tête de mergeGS, dans les deux copies.`);
-      }
+      const { constats, visites } = constatsFusion(rc, attendues);
+      examinés += visites;
+      for (const { axe, msg } of constats)
+        fail(`mergeGS (${sens}, preferIncoming=${pref}) [${axe}] — ${msg}`);
       if ((rc.resetAt || 0) !== 1755999999999)
-        fail(`mergeGS (${sens}, preferIncoming=${pref}) — l'époque \`resetAt\` ne se propage pas : le prochain `
-           + `appareil qui pousse son vieil état ferait revenir toute la progression.`);
+        fail(`mergeGS (${sens}, preferIncoming=${pref}) [époque] — l'époque \`resetAt\` ne se propage pas : le `
+           + `prochain appareil qui pousse son vieil état ferait revenir toute la progression.`);
     }
   }
   // À époque ÉGALE, rien ne court-circuite : la fusion normale doit reprendre la main.
@@ -1520,6 +1670,47 @@ console.log("· époque de reset — le côté qui a vu le reset le plus récent
   if (!same(n1, n2)) fail("époque égale — client ≠ serveur.");
   if ((n1.completed || []).length < 2)
     fail("époque égale — la fusion normale ne s'applique plus (l'époque court-circuite alors qu'elle ne devrait pas).");
+  if (examinés < 100)
+    fail(`les axes de cet étage n'ont examiné que ${examinés} champ(s) (127 au 4 septembre 2026) : leurs `
+       + `boucles ne sont plus promenées sur la vraie fixture ni sur le vrai résultat de fusion. Les `
+       + `témoins ci-dessous appellent les fonctions pures DIRECTEMENT — ils resteraient verts, et une `
+       + `fixture saine ne peut pas distinguer « rien trouvé » de « rien regardé ».`);
+  console.log(`    (${cles.length} clé(s) de reset recensée(s) dans App.jsx, ${Object.keys(VIDES).length} vidée(s) `
+            + `vérifiée(s), ${Object.keys(PORTES).length} portée(s) à dessein, ${examinés} champ(s) examiné(s))`);
+
+  // ── TÉMOINS : chaque axe doit savoir crier SEUL, par les MÊMES fonctions pures ──
+  // Chaque témoin ne vise qu'un axe : un témoin qui en prouverait deux à la fois masquerait que
+  // l'un des deux ne sait plus crier seul (leçon v2.17.22).
+  const AXES = ["classement", "miroir", "contradiction", "vidé", "fuite"];
+  const prouvés = new Set();
+  const seulAxe = (constats, axe, quoi) => {
+    const axes = [...new Set(constats.map((c) => c.axe))];
+    if (axes.length !== 1 || axes[0] !== axe)
+      fail(`témoin [${axe}] — ${quoi} : attendu le seul axe « ${axe} », obtenu ${axes.length ? axes.join("+") : "AUCUN cri"}.`);
+    else prouvés.add(axe);
+  };
+  seulAxe(constatsFixture([...cles, "intrus"], { ...vide, intrus: 1 }, { ...plein, intrus: 2 }).constats,
+          "classement", "une clé de reset que ni `VIDES` ni `PORTES` ne connaît");
+  { const { xp, ...sansXp } = vide;
+    seulAxe(constatsFixture(cles, sansXp, plein).constats, "miroir", "la fixture `vide` ne pose plus `xp` (moitié VIDES)"); }
+  { const { coinsWeek, ...sansCW } = vide;
+    seulAxe(constatsFixture(cles, sansCW, plein).constats, "miroir", "la fixture `vide` ne porte plus `coinsWeek` (moitié PORTES)"); }
+  seulAxe(constatsFixture(cles, { ...vide, activeDays: [] }, plein).constats,
+          "miroir", "la fixture `vide` pose un champ que le reset d'App.jsx n'écrit pas (sens inverse)");
+  seulAxe(constatsFixture(cles, vide, { ...plein, xp: 0 }).constats,
+          "contradiction", "le côté périmé porte lui aussi `xp: 0`");
+  seulAxe(constatsFusion({ ...vide, xp: 900 }, attendues).constats,
+          "vidé", "la fusion rend un `xp` non nul après le reset");
+  seulAxe(constatsFusion({ ...vide, sessionMinutes: { day: "2026-08-15", minutes: 42 } }, attendues).constats,
+          "fuite", "un champ du seul côté périmé survit à l'époque");
+  if (clesDuReset("const n = { xp: 0, coins: 0 };").length !== 0)
+    fail("témoin [ancre] — `clesDuReset` rend des clés sur une source qui n'écrit AUCUNE époque : la sonde "
+       + "ne cible plus le littéral de reset, elle attrape n'importe quel objet.");
+  // Contrôle témoin → axe : un axe déclaré que PLUS AUCUN témoin ne prouve est un axe qu'on croit
+  // surveillé. Sans lui, supprimer un témoin ne coûte rien (leçon v2.17.22, 4 axes / 4 témoins).
+  for (const a of AXES)
+    if (!prouvés.has(a))
+      fail(`axe « ${a} » déclaré et prouvé par AUCUN témoin : rien ne dit qu'il sait encore crier seul.`);
 }
 
 // ── 7e ÉTAGE : LE GESTE ÉCRIT-IL VRAIMENT LE TOMBSTONE ? ───────────────────

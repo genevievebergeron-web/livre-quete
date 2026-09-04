@@ -1,18 +1,18 @@
 {
-  "laveLe": "2026-09-02",
+  "laveLe": "2026-09-04",
   "cible": "scripts/check-merge-parity.mjs",
-  "catalogues": 66,
-  "entrees": 464,
+  "catalogues": 73,
+  "entrees": 485,
   "sousEntreesNonVisitees": 935,
   "ecartesNonVisites": [
     "cas:1455",
-    "trucs:3799",
-    "fauxRang:3867",
-    "sourcesM:4313"
+    "trucs:4237",
+    "fauxRang:4305",
+    "sourcesM:4751"
   ],
   "exhaustif": true,
-  "cris": 373,
-  "muettes": 61,
+  "cris": 417,
+  "muettes": 38,
   "plantages": 30,
   "muettesDetail": [
     {
@@ -70,98 +70,6 @@
     {
       "catalogue": "CHAINES",
       "entree": "{ champ: \"starterThemes\", dans: \"config\", sansRetrait: \"posé à la créati"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "xp: 0"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "coins: 0"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "coinsLifetime: 0"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "completed: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "pending: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "owned: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "equipped: {}"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "boughtRewards: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "badges: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "activeDays: []"
-    },
-    {
-      "catalogue": "vide",
-      "entree": "refusedKeys: [] "
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "completed: \"deCompleted\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "owned: \"refundedRewards\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "announcements: \"removedAnnouncements\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "assignments: \"removedAssignments\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "customTasks: \"removedCustomTasks\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "removalRequests: \"removedRemovalRequests\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "momentRequests: \"removedMomentRequests\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "childTaskProposals: \"removedProposals\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "routines: \"removedRoutineIds\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "calendar: \"removedCalendarIds\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "pendingCelebrations: \"consumedCelebrationIds\""
-    },
-    {
-      "catalogue": "GESTES",
-      "entree": "likes: \"unlikes\""
     },
     {
       "catalogue": "elemFrais",
